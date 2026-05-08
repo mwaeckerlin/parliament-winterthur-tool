@@ -1,0 +1,26 @@
+{
+  "require": {
+    "php": ">=8.0",
+    "ext-dom": "*",
+    "ext-json": "*",
+    "ext-libxml": "*"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^10.5",
+    "nextcloud/coding-standard": "^1.1"
+  },
+  "autoload": {
+    "psr-4": {
+      "OCA\\ParliamentWinterthur\\": "lib/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "OCA\\ParliamentWinterthur\\Tests\\": "tests/"
+    }
+  },
+  "scripts": {
+    "test": "phpunit tests/",
+    "lint": "php-cs-fixer fix --dry-run --diff lib/"
+  }
+}

@@ -1,0 +1,36 @@
+# Abhängigkeiten
+/vendor/
+/node_modules/
+
+# Frontend-Build-Artefakte
+/js/*.js
+/js/*.js.map
+/js/chunks/
+
+# CSS-Build-Artefakte
+/css/*.css
+/css/*.css.map
+
+# PHPUnit / Coverage
+/coverage/
+/coverage.xml
+
+# Composer-Lock nur in Entwicklung
+# composer.lock  # Für Production einkommentieren
+
+# NPM-Lock
+# package-lock.json  # Für Production einkommentieren
+
+# IDE / Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# MacOS
+.DS_Store
+
+# Temporäre Dateien
+*.tmp
+*.bak
