@@ -14,9 +14,10 @@
 # PHPUnit / Coverage
 /coverage/
 /coverage.xml
+.phpunit.result.cache
 
 # Composer-Lock nur in Entwicklung
-# composer.lock  # Für Production einkommentieren
+composer.lock
 
 # NPM-Lock
 # package-lock.json  # Für Production einkommentieren
