@@ -1,0 +1,169 @@
+services:
+  nextcloud-nginx:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: nginx
+    image: parlwin-nginx
+    environment:
+      WEBROOT: ${WEBROOT:-}
+    ports:
+      - "${NEXTCLOUD_HTTP_PORT:-29824}:8080"
+    depends_on:
+      nextcloud-php-fpm:
+        condition: service_started
+    networks:
+      - nxinx-php
+      - nginx-collabora
+      - nginx-realtime
+
+  nextcloud-php-fpm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: php-fpm
+    image: parlwin-php-fpm
+    environment:
+      HOST: ${HOST:-localhost:${NEXTCLOUD_HTTP_PORT:-29824}}
+      PROTOCOL: ${PROTOCOL:-http}
+      WEBROOT: ${WEBROOT:-}
+      MYSQL_HOST: nextcloud-db
+      MYSQL_USER: nextcloud
+      MYSQL_DATABASE: nextcloud
+      PARLWIN_REALTIME_WS_URL: ${PARLWIN_REALTIME_WS_URL:-ws://localhost:${PARLWIN_REALTIME_PORT:-29825}/ws}
+      PARLWIN_REALTIME_PUBLISH_URL: ${PARLWIN_REALTIME_PUBLISH_URL:-http://parlwin-realtime:3001/publish}
+      PARLWIN_REALTIME_SECRET: ${PARLWIN_REALTIME_SECRET:-}
+      PARLWIN_SYNC_LIMIT_ALL: ${PARLWIN_SYNC_LIMIT_ALL:-}
+      PARLWIN_SYNC_LIMIT_GESCHAEFTE: ${PARLWIN_SYNC_LIMIT_GESCHAEFTE:-}
+      PARLWIN_SYNC_LIMIT_SITZUNGEN: ${PARLWIN_SYNC_LIMIT_SITZUNGEN:-}
+      PARLWIN_SYNC_LIMIT_MITGLIEDER: ${PARLWIN_SYNC_LIMIT_MITGLIEDER:-}
+      PARLWIN_SYNC_LIMIT_KOMMISSIONEN: ${PARLWIN_SYNC_LIMIT_KOMMISSIONEN:-}
+      PARLWIN_SYNC_LIMIT_FRAKTIONEN: ${PARLWIN_SYNC_LIMIT_FRAKTIONEN:-}
+    secrets:
+      - nextcloud_db_password
+      - nextcloud_admin_password
+    volumes:
+      - data:/app/data
+      - config:/app/config
+    depends_on:
+      nextcloud-db:
+        condition: service_started
+      collabora:
+        condition: service_started
+      parlwin-realtime:
+        condition: service_started
+    networks:
+      - nxinx-php
+      - php-db
+      - php-smtp
+      - php-collabora
+      - php-realtime
+
+  parlwin-app-init:
+    image: parlwin-php-fpm
+    restart: on-failure
+    entrypoint:
+      - /usr/bin/php
+      - /tmp/init-enable-parlwin.php
+    depends_on:
+      nextcloud-php-fpm:
+        condition: service_started
+      nextcloud-nginx:
+        condition: service_started
+    volumes:
+      - ./docker/init-enable-parlwin.php:/tmp/init-enable-parlwin.php:ro
+      - data:/app/data
+      - config:/app/config
+    networks:
+      - nxinx-php
+      - php-db
+
+  parlwin-realtime:
+    build:
+      context: .
+      dockerfile: Dockerfile.realtime
+    image: parlwin-realtime
+    environment:
+      PORT: 3001
+      PARLWIN_REALTIME_AUTH_REQUIRED: ${PARLWIN_REALTIME_AUTH_REQUIRED:-1}
+      PARLWIN_NEXTCLOUD_BASE_URL: ${PARLWIN_NEXTCLOUD_BASE_URL:-http://nextcloud-nginx:8080}
+      PARLWIN_NEXTCLOUD_AUTH_URL: ${PARLWIN_NEXTCLOUD_AUTH_URL:-}
+      PARLWIN_REALTIME_SECRET: ${PARLWIN_REALTIME_SECRET:-}
+    ports:
+      - "${PARLWIN_REALTIME_PORT:-29825}:3001"
+    networks:
+      - php-realtime
+      - nginx-realtime
+
+  smtp-relay:
+    image: mwaeckerlin/smtp-relay
+    networks:
+      - php-smtp
+
+  collabora:
+    image: collabora/code
+    environment:
+      server_name: ${HOST:-localhost:${NEXTCLOUD_HTTP_PORT:-29824}}
+      domain: nextcloud-nginx|localhost
+      aliasgroup1: http://nextcloud-nginx:8080,http://localhost:${NEXTCLOUD_HTTP_PORT:-29824}
+      extra_params: --o:ssl.enable=false --o:ssl.termination=false
+    cap_add:
+      - MKNOD
+    networks:
+      - nginx-collabora
+      - php-collabora
+
+  nextcloud-db:
+    image: mariadb
+    environment:
+      MYSQL_DATABASE: nextcloud
+      MYSQL_USER: nextcloud
+      MYSQL_PASSWORD_FILE: /run/secrets/nextcloud_db_password
+      MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+    secrets:
+      - nextcloud_db_password
+    volumes:
+      - db:/var/lib/mysql
+    networks:
+      - php-db
+
+  access-fix:
+    image: mwaeckerlin/allow-write-access
+    network_mode: none
+    volumes:
+      - data:/app/data
+      - config:/app/config
+
+secrets:
+  nextcloud_db_password:
+    environment: NEXTCLOUD_DB_PASSWORD
+  nextcloud_admin_password:
+    environment: NEXTCLOUD_ADMIN_PASSWORD
+
+volumes:
+  data:
+  config:
+  db:
+
+networks:
+  nxinx-php:
+    driver_opts:
+      encrypted: 1
+  php-db:
+    driver_opts:
+      encrypted: 1
+  php-smtp:
+    driver_opts:
+      encrypted: 1
+  nginx-collabora:
+    driver_opts:
+      encrypted: 1
+  php-collabora:
+    driver_opts:
+      encrypted: 1
+  php-realtime:
+    driver_opts:
+      encrypted: 1
+  nginx-realtime:
+    driver_opts:
+      encrypted: 1

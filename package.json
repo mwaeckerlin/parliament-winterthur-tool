@@ -1,0 +1,16 @@
+{
+  "name": "parliament-winterthur-tool",
+  "version": "1.0.0",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "build": "docker compose build",
+    "start": "docker compose up -d --build --force-recreate --remove-orphans",
+    "start:dev": "docker compose up -d --build --force-recreate --remove-orphans",
+    "stop": "docker compose down --remove-orphans",
+    "test:unit": "cd parlwin && phpunit --bootstrap tests/bootstrap.php --exclude-group live --fail-on-warning --fail-on-risky --fail-on-deprecation --fail-on-notice --fail-on-skipped --fail-on-incomplete tests",
+    "test:live": "cd parlwin && phpunit --bootstrap tests/bootstrap.php --group live --fail-on-warning --fail-on-risky --fail-on-deprecation --fail-on-notice --fail-on-skipped --fail-on-incomplete tests/Service/ScraperLiveEndpointTest.php",
+    "test:e2e": "./tests/e2e/run-compose-e2e.sh",
+    "test": "npm run test:unit && npm run test:live && npm run test:e2e"
+  }
+}

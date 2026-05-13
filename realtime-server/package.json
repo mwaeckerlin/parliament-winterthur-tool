@@ -1,0 +1,11 @@
+{
+  "name": "parlwin-realtime-server",
+  "version": "1.0.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Realtime broker for Parlament Winterthur Tool",
+  "main": "server.js",
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

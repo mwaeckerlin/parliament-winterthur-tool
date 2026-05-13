@@ -1,0 +1,6 @@
+services:
+  nextcloud-nginx:
+    ports: !reset []
+
+  parlwin-realtime:
+    ports: !reset []

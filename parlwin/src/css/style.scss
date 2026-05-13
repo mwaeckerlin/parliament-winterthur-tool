@@ -1,0 +1,1170 @@
+/**
+ * Parlament Winterthur Tool – App Styles
+ * Ausgerichtet auf Nextcloud-Design-Variablen und Standard-Abstände.
+ */
+
+:root {
+  --pw-gap-1: calc(var(--default-grid-baseline, 4px) * 2);
+  --pw-gap-2: calc(var(--default-grid-baseline, 4px) * 3);
+  --pw-gap-3: calc(var(--default-grid-baseline, 4px) * 4);
+  --pw-gap-4: calc(var(--default-grid-baseline, 4px) * 6);
+  --pw-radius: var(--border-radius-large, 10px);
+  --pw-radius-small: var(--border-radius-small, 6px);
+  --pw-surface: var(--color-main-background);
+  --pw-surface-strong: color-mix(in srgb, var(--color-main-background) 96%, var(--color-background-hover));
+  --pw-text-muted: var(--color-text-maxcontrast);
+  --pw-focus-ring: color-mix(in srgb, var(--color-primary-element) 24%, transparent);
+}
+
+#parlwin-root,
+#parlwin-admin-settings {
+  width: 100%;
+  overflow-x: hidden;
+}
+
+.section#parlwin-admin-settings {
+  max-width: 1180px;
+}
+
+#parlwin-admin-settings h2 {
+  margin: 0 0 var(--pw-gap-3);
+  font-size: 30px;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+}
+
+#parlwin-admin-settings .settings-hint {
+  margin: 0;
+  color: var(--color-text-maxcontrast);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.pw-app {
+  width: 100%;
+  max-width: 1540px;
+  margin: 0 auto;
+  padding: var(--pw-gap-3) var(--pw-gap-4);
+  color: var(--color-main-text);
+  overflow-x: hidden;
+}
+
+.pw-app-header {
+  margin-bottom: var(--pw-gap-2);
+}
+
+.pw-app-header h1 {
+  margin: 0 0 4px;
+  font-size: 28px;
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.pw-app-header p {
+  margin: 0;
+  color: var(--color-text-maxcontrast);
+  font-size: 14px;
+}
+
+.pw-panel {
+  display: grid;
+  gap: var(--pw-gap-3);
+  background: var(--pw-surface);
+  border: 1px solid color-mix(in srgb, var(--color-border) 88%, var(--color-main-text) 12%);
+  border-radius: var(--pw-radius);
+  padding: var(--pw-gap-3);
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--color-box-shadow, #000) 10%, transparent);
+}
+
+.pw-panel-content {
+  display: grid;
+  gap: var(--pw-gap-2);
+}
+
+.pw-geschaefte,
+.pw-sitzungen,
+.pw-mitglieder,
+.pw-kommissionen {
+  display: grid;
+  gap: var(--pw-gap-2);
+}
+
+.pw-admin-form {
+  display: grid;
+  gap: var(--pw-gap-3);
+  max-width: 1280px;
+}
+
+.pw-admin-card {
+  border: 1px solid color-mix(in srgb, var(--color-border) 88%, var(--color-main-text) 12%);
+  border-radius: var(--pw-radius);
+  background: var(--pw-surface);
+  padding: var(--pw-gap-3) var(--pw-gap-4);
+  display: grid;
+  gap: var(--pw-gap-2);
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--color-box-shadow, #000) 9%, transparent);
+}
+
+.pw-admin-card h3 {
+  margin: 0;
+  font-size: 21px;
+  font-weight: 600;
+}
+
+.pw-admin-grid {
+  display: grid;
+  gap: var(--pw-gap-2);
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.pw-admin-field {
+  display: grid;
+  gap: 6px;
+}
+
+.pw-admin-field .pw-input,
+.pw-admin-field .pw-select,
+.pw-admin-field .pw-textarea,
+.pw-admin-field .pw-input-klein,
+.pw-admin-field .pw-textarea-klein {
+  width: 100%;
+}
+
+.pw-admin-field > label {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.pw-admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--pw-gap-2);
+}
+
+.pw-selection-state {
+  min-height: 18px;
+  font-size: 12px;
+  color: var(--pw-text-muted);
+}
+
+.pw-selection-state.existing {
+  color: var(--color-success, var(--color-primary-element));
+}
+
+.pw-selection-state.new {
+  color: var(--color-warning, var(--color-primary-element));
+}
+
+.pw-selection-state.invalid {
+  color: var(--color-error);
+}
+
+.pw-selection-state.inactive {
+  color: var(--pw-text-muted);
+}
+
+.pw-sync-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--pw-gap-1);
+}
+
+.pw-sync-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pw-sync-progress-row progress {
+  width: min(560px, 100%);
+}
+
+.pw-mitglied-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--pw-gap-1);
+}
+
+.pw-mitglied-select-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-main-text);
+}
+
+.pw-members-table-wrap {
+  overflow: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--pw-radius-small);
+  background: var(--pw-surface-strong);
+}
+
+.pw-members-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 860px;
+}
+
+.pw-members-table th,
+.pw-members-table td {
+  border-bottom: 1px solid var(--color-border);
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.pw-members-table th {
+  font-size: 12px;
+  color: var(--pw-text-muted);
+  background: color-mix(in srgb, var(--color-background-hover) 75%, var(--color-main-background));
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.pw-member-username {
+  width: 100%;
+  min-width: 200px;
+}
+
+.pw-member-local-exists {
+  color: var(--color-success, var(--color-primary-element));
+}
+
+.pw-member-local-pending {
+  color: var(--color-text-maxcontrast);
+}
+
+.pw-member-local-missing {
+  color: var(--color-error);
+}
+
+.pw-nav {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: 6px;
+  border-bottom: 1px solid var(--color-border);
+  padding: 2px 0 var(--pw-gap-1);
+  margin: 0;
+}
+
+.pw-nav-btn.button {
+  border-radius: var(--pw-radius-small);
+  border: 1px solid var(--color-border);
+  box-shadow: none;
+  background: var(--pw-surface-strong);
+  min-height: 42px;
+  padding-inline: 14px;
+  color: var(--color-main-text);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pw-nav-btn.aktiv.button {
+  border-color: var(--color-primary-element);
+  color: var(--color-main-text);
+  background: color-mix(in srgb, var(--color-primary-element) 16%, var(--color-main-background));
+}
+
+.pw-nav-btn.button:hover,
+.pw-nav-btn.button:focus {
+  color: var(--color-main-text);
+  background: color-mix(in srgb, var(--color-background-hover) 65%, transparent);
+  box-shadow: none;
+}
+
+.pw-sync-meldung {
+  padding: var(--pw-gap-1) var(--pw-gap-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--pw-radius-small);
+  font-size: 13px;
+}
+
+.pw-sync-meldung.erfolg {
+  border-color: var(--color-success, var(--color-primary-element));
+}
+
+.pw-sync-meldung.fehler {
+  border-color: var(--color-error);
+}
+
+.pw-toolbar {
+  display: grid;
+  gap: var(--pw-gap-2);
+}
+
+.pw-toolbar h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.pw-filter {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  align-items: start;
+  gap: var(--pw-gap-1);
+  width: 100%;
+  border: 1px solid color-mix(in srgb, var(--color-border) 90%, var(--color-main-text) 10%);
+  border-radius: var(--pw-radius-small);
+  padding: var(--pw-gap-2);
+  background: var(--pw-surface-strong);
+}
+
+.pw-filter-feld {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.pw-filter-feld.pw-filter-wide {
+  grid-column: span 2;
+}
+
+.pw-filter-feld label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-main-text);
+}
+
+.pw-filter-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--default-clickable-area, 34px);
+  font-size: 13px;
+}
+
+.pw-filter-feld-actions {
+  align-self: end;
+}
+
+.pw-filter-feld .pw-suche,
+.pw-filter-feld .pw-select {
+  width: 100%;
+}
+
+.pw-filter label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-main-text);
+}
+
+.pw-suche,
+.pw-select,
+.pw-input,
+.pw-input-klein,
+.pw-textarea,
+.pw-textarea-klein {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid color-mix(in srgb, var(--color-border-dark) 85%, var(--color-main-text) 15%);
+  border-radius: var(--pw-radius-small);
+  background: var(--pw-surface-strong);
+  color: var(--color-main-text);
+  padding: 0 12px;
+  font-size: 14px;
+}
+
+.pw-suche,
+.pw-select {
+  min-width: 0;
+}
+
+.pw-select.pw-select-multi {
+  min-height: 148px;
+  padding: 6px;
+  width: 100%;
+}
+
+.pw-input-klein,
+.pw-textarea-klein {
+  min-height: 32px;
+  font-size: 12px;
+}
+
+.pw-textarea,
+.pw-textarea-klein {
+  padding: 10px 12px;
+  min-height: 64px;
+  resize: vertical;
+  line-height: 1.4;
+}
+
+.pw-suche:focus,
+.pw-select:focus,
+.pw-input:focus,
+.pw-input-klein:focus,
+.pw-textarea:focus,
+.pw-textarea-klein:focus {
+  outline: none;
+  border-color: var(--color-primary-element);
+  box-shadow: 0 0 0 2px var(--pw-focus-ring);
+}
+
+.pw-laden,
+.pw-leer {
+  padding: calc(var(--pw-gap-3) * 2);
+  color: var(--color-text-maxcontrast);
+  text-align: center;
+}
+
+.pw-table-wrap {
+  border: 1px solid color-mix(in srgb, var(--color-border) 90%, var(--color-main-text) 10%);
+  border-radius: var(--pw-radius);
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: var(--pw-surface-strong);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--color-box-shadow, #000) 8%, transparent);
+}
+
+.pw-tabelle {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 0;
+  table-layout: fixed;
+}
+
+.pw-tabelle th,
+.pw-tabelle td {
+  padding: 12px 12px;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 14px;
+  text-align: left;
+  vertical-align: top;
+  line-height: 1.45;
+  overflow: hidden;
+}
+
+.pw-tabelle thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: color-mix(in srgb, var(--color-background-hover) 84%, var(--color-main-background));
+  backdrop-filter: blur(6px);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .02em;
+  color: var(--pw-text-muted);
+}
+
+.pw-sortierbar {
+  cursor: pointer;
+  user-select: none;
+}
+
+.pw-sortierbar:hover {
+  color: var(--color-primary-element);
+}
+
+.pw-tabelle tbody tr {
+  transition: background-color .12s ease-in-out;
+}
+
+.pw-tabelle tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--color-main-background) 92%, var(--color-background-hover));
+}
+
+.pw-tabelle tbody tr:hover {
+  background: var(--color-background-hover);
+  cursor: pointer;
+}
+
+.pw-table-row-clickable:focus-visible {
+  outline: 2px solid var(--color-primary-element);
+  outline-offset: -2px;
+}
+
+.pw-geloescht {
+  opacity: .55;
+  text-decoration: line-through;
+}
+
+.pw-titel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  line-height: 1.4;
+}
+
+.pw-cell-ellipsis {
+  display: block;
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pw-inline-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  color: var(--color-primary-element);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+[class^="pw-status-"] {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 2px 10px;
+  border: 1px solid var(--color-border);
+  font-size: 12px;
+  line-height: 1.3;
+  white-space: nowrap;
+  background: color-mix(in srgb, var(--color-main-background) 88%, var(--color-background-hover));
+  color: var(--color-main-text);
+}
+
+.pw-status-offen {
+  border-color: var(--color-warning, var(--color-primary-element));
+  background: color-mix(in srgb, var(--color-warning, var(--color-primary-element)) 16%, var(--color-main-background));
+}
+
+.pw-status-erledigt {
+  border-color: var(--color-success, var(--color-primary-element));
+  background: color-mix(in srgb, var(--color-success, var(--color-primary-element)) 14%, var(--color-main-background));
+}
+
+.pw-status-abgelehnt {
+  border-color: var(--color-error);
+  background: color-mix(in srgb, var(--color-error) 14%, var(--color-main-background));
+}
+
+.pw-status-neutral {
+  border-color: var(--color-border-dark);
+  background: color-mix(in srgb, var(--color-main-background) 92%, var(--color-background-hover));
+}
+
+.pw-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--pw-gap-3);
+  background: color-mix(in srgb, var(--color-main-background) 60%, black);
+}
+
+.pw-modal {
+  width: min(980px, 96vw);
+  max-height: 92vh;
+  border: 1px solid var(--color-border);
+  border-radius: var(--pw-radius);
+  overflow: auto;
+  background: var(--pw-surface-strong);
+}
+
+.pw-modal-kopf {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pw-gap-2);
+  padding: var(--pw-gap-2) var(--pw-gap-3);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-main-background);
+}
+
+.pw-modal-kopf h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.pw-btn-schliessen.button {
+  min-width: var(--default-clickable-area, 34px);
+  padding: 0;
+}
+
+.pw-geschaeft-detail {
+  padding: var(--pw-gap-3);
+}
+
+.pw-detail-abschnitt {
+  margin-bottom: var(--pw-gap-3);
+}
+
+.pw-detail-abschnitt h4 {
+  margin: 0 0 var(--pw-gap-1);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-maxcontrast);
+}
+
+.pw-oeffentlich,
+.pw-fraktion {
+  border: 1px solid var(--color-border);
+  border-radius: var(--pw-radius);
+  padding: var(--pw-gap-2);
+  background: var(--pw-surface-strong);
+}
+
+.pw-info-tabelle {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.pw-info-tabelle th,
+.pw-info-tabelle td {
+  border-bottom: 1px solid var(--color-border);
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: top;
+  word-break: break-word;
+  font-size: 13px;
+}
+
+.pw-info-tabelle th {
+  width: 180px;
+  color: var(--color-text-maxcontrast);
+}
+
+.pw-form-zeile {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: var(--pw-gap-2);
+}
+
+.pw-form-zeile > label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pw-zustaendigkeiten-liste {
+  max-height: 220px;
+  overflow: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--pw-radius-small);
+  padding: 8px;
+  display: grid;
+  gap: 6px;
+}
+
+.pw-zustaendigkeiten-gruppe {
+  display: grid;
+  gap: 6px;
+}
+
+.pw-zustaendigkeiten-gruppe h5 {
+  margin: 8px 0 2px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-maxcontrast);
+}
+
+.pw-zustaendigkeiten-trenner {
+  border: 0;
+  border-top: 1px solid var(--color-border);
+  margin: 4px 0;
+}
+
+.pw-checkbox-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pw-detail-aktionen {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.pw-hinweis {
+  color: var(--color-text-maxcontrast);
+  font-size: 12px;
+}
+
+.pw-fehler {
+  padding: var(--pw-gap-2);
+  border: 1px solid var(--color-error);
+  border-radius: var(--pw-radius-small);
+}
+
+.pw-meldung {
+  border-radius: var(--pw-radius-small);
+  border: 1px solid var(--color-border);
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.pw-meldung.erfolg {
+  border-color: var(--color-success, var(--color-primary-element));
+}
+
+.pw-meldung.fehler {
+  border-color: var(--color-error);
+}
+
+.pw-timeline-eintrag {
+  border: 1px solid color-mix(in srgb, var(--color-border) 90%, var(--color-main-text) 10%);
+  border-radius: var(--pw-radius-small);
+  padding: 12px 14px;
+  margin-bottom: var(--pw-gap-1);
+  background: var(--color-main-background);
+}
+
+.pw-timeline-kopf {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.pw-timeline-meta {
+  margin-top: 4px;
+  color: var(--color-text-maxcontrast);
+  font-size: 12px;
+}
+
+.pw-timeline-text {
+  margin-top: 8px;
+  white-space: pre-wrap;
+  font-size: 13px;
+}
+
+.pw-btn-klein.button,
+.pw-btn-mini.button {
+  min-height: var(--default-clickable-area, 34px);
+}
+
+.pw-btn-mini.button {
+  min-height: 28px;
+  font-size: 12px;
+  padding-inline: 8px;
+}
+
+.pw-sitzung-karte,
+.pw-kommission-karte,
+.pw-mitglied-karte {
+  border: 1px solid color-mix(in srgb, var(--color-border) 90%, var(--color-main-text) 10%);
+  border-radius: var(--pw-radius);
+  background: var(--color-main-background);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--color-box-shadow, #000) 8%, transparent);
+}
+
+.pw-sitzung-karte {
+  overflow: hidden;
+  margin-bottom: var(--pw-gap-2);
+}
+
+.pw-sitzung-karte.pw-vergangen {
+  opacity: .7;
+}
+
+.pw-sitzung-kopf,
+.pw-kommission-kopf {
+  display: grid;
+  grid-template-columns: minmax(130px, 180px) 1fr minmax(140px, auto) auto auto;
+  align-items: start;
+  gap: var(--pw-gap-1) var(--pw-gap-2);
+  padding: var(--pw-gap-2);
+  background: var(--color-background-hover);
+  cursor: pointer;
+}
+
+.pw-sitzung-kopf:hover,
+.pw-kommission-kopf:hover {
+  background: color-mix(in srgb, var(--color-background-hover) 75%, var(--color-main-background));
+}
+
+.pw-sitzung-datum {
+  min-width: 130px;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  color: var(--color-text-maxcontrast);
+}
+
+.pw-sitzung-titel {
+  min-width: 0;
+  font-weight: 600;
+  overflow-wrap: break-word;
+}
+
+.pw-sitzung-ort {
+  color: var(--color-text-maxcontrast);
+  overflow-wrap: break-word;
+}
+
+.pw-extern-link {
+  color: var(--color-primary-element);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pw-toggle {
+  color: var(--color-text-maxcontrast);
+  align-self: center;
+}
+
+.pw-sitzung-details,
+.pw-kommission-details {
+  padding: var(--pw-gap-2);
+}
+
+.pw-sitzung-bemerkungen label {
+  font-weight: 600;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.pw-traktanden h4 {
+  margin: 0 0 var(--pw-gap-1);
+}
+
+.pw-traktandum {
+  border-left: 3px solid var(--color-primary-element);
+  padding: 6px 0 6px 12px;
+  margin-bottom: var(--pw-gap-2);
+  background: color-mix(in srgb, var(--color-main-background) 94%, var(--color-background-hover));
+  border-radius: 0 var(--pw-radius-small) var(--pw-radius-small) 0;
+}
+
+.pw-traktandum-kopf {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+.pw-traktandum-nr {
+  font-weight: 700;
+  color: var(--color-primary-element);
+}
+
+.pw-traktandum-titel {
+  font-weight: 600;
+}
+
+.pw-traktandum-beschr {
+  color: var(--color-text-maxcontrast);
+  font-size: 12px;
+}
+
+.pw-traktandum-felder {
+  display: grid;
+  gap: 8px;
+}
+
+.pw-traktandum-notizen {
+  border: 1px solid var(--color-border);
+  border-radius: var(--pw-radius-small);
+  padding: 8px;
+}
+
+.pw-notiz-klein {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.pw-notiz-datum {
+  color: var(--pw-text-muted);
+  min-width: 120px;
+}
+
+.pw-neue-notiz-klein {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.pw-neue-notiz-klein .pw-input-klein {
+  flex: 1;
+}
+
+.pw-mitglieder-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--pw-gap-2);
+}
+
+.pw-mitglied-karte {
+  overflow: hidden;
+}
+
+.pw-mitglied-karte.inaktiv {
+  opacity: .65;
+}
+
+.pw-mitglied-foto {
+  height: 140px;
+  background: var(--color-background-hover);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pw-mitglied-foto img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pw-mitglied-initial {
+  color: var(--color-primary-element);
+  font-size: 34px;
+  font-weight: 700;
+}
+
+.pw-mitglied-info {
+  display: grid;
+  gap: 4px;
+  padding: var(--pw-gap-2);
+}
+
+.pw-mitglied-partei,
+.pw-mitglied-fraktion {
+  color: var(--color-text-maxcontrast);
+  font-size: 13px;
+}
+
+.pw-mitglied-email {
+  color: var(--color-primary-element);
+  word-break: break-all;
+  font-size: 13px;
+}
+
+.pw-badge {
+  display: inline-flex;
+  width: max-content;
+  padding: 2px 8px;
+  border: 1px solid var(--color-border-dark);
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.pw-badge.inaktiv {
+  border-color: var(--color-warning, var(--color-border-dark));
+}
+
+.pw-kommission-kopf {
+  justify-content: space-between;
+}
+
+.pw-kommission-kopf h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.pw-kommission-mitglieder ul {
+  margin: 6px 0 0 18px;
+}
+
+.pw-sync-status {
+  font-size: 13px;
+  color: var(--pw-text-muted);
+}
+
+.pw-admin-select {
+  width: 100%;
+}
+
+.pw-filter-clear.button {
+  justify-self: start;
+  width: 100%;
+}
+
+.pw-tabelle .pw-col-nr {
+  width: 7%;
+}
+
+.pw-tabelle .pw-col-titel {
+  width: 30%;
+}
+
+.pw-tabelle .pw-col-typ {
+  width: 11%;
+}
+
+.pw-tabelle .pw-col-status {
+  width: 14%;
+}
+
+.pw-tabelle .pw-col-datum {
+  width: 9%;
+}
+
+.pw-tabelle .pw-col-zustaendig {
+  width: 11%;
+}
+
+.pw-tabelle .pw-col-beschluss {
+  width: 11%;
+}
+
+.pw-tabelle .pw-col-fraktionsstatus {
+  width: 7%;
+}
+
+@media (max-width: 1024px) {
+  .pw-app {
+    padding: var(--pw-gap-2);
+  }
+
+  .pw-app-header h1 {
+    font-size: 24px;
+  }
+
+  .pw-panel {
+    padding: var(--pw-gap-2);
+  }
+
+  .pw-filter-feld.pw-filter-wide {
+    grid-column: span 1;
+  }
+
+  .pw-sitzung-kopf,
+  .pw-kommission-kopf {
+    grid-template-columns: minmax(120px, 170px) 1fr auto;
+  }
+
+  .pw-sitzung-ort {
+    grid-column: 2 / span 2;
+  }
+}
+
+@media (max-width: 768px) {
+  .pw-app {
+    padding: var(--pw-gap-1);
+  }
+
+  .pw-suche,
+  .pw-select,
+  .pw-input {
+    width: 100%;
+  }
+
+  .pw-admin-card {
+    padding: var(--pw-gap-2);
+  }
+
+  .pw-admin-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pw-sync-progress-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .pw-modal-overlay {
+    padding: var(--pw-gap-1);
+  }
+
+  .pw-modal-kopf,
+  .pw-geschaeft-detail {
+    padding: var(--pw-gap-2);
+  }
+
+  .pw-app-header p {
+    font-size: 13px;
+  }
+
+  .pw-sitzung-kopf,
+  .pw-kommission-kopf {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .pw-sitzung-ort {
+    grid-column: auto;
+  }
+
+  .pw-toggle {
+    justify-self: end;
+  }
+
+  .pw-mitglieder-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1120px) {
+  .pw-panel {
+    padding: var(--pw-gap-1);
+  }
+
+  .pw-filter {
+    grid-template-columns: 1fr;
+  }
+
+  .pw-table-wrap {
+    border: 0;
+    background: transparent;
+    overflow: visible;
+  }
+
+  .pw-tabelle {
+    min-width: 0;
+    border-collapse: separate;
+    border-spacing: 0 10px;
+    table-layout: auto;
+  }
+
+  .pw-tabelle thead {
+    display: none;
+  }
+
+  .pw-tabelle tbody tr {
+    display: block;
+    border: 1px solid var(--color-border);
+    border-radius: var(--pw-radius-small);
+    padding: 8px 10px;
+    background: var(--pw-surface-strong);
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--color-box-shadow, #000) 7%, transparent);
+  }
+
+  .pw-tabelle tbody tr:hover {
+    background: var(--color-main-background);
+  }
+
+  .pw-tabelle tbody td {
+    display: grid;
+    grid-template-columns: minmax(110px, 36%) 1fr;
+    gap: 8px;
+    border-bottom: 0;
+    padding: 5px 0;
+    align-items: start;
+    white-space: normal;
+    overflow: visible;
+  }
+
+  .pw-tabelle tbody td::before {
+    content: attr(data-label);
+    color: var(--color-text-maxcontrast);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  .pw-cell-ellipsis {
+    white-space: normal;
+    text-overflow: clip;
+    overflow: visible;
+  }
+}
