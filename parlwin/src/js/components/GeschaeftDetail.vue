@@ -4,6 +4,16 @@
     <div v-else-if="!geschaeft" class="pw-fehler">Geschäft konnte nicht geladen werden.</div>
 
     <template v-else>
+      <header class="pw-detail-header">
+        <div>
+          <p class="pw-detail-kicker">{{ geschaeft.nummer || 'Geschäft' }}</p>
+          <h3>{{ geschaeft.titel }}</h3>
+        </div>
+        <span :class="'pw-status-' + fraktionsstatusKlasse(geschaeft.fraktionsstatus)">
+          {{ fraktionsstatusLabel(geschaeft.fraktionsstatus) }}
+        </span>
+      </header>
+
       <div class="pw-detail-abschnitt pw-oeffentlich">
         <h4>Öffentliche Informationen</h4>
         <table class="pw-info-tabelle">
@@ -25,7 +35,7 @@
         <h4>Fraktionsinterne Bearbeitung</h4>
 
         <div class="pw-form-zeile">
-          <label>Zuständigkeiten</label>
+          <label>Zuständigkeit</label>
           <div class="pw-zustaendigkeiten-liste">
             <div class="pw-zustaendigkeiten-gruppe">
               <h5>Aktive Mitglieder</h5>
@@ -45,14 +55,9 @@
               </div>
             </template>
           </div>
-        </div>
-
-        <div class="pw-form-zeile">
-          <label>Hauptzuständig</label>
-          <select v-model="hauptPersonKey" class="pw-select">
-            <option value="">— keine —</option>
-            <option v-for="key in ausgewaehltePersonKeys" :key="key" :value="key">{{ personLabelByKey(key) }}</option>
-          </select>
+          <small class="pw-hinweis">
+            Falls mehrere Personen ausgewählt sind, wird die erste Auswahl intern als Hauptzuständigkeit geführt.
+          </small>
           <button type="button" class="button pw-btn-klein" @click="speichereZustaendigkeiten">Zuständigkeiten speichern</button>
         </div>
 
@@ -173,6 +178,9 @@ export default {
         this.ladeDetail()
       },
     },
+    ausgewaehltePersonKeys() {
+      this.synchronisiereHauptPersonKey()
+    },
   },
   methods: {
     vollerName(m) {
@@ -197,6 +205,7 @@ export default {
         this.ausgewaehltePersonKeys = zustaendigkeiten.map(z => z.personKey)
         const haupt = zustaendigkeiten.find(z => z.istHaupt)
         this.hauptPersonKey = haupt?.personKey || ''
+        this.synchronisiereHauptPersonKey()
       } catch (e) {
         this.geschaeft = null
         console.error(e)
@@ -217,6 +226,7 @@ export default {
     },
     async speichereZustaendigkeiten() {
       try {
+        this.synchronisiereHauptPersonKey()
         const zustaendigkeiten = this.ausgewaehltePersonKeys.map(key => {
           const member = this.mitglieder.find(m => this.personKey(m) === key)
           return {
@@ -312,6 +322,17 @@ export default {
       if (status === 'neu_zu_entscheiden') return 'Neu zu entscheiden'
       if (status === 'entschieden') return 'Entschieden'
       return 'Offen'
+    },
+    fraktionsstatusKlasse(status) {
+      if (status === 'neu_zu_entscheiden') return 'offen'
+      if (status === 'entschieden') return 'erledigt'
+      return 'neutral'
+    },
+    synchronisiereHauptPersonKey() {
+      if (this.ausgewaehltePersonKeys.includes(this.hauptPersonKey)) {
+        return
+      }
+      this.hauptPersonKey = this.ausgewaehltePersonKeys[0] || ''
     },
   },
 }

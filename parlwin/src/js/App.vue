@@ -1,52 +1,57 @@
 <template>
-  <div class="pw-app">
-    <header class="pw-app-header">
-      <h1>Parlament Winterthur</h1>
-      <p>Fraktionsarbeit, Sitzungen und Beschlüsse in einer Oberfläche.</p>
-    </header>
+  <NcAppNavigation>
+    <template #list>
+      <li class="pw-nav-search-item">
+        <div id="pw-search-slot" class="pw-nav-search"></div>
+      </li>
+      <NcAppNavigationItem
+        v-for="ansicht in ansichten"
+        :key="ansicht.key"
+        :name="ansicht.bezeichnung"
+        :active="aktiveAnsicht === ansicht.key"
+        @click="aktiveAnsicht = ansicht.key"
+      >
+        <template #icon>
+          <span class="pw-nav-emoji" aria-hidden="true">{{ ansicht.icon }}</span>
+        </template>
+      </NcAppNavigationItem>
+      <li class="pw-nav-filter-item">
+        <div id="pw-filter-slot" class="pw-nav-filter"></div>
+      </li>
+    </template>
+  </NcAppNavigation>
 
-    <section class="pw-panel">
-      <nav class="pw-nav" aria-label="Hauptnavigation">
-        <button
-          v-for="ansicht in ansichten"
-          :key="ansicht.key"
-          type="button"
-          :aria-pressed="aktiveAnsicht === ansicht.key ? 'true' : 'false'"
-          :class="['button', 'pw-nav-btn', { aktiv: aktiveAnsicht === ansicht.key }]"
-          @click="aktiveAnsicht = ansicht.key"
-        >
-          {{ ansicht.bezeichnung }}
-        </button>
-      </nav>
+  <NcAppContent>
+    <div v-if="syncMeldung" class="pw-sync-meldung" :class="syncFehler ? 'fehler' : 'erfolg'">
+      {{ syncMeldung }}
+    </div>
 
-      <div v-if="syncMeldung" class="pw-sync-meldung" :class="syncFehler ? 'fehler' : 'erfolg'">
-        {{ syncMeldung }}
-      </div>
-
-      <div class="pw-panel-content">
-        <Geschaeftsliste
-          v-if="aktiveAnsicht === 'geschaefte'"
-          :mitglieder="mitglieder"
-          @aktualisiert="ladeGeschaefte"
-        />
-        <Sitzungsliste
-          v-else-if="aktiveAnsicht === 'sitzungen'"
-        />
-        <Mitgliederliste
-          v-else-if="aktiveAnsicht === 'mitglieder'"
-          :mitglieder="mitglieder"
-        />
-        <Kommissionsliste
-          v-else-if="aktiveAnsicht === 'kommissionen'"
-        />
-      </div>
-    </section>
-  </div>
+    <Geschaeftsliste
+      v-if="aktiveAnsicht === 'geschaefte'"
+      :mitglieder="mitglieder"
+      @aktualisiert="ladeGeschaefte"
+    />
+    <Sitzungsliste
+      v-else-if="aktiveAnsicht === 'sitzungen'"
+      :mitglieder="mitglieder"
+    />
+    <Mitgliederliste
+      v-else-if="aktiveAnsicht === 'mitglieder'"
+      :mitglieder="mitglieder"
+    />
+    <Kommissionsliste
+      v-else-if="aktiveAnsicht === 'kommissionen'"
+      :mitglieder="mitglieder"
+    />
+  </NcAppContent>
 </template>
 
 <script>
 import { generateUrl } from '@nextcloud/router'
 import axios from '@nextcloud/axios'
+import NcAppNavigation from '@nextcloud/vue/components/NcAppNavigation'
+import NcAppNavigationItem from '@nextcloud/vue/components/NcAppNavigationItem'
+import NcAppContent from '@nextcloud/vue/components/NcAppContent'
 import { subscribeRealtime } from './realtime'
 import Geschaeftsliste from './components/Geschaeftsliste.vue'
 import Sitzungsliste from './components/Sitzungsliste.vue'
@@ -56,10 +61,21 @@ import Kommissionsliste from './components/Kommissionsliste.vue'
 export default {
   name: 'ParliamentWinterthurApp',
   components: {
+    NcAppNavigation,
+    NcAppNavigationItem,
+    NcAppContent,
     Geschaeftsliste,
     Sitzungsliste,
     Mitgliederliste,
     Kommissionsliste,
+  },
+  provide() {
+    // NcAppNavigation / NcAppContent in @nextcloud/vue v9 erwarten diesen Inject
+    // normalerweise vom NcContent-Wrapper. Da wir ohne NcContent direkt im
+    // Nextcloud-#content-Element mounten, liefern wir den No-Op selbst.
+    return {
+      'NcContent:setHasAppNavigation': () => {},
+    }
   },
   data() {
     return {
@@ -68,10 +84,10 @@ export default {
       syncMeldung: '',
       syncFehler: false,
       ansichten: [
-        { key: 'geschaefte',  bezeichnung: 'Geschäfte' },
-        { key: 'sitzungen',   bezeichnung: 'Sitzungen' },
-        { key: 'mitglieder',  bezeichnung: 'Mitglieder' },
-        { key: 'kommissionen', bezeichnung: 'Kommissionen' },
+        { key: 'geschaefte', bezeichnung: 'Geschäfte', icon: '📋' },
+        { key: 'sitzungen', bezeichnung: 'Sitzungen', icon: '📅' },
+        { key: 'mitglieder', bezeichnung: 'Mitglieder', icon: '👥' },
+        { key: 'kommissionen', bezeichnung: 'Kommissionen', icon: '🏛' },
       ],
       unsubRealtime: null,
     }

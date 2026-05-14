@@ -32,7 +32,8 @@ use OCP\IUserManager;
 /**
  * REST-Controller für Einstellungen und manuelle Synchronisation.
  */
-class SettingsController extends Controller {
+class SettingsController extends Controller
+{
     private const SYNC_PROGRESS_KEY = 'sync_progress';
     private const SYNC_CANCEL_REQUESTED_KEY = SyncCommand::SYNC_CANCEL_REQUESTED_KEY;
     private const SYNC_WORKER_PID_KEY = SyncCommand::SYNC_WORKER_PID_KEY;
@@ -53,11 +54,11 @@ class SettingsController extends Controller {
 
     /** Erlaubte Einstellungsschlüssel und ihre Standardwerte */
     private const EINSTELLUNGEN = [
-        'fraktion'             => '',
-        'nextcloud_gruppe'     => '',
-        'kalender_nutzer'      => '',
-        'absender_email'       => '',
-        'absender_name'        => 'Parlament Winterthur Tool',
+        'fraktion' => '',
+        'nextcloud_gruppe' => '',
+        'kalender_nutzer' => '',
+        'absender_email' => '',
+        'absender_name' => 'Parlament Winterthur Tool',
     ];
 
     public function __construct(
@@ -83,7 +84,8 @@ class SettingsController extends Controller {
      * Gibt alle Einstellungen zurück.
      */
     #[AuthorizedAdminSetting(settings: \OCA\ParliamentWinterthur\Settings\AdminSettings::class)]
-    public function get(): DataResponse {
+    public function get(): DataResponse
+    {
         $daten = [];
         foreach (self::EINSTELLUNGEN as $schluessel => $standard) {
             $daten[$schluessel] = $this->config->getAppValue(Application::APP_ID, $schluessel, $standard);
@@ -100,7 +102,8 @@ class SettingsController extends Controller {
      * Speichert Einstellungen.
      */
     #[AuthorizedAdminSetting(settings: \OCA\ParliamentWinterthur\Settings\AdminSettings::class)]
-    public function set(): DataResponse {
+    public function set(): DataResponse
+    {
         $fraktionsOptionen = $this->fraktionsOptionen();
         $zuSpeichern = [];
         foreach (self::EINSTELLUNGEN as $schluessel => $standard) {
@@ -130,7 +133,8 @@ class SettingsController extends Controller {
      * Liefert Mitglieder der gewählten Fraktion inkl. Mapping auf lokale User.
      */
     #[AuthorizedAdminSetting(settings: \OCA\ParliamentWinterthur\Settings\AdminSettings::class)]
-    public function fraktionMitglieder(): DataResponse {
+    public function fraktionMitglieder(): DataResponse
+    {
         $fraktion = trim((string) $this->request->getParam(
             'fraktion',
             $this->config->getAppValue(Application::APP_ID, 'fraktion', '')
@@ -154,7 +158,8 @@ class SettingsController extends Controller {
      * Speichert Username-Mappings für Fraktionsmitglieder.
      */
     #[AuthorizedAdminSetting(settings: \OCA\ParliamentWinterthur\Settings\AdminSettings::class)]
-    public function saveFraktionMitgliederMapping(): DataResponse {
+    public function saveFraktionMitgliederMapping(): DataResponse
+    {
         $fraktion = trim((string) $this->request->getParam('fraktion', ''));
         if ($fraktion === '') {
             return new DataResponse(['fehler' => 'Fraktion ist erforderlich.'], Http::STATUS_BAD_REQUEST);
@@ -194,7 +199,8 @@ class SettingsController extends Controller {
      * und weist sie der gewählten Nextcloud-Gruppe zu.
      */
     #[AuthorizedAdminSetting(settings: \OCA\ParliamentWinterthur\Settings\AdminSettings::class)]
-    public function provisionFraktionMitglieder(): DataResponse {
+    public function provisionFraktionMitglieder(): DataResponse
+    {
         $fraktion = trim((string) $this->request->getParam('fraktion', ''));
         $gruppeName = trim((string) $this->request->getParam(
             'nextcloud_gruppe',
@@ -280,7 +286,8 @@ class SettingsController extends Controller {
      * Nur für Administratoren.
      */
     #[AuthorizedAdminSetting(settings: \OCA\ParliamentWinterthur\Settings\AdminSettings::class)]
-    public function run(): DataResponse {
+    public function run(): DataResponse
+    {
         $vorherigerStatus = $this->getSyncProgress();
         $warStaleAbbruch = false;
 
@@ -396,7 +403,8 @@ class SettingsController extends Controller {
      * Fordert den Abbruch einer laufenden Synchronisation an.
      */
     #[AuthorizedAdminSetting(settings: \OCA\ParliamentWinterthur\Settings\AdminSettings::class)]
-    public function cancelSync(): DataResponse {
+    public function cancelSync(): DataResponse
+    {
         $status = $this->getSyncProgress();
         $laeuft = ($status['running'] ?? false) === true || $this->syncLockService->isLocked();
 
@@ -434,7 +442,7 @@ class SettingsController extends Controller {
 
         $stopResult = $this->syncProcessService->ensureStopped(
             $this->getCurrentWorkerPid(),
-            fn (): bool => $this->syncLockService->isLocked(),
+            fn(): bool => $this->syncLockService->isLocked(),
             self::SYNC_CANCEL_GRACE_MS,
             self::SYNC_CANCEL_TERM_WAIT_MS,
             self::SYNC_CANCEL_KILL_WAIT_MS,
@@ -447,8 +455,8 @@ class SettingsController extends Controller {
             $status = $this->markiereSyncAlsAbgebrochen(
                 $status,
                 (($stopResult['forced'] ?? false) === true)
-                    ? 'Synchronisation wurde manuell abgebrochen (hart beendet)'
-                    : 'Synchronisation wurde manuell abgebrochen'
+                ? 'Synchronisation wurde manuell abgebrochen (hart beendet)'
+                : 'Synchronisation wurde manuell abgebrochen'
             );
             $this->realtimePublisher->publish('sync.cancelled', [
                 'quelle' => 'admin-ui',
@@ -477,7 +485,8 @@ class SettingsController extends Controller {
      * Liefert den aktuellen Fortschritt des manuellen Synchronisationslaufs.
      */
     #[AuthorizedAdminSetting(settings: \OCA\ParliamentWinterthur\Settings\AdminSettings::class)]
-    public function syncStatus(): DataResponse {
+    public function syncStatus(): DataResponse
+    {
         $status = $this->getSyncProgress();
         $lockAktiv = $this->syncLockService->isLocked();
 
@@ -508,8 +517,8 @@ class SettingsController extends Controller {
                     $status = $this->markiereSyncAlsAbgebrochen(
                         $status,
                         $phase === 'abbruch_angefragt'
-                            ? 'Synchronisation wurde manuell abgebrochen'
-                            : 'Synchronisationsprozess nicht mehr aktiv'
+                        ? 'Synchronisation wurde manuell abgebrochen'
+                        : 'Synchronisationsprozess nicht mehr aktiv'
                     );
                     $this->setCancelRequested(false);
                     $this->setCurrentWorkerPid(null);
@@ -533,7 +542,8 @@ class SettingsController extends Controller {
      * Zugriff: Fraktionspräsidium (inkl. aktiver Stellvertretung).
      */
     #[NoAdminRequired]
-    public function setFraktionssitzung(): DataResponse {
+    public function setFraktionssitzung(): DataResponse
+    {
         $aktiv = (bool) $this->request->getParam('aktiv', false);
 
         try {
@@ -550,7 +560,8 @@ class SettingsController extends Controller {
      * Liefert den aktuellen Fraktionssitzungs-Kontext (lesend).
      */
     #[NoAdminRequired]
-    public function getFraktionssitzung(): DataResponse {
+    public function getFraktionssitzung(): DataResponse
+    {
         return new DataResponse($this->fraktionsarbeitService->fraktionssitzungKontext());
     }
 
@@ -560,7 +571,8 @@ class SettingsController extends Controller {
      * Zugriff: Fraktionspräsidium (inkl. aktiver Stellvertretung).
      */
     #[NoAdminRequired]
-    public function setProtokollfuehrer(): DataResponse {
+    public function setProtokollfuehrer(): DataResponse
+    {
         $uid = trim((string) $this->request->getParam('uid', ''));
         $name = trim((string) $this->request->getParam('name', ''));
         if ($uid === '') {
@@ -585,7 +597,8 @@ class SettingsController extends Controller {
      * Zugriff: Fraktions-Gruppen-Admin.
      */
     #[NoAdminRequired]
-    public function setFraktionspraesident(): DataResponse {
+    public function setFraktionspraesident(): DataResponse
+    {
         $uid = trim((string) $this->request->getParam('uid', ''));
         $name = trim((string) $this->request->getParam('name', ''));
         if ($uid === '') {
@@ -610,7 +623,8 @@ class SettingsController extends Controller {
      * Zugriff: Fraktionspräsidium (inkl. aktiver Stellvertretung).
      */
     #[NoAdminRequired]
-    public function addPraesidiumStellvertretung(): DataResponse {
+    public function addPraesidiumStellvertretung(): DataResponse
+    {
         $uid = trim((string) $this->request->getParam('uid', ''));
         $name = trim((string) $this->request->getParam('name', ''));
         $von = trim((string) $this->request->getParam('gueltig_von', ''));
@@ -637,7 +651,8 @@ class SettingsController extends Controller {
      * Zugriff: Protokollführung oder Fraktionspräsidium.
      */
     #[NoAdminRequired]
-    public function addProtokollfuehrerStellvertretung(): DataResponse {
+    public function addProtokollfuehrerStellvertretung(): DataResponse
+    {
         $uid = trim((string) $this->request->getParam('uid', ''));
         $name = trim((string) $this->request->getParam('name', ''));
         $von = trim((string) $this->request->getParam('gueltig_von', ''));
@@ -664,7 +679,8 @@ class SettingsController extends Controller {
      * Zugriff: Fraktionspräsidium.
      */
     #[NoAdminRequired]
-    public function addKommissionsmitglied(): DataResponse {
+    public function addKommissionsmitglied(): DataResponse
+    {
         $uid = trim((string) $this->request->getParam('uid', ''));
         $name = trim((string) $this->request->getParam('name', ''));
         $von = trim((string) $this->request->getParam('gueltig_von', ''));
@@ -688,7 +704,8 @@ class SettingsController extends Controller {
     /**
      * @return string[]
      */
-    private function fraktionsOptionen(): array {
+    private function fraktionsOptionen(): array
+    {
         $optionen = [];
         foreach ($this->fraktionMapper->findAll() as $fraktion) {
             if ($fraktion->getAktiv() !== true) {
@@ -708,7 +725,8 @@ class SettingsController extends Controller {
     /**
      * @param string[] $optionen
      */
-    private function istGueltigeFraktion(string $fraktion, array $optionen): bool {
+    private function istGueltigeFraktion(string $fraktion, array $optionen): bool
+    {
         foreach ($optionen as $option) {
             if (strcasecmp($option, $fraktion) === 0) {
                 return true;
@@ -720,7 +738,8 @@ class SettingsController extends Controller {
     /**
      * @return array{fraktion: string, mitglieder: array<int, array<string, mixed>>, summary: array{anzahl: int, mitLokalemUser: int}}
      */
-    private function baueFraktionsMitgliederPayload(string $fraktion): array {
+    private function baueFraktionsMitgliederPayload(string $fraktion): array
+    {
         $mitglieder = $this->mitgliedService->aktiveDerFraktion($fraktion);
         $eintraege = [];
         $mitLokalemUser = 0;
@@ -746,7 +765,8 @@ class SettingsController extends Controller {
     /**
      * @return array<string, mixed>
      */
-    private function baueFraktionsMitgliedEintrag(Mitglied $mitglied): array {
+    private function baueFraktionsMitgliedEintrag(Mitglied $mitglied): array
+    {
         $vorschlag = $this->vorschlagUsernameFuerMitglied($mitglied);
         $gespeichert = trim((string) $mitglied->getNextcloudUid());
         $username = $gespeichert !== '' ? $this->normalisiereUsername($gespeichert, $mitglied) : $vorschlag;
@@ -771,7 +791,8 @@ class SettingsController extends Controller {
     /**
      * @return array<int, array{mitgliedId: int, username: string}>
      */
-    private function leseMappingsAusRequest(): array {
+    private function leseMappingsAusRequest(): array
+    {
         $raw = $this->request->getParam('mappings', []);
         if (!is_array($raw)) {
             return [];
@@ -797,7 +818,8 @@ class SettingsController extends Controller {
     /**
      * @return int[]
      */
-    private function leseAuswahlIdsAusRequest(): array {
+    private function leseAuswahlIdsAusRequest(): array
+    {
         $raw = $this->request->getParam('mitglied_ids', []);
         if (!is_array($raw)) {
             return [];
@@ -812,11 +834,13 @@ class SettingsController extends Controller {
         return array_values(array_unique($result));
     }
 
-    private function gehoertMitgliedZuFraktion(Mitglied $mitglied, string $fraktion): bool {
+    private function gehoertMitgliedZuFraktion(Mitglied $mitglied, string $fraktion): bool
+    {
         return strcasecmp(trim($mitglied->getFraktion()), trim($fraktion)) === 0;
     }
 
-    private function vorschlagUsernameFuerMitglied(Mitglied $mitglied): string {
+    private function vorschlagUsernameFuerMitglied(Mitglied $mitglied): string
+    {
         $basis = trim($mitglied->getVorname() . '-' . $mitglied->getName());
         if ($basis === '') {
             $basis = trim($mitglied->getExternId());
@@ -827,7 +851,8 @@ class SettingsController extends Controller {
         return $this->normalisiereUsername($basis, $mitglied);
     }
 
-    private function normalisiereUsername(string $username, Mitglied $mitglied): string {
+    private function normalisiereUsername(string $username, Mitglied $mitglied): string
+    {
         $wert = trim($username);
         if ($wert === '') {
             $wert = trim($mitglied->getVorname() . '-' . $mitglied->getName());
@@ -839,21 +864,19 @@ class SettingsController extends Controller {
             $wert = 'mitglied-' . (string) $mitglied->getId();
         }
 
-        $transliteriert = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $wert);
-        if (is_string($transliteriert) && $transliteriert !== '') {
-            $wert = $transliteriert;
-        }
-
-        $wert = strtolower($wert);
-        $wert = (string) preg_replace('/[^a-z0-9._-]+/', '-', $wert);
+        $wert = function_exists('mb_strtolower') ? mb_strtolower($wert, 'UTF-8') : strtolower($wert);
+        $wert = (string) preg_replace('/\s+/u', '-', $wert);
+        $wert = (string) preg_replace('/[^\p{L}\p{N}._-]+/u', '-', $wert);
+        $wert = (string) preg_replace('/-+/u', '-', $wert);
         $wert = trim($wert, '-._');
         if ($wert === '') {
             $wert = 'mitglied-' . (string) $mitglied->getId();
         }
-        return substr($wert, 0, 64);
+        return function_exists('mb_substr') ? mb_substr($wert, 0, 64, 'UTF-8') : substr($wert, 0, 64);
     }
 
-    private function ladeOderErzeugeGruppe(string $gruppeName): ?object {
+    private function ladeOderErzeugeGruppe(string $gruppeName): ?object
+    {
         try {
             if (!$this->groupManager->groupExists($gruppeName)) {
                 $this->groupManager->createGroup($gruppeName);
@@ -865,7 +888,8 @@ class SettingsController extends Controller {
         }
     }
 
-    private function erstelleNextcloudUser(string $username, Mitglied $mitglied): ?IUser {
+    private function erstelleNextcloudUser(string $username, Mitglied $mitglied): ?IUser
+    {
         if (!method_exists($this->userManager, 'createUser')) {
             return null;
         }
@@ -892,7 +916,8 @@ class SettingsController extends Controller {
         return $user;
     }
 
-    private function setzeUserProfilfelder(IUser $user, Mitglied $mitglied): void {
+    private function setzeUserProfilfelder(IUser $user, Mitglied $mitglied): void
+    {
         $displayName = trim($mitglied->getVollerName());
         if ($displayName !== '' && method_exists($user, 'setDisplayName')) {
             try {
@@ -917,7 +942,8 @@ class SettingsController extends Controller {
         }
     }
 
-    private function generiereInitialPasswort(): string {
+    private function generiereInitialPasswort(): string
+    {
         try {
             return bin2hex(random_bytes(24));
         } catch (\Throwable) {
@@ -925,7 +951,8 @@ class SettingsController extends Controller {
         }
     }
 
-    private function fuegeUserZuGruppeHinzu(object $gruppe, IUser $user): bool {
+    private function fuegeUserZuGruppeHinzu(object $gruppe, IUser $user): bool
+    {
         if (!method_exists($gruppe, 'addUser')) {
             return false;
         }
@@ -948,7 +975,8 @@ class SettingsController extends Controller {
     /**
      * @return string[]
      */
-    private function gruppenIdsFuerUser(IUser $user): array {
+    private function gruppenIdsFuerUser(IUser $user): array
+    {
         $gruppen = [];
         if (method_exists($this->groupManager, 'getUserGroupIds')) {
             try {
@@ -972,7 +1000,7 @@ class SettingsController extends Controller {
             }
         }
 
-        $gruppen = array_values(array_filter(array_map('trim', $gruppen), static fn (string $value): bool => $value !== ''));
+        $gruppen = array_values(array_filter(array_map('trim', $gruppen), static fn(string $value): bool => $value !== ''));
         $gruppen = array_values(array_unique($gruppen));
         natcasesort($gruppen);
         return array_values($gruppen);
@@ -981,7 +1009,8 @@ class SettingsController extends Controller {
     /**
      * @return array<string, mixed>
      */
-    private function getSyncProgress(): array {
+    private function getSyncProgress(): array
+    {
         $raw = trim((string) $this->config->getAppValue(Application::APP_ID, self::SYNC_PROGRESS_KEY, ''));
         if ($raw === '') {
             return [
@@ -1022,7 +1051,8 @@ class SettingsController extends Controller {
     /**
      * @param array<string, mixed> $status
      */
-    private function setSyncProgress(array $status): void {
+    private function setSyncProgress(array $status): void
+    {
         $json = json_encode($status, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         if ($json === false) {
             return;
@@ -1030,7 +1060,8 @@ class SettingsController extends Controller {
         $this->config->setAppValue(Application::APP_ID, self::SYNC_PROGRESS_KEY, $json);
     }
 
-    private function starteSyncImHintergrund(): bool {
+    private function starteSyncImHintergrund(): bool
+    {
         if ($this->starteSyncUeberOccProzess()) {
             return true;
         }
@@ -1051,7 +1082,8 @@ class SettingsController extends Controller {
         }
     }
 
-    private function starteSyncUeberOccProzess(): bool {
+    private function starteSyncUeberOccProzess(): bool
+    {
         if (!$this->funktionVerfuegbar('exec')) {
             return false;
         }
@@ -1080,7 +1112,8 @@ class SettingsController extends Controller {
         return $code === 0;
     }
 
-    private function ermittleOccPfad(): string {
+    private function ermittleOccPfad(): string
+    {
         if (class_exists('\\OC') && isset(\OC::$SERVERROOT) && is_string(\OC::$SERVERROOT)) {
             $kandidat = rtrim(\OC::$SERVERROOT, '/') . '/occ';
             if (is_file($kandidat)) {
@@ -1097,7 +1130,8 @@ class SettingsController extends Controller {
         return '';
     }
 
-    private function funktionVerfuegbar(string $name): bool {
+    private function funktionVerfuegbar(string $name): bool
+    {
         if (!function_exists($name)) {
             return false;
         }
@@ -1105,7 +1139,8 @@ class SettingsController extends Controller {
         return !in_array($name, $disabled, true);
     }
 
-    private function fuehreSynchronisationAus(): void {
+    private function fuehreSynchronisationAus(): void
+    {
         if (!$this->syncLockService->acquire()) {
             return;
         }
@@ -1315,7 +1350,8 @@ class SettingsController extends Controller {
      * @param array<string, string> $resumeCursors
      * @return array<string, array<string, mixed>>
      */
-    private function initialisiereSections(array $resumeCursors = []): array {
+    private function initialisiereSections(array $resumeCursors = []): array
+    {
         $sections = [];
         foreach (self::SYNC_SECTION_META as $scope => $meta) {
             $sections[$scope] = [
@@ -1333,7 +1369,8 @@ class SettingsController extends Controller {
      * @param array<string, mixed> $sections
      * @return array<string, array<string, mixed>>
      */
-    private function normalisiereSections(array $sections): array {
+    private function normalisiereSections(array $sections): array
+    {
         $normalisiert = $this->initialisiereSections();
         foreach ($sections as $scope => $werte) {
             if (!is_array($werte) || !isset($normalisiert[$scope])) {
@@ -1350,7 +1387,8 @@ class SettingsController extends Controller {
      * @param array<string, array<string, mixed>> $sections
      * @return array{0: int, 1: int}
      */
-    private function berechneGlobalenFortschritt(array $sections): array {
+    private function berechneGlobalenFortschritt(array $sections): array
+    {
         $processed = 0;
         $total = 0;
         foreach ($sections as $section) {
@@ -1371,7 +1409,8 @@ class SettingsController extends Controller {
     /**
      * @param array<string, mixed> $status
      */
-    private function istSyncStatusVeraltet(array $status): bool {
+    private function istSyncStatusVeraltet(array $status): bool
+    {
         if (($status['running'] ?? false) !== true) {
             return false;
         }
@@ -1392,7 +1431,8 @@ class SettingsController extends Controller {
      * @param array<string, mixed> $status
      * @return array<string, mixed>
      */
-    private function markiereSyncAlsAbgebrochen(array $status, string $grund): array {
+    private function markiereSyncAlsAbgebrochen(array $status, string $grund): array
+    {
         $status['running'] = false;
         $status['phase'] = 'abgebrochen';
         $status['phaseLabel'] = 'Synchronisation abgebrochen';
@@ -1416,7 +1456,8 @@ class SettingsController extends Controller {
      * @param array<string, mixed> $status
      * @return array<string, string>
      */
-    private function ermittleResumeCursors(array $status): array {
+    private function ermittleResumeCursors(array $status): array
+    {
         $result = [];
         $sections = $status['sections'] ?? [];
         if (!is_array($sections)) {
@@ -1437,7 +1478,8 @@ class SettingsController extends Controller {
         return $result;
     }
 
-    private function formatiereDauer(int $sekunden): string {
+    private function formatiereDauer(int $sekunden): string
+    {
         $sekunden = max(0, $sekunden);
         $h = intdiv($sekunden, 3600);
         $m = intdiv($sekunden % 3600, 60);
@@ -1448,7 +1490,8 @@ class SettingsController extends Controller {
     /**
      * @param array<string, mixed> $status
      */
-    private function setzePhase(array &$status, string $scope, \DateTimeImmutable $start): void {
+    private function setzePhase(array &$status, string $scope, \DateTimeImmutable $start): void
+    {
         if (!isset(self::SYNC_SECTION_META[$scope])) {
             return;
         }
@@ -1467,11 +1510,13 @@ class SettingsController extends Controller {
         $this->setSyncProgress($status);
     }
 
-    private function isCancelRequested(): bool {
+    private function isCancelRequested(): bool
+    {
         return trim($this->config->getAppValue(Application::APP_ID, self::SYNC_CANCEL_REQUESTED_KEY, '0')) === '1';
     }
 
-    private function setCancelRequested(bool $requested): void {
+    private function setCancelRequested(bool $requested): void
+    {
         $this->config->setAppValue(
             Application::APP_ID,
             self::SYNC_CANCEL_REQUESTED_KEY,
@@ -1479,7 +1524,8 @@ class SettingsController extends Controller {
         );
     }
 
-    private function getCurrentWorkerPid(): ?int {
+    private function getCurrentWorkerPid(): ?int
+    {
         $raw = trim((string) $this->config->getAppValue(Application::APP_ID, self::SYNC_WORKER_PID_KEY, ''));
         if ($raw === '') {
             return null;
@@ -1488,7 +1534,8 @@ class SettingsController extends Controller {
         return $pid > 1 ? $pid : null;
     }
 
-    private function setCurrentWorkerPid(?int $pid): void {
+    private function setCurrentWorkerPid(?int $pid): void
+    {
         $this->config->setAppValue(
             Application::APP_ID,
             self::SYNC_WORKER_PID_KEY,
@@ -1499,7 +1546,8 @@ class SettingsController extends Controller {
     /**
      * @param array<string, mixed> $status
      */
-    private function istQueueStartFrisch(array $status): bool {
+    private function istQueueStartFrisch(array $status): bool
+    {
         if (((string) ($status['phase'] ?? '')) !== 'queued') {
             return false;
         }

@@ -1,59 +1,69 @@
 <template>
-  <div class="pw-mitglieder">
-    <div class="pw-toolbar">
-      <h2>Mitglieder</h2>
-      <div class="pw-filter">
-        <input v-model="suche" type="text" placeholder="Suchen..." class="pw-suche" />
-        <select v-model="filterFraktion" class="pw-select">
-          <option value="">Alle Fraktionen</option>
-          <option v-for="f in alleFraktionen" :key="f" :value="f">{{ f }}</option>
-        </select>
-        <select v-model="filterPartei" class="pw-select">
-          <option value="">Alle Parteien</option>
-          <option v-for="p in alleParteien" :key="p" :value="p">{{ p }}</option>
-        </select>
-        <label class="pw-filter-checkbox">
-          <input v-model="nurAktive" type="checkbox" />
-          Nur aktive Mitglieder
-        </label>
-      </div>
+  <Teleport v-if="filterReady" to="#pw-search-slot">
+    <NcTextField :value="suche" label="Suche" placeholder="Name, Partei oder E-Mail" trailing-button-icon="close" :show-trailing-button="!!suche" @update:value="suche = $event" @trailing-button-click="suche = ''" />
+  </Teleport>
+  <Teleport v-if="filterReady" to="#pw-filter-slot">
+    <div class="pw-filter-body">
+      <NcSelect v-model="filterFraktionOption" :options="fraktionOptions" :clearable="false" input-label="Fraktion" />
+      <NcSelect v-model="filterParteiOption" :options="parteiOptions" :clearable="false" input-label="Partei" />
+      <NcCheckboxRadioSwitch v-model="nurAktive" type="switch">
+        Nur aktive Mitglieder
+      </NcCheckboxRadioSwitch>
     </div>
+  </Teleport>
 
-    <div class="pw-mitglieder-grid">
+  <section class="pw-view-content pw-mitglieder">
+      <header class="pw-view-header">
+        <h2 class="pw-view-title">Mitglieder</h2>
+        <span class="pw-view-count">{{ gefilterteMitglieder.length }}</span>
+      </header>
+      <div class="pw-mitglieder-grid">
       <div
         v-for="m in gefilterteMitglieder"
         :key="m.id"
         class="pw-mitglied-karte"
         :class="{ inaktiv: !m.aktiv }"
       >
-        <div class="pw-mitglied-foto">
-          <img v-if="m.fotoUrl" :src="m.fotoUrl" :alt="m.vorname + ' ' + m.name" loading="lazy" />
-          <div v-else class="pw-mitglied-initial">{{ (m.vorname || '?')[0] }}{{ (m.name || '?')[0] }}</div>
+        <div class="pw-mitglied-kopf">
+          <div class="pw-mitglied-avatar">
+            <img v-if="m.fotoUrl" :src="m.fotoUrl" :alt="m.vorname + ' ' + m.name" loading="lazy" />
+            <div v-else class="pw-mitglied-initial">{{ (m.vorname || '?')[0] }}{{ (m.name || '?')[0] }}</div>
+          </div>
+          <div class="pw-mitglied-kopftext">
+            <strong>{{ m.vorname }} {{ m.name }}</strong>
+            <span class="pw-mitglied-partei">{{ m.partei || 'Ohne Partei' }}</span>
+          </div>
         </div>
         <div class="pw-mitglied-info">
-          <strong>{{ m.vorname }} {{ m.name }}</strong>
-          <span class="pw-mitglied-partei">{{ m.partei }}</span>
-          <span class="pw-mitglied-fraktion">{{ m.fraktion }}</span>
+          <div class="pw-data-pair">
+            <span>Fraktion</span>
+            <strong>{{ m.fraktion || '—' }}</strong>
+          </div>
           <a v-if="m.email" :href="'mailto:' + m.email" class="pw-mitglied-email">{{ m.email }}</a>
           <span v-if="!m.aktiv" class="pw-badge inaktiv">Ehemaliges Mitglied</span>
         </div>
       </div>
-    </div>
+      </div>
 
-    <p v-if="gefilterteMitglieder.length === 0" class="pw-leer">
-      Keine Mitglieder gefunden.
-    </p>
-  </div>
+      <NcEmptyContent v-if="gefilterteMitglieder.length === 0" name="Keine Mitglieder gefunden" />
+    </section>
 </template>
 
 <script>
+import NcTextField from '@nextcloud/vue/components/NcTextField'
+import NcSelect from '@nextcloud/vue/components/NcSelect'
+import NcCheckboxRadioSwitch from '@nextcloud/vue/components/NcCheckboxRadioSwitch'
+import NcEmptyContent from '@nextcloud/vue/components/NcEmptyContent'
+
 export default {
   name: 'Mitgliederliste',
+  components: { NcTextField, NcSelect, NcCheckboxRadioSwitch, NcEmptyContent },
   props: {
     mitglieder: { type: Array, default: () => [] },
   },
   data() {
     return {
+      filterReady: false,
       suche: '',
       filterFraktion: '',
       filterPartei: '',
@@ -62,16 +72,30 @@ export default {
   },
   computed: {
     alleFraktionen() {
-      return [...new Set(this.mitglieder.map(m => m.fraktion).filter(Boolean))].sort()
+      return [...new Set(this.basisMitglieder.map(m => m.fraktion).filter(Boolean))].sort()
     },
     alleParteien() {
-      return [...new Set(this.mitglieder.map(m => m.partei).filter(Boolean))].sort()
+      return [...new Set(this.basisMitglieder.map(m => m.partei).filter(Boolean))].sort()
+    },
+    fraktionOptions() {
+      return [{ label: 'Alle Fraktionen', value: '' }, ...this.alleFraktionen.map(f => ({ label: f, value: f }))]
+    },
+    parteiOptions() {
+      return [{ label: 'Alle Parteien', value: '' }, ...this.alleParteien.map(p => ({ label: p, value: p }))]
+    },
+    filterFraktionOption: {
+      get() { return this.fraktionOptions.find(o => o.value === this.filterFraktion) || this.fraktionOptions[0] },
+      set(v) { this.filterFraktion = v ? v.value : '' },
+    },
+    filterParteiOption: {
+      get() { return this.parteiOptions.find(o => o.value === this.filterPartei) || this.parteiOptions[0] },
+      set(v) { this.filterPartei = v ? v.value : '' },
+    },
+    basisMitglieder() {
+      return this.nurAktive ? this.mitglieder.filter(m => m.aktiv) : this.mitglieder
     },
     gefilterteMitglieder() {
-      let liste = [...this.mitglieder]
-      if (this.nurAktive) {
-        liste = liste.filter(m => m.aktiv)
-      }
+      let liste = [...this.basisMitglieder]
       if (this.suche) {
         const s = this.suche.toLowerCase()
         liste = liste.filter(m =>
@@ -87,8 +111,11 @@ export default {
       if (this.filterPartei) {
         liste = liste.filter(m => m.partei === this.filterPartei)
       }
-      return liste.sort((a, b) => (a.name + a.vorname).localeCompare(b.name + b.vorname))
+      return liste.sort((a, b) => `${a.name}${a.vorname}`.localeCompare(`${b.name}${b.vorname}`))
     },
+  },
+  mounted() {
+    this.$nextTick(() => { this.filterReady = true })
   },
 }
 </script>
