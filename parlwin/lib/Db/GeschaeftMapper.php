@@ -14,8 +14,10 @@ use OCP\IDBConnection;
  *
  * @extends QBMapper<Geschaeft>
  */
-class GeschaeftMapper extends QBMapper {
-    public function __construct(IDBConnection $db) {
+class GeschaeftMapper extends QBMapper
+{
+    public function __construct(IDBConnection $db)
+    {
         parent::__construct($db, 'pw_geschaefte', Geschaeft::class);
     }
 
@@ -24,7 +26,8 @@ class GeschaeftMapper extends QBMapper {
      *
      * @return Geschaeft[]
      */
-    public function findAll(int $limit = 100, int $offset = 0, bool $inklusiveErledigt = false): array {
+    public function findAll(int $limit = 100, int $offset = 0, bool $inklusiveErledigt = false): array
+    {
         $qb = $this->db->getQueryBuilder();
         $qb->select('*')
             ->from($this->getTableName())
@@ -43,6 +46,10 @@ class GeschaeftMapper extends QBMapper {
                 $qb->expr()->isNull('status'),
                 $qb->expr()->notLike($statusLower, $qb->createNamedParameter('%abgeschlossen%'))
             ));
+            $qb->andWhere($qb->expr()->orX(
+                $qb->expr()->isNull('status'),
+                $qb->expr()->notLike($statusLower, $qb->createNamedParameter('%aufgehoben%'))
+            ));
         }
 
         return $this->findEntities($qb);
@@ -53,7 +60,8 @@ class GeschaeftMapper extends QBMapper {
      *
      * @throws DoesNotExistException wenn nicht gefunden
      */
-    public function find(int $id): Geschaeft {
+    public function find(int $id): Geschaeft
+    {
         $qb = $this->db->getQueryBuilder();
         $qb->select('*')
             ->from($this->getTableName())
@@ -66,7 +74,8 @@ class GeschaeftMapper extends QBMapper {
      *
      * @throws DoesNotExistException wenn nicht gefunden
      */
-    public function findByExternId(string $externId): Geschaeft {
+    public function findByExternId(string $externId): Geschaeft
+    {
         $qb = $this->db->getQueryBuilder();
         $qb->select('*')
             ->from($this->getTableName())
@@ -79,7 +88,8 @@ class GeschaeftMapper extends QBMapper {
      *
      * @return string[]
      */
-    public function findAllExternIds(): array {
+    public function findAllExternIds(): array
+    {
         $qb = $this->db->getQueryBuilder();
         $qb->select('extern_id')
             ->from($this->getTableName());
@@ -97,7 +107,8 @@ class GeschaeftMapper extends QBMapper {
      *
      * @param string[] $bekannteIds Externe IDs, die noch auf der Webseite vorhanden sind
      */
-    public function markiereNichtMehrVorhandeneAlsGeloescht(array $bekannteIds): int {
+    public function markiereNichtMehrVorhandeneAlsGeloescht(array $bekannteIds): int
+    {
         $qb = $this->db->getQueryBuilder();
         $qb->update($this->getTableName())
             ->set('geloescht', $qb->createNamedParameter(true, IQueryBuilder::PARAM_BOOL))
@@ -117,7 +128,8 @@ class GeschaeftMapper extends QBMapper {
      *
      * Falls nötig, werden auch referenzierende Traktanden auf die neue ID umgehängt.
      */
-    public function harmonisiereIdMitExternId(Geschaeft $geschaeft, int $externIdAlsInt): void {
+    public function harmonisiereIdMitExternId(Geschaeft $geschaeft, int $externIdAlsInt): void
+    {
         $aktuelleId = $geschaeft->getId();
         if ($aktuelleId === $externIdAlsInt) {
             return;
@@ -143,7 +155,8 @@ class GeschaeftMapper extends QBMapper {
         $geschaeft->setId($externIdAlsInt);
     }
 
-    private function idExistiert(int $id): bool {
+    private function idExistiert(int $id): bool
+    {
         $qb = $this->db->getQueryBuilder();
         $qb->select('id')
             ->from($this->getTableName())

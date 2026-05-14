@@ -161,13 +161,19 @@ export default {
   },
   computed: {
     aktiveMitglieder() {
+      // Nur Fraktionsmitglieder, die auch als Nextcloud-User registriert sind,
+      // können als zuständig gewählt werden.
       return this.mitglieder
         .filter((mitglied) => mitglied.aktiv !== false)
+        .filter((mitglied) => !!(mitglied.nextcloudUid || mitglied.nextcloud_uid))
         .sort((a, b) => this.vollerName(a).localeCompare(this.vollerName(b)))
     },
     inaktiveMitglieder() {
+      // Auch inaktive werden nur dann angeboten, wenn sie einen Nextcloud-User
+      // haben (z.B. ehemalige Mitglieder, die noch zuständig sein können).
       return this.mitglieder
         .filter((mitglied) => mitglied.aktiv === false)
+        .filter((mitglied) => !!(mitglied.nextcloudUid || mitglied.nextcloud_uid))
         .sort((a, b) => this.vollerName(a).localeCompare(this.vollerName(b)))
     },
   },

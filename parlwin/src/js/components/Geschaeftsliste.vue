@@ -112,22 +112,24 @@
       </template>
     </section>
 
-    <div v-if="ausgewaehlteGeschaeftId" class="pw-modal-overlay" @click.self="schliesseDetail">
-      <div class="pw-modal">
-        <div class="pw-modal-kopf">
-          <div>
-            <p class="pw-modal-kicker">Geschäft bearbeiten</p>
-            <h3>{{ ausgewaehltesGeschaeft?.titel || 'Geschäft' }}</h3>
+    <Teleport to="body">
+      <div v-if="ausgewaehlteGeschaeftId" class="pw-modal-overlay" @click.self="schliesseDetail">
+        <div class="pw-modal">
+          <div class="pw-modal-kopf">
+            <div>
+              <p class="pw-modal-kicker">Geschäft bearbeiten</p>
+              <h3>{{ ausgewaehltesGeschaeft?.titel || 'Geschäft' }}</h3>
+            </div>
+            <button type="button" class="button pw-btn-schliessen" aria-label="Dialog schliessen" @click="schliesseDetail">✕</button>
           </div>
-          <button type="button" class="button pw-btn-schliessen" aria-label="Dialog schliessen" @click="schliesseDetail">✕</button>
+          <GeschaeftDetail
+            :geschaeft-id="ausgewaehlteGeschaeftId"
+            :mitglieder="mitglieder"
+            @gespeichert="nachSpeichern"
+          />
         </div>
-        <GeschaeftDetail
-          :geschaeft-id="ausgewaehlteGeschaeftId"
-          :mitglieder="mitglieder"
-          @gespeichert="nachSpeichern"
-        />
       </div>
-    </div>
+    </Teleport>
 </template>
 
 <script>
@@ -155,7 +157,7 @@ export default {
       geschaefte: [],
       laden: true,
       suche: '',
-      filterStatus: [],
+      filterStatus: ['Behandlungsreif'],
       filterTyp: [],
       filterZustaendige: [],
       filterBeschluss: [],
@@ -398,7 +400,9 @@ export default {
     },
     istErledigtStatus(status) {
       const s = (status || '').toLowerCase()
-      return s.includes('erledigt') || s.includes('abgeschlossen')
+      // Regel: Status gilt als "erledigt", wenn er "erledigt", "abgeschlossen"
+      // oder "aufgehoben" enthält (z.B. "Durch Rechtsmittelinstanz aufgehoben").
+      return s.includes('erledigt') || s.includes('abgeschlossen') || s.includes('aufgehoben')
     },
     fraktionsstatusLabel(status) {
       if (status === 'neu_zu_entscheiden') return 'Neu zu entscheiden'

@@ -23,7 +23,8 @@ use Psr\Log\LoggerInterface;
  * Ermöglicht zusätzlich die automatische Verwaltung von Nextcloud-Gruppen
  * für die konfigurierte Fraktion.
  */
-class MitgliedService {
+class MitgliedService
+{
     public function __construct(
         private readonly MitgliedMapper $mitgliedMapper,
         private readonly FraktionMapper $fraktionMapper,
@@ -43,7 +44,8 @@ class MitgliedService {
      * @param array<string, mixed> $optionen
      * @return array{mitglieder: array, fraktionen: array, kommissionen: array}
      */
-    public function synchronisieren(?callable $fortschritt = null, array $optionen = []): array {
+    public function synchronisieren(?callable $fortschritt = null, array $optionen = []): array
+    {
         $statistik = [
             'mitglieder' => $this->synchronisiereMitglieder(
                 $fortschritt,
@@ -71,7 +73,8 @@ class MitgliedService {
      * @param array<string, mixed> $optionen
      * @return array{neu: int, aktualisiert: int, inaktiv: int}
      */
-    public function synchronisiereMitglieder(?callable $fortschritt = null, array $optionen = []): array {
+    public function synchronisiereMitglieder(?callable $fortschritt = null, array $optionen = []): array
+    {
         $rohdaten = $this->scraper->ladeMitglieder();
         $statistik = ['neu' => 0, 'aktualisiert' => 0, 'inaktiv' => 0];
         $bekannteExternIds = [];
@@ -175,7 +178,8 @@ class MitgliedService {
      * @param array<string, mixed> $optionen
      * @return array{neu: int, aktualisiert: int}
      */
-    public function synchronisiereFraktionen(?callable $fortschritt = null, array $optionen = []): array {
+    public function synchronisiereFraktionen(?callable $fortschritt = null, array $optionen = []): array
+    {
         $rohdaten = $this->scraper->ladeFraktionen();
         $statistik = ['neu' => 0, 'aktualisiert' => 0];
         $gesamt = count($rohdaten);
@@ -271,7 +275,8 @@ class MitgliedService {
      *
      * @param array<string, mixed> $daten
      */
-    private function aktualisiereFraktionsFelder(Fraktion $fraktion, array $daten): void {
+    private function aktualisiereFraktionsFelder(Fraktion $fraktion, array $daten): void
+    {
         $jetzt = (new \DateTime())->format('Y-m-d H:i:s');
         $fraktion->setName((string) ScraperService::wert($daten, ['name', 'Name', 'bezeichnung']));
         $fraktion->setBeschreibung((string) ScraperService::wert($daten, ['description', 'beschreibung']));
@@ -288,7 +293,8 @@ class MitgliedService {
      * @param array<string, mixed> $optionen
      * @return array{neu: int, aktualisiert: int}
      */
-    public function synchronisiereKommissionen(?callable $fortschritt = null, array $optionen = []): array {
+    public function synchronisiereKommissionen(?callable $fortschritt = null, array $optionen = []): array
+    {
         $rohdaten = $this->scraper->ladeKommissionen();
         $statistik = ['neu' => 0, 'aktualisiert' => 0];
         $gesamt = count($rohdaten);
@@ -344,6 +350,9 @@ class MitgliedService {
                 $kommission->setName((string) ScraperService::wert($daten, ['name', 'Name', 'bezeichnung']));
                 $kommission->setBeschreibung((string) ScraperService::wert($daten, ['description', 'beschreibung']));
                 $kommission->setMitglieder(json_encode(ScraperService::wert($daten, ['members', 'mitglieder', 'persons'], [])));
+                $kommission->setDatumVon((string) ScraperService::wert($daten, ['datumVon', '_datumVon', 'dateFrom', 'von']));
+                $kommission->setDatumBis((string) ScraperService::wert($daten, ['datumBis', '_datumBis', 'dateTo', 'bis']));
+                $kommission->setAktiv((bool) ScraperService::wert($daten, ['aktiv', 'active', 'isActive', 'is_active'], true));
                 $kommission->setAktualisiertAm((new \DateTime())->format('Y-m-d H:i:s'));
                 $this->kommissionMapper->update($kommission);
                 $statistik['aktualisiert']++;
@@ -354,6 +363,9 @@ class MitgliedService {
                 $kommission->setName((string) ScraperService::wert($daten, ['name', 'Name', 'bezeichnung']));
                 $kommission->setBeschreibung((string) ScraperService::wert($daten, ['description', 'beschreibung']));
                 $kommission->setMitglieder(json_encode(ScraperService::wert($daten, ['members', 'mitglieder', 'persons'], [])));
+                $kommission->setDatumVon((string) ScraperService::wert($daten, ['datumVon', '_datumVon', 'dateFrom', 'von']));
+                $kommission->setDatumBis((string) ScraperService::wert($daten, ['datumBis', '_datumBis', 'dateTo', 'bis']));
+                $kommission->setAktiv((bool) ScraperService::wert($daten, ['aktiv', 'active', 'isActive', 'is_active'], true));
                 $kommission->setGeloescht(false);
                 $kommission->setErstelltAm($jetzt);
                 $kommission->setAktualisiertAm($jetzt);
@@ -389,7 +401,8 @@ class MitgliedService {
      * @param array<int, array<string, mixed>> $rohdaten
      * @param array<int, string> $idFelder
      */
-    private function istResumeCursorVorhanden(array $rohdaten, string $resumeCursor, array $idFelder): bool {
+    private function istResumeCursorVorhanden(array $rohdaten, string $resumeCursor, array $idFelder): bool
+    {
         if ($resumeCursor === '') {
             return false;
         }
@@ -411,7 +424,8 @@ class MitgliedService {
      * - Bestehende Mitglieder bleiben in der Gruppe.
      * - Mitglieder, die nicht mehr zur Fraktion gehören, werden aus der Gruppe entfernt.
      */
-    public function aktualisiereNextcloudGruppe(): void {
+    public function aktualisiereNextcloudGruppe(): void
+    {
         $konfigFraktion = $this->config->getAppValue('parlwin', 'fraktion', '');
         $konfigGruppe = $this->config->getAppValue('parlwin', 'nextcloud_gruppe', '');
 
@@ -480,7 +494,8 @@ class MitgliedService {
      *
      * @return Mitglied[]
      */
-    public function alle(): array {
+    public function alle(): array
+    {
         return $this->mitgliedMapper->findAlle();
     }
 
@@ -489,7 +504,8 @@ class MitgliedService {
      *
      * @return Mitglied[]
      */
-    public function aktive(): array {
+    public function aktive(): array
+    {
         return $this->mitgliedMapper->findAktive();
     }
 
@@ -498,7 +514,8 @@ class MitgliedService {
      *
      * @throws DoesNotExistException
      */
-    public function eins(int $id): Mitglied {
+    public function eins(int $id): Mitglied
+    {
         return $this->mitgliedMapper->find($id);
     }
 
@@ -507,7 +524,8 @@ class MitgliedService {
      *
      * @return Mitglied[]
      */
-    public function aktiveDerFraktion(string $fraktion): array {
+    public function aktiveDerFraktion(string $fraktion): array
+    {
         return $this->mitgliedMapper->findByFraktion($fraktion);
     }
 
@@ -516,7 +534,8 @@ class MitgliedService {
      *
      * @throws DoesNotExistException
      */
-    public function setzeNextcloudUid(int $mitgliedId, string $nextcloudUid): Mitglied {
+    public function setzeNextcloudUid(int $mitgliedId, string $nextcloudUid): Mitglied
+    {
         $mitglied = $this->mitgliedMapper->find($mitgliedId);
         $mitglied->setNextcloudUid($nextcloudUid);
         $mitglied->setAktualisiertAm((new \DateTime())->format('Y-m-d H:i:s'));
@@ -526,7 +545,8 @@ class MitgliedService {
     /**
      * Sendet eine Einladungs-E-Mail an eine Person, die noch kein Nextcloud-Konto hat.
      */
-    private function sendeEinladung(string $email, string $name, string $gruppe): void {
+    private function sendeEinladung(string $email, string $name, string $gruppe): void
+    {
         try {
             $absenderEmail = $this->config->getAppValue('parlwin', 'absender_email', 'noreply@example.com');
             $absenderName = $this->config->getAppValue('parlwin', 'absender_name', 'Parlament Winterthur Tool');
@@ -556,7 +576,8 @@ class MitgliedService {
         }
     }
 
-    private function erstelleAusRohdaten(string $externId, array $daten): Mitglied {
+    private function erstelleAusRohdaten(string $externId, array $daten): Mitglied
+    {
         $jetzt = (new \DateTime())->format('Y-m-d H:i:s');
         $mitglied = new Mitglied();
         $mitglied->setExternId($externId);
@@ -566,7 +587,8 @@ class MitgliedService {
         return $mitglied;
     }
 
-    private function aktualisiereOeffentlicheFelder(Mitglied $mitglied, array $daten): void {
+    private function aktualisiereOeffentlicheFelder(Mitglied $mitglied, array $daten): void
+    {
         $jetzt = (new \DateTime())->format('Y-m-d H:i:s');
         $mitglied->setName((string) ScraperService::wert($daten, ['lastName', 'name', 'Name', 'nachname', 'Nachname']));
         $mitglied->setVorname((string) ScraperService::wert($daten, ['firstName', 'vorname', 'Vorname', 'firstname']));
@@ -581,7 +603,8 @@ class MitgliedService {
         $mitglied->setAktualisiertAm($jetzt);
     }
 
-    private function normalisiereBool(mixed $wert, bool $standard): bool {
+    private function normalisiereBool(mixed $wert, bool $standard): bool
+    {
         if (is_bool($wert)) {
             return $wert;
         }
