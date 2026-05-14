@@ -1,136 +1,124 @@
 <template>
-  <div class="pw-geschaefte">
-    <div class="pw-toolbar">
-      <h2>Politische Geschäfte</h2>
-      <div class="pw-filter">
-        <div class="pw-filter-feld pw-filter-wide">
-          <label for="pw-suche-feld">Suche</label>
-          <input
-            id="pw-suche-feld"
-            v-model="suche"
-            type="text"
-            placeholder="Suchen..."
-            class="pw-suche"
-          />
-        </div>
-        <div class="pw-filter-feld">
-          <label for="pw-filter-status">Status (Mehrfachauswahl)</label>
-          <select id="pw-filter-status" v-model="filterStatus" class="pw-select pw-select-multi" multiple :size="5">
-            <option v-for="s in alleStatus" :key="s" :value="s">{{ s }}</option>
-          </select>
-        </div>
-        <div class="pw-filter-feld">
-          <label for="pw-filter-typ">Typ (Mehrfachauswahl)</label>
-          <select id="pw-filter-typ" v-model="filterTyp" class="pw-select pw-select-multi" multiple :size="5">
-            <option v-for="t in alleTypen" :key="t" :value="t">{{ t }}</option>
-          </select>
-        </div>
-        <div class="pw-filter-feld">
-          <label for="pw-filter-zustaendig">Zuständige (Mehrfachauswahl)</label>
-          <select id="pw-filter-zustaendig" v-model="filterZustaendige" class="pw-select pw-select-multi" multiple :size="5">
-            <option v-for="person in aktiveZustaendigeOptionen" :key="`aktiv-${person.value}`" :value="person.value">
-              {{ person.label }}
-            </option>
-            <option v-if="aktiveZustaendigeOptionen.length > 0 && inaktiveZustaendigeOptionen.length > 0" disabled>──────────</option>
-            <option v-for="person in inaktiveZustaendigeOptionen" :key="`inaktiv-${person.value}`" :value="person.value">
-              {{ person.label }}
-            </option>
-          </select>
-        </div>
-        <div class="pw-filter-feld">
-          <label for="pw-filter-beschluss">Aktueller Beschluss (Mehrfachauswahl)</label>
-          <select id="pw-filter-beschluss" v-model="filterBeschluss" class="pw-select pw-select-multi" multiple :size="5">
-            <option v-for="b in alleBeschluesse" :key="b.code" :value="b.code">{{ b.label }}</option>
-          </select>
-        </div>
-        <div class="pw-filter-feld">
-          <label for="pw-filter-entscheidungsbedarf">Entscheidungsbedarf</label>
-          <select id="pw-filter-entscheidungsbedarf" v-model="filterEntscheidungsbedarf" class="pw-select">
-            <option value="">Alle</option>
-            <option value="1">Nur Entscheid nötig</option>
-            <option value="0">Nur ohne offenen Entscheid</option>
-          </select>
-        </div>
-        <div class="pw-filter-feld">
-          <label class="pw-filter-checkbox" for="pw-filter-show-erledigt">
-            <input id="pw-filter-show-erledigt" v-model="zeigeErledigte" type="checkbox" />
-            Erledigte anzeigen
-          </label>
-        </div>
-        <div class="pw-filter-feld pw-filter-feld-actions">
-          <button type="button" class="button pw-filter-clear" @click="resetFilter">
-            Filter zurücksetzen
-          </button>
-        </div>
-      </div>
+  <Teleport v-if="filterReady" to="#pw-search-slot">
+    <NcTextField :value="suche" label="Suche" placeholder="Nr. oder Titel" trailing-button-icon="close" :show-trailing-button="!!suche" @update:value="suche = $event" @trailing-button-click="suche = ''" />
+  </Teleport>
+  <Teleport v-if="filterReady" to="#pw-filter-slot">
+    <div class="pw-filter-body">
+      <NcSelect v-model="entscheidungsbedarfOption" :options="entscheidungsbedarfOptions" :clearable="false" input-label="Entscheidungsbedarf" />
+      <NcSelect :model-value="filterStatus" :options="alleStatus" multiple :close-on-select="false" :selectable="opt => !filterStatus.includes(opt)" input-label="Status" placeholder="Alle" @update:model-value="filterStatus = $event || []" />
+      <NcSelect :model-value="filterTyp" :options="alleTypen" multiple :close-on-select="false" :selectable="opt => !filterTyp.includes(opt)" input-label="Typ" placeholder="Alle" @update:model-value="filterTyp = $event || []" />
+      <NcSelect :model-value="filterZustaendige" :options="zustaendigeLabels" multiple :close-on-select="false" :selectable="opt => !filterZustaendige.includes(opt)" input-label="Zuständigkeit" placeholder="Alle" @update:model-value="filterZustaendige = $event || []" />
+      <NcSelect :model-value="filterBeschlussOptions" :options="beschlussOptionsList" multiple :close-on-select="false" :selectable="opt => !filterBeschluss.includes(opt.value)" input-label="Beschluss" placeholder="Alle" @update:model-value="filterBeschluss = ($event || []).map(o => o.value)" />
+      <NcCheckboxRadioSwitch v-model="zeigeErledigte" type="switch">
+        Erledigte anzeigen
+      </NcCheckboxRadioSwitch>
+      <NcButton type="tertiary" wide @click="resetFilter">Filter zurücksetzen</NcButton>
     </div>
+  </Teleport>
 
-    <div v-if="laden" class="pw-laden">Daten werden geladen...</div>
+  <section class="pw-view-content pw-geschaefte">
+      <header class="pw-view-header">
+        <h2 class="pw-view-title">Geschäfte</h2>
+        <span class="pw-view-count">{{ gefilterteGeschaefte.length }}</span>
+      </header>
+      <div v-if="laden" class="pw-laden"><NcLoadingIcon :size="32" /></div>
 
-    <div v-else class="pw-table-wrap">
-      <table class="pw-tabelle">
-        <colgroup>
-          <col class="pw-col-nr">
-          <col class="pw-col-titel">
-          <col class="pw-col-typ">
-          <col class="pw-col-status">
-          <col class="pw-col-datum">
-          <col class="pw-col-zustaendig">
-          <col class="pw-col-beschluss">
-          <col class="pw-col-fraktionsstatus">
-        </colgroup>
+      <template v-else>
+        <div class="pw-table-wrap pw-table-desktop">
+          <table class="pw-tabelle" lang="de">
         <thead>
           <tr>
-            <th @click="sortiereNach('nummer')" class="pw-sortierbar">Nr.</th>
-            <th @click="sortiereNach('titel')" class="pw-sortierbar">Titel</th>
+            <th @click="sortiereNach('nummer')" class="pw-sortierbar pw-col-nr">Nr.</th>
+            <th @click="sortiereNach('titel')" class="pw-sortierbar pw-col-titel">Titel</th>
             <th @click="sortiereNach('typ')" class="pw-sortierbar">Typ</th>
             <th @click="sortiereNach('status')" class="pw-sortierbar">Status</th>
             <th @click="sortiereNach('datum')" class="pw-sortierbar">Datum</th>
             <th>Zuständig</th>
-            <th>Aktueller Beschluss</th>
-            <th>Fraktionsstatus</th>
+            <th>Beschluss</th>
           </tr>
         </thead>
-        <tbody>
-          <tr
+          <tbody>
+            <tr
+              v-for="g in gefilterteGeschaefte"
+              :key="g.id"
+              :class="['pw-table-row-clickable', { 'pw-geloescht': g.geloescht }]"
+              tabindex="0"
+              role="button"
+              :aria-label="`Geschäft ${g.nummer || ''} öffnen`"
+              @click="oeffneDetail(g.id)"
+              @keydown.enter.prevent="oeffneDetail(g.id)"
+              @keydown.space.prevent="oeffneDetail(g.id)"
+            >
+              <td data-label="Nr." class="pw-col-nr">{{ g.nummer }}</td>
+              <td class="pw-titel pw-col-titel" data-label="Titel">
+                <a v-if="g.url" :href="g.url" target="_blank" @click.stop class="pw-inline-link" title="Extern öffnen">↗</a>
+                {{ g.titel }}
+              </td>
+              <td data-label="Typ">{{ g.typ }}</td>
+              <td data-label="Status">
+                <span :class="['pw-status-' + statusKlasse(g.status), 'pw-status-text']" :title="g.status">{{ g.status }}</span>
+              </td>
+              <td data-label="Datum">{{ formatieredatum(g.datum) }}</td>
+              <td data-label="Zuständig">{{ g.hauptZustaendigePerson || '—' }}</td>
+              <td data-label="Beschluss">{{ g.letzterBeschluss?.titel || '—' }}</td>
+            </tr>
+          </tbody>
+          </table>
+        </div>
+
+        <div class="pw-card-grid pw-card-mobile">
+          <article
             v-for="g in gefilterteGeschaefte"
-            :key="g.id"
-            :class="['pw-table-row-clickable', { 'pw-geloescht': g.geloescht }]"
+            :key="`card-${g.id}`"
+            class="pw-data-card pw-geschaeft-card"
+            :class="{ 'pw-geloescht': g.geloescht }"
             tabindex="0"
             role="button"
-            :aria-label="`Geschäft ${g.nummer || ''} öffnen`"
             @click="oeffneDetail(g.id)"
             @keydown.enter.prevent="oeffneDetail(g.id)"
             @keydown.space.prevent="oeffneDetail(g.id)"
           >
-            <td data-label="Nr."><span class="pw-cell-ellipsis" :title="g.nummer">{{ g.nummer }}</span></td>
-            <td class="pw-titel" data-label="Titel">
-              <span class="pw-cell-ellipsis" :title="g.titel">{{ g.titel }}</span>
-              <a v-if="g.url" :href="g.url" target="_blank" @click.stop class="pw-inline-link" title="Extern öffnen">↗</a>
-            </td>
-            <td data-label="Typ"><span class="pw-cell-ellipsis" :title="g.typ">{{ g.typ }}</span></td>
-            <td data-label="Status">
-              <span :class="'pw-status-' + statusKlasse(g.status)" :title="g.status">{{ g.status }}</span>
-            </td>
-            <td data-label="Datum"><span class="pw-cell-ellipsis" :title="formatieredatum(g.datum)">{{ formatieredatum(g.datum) }}</span></td>
-            <td data-label="Zuständig"><span class="pw-cell-ellipsis" :title="g.hauptZustaendigePerson">{{ g.hauptZustaendigePerson }}</span></td>
-            <td data-label="Aktueller Beschluss">
-              <span class="pw-cell-ellipsis" :title="g.letzterBeschluss?.titel || ''">{{ g.letzterBeschluss?.titel || '' }}</span>
-            </td>
-            <td data-label="Fraktionsstatus">
-              <span :class="'pw-status-' + fraktionsstatusKlasse(g.fraktionsstatus)">
-                {{ fraktionsstatusLabel(g.fraktionsstatus) }}
-              </span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+            <div class="pw-data-card-header">
+              <div>
+                <p class="pw-data-card-kicker">
+                  <a v-if="g.url" :href="g.url" target="_blank" @click.stop class="pw-inline-link" title="Extern öffnen">↗</a>
+                  {{ g.nummer || 'Ohne Nummer' }}
+                </p>
+                <h3>{{ g.titel }}</h3>
+              </div>
+              <span :class="'pw-status-' + statusKlasse(g.status)">{{ g.status || '—' }}</span>
+            </div>
+
+            <div class="pw-data-card-grid">
+              <div class="pw-data-pair">
+                <span>Typ</span>
+                <strong>{{ g.typ || '—' }}</strong>
+              </div>
+              <div class="pw-data-pair">
+                <span>Datum</span>
+                <strong>{{ formatieredatum(g.datum) || '—' }}</strong>
+              </div>
+              <div class="pw-data-pair">
+                <span>Zuständigkeit</span>
+                <strong>{{ g.hauptZustaendigePerson || '—' }}</strong>
+              </div>
+            </div>
+
+            <p class="pw-card-note">{{ g.letzterBeschluss?.titel || 'Noch kein Fraktionsbeschluss erfasst' }}</p>
+          </article>
+        </div>
+
+        <NcEmptyContent v-if="gefilterteGeschaefte.length === 0" name="Keine Geschäfte gefunden" />
+      </template>
+    </section>
 
     <div v-if="ausgewaehlteGeschaeftId" class="pw-modal-overlay" @click.self="schliesseDetail">
       <div class="pw-modal">
         <div class="pw-modal-kopf">
-          <h3>Geschäft bearbeiten</h3>
+          <div>
+            <p class="pw-modal-kicker">Geschäft bearbeiten</p>
+            <h3>{{ ausgewaehltesGeschaeft?.titel || 'Geschäft' }}</h3>
+          </div>
           <button type="button" class="button pw-btn-schliessen" aria-label="Dialog schliessen" @click="schliesseDetail">✕</button>
         </div>
         <GeschaeftDetail
@@ -140,7 +128,6 @@
         />
       </div>
     </div>
-  </div>
 </template>
 
 <script>
@@ -148,16 +135,23 @@ import { generateUrl } from '@nextcloud/router'
 import axios from '@nextcloud/axios'
 import { subscribeRealtime } from '../realtime'
 import GeschaeftDetail from './GeschaeftDetail.vue'
+import NcTextField from '@nextcloud/vue/components/NcTextField'
+import NcSelect from '@nextcloud/vue/components/NcSelect'
+import NcCheckboxRadioSwitch from '@nextcloud/vue/components/NcCheckboxRadioSwitch'
+import NcButton from '@nextcloud/vue/components/NcButton'
+import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
+import NcEmptyContent from '@nextcloud/vue/components/NcEmptyContent'
 
 export default {
   name: 'Geschaeftsliste',
-  components: { GeschaeftDetail },
+  components: { GeschaeftDetail, NcTextField, NcSelect, NcCheckboxRadioSwitch, NcButton, NcLoadingIcon, NcEmptyContent },
   props: {
     mitglieder: { type: Array, default: () => [] },
   },
   emits: ['aktualisiert'],
   data() {
     return {
+      filterReady: false,
       geschaefte: [],
       laden: true,
       suche: '',
@@ -175,6 +169,17 @@ export default {
     }
   },
   computed: {
+    entscheidungsbedarfOptions() {
+      return [
+        { label: 'Alle', value: '' },
+        { label: 'Nur Entscheid nötig', value: '1' },
+        { label: 'Nur ohne offenen Entscheid', value: '0' },
+      ]
+    },
+    entscheidungsbedarfOption: {
+      get() { return this.entscheidungsbedarfOptions.find(o => o.value === this.filterEntscheidungsbedarf) || this.entscheidungsbedarfOptions[0] },
+      set(v) { this.filterEntscheidungsbedarf = v ? v.value : '' },
+    },
     alleStatus() {
       return [...new Set(this.geschaefte.map(g => g.status).filter(Boolean))].sort()
     },
@@ -222,11 +227,17 @@ export default {
         return a.label.localeCompare(b.label)
       })
     },
-    aktiveZustaendigeOptionen() {
-      return this.zustaendigeOptionen.filter((person) => person.aktiv)
+    zustaendigeLabels() {
+      return this.zustaendigeOptionen.map((p) => p.label)
     },
-    inaktiveZustaendigeOptionen() {
-      return this.zustaendigeOptionen.filter((person) => !person.aktiv)
+    beschlussOptionsList() {
+      return this.alleBeschluesse.map((b) => ({ label: b.label, value: b.code }))
+    },
+    filterBeschlussOptions() {
+      return this.beschlussOptionsList.filter((o) => this.filterBeschluss.includes(o.value))
+    },
+    ausgewaehltesGeschaeft() {
+      return this.geschaefte.find((geschaeft) => geschaeft.id === this.ausgewaehlteGeschaeftId) || null
     },
     gefilterteGeschaefte() {
       let liste = [...this.geschaefte]
@@ -273,6 +284,7 @@ export default {
     },
   },
   mounted() {
+    this.$nextTick(() => { this.filterReady = true })
     this.initialisiereAnsicht()
     this.unsubRealtime = subscribeRealtime(this.handleRealtimeEvent)
   },
@@ -287,6 +299,14 @@ export default {
     }
   },
   methods: {
+    toggleMehrfachFilter(feld, wert, checked) {
+      const liste = Array.isArray(this[feld]) ? [...this[feld]] : []
+      const index = liste.indexOf(wert)
+      const soll = checked === undefined ? index < 0 : !!checked
+      if (soll && index < 0) liste.push(wert)
+      else if (!soll && index >= 0) liste.splice(index, 1)
+      this[feld] = liste
+    },
     vollerName(m) {
       return `${m.vorname || ''} ${m.name || ''}`.trim()
     },

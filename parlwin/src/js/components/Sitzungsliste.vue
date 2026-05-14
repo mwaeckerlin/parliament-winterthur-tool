@@ -1,24 +1,26 @@
 <template>
-  <div class="pw-sitzungen">
-    <div class="pw-toolbar">
-      <h2>Sitzungen</h2>
-      <div class="pw-filter">
-        <label class="pw-filter-checkbox">
-          <input v-model="nurKuenftige" type="checkbox" />
-          Nur zukünftige Sitzungen
-        </label>
-      </div>
+  <Teleport v-if="filterReady" to="#pw-filter-slot">
+    <div class="pw-filter-body">
+      <NcCheckboxRadioSwitch v-model="nurKuenftige" type="switch">
+        Nur zukünftige Sitzungen
+      </NcCheckboxRadioSwitch>
     </div>
+  </Teleport>
 
-    <div v-if="laden" class="pw-laden">Daten werden geladen...</div>
+  <section class="pw-view-content pw-sitzungen">
+      <header class="pw-view-header">
+        <h2 class="pw-view-title">Sitzungen</h2>
+        <span class="pw-view-count">{{ gefilterteSitzungen.length }}</span>
+      </header>
+      <div v-if="laden" class="pw-laden"><NcLoadingIcon :size="32" /></div>
 
-    <div v-else>
-      <div
-        v-for="sitzung in gefilterteSitzungen"
-        :key="sitzung.id"
-        class="pw-sitzung-karte"
-        :class="{ 'pw-vergangen': istVergangen(sitzung.datum) }"
-      >
+      <div v-else>
+        <div
+          v-for="sitzung in gefilterteSitzungen"
+          :key="sitzung.id"
+          class="pw-sitzung-karte"
+          :class="{ 'pw-vergangen': istVergangen(sitzung.datum) }"
+        >
         <div class="pw-sitzung-kopf" @click="toggleSitzung(sitzung.id)">
           <div class="pw-sitzung-datum">
             <strong>{{ formatieredatum(sitzung.datum) }}</strong>
@@ -56,8 +58,21 @@
             >
               <div class="pw-traktandum-kopf">
                 <span class="pw-traktandum-nr">{{ t.nummer }}.</span>
-                <span class="pw-traktandum-titel">{{ t.titel }}</span>
+                <button
+                  v-if="t.geschaeftId > 0"
+                  type="button"
+                  class="button pw-traktandum-link"
+                  @click="oeffneGeschaeft(t.geschaeftId)"
+                >
+                  {{ t.titel }}
+                </button>
+                <span v-else class="pw-traktandum-titel">{{ t.titel }}</span>
                 <span v-if="t.beschreibung" class="pw-traktandum-beschr">{{ t.beschreibung }}</span>
+              </div>
+              <div v-if="t.geschaeftId > 0" class="pw-traktandum-aktion">
+                <button type="button" class="button pw-btn-mini" @click="oeffneGeschaeft(t.geschaeftId)">
+                  Geschäft direkt bearbeiten
+                </button>
               </div>
               <div class="pw-traktandum-felder">
                 <textarea
@@ -92,20 +107,46 @@
             </p>
           </div>
         </div>
+        </div>
+        <p v-if="gefilterteSitzungen.length === 0" class="pw-leer">Keine Sitzungen gefunden.</p>
+      </div>
+    </section>
+
+    <div v-if="ausgewaehlteGeschaeftId" class="pw-modal-overlay" @click.self="schliesseGeschaeft">
+      <div class="pw-modal">
+        <div class="pw-modal-kopf">
+          <div>
+            <p class="pw-modal-kicker">Geschäft aus Traktandum</p>
+            <h3>{{ ausgewaehltesGeschaeftLabel }}</h3>
+          </div>
+          <button type="button" class="button pw-btn-schliessen" aria-label="Dialog schliessen" @click="schliesseGeschaeft">✕</button>
+        </div>
+        <GeschaeftDetail
+          :geschaeft-id="ausgewaehlteGeschaeftId"
+          :mitglieder="mitglieder"
+          @gespeichert="schliesseGeschaeft"
+        />
       </div>
     </div>
-  </div>
 </template>
 
 <script>
 import { generateUrl } from '@nextcloud/router'
 import axios from '@nextcloud/axios'
 import { subscribeRealtime } from '../realtime'
+import GeschaeftDetail from './GeschaeftDetail.vue'
+import NcCheckboxRadioSwitch from '@nextcloud/vue/components/NcCheckboxRadioSwitch'
+import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 
 export default {
   name: 'Sitzungsliste',
+  components: { GeschaeftDetail, NcCheckboxRadioSwitch, NcLoadingIcon },
+  props: {
+    mitglieder: { type: Array, default: () => [] },
+  },
   data() {
     return {
+      filterReady: false,
       sitzungen: [],
       laden: true,
       nurKuenftige: true,
@@ -116,6 +157,7 @@ export default {
       traktandumBemerkungen: {},
       traktandumNotizen: {},
       neueNotizen: {},
+      ausgewaehlteGeschaeftId: null,
       unsubRealtime: null,
     }
   },
@@ -125,8 +167,15 @@ export default {
       const heute = new Date().toISOString().slice(0, 10)
       return this.sitzungen.filter(s => (s.datum || '') >= heute)
     },
+    ausgewaehltesGeschaeftLabel() {
+      const traktandum = Object.values(this.traktanden)
+        .flat()
+        .find((eintrag) => Number(eintrag.geschaeftId || 0) === Number(this.ausgewaehlteGeschaeftId || 0))
+      return traktandum?.titel || 'Geschäft'
+    },
   },
   mounted() {
+    this.$nextTick(() => { this.filterReady = true })
     this.ladeSitzungen()
     this.unsubRealtime = subscribeRealtime(this.handleRealtimeEvent)
   },
@@ -244,6 +293,12 @@ export default {
       } catch (e) {
         console.error('Fehler beim Speichern des Traktandums:', e)
       }
+    },
+    oeffneGeschaeft(geschaeftId) {
+      this.ausgewaehlteGeschaeftId = Number(geschaeftId || 0) || null
+    },
+    schliesseGeschaeft() {
+      this.ausgewaehlteGeschaeftId = null
     },
     istVergangen(datum) {
       if (!datum) return false
