@@ -112,22 +112,24 @@
       </div>
     </section>
 
-    <div v-if="ausgewaehlteGeschaeftId" class="pw-modal-overlay" @click.self="schliesseGeschaeft">
-      <div class="pw-modal">
-        <div class="pw-modal-kopf">
-          <div>
-            <p class="pw-modal-kicker">Geschäft aus Traktandum</p>
-            <h3>{{ ausgewaehltesGeschaeftLabel }}</h3>
+    <Teleport to="body">
+      <div v-if="ausgewaehlteGeschaeftId" class="pw-modal-overlay" @click.self="schliesseGeschaeft">
+        <div class="pw-modal">
+          <div class="pw-modal-kopf">
+            <div>
+              <p class="pw-modal-kicker">Geschäft aus Traktandum</p>
+              <h3>{{ ausgewaehltesGeschaeftLabel }}</h3>
+            </div>
+            <button type="button" class="button pw-btn-schliessen" aria-label="Dialog schliessen" @click="schliesseGeschaeft">✕</button>
           </div>
-          <button type="button" class="button pw-btn-schliessen" aria-label="Dialog schliessen" @click="schliesseGeschaeft">✕</button>
+          <GeschaeftDetail
+            :geschaeft-id="ausgewaehlteGeschaeftId"
+            :mitglieder="mitglieder"
+            @gespeichert="schliesseGeschaeft"
+          />
         </div>
-        <GeschaeftDetail
-          :geschaeft-id="ausgewaehlteGeschaeftId"
-          :mitglieder="mitglieder"
-          @gespeichert="schliesseGeschaeft"
-        />
       </div>
-    </div>
+    </Teleport>
 </template>
 
 <script>

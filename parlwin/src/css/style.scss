@@ -679,7 +679,7 @@ ul.app-navigation__list {
 .pw-modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: 2000;
+  z-index: 10000;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -858,6 +858,46 @@ ul.app-navigation__list {
 .pw-kommission-mitglieder {
   display: grid;
   gap: 0.25rem;
+}
+
+.pw-kommission-geschaefte {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.pw-kommission-geschaeftsliste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.25rem;
+
+  li {
+    display: grid;
+    grid-template-columns: auto auto 1fr auto;
+    gap: 0.5rem;
+    align-items: baseline;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--border-radius, 0.25rem);
+    background: var(--pw-surface-soft);
+  }
+
+  .pw-nr {
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .pw-titel {
+    overflow-wrap: anywhere;
+    hyphens: auto;
+    -webkit-hyphens: auto;
+  }
+
+  .pw-status {
+    font-size: 0.75rem;
+    color: var(--color-text-maxcontrast, var(--pw-fg-muted));
+    white-space: nowrap;
+  }
 }
 
 .pw-badge,
