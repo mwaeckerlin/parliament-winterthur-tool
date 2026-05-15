@@ -51,6 +51,24 @@ class SitzungService {
             ]);
         }
 
+        // Detailseiten parallel vorladen, statt sie pro Sitzung sequenziell
+        // nachzuziehen. Verhindert das wahrgenommene Hängen bei späten
+        // Sitzungen, deren Server-Antwort langsam ist.
+        $detailUrls = [];
+        foreach ($rohdaten as $daten) {
+            $hatInline = !empty(ScraperService::wert($daten, ['agenda', 'Agenda', 'traktanden', 'items'], []));
+            if ($hatInline) {
+                continue;
+            }
+            $url = (string) ScraperService::wert($daten, ['url', 'Url', 'URL', 'detailUrl', 'link']);
+            if ($url !== '') {
+                $detailUrls[] = $url;
+            }
+        }
+        $traktandenCache = $detailUrls !== []
+            ? $this->scraper->ladeTraktandenJeUrlParallel($detailUrls)
+            : [];
+
         foreach ($rohdaten as $daten) {
             $verarbeitet++;
             $externId = (string) ScraperService::wert($daten, ['id', 'Id', 'ID', 'guid']);
@@ -102,7 +120,7 @@ class SitzungService {
             // Traktanden laden, wenn eine Detail-URL vorhanden ist
             $detailUrl = (string) ScraperService::wert($daten, ['url', 'Url', 'URL', 'detailUrl', 'link']);
             if (!empty($detailUrl)) {
-                $this->synchronisiereTraktanden($sitzung, $detailUrl, $daten);
+                $this->synchronisiereTraktanden($sitzung, $detailUrl, $daten, $traktandenCache);
             }
 
             if ($fortschritt !== null) {
@@ -156,14 +174,21 @@ class SitzungService {
 
     /**
      * Synchronisiert die Traktanden einer einzelnen Sitzung.
+     *
+     * @param array<string, array> $traktandenCache Map: absolute URL → vorab geladene Traktanden
      */
-    private function synchronisiereTraktanden(Sitzung $sitzung, string $url, array $sitzungsDaten): void {
+    private function synchronisiereTraktanden(Sitzung $sitzung, string $url, array $sitzungsDaten, array $traktandenCache = []): void {
         // Traktanden können direkt in den Sitzungsdaten enthalten sein
         $traktandenDaten = ScraperService::wert($sitzungsDaten, ['agenda', 'Agenda', 'traktanden', 'items'], []);
 
-        // Oder von der Detailseite laden
+        // Oder von der Detailseite laden (bevorzugt aus dem parallelen Cache)
         if (empty($traktandenDaten) && !empty($url)) {
-            $traktandenDaten = $this->scraper->ladeTraktanden($url);
+            $absUrl = ScraperService::absolutUrl($url);
+            if ($absUrl !== '' && array_key_exists($absUrl, $traktandenCache)) {
+                $traktandenDaten = $traktandenCache[$absUrl];
+            } else {
+                $traktandenDaten = $this->scraper->ladeTraktanden($url);
+            }
         }
 
         if (empty($traktandenDaten)) {

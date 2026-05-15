@@ -105,22 +105,43 @@ class GeschaeftMapper extends QBMapper
     /**
      * Markiert alle Geschäfte, deren externe IDs nicht in $bekannteIds sind, als gelöscht.
      *
+     * Implementierung ohne `NOT IN (große-liste)`, da Nextclouds DBAL Oracle-kompatible
+     * Limits durchsetzt (max. 1000 IN-Werte). Wir laden die aktuell ungelöschten
+     * extern_ids, ermitteln in PHP, welche fehlen, und löschen sie chunkweise via `IN`.
+     *
      * @param string[] $bekannteIds Externe IDs, die noch auf der Webseite vorhanden sind
      */
     public function markiereNichtMehrVorhandeneAlsGeloescht(array $bekannteIds): int
     {
         $qb = $this->db->getQueryBuilder();
-        $qb->update($this->getTableName())
-            ->set('geloescht', $qb->createNamedParameter(true, IQueryBuilder::PARAM_BOOL))
-            ->set('aktualisiert_am', $qb->createNamedParameter((new \DateTime())->format('Y-m-d H:i:s')))
+        $qb->select('extern_id')
+            ->from($this->getTableName())
             ->where($qb->expr()->eq('geloescht', $qb->createNamedParameter(false, IQueryBuilder::PARAM_BOOL)));
-        if (!empty($bekannteIds)) {
-            $qb->andWhere($qb->expr()->notIn(
-                'extern_id',
-                $qb->createNamedParameter($bekannteIds, IQueryBuilder::PARAM_STR_ARRAY)
-            ));
+        $result = $qb->executeQuery();
+        $aktive = [];
+        while ($row = $result->fetch()) {
+            $aktive[] = (string) $row['extern_id'];
         }
-        return $qb->executeStatement();
+        $result->closeCursor();
+
+        $bekanntSet = array_flip(array_map('strval', $bekannteIds));
+        $zuLoeschen = array_values(array_filter($aktive, static fn(string $id): bool => !isset($bekanntSet[$id])));
+        if ($zuLoeschen === []) {
+            return 0;
+        }
+
+        $jetzt = (new \DateTime())->format('Y-m-d H:i:s');
+        $total = 0;
+        foreach (array_chunk($zuLoeschen, 900) as $chunk) {
+            $qbu = $this->db->getQueryBuilder();
+            $qbu->update($this->getTableName())
+                ->set('geloescht', $qbu->createNamedParameter(true, IQueryBuilder::PARAM_BOOL))
+                ->set('aktualisiert_am', $qbu->createNamedParameter($jetzt))
+                ->where($qbu->expr()->eq('geloescht', $qbu->createNamedParameter(false, IQueryBuilder::PARAM_BOOL)))
+                ->andWhere($qbu->expr()->in('extern_id', $qbu->createNamedParameter($chunk, IQueryBuilder::PARAM_STR_ARRAY)));
+            $total += $qbu->executeStatement();
+        }
+        return $total;
     }
 
     /**

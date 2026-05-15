@@ -3,14 +3,46 @@
   "version": "1.0.0",
   "private": true,
   "license": "MIT",
+  "description": "Nextcloud-Plugin für die Fraktionsarbeit im Winterthurer Parlament",
+  "keywords": [
+    "nextcloud",
+    "parliament",
+    "winterthur",
+    "fraktion"
+  ],
   "scripts": {
     "build": "docker compose build",
     "start": "docker compose up -d --build --force-recreate --remove-orphans",
     "start:dev": "docker compose up -d --build --force-recreate --remove-orphans",
     "stop": "docker compose down --remove-orphans",
+    "build:app": "webpack --node-env production --config parlwin/webpack.js && npm run build:css",
+    "build:css": "sass parlwin/src/css/style.scss parlwin/css/parlwin-style.css --no-source-map",
+    "dev": "webpack --node-env development --config parlwin/webpack.js --watch",
+    "lint": "eslint parlwin/src --ext .js,.vue",
     "test:unit": "cd parlwin && phpunit --bootstrap tests/bootstrap.php --exclude-group live --fail-on-warning --fail-on-risky --fail-on-deprecation --fail-on-notice --fail-on-skipped --fail-on-incomplete tests",
     "test:live": "cd parlwin && phpunit --bootstrap tests/bootstrap.php --group live --fail-on-warning --fail-on-risky --fail-on-deprecation --fail-on-notice --fail-on-skipped --fail-on-incomplete tests/Service/ScraperLiveEndpointTest.php",
     "test:e2e": "./tests/e2e/run-compose-e2e.sh",
     "test": "npm run test:unit && npm run test:live && npm run test:e2e"
+  },
+  "dependencies": {
+    "@nextcloud/axios": "^2.5.0",
+    "@nextcloud/router": "^3.0.1",
+    "@nextcloud/vue": "^9.8.0",
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "@nextcloud/eslint-config": "^8.4.1",
+    "@nextcloud/webpack-vue-config": "^7.0.2",
+    "babel-loader": "^10.0.0",
+    "css-loader": "^7.1.2",
+    "eslint": "^8.57.0",
+    "eslint-plugin-vue": "^9.26.0",
+    "sass": "^1.77.4",
+    "sass-loader": "^16.0.2",
+    "terser-webpack-plugin": "^5.3.10",
+    "vue-loader": "^17.4.2",
+    "webpack": "^5.93.0",
+    "webpack-cli": "^6.0.1"
   }
 }
+

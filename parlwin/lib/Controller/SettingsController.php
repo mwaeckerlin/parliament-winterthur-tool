@@ -44,6 +44,7 @@ class SettingsController extends Controller
     private const SYNC_CANCEL_TERM_WAIT_MS = 250;
     private const SYNC_CANCEL_KILL_WAIT_MS = 450;
     private const SYNC_CANCEL_STEP_MS = 50;
+    private string $letzterCreateUserFehler = '';
     private const SYNC_SECTION_META = [
         'mitglieder' => ['label' => 'Mitglieder', 'db' => 'pw_mitglieder'],
         'fraktionen' => ['label' => 'Fraktionen', 'db' => 'pw_fraktionen'],
@@ -105,22 +106,25 @@ class SettingsController extends Controller
     public function set(): DataResponse
     {
         $fraktionsOptionen = $this->fraktionsOptionen();
+        $sentinel = new \stdClass();
         $zuSpeichern = [];
         foreach (self::EINSTELLUNGEN as $schluessel => $standard) {
-            if ($this->request->offsetExists($schluessel)) {
-                $wert = trim((string) $this->request->getParam($schluessel, $standard));
-                if ($schluessel === 'fraktion' && $wert !== '' && !$this->istGueltigeFraktion($wert, $fraktionsOptionen)) {
-                    return new DataResponse([
-                        'fehler' => 'Bitte eine vorhandene Fraktion aus der Liste wählen.',
-                    ], Http::STATUS_BAD_REQUEST);
-                }
-                if ($schluessel === 'kalender_nutzer' && $wert !== '' && $this->userManager->get($wert) === null) {
-                    return new DataResponse([
-                        'fehler' => 'Der gewählte Kalender-Benutzer existiert nicht.',
-                    ], Http::STATUS_BAD_REQUEST);
-                }
-                $zuSpeichern[$schluessel] = $wert;
+            $raw = $this->request->getParam($schluessel, $sentinel);
+            if ($raw === $sentinel) {
+                continue;
             }
+            $wert = trim((string) $raw);
+            if ($schluessel === 'fraktion' && $wert !== '' && !$this->istGueltigeFraktion($wert, $fraktionsOptionen)) {
+                return new DataResponse([
+                    'fehler' => 'Bitte eine vorhandene Fraktion aus der Liste wählen.',
+                ], Http::STATUS_BAD_REQUEST);
+            }
+            if ($schluessel === 'kalender_nutzer' && $wert !== '' && $this->userManager->get($wert) === null) {
+                return new DataResponse([
+                    'fehler' => 'Der gewählte Kalender-Benutzer existiert nicht.',
+                ], Http::STATUS_BAD_REQUEST);
+            }
+            $zuSpeichern[$schluessel] = $wert;
         }
         foreach ($zuSpeichern as $schluessel => $wert) {
             $this->config->setAppValue(Application::APP_ID, $schluessel, (string) $wert);
@@ -246,6 +250,12 @@ class SettingsController extends Controller
             }
 
             if (!$this->gehoertMitgliedZuFraktion($mitglied, $fraktion)) {
+                $statistik['warnungen'][] = sprintf(
+                    'Mitglied "%s" (ID %d) gehört nicht zur Fraktion "%s" und wurde übersprungen.',
+                    trim((string) $mitglied->getName()) !== '' ? $mitglied->getName() : '?',
+                    $mitgliedId,
+                    $fraktion
+                );
                 continue;
             }
 
@@ -254,9 +264,16 @@ class SettingsController extends Controller
 
             $user = $this->userManager->get($username);
             if ($user === null) {
+                $this->letzterCreateUserFehler = '';
                 $user = $this->erstelleNextcloudUser($username, $mitglied);
                 if ($user === null) {
-                    $statistik['warnungen'][] = sprintf('User "%s" konnte nicht angelegt werden.', $username);
+                    $statistik['warnungen'][] = sprintf(
+                        'User "%s" konnte nicht angelegt werden%s.',
+                        $username,
+                        $this->letzterCreateUserFehler !== ''
+                            ? ': ' . $this->letzterCreateUserFehler
+                            : ''
+                    );
                     continue;
                 }
                 $statistik['angelegt']++;
@@ -291,7 +308,7 @@ class SettingsController extends Controller
         $vorherigerStatus = $this->getSyncProgress();
         $warStaleAbbruch = false;
 
-        if ($this->syncLockService->isLocked()) {
+        if ($this->syncLockService->isLocked() || $this->istWorkerProzessLebendig()) {
             return new DataResponse([
                 'erfolg' => true,
                 'asynchron' => true,
@@ -302,7 +319,8 @@ class SettingsController extends Controller
 
         if (($vorherigerStatus['running'] ?? false) === true) {
             $phase = (string) ($vorherigerStatus['phase'] ?? '');
-            if (!$this->syncLockService->isLocked()) {
+            $syncAktiv = $this->syncLockService->isLocked() || $this->istWorkerProzessLebendig();
+            if (!$syncAktiv) {
                 if ($phase === 'queued' && $this->istQueueStartFrisch($vorherigerStatus)) {
                     return new DataResponse([
                         'erfolg' => true,
@@ -406,7 +424,9 @@ class SettingsController extends Controller
     public function cancelSync(): DataResponse
     {
         $status = $this->getSyncProgress();
-        $laeuft = ($status['running'] ?? false) === true || $this->syncLockService->isLocked();
+        $laeuft = ($status['running'] ?? false) === true
+            || $this->syncLockService->isLocked()
+            || $this->istWorkerProzessLebendig();
 
         if (!$laeuft) {
             $this->setCancelRequested(false);
@@ -489,8 +509,10 @@ class SettingsController extends Controller
     {
         $status = $this->getSyncProgress();
         $lockAktiv = $this->syncLockService->isLocked();
+        $workerLebt = $this->istWorkerProzessLebendig();
+        $syncAktiv = $lockAktiv || $workerLebt;
 
-        if (($status['running'] ?? false) !== true && $lockAktiv) {
+        if (($status['running'] ?? false) !== true && $syncAktiv) {
             $status['running'] = true;
             $status['phase'] = 'running';
             $status['phaseLabel'] = 'Synchronisation läuft';
@@ -507,7 +529,7 @@ class SettingsController extends Controller
         }
         if (($status['running'] ?? false) === true) {
             $phase = (string) ($status['phase'] ?? '');
-            if (!$lockAktiv) {
+            if (!$syncAktiv) {
                 if (
                     $phase === 'queued'
                     && $this->istQueueStartFrisch($status)
@@ -836,7 +858,7 @@ class SettingsController extends Controller
 
     private function gehoertMitgliedZuFraktion(Mitglied $mitglied, string $fraktion): bool
     {
-        return strcasecmp(trim($mitglied->getFraktion()), trim($fraktion)) === 0;
+        return $this->mitgliedService->gehoertZurFraktion($mitglied, $fraktion);
     }
 
     private function vorschlagUsernameFuerMitglied(Mitglied $mitglied): string
@@ -865,9 +887,19 @@ class SettingsController extends Controller
         }
 
         $wert = function_exists('mb_strtolower') ? mb_strtolower($wert, 'UTF-8') : strtolower($wert);
+        $umlautMap = [
+            'ä' => 'ae', 'ö' => 'oe', 'ü' => 'ue', 'ß' => 'ss',
+            'à' => 'a', 'á' => 'a', 'â' => 'a', 'ã' => 'a', 'å' => 'a',
+            'è' => 'e', 'é' => 'e', 'ê' => 'e', 'ë' => 'e',
+            'ì' => 'i', 'í' => 'i', 'î' => 'i', 'ï' => 'i',
+            'ò' => 'o', 'ó' => 'o', 'ô' => 'o', 'õ' => 'o',
+            'ù' => 'u', 'ú' => 'u', 'û' => 'u',
+            'ñ' => 'n', 'ç' => 'c',
+        ];
+        $wert = strtr($wert, $umlautMap);
         $wert = (string) preg_replace('/\s+/u', '-', $wert);
-        $wert = (string) preg_replace('/[^\p{L}\p{N}._-]+/u', '-', $wert);
-        $wert = (string) preg_replace('/-+/u', '-', $wert);
+        $wert = (string) preg_replace('/[^a-z0-9._-]+/', '-', $wert);
+        $wert = (string) preg_replace('/-+/', '-', $wert);
         $wert = trim($wert, '-._');
         if ($wert === '') {
             $wert = 'mitglied-' . (string) $mitglied->getId();
@@ -898,7 +930,8 @@ class SettingsController extends Controller
         try {
             /** @var mixed $created */
             $created = $this->userManager->createUser($username, $password);
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            $this->letzterCreateUserFehler = $e->getMessage();
             return null;
         }
 
@@ -913,7 +946,32 @@ class SettingsController extends Controller
         }
 
         $this->setzeUserProfilfelder($user, $mitglied);
+        $this->sendeWillkommensMail($user);
         return $user;
+    }
+
+    /**
+     * Sendet die Standard-Nextcloud-Willkommensmail mit einem Passwort-Setz-Link,
+     * sodass der neue Benutzer sein eigenes Passwort vergeben kann.
+     */
+    private function sendeWillkommensMail(IUser $user): void
+    {
+        $email = trim((string) $user->getEMailAddress());
+        if ($email === '') {
+            return;
+        }
+        $helperClass = '\\OCA\\Settings\\Mailer\\NewUserMailHelper';
+        if (!class_exists($helperClass)) {
+            return;
+        }
+        try {
+            /** @var object $helper */
+            $helper = \OCP\Server::get($helperClass);
+            $template = $helper->generateTemplate($user, true);
+            $helper->sendMail($user, $template);
+        } catch (\Throwable $e) {
+            $this->letzterCreateUserFehler = 'Willkommensmail konnte nicht gesendet werden: ' . $e->getMessage();
+        }
     }
 
     private function setzeUserProfilfelder(IUser $user, Mitglied $mitglied): void
@@ -939,6 +997,19 @@ class SettingsController extends Controller
                 } catch (\Throwable) {
                 }
             }
+        }
+
+        if (method_exists($user, 'setQuota')) {
+            try {
+                $user->setQuota('default');
+            } catch (\Throwable) {
+            }
+        }
+
+        try {
+            $this->config->setUserValue($user->getUID(), 'core', 'lang', 'de');
+            $this->config->setUserValue($user->getUID(), 'core', 'locale', 'de_CH');
+        } catch (\Throwable) {
         }
     }
 
@@ -1062,9 +1133,16 @@ class SettingsController extends Controller
 
     private function starteSyncImHintergrund(): bool
     {
-        if ($this->starteSyncUeberOccProzess()) {
-            return true;
-        }
+        // Der Sync läuft im aktuellen FPM-Worker weiter, NACHDEM die HTTP-Antwort an
+        // den Browser geschickt wurde (fastcgi_finish_request). Damit erbt der Sync
+        // automatisch fd1/fd2 des FPM-Workers; in Kombination mit
+        // `catch_workers_output=yes` in der Pool-Config landen alle Ausgaben (stdout
+        // und stderr, inkl. error_log()) im docker-logs-Stream. Ein separat per
+        // proc_open gestarteter Child-Prozess würde demgegenüber stdout/stderr auf
+        // /dev/null abgleiten lassen, weil PHP-FPM die Worker-Pipes nicht an Kinder
+        // weiterreicht. Singleton wird über SyncLockService garantiert.
+        @ignore_user_abort(true);
+        @set_time_limit(0);
 
         try {
             register_shutdown_function(function (): void {
@@ -1074,7 +1152,16 @@ class SettingsController extends Controller
                 if (function_exists('fastcgi_finish_request')) {
                     @fastcgi_finish_request();
                 }
-                $this->fuehreSynchronisationAus();
+                @ignore_user_abort(true);
+                @set_time_limit(0);
+                $pid = getmypid() ?: 0;
+                error_log('[parlwin] sync-worker gestartet (FPM-Worker PID=' . $pid . ', Quelle=admin-ui)');
+                try {
+                    $this->fuehreSynchronisationAus();
+                    error_log('[parlwin] sync-worker beendet (FPM-Worker PID=' . $pid . ')');
+                } catch (\Throwable $e) {
+                    error_log('[parlwin] sync-worker Fehler (PID=' . $pid . '): ' . $e->getMessage());
+                }
             });
             return true;
         } catch (\Throwable) {
@@ -1084,7 +1171,7 @@ class SettingsController extends Controller
 
     private function starteSyncUeberOccProzess(): bool
     {
-        if (!$this->funktionVerfuegbar('exec')) {
+        if (!$this->funktionVerfuegbar('proc_open')) {
             return false;
         }
 
@@ -1093,23 +1180,123 @@ class SettingsController extends Controller
             return false;
         }
 
-        $phpBinary = PHP_BINARY !== '' ? PHP_BINARY : 'php';
-        $cmd = sprintf(
-            '%s -d max_execution_time=0 %s parlwin:sync --update-progress --source=admin-ui --no-ansi --no-interaction > /tmp/parlwin-sync.log 2>&1 & echo $!',
-            escapeshellarg($phpBinary),
-            escapeshellarg($occPfad)
-        );
+        $phpBinary = $this->ermittlePhpCliBinary();
+        if ($phpBinary === '') {
+            return false;
+        }
 
-        $output = [];
-        $code = 1;
-        @exec($cmd, $output, $code);
-        if ($code === 0 && isset($output[0])) {
-            $pid = (int) trim((string) $output[0]);
-            if ($pid > 1) {
-                $this->setCurrentWorkerPid($pid);
+        // Array-Form von proc_open umgeht jede Shell (in diesem Container fehlt /bin/sh).
+        // stdout/stderr werden via php://fd/{1,2} an die fd1/fd2 des FPM-Workers gebunden;
+        // FPM ist mit `catch_workers_output=yes` konfiguriert, sodass die Sync-Ausgaben in
+        // `docker logs` sichtbar werden. Stdin geht nach /dev/null. Sobald proc_open
+        // zurückkehrt, lassen wir das Process-Handle bewusst fallen (kein proc_close),
+        // damit der Sync-Prozess nach Beenden des FPM-Workers von init (PID 1) adoptiert
+        // wird und im Hintergrund weiterläuft.
+        $kommando = [
+            $phpBinary,
+            '-d',
+            'max_execution_time=0',
+            $occPfad,
+            'parlwin:sync',
+            '--update-progress',
+            '--source=admin-ui',
+            '--no-ansi',
+            '--no-interaction',
+        ];
+        $stdoutResource = @fopen('php://fd/1', 'w');
+        $stderrResource = @fopen('php://fd/2', 'w');
+        $descriptors = [
+            0 => ['file', '/dev/null', 'r'],
+            1 => is_resource($stdoutResource) ? $stdoutResource : ['file', '/dev/null', 'a'],
+            2 => is_resource($stderrResource) ? $stderrResource : ['file', '/dev/null', 'a'],
+        ];
+        $pipes = [];
+
+        $handle = @proc_open($kommando, $descriptors, $pipes, '/tmp', null);
+        if (!is_resource($handle)) {
+            if (is_resource($stdoutResource)) {
+                @fclose($stdoutResource);
+            }
+            if (is_resource($stderrResource)) {
+                @fclose($stderrResource);
+            }
+            return false;
+        }
+
+        foreach ($pipes as $pipe) {
+            if (is_resource($pipe)) {
+                @fclose($pipe);
             }
         }
-        return $code === 0;
+        if (is_resource($stdoutResource)) {
+            @fclose($stdoutResource);
+        }
+        if (is_resource($stderrResource)) {
+            @fclose($stderrResource);
+        }
+
+        $status = @proc_get_status($handle);
+        $pid = is_array($status) ? (int) ($status['pid'] ?? 0) : 0;
+        if ($pid > 1) {
+            $this->setCurrentWorkerPid($pid);
+        }
+
+        // Detach: Handle bewusst nicht via proc_close abwarten.
+        unset($handle);
+
+        return $pid > 1;
+    }
+
+    /**
+     * Liefert einen schreibbaren Pfad, der auf den Container-Stdout (fd=1) bzw. -Stderr (fd=2)
+     * verweist, sodass `docker logs` die Ausgaben des detached Sync-Prozesses einsammelt.
+     * Wir bevorzugen /proc/1/fd/<n>; existiert das nicht, fallen wir auf /dev/stdout bzw.
+     * /dev/stderr zurück und im Notfall auf /dev/null.
+     */
+    private function ermittleContainerLogZiel(int $fd): string
+    {
+        $kandidaten = [
+            '/proc/1/fd/' . $fd,
+            $fd === 1 ? '/dev/stdout' : '/dev/stderr',
+            '/proc/self/fd/' . $fd,
+        ];
+        foreach ($kandidaten as $pfad) {
+            if (@file_exists($pfad) && @is_writable($pfad)) {
+                return $pfad;
+            }
+        }
+        return '/dev/null';
+    }
+
+    private function ermittlePhpCliBinary(): string
+    {
+        // In einem PHP-FPM-Worker ist PHP_BINARY oft das FPM-Binary (z.B. /usr/sbin/php-fpm),
+        // welches OCC-Argumente nicht interpretieren kann. Wir bevorzugen daher das CLI-Binary.
+        $kandidaten = [];
+        if (PHP_SAPI === 'cli' && PHP_BINARY !== '' && @is_executable(PHP_BINARY)) {
+            $kandidaten[] = PHP_BINARY;
+        }
+        $kandidaten[] = '/usr/bin/php';
+        $kandidaten[] = '/usr/local/bin/php';
+        if (defined('PHP_BINDIR') && PHP_BINDIR !== '') {
+            $kandidaten[] = rtrim(PHP_BINDIR, '/') . '/php';
+        }
+        // PHP_BINARY zuletzt als Fallback, falls nichts anderes verfügbar.
+        if (PHP_BINARY !== '') {
+            $kandidaten[] = PHP_BINARY;
+        }
+        foreach ($kandidaten as $kandidat) {
+            if ($kandidat === '' || !@is_file($kandidat) || !@is_executable($kandidat)) {
+                continue;
+            }
+            // FPM/CGI-Binaries explizit aussortieren.
+            $basis = basename($kandidat);
+            if (str_contains($basis, 'fpm') || str_contains($basis, 'cgi')) {
+                continue;
+            }
+            return $kandidat;
+        }
+        return '';
     }
 
     private function ermittleOccPfad(): string
@@ -1508,6 +1695,8 @@ class SettingsController extends Controller
         $status['updatedAt'] = (new \DateTimeImmutable())->format(DATE_ATOM);
         $status['elapsed'] = $this->formatiereDauer(max(0, time() - $start->getTimestamp()));
         $this->setSyncProgress($status);
+        error_log('[parlwin] sync-phase: ' . self::SYNC_SECTION_META[$scope]['label']
+            . ' (db=' . self::SYNC_SECTION_META[$scope]['db'] . ')');
     }
 
     private function isCancelRequested(): bool
@@ -1532,6 +1721,31 @@ class SettingsController extends Controller
         }
         $pid = (int) $raw;
         return $pid > 1 ? $pid : null;
+    }
+
+    /**
+     * Prüft, ob der zuletzt gespeicherte Worker-Prozess noch läuft.
+     * Wir bevorzugen `posix_kill($pid, 0)`, fallen sonst auf `/proc/<pid>` zurück.
+     */
+    private function istWorkerProzessLebendig(): bool
+    {
+        $pid = $this->getCurrentWorkerPid();
+        if ($pid === null) {
+            return false;
+        }
+        if (function_exists('posix_kill')) {
+            if (@posix_kill($pid, 0)) {
+                return true;
+            }
+            // ESRCH oder EPERM: bei EPERM lebt der Prozess noch (gehört nur jemand anderem).
+            if (function_exists('posix_get_last_error') && posix_get_last_error() === 1 /* EPERM */) {
+                return true;
+            }
+        }
+        if (@is_dir('/proc/' . $pid)) {
+            return true;
+        }
+        return false;
     }
 
     private function setCurrentWorkerPid(?int $pid): void

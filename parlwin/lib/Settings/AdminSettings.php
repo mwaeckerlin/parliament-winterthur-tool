@@ -6,7 +6,6 @@ namespace OCA\ParliamentWinterthur\Settings;
 
 use OCA\ParliamentWinterthur\AppInfo\Application;
 use OCA\ParliamentWinterthur\Db\FraktionMapper;
-use OCP\AppFramework\Http\ContentSecurityPolicy;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IConfig;
 use OCP\IGroupManager;
@@ -18,8 +17,6 @@ use OCP\IUserManager;
 use OCP\Util;
 
 class AdminSettings implements ISettings {
-    private const DEFAULT_REALTIME_PORT = 29825;
-
     public function __construct(
         private readonly IConfig $config,
         private readonly IL10N $l,
@@ -56,16 +53,7 @@ class AdminSettings implements ISettings {
             'kalender_nutzer_optionen_aktiv' => $kalenderNutzerOptionen['aktiv'],
             'kalender_nutzer_optionen_inaktiv' => $kalenderNutzerOptionen['inaktiv'],
             'realtime_ws_url' => $realtimeWsUrl,
-            'realtime_ws_port' => $this->realtimePort(),
-            'realtime_ws_path' => $this->realtimePath(),
         ], '');
-
-        $connectDomain = $this->connectDomainFromUrl($realtimeWsUrl);
-        if ($connectDomain !== '') {
-            $csp = new ContentSecurityPolicy();
-            $csp->addAllowedConnectDomain($connectDomain);
-            $response->setContentSecurityPolicy($csp);
-        }
 
         return $response;
     }
@@ -89,31 +77,16 @@ class AdminSettings implements ISettings {
             return $configured;
         }
 
+        // Default: same-origin reverse-proxy convention provided by
+        // mwaeckerlin/nextcloud:nginx. The /ws/<appid>/ location is
+        // proxied to the parlwin-ws service on the internal port 3001.
         $host = trim((string) $this->request->getServerHost());
         if ($host === '') {
             $host = 'localhost';
         }
         $scheme = $this->isHttpsRequest() ? 'wss' : 'ws';
-        return sprintf('%s://%s:%d%s', $scheme, $host, $this->realtimePort(), $this->realtimePath());
-    }
-
-    private function realtimePort(): int {
-        $env = trim((string) getenv('PARLWIN_REALTIME_PORT'));
-        if ($env !== '' && ctype_digit($env)) {
-            return (int) $env;
-        }
-        return self::DEFAULT_REALTIME_PORT;
-    }
-
-    private function realtimePath(): string {
-        $path = trim((string) getenv('PARLWIN_REALTIME_PATH'));
-        if ($path === '') {
-            return '/ws';
-        }
-        if (!str_starts_with($path, '/')) {
-            $path = '/' . $path;
-        }
-        return $path;
+        $webroot = rtrim((string) \OC::$WEBROOT, '/');
+        return sprintf('%s://%s%s/ws/%s/', $scheme, $host, $webroot, Application::APP_ID);
     }
 
     private function isHttpsRequest(): bool {
@@ -129,28 +102,6 @@ class AdminSettings implements ISettings {
 
         $protocol = strtolower(trim((string) $this->request->getServerProtocol()));
         return $protocol === 'https';
-    }
-
-    private function connectDomainFromUrl(string $url): string {
-        if ($url === '') {
-            return '';
-        }
-
-        $teile = parse_url($url);
-        if (!is_array($teile) || empty($teile['scheme']) || empty($teile['host'])) {
-            return '';
-        }
-
-        $scheme = strtolower((string) $teile['scheme']);
-        if (!in_array($scheme, ['ws', 'wss', 'http', 'https'], true)) {
-            return '';
-        }
-
-        $domain = $scheme . '://' . $teile['host'];
-        if (isset($teile['port'])) {
-            $domain .= ':' . (int) $teile['port'];
-        }
-        return $domain;
     }
 
     /**

@@ -122,18 +122,91 @@ class ScraperHtmlSyncTest extends TestCase {
 
     public function testLadeKommissionenAusLokalerFixture(): void {
         $html = $this->ladeFixture('kommissionen-list.html');
-        $this->erwarteHttpAntwort('https://parlament.winterthur.ch/kommissionen', $html);
+        $detailHtml = $this->ladeFixture('kommission-detail-27446.html');
+
+        $this->erwarteHttpAntwortenMitResolver(static function (string $url) use ($html, $detailHtml): string {
+            if ($url === 'https://parlament.winterthur.ch/kommissionen') {
+                return $html;
+            }
+            if ($url === 'https://parlament.winterthur.ch/_rte/behoerde/27446') {
+                return $detailHtml;
+            }
+            if (str_contains($url, '/_rte/behoerde/')) {
+                // Andere Kommissionen liefern leeres HTML → keine Mitglieder
+                return '<html></html>';
+            }
+            throw new \RuntimeException("Unerwartete URL: {$url}");
+        });
 
         $entitaeten = $this->service->ladeKommissionen();
 
         $this->assertNotEmpty($entitaeten);
         $this->assertSame('27446', ScraperService::wert($entitaeten[0], ['id']));
         $this->assertSame('Aufsichtskommission', ScraperService::wert($entitaeten[0], ['name']));
+
+        // Mitgliederliste der Aufsichtskommission muss aus der Detailseite stammen
+        $mitglieder = $entitaeten[0]['members'] ?? [];
+        $this->assertIsArray($mitglieder);
+        $this->assertNotEmpty($mitglieder, 'Aufsichtskommission sollte Mitglieder aus der Detailseite haben');
+
+        $aktive = array_values(array_filter($mitglieder, static fn (array $m): bool => ($m['aktiv'] ?? false) === true));
+        $inaktive = array_values(array_filter($mitglieder, static fn (array $m): bool => ($m['aktiv'] ?? true) === false));
+        $this->assertNotEmpty($aktive, 'Es sollten aktive Mitglieder vorhanden sein');
+        $this->assertNotEmpty($inaktive, 'Es sollten auch ehemalige Mitglieder vorhanden sein');
+
+        $externIds = array_map(static fn (array $m): string => (string) $m['externId'], $mitglieder);
+        $this->assertContains('403309', $externIds, 'Bachmann Miguel Pedro (aktiv) erwartet');
+        $this->assertContains('285922', $externIds, 'Albanese Franco (ehemals) erwartet');
+
+        // Dedupe: jede externId nur einmal
+        $this->assertSame(count($externIds), count(array_unique($externIds)));
+    }
+
+    public function testExtrahiereBehoerdenMitgliederAusKommissionsDetail(): void {
+        $html = $this->ladeFixture('kommission-detail-27446.html');
+
+        $mitglieder = $this->service->extrahiereBehoerdenMitgliederAusHtml($html, 'Aufsichtskommission');
+
+        $this->assertNotEmpty($mitglieder);
+
+        $bachmann = array_values(array_filter(
+            $mitglieder,
+            static fn (array $m): bool => ($m['externId'] ?? '') === '403309'
+        ))[0] ?? null;
+        $this->assertNotNull($bachmann);
+        $this->assertTrue($bachmann['aktiv']);
+        $this->assertSame('Mitglied', $bachmann['funktion']);
+        $this->assertSame('Bachmann Miguel', $bachmann['name']);
+        $this->assertSame('Pedro', $bachmann['vorname']);
+        $this->assertSame('2026-05-11', $bachmann['datumVon']);
+        $this->assertSame('', $bachmann['datumBis']);
+
+        $albanese = array_values(array_filter(
+            $mitglieder,
+            static fn (array $m): bool => ($m['externId'] ?? '') === '285922'
+        ))[0] ?? null;
+        $this->assertNotNull($albanese);
+        $this->assertFalse($albanese['aktiv']);
+        $this->assertSame('Mitglied', $albanese['funktion']);
+        $this->assertSame('2018-05-13', $albanese['datumBis']);
     }
 
     public function testLadeFraktionenAusLokalerFixture(): void {
         $html = $this->ladeFixture('fraktionen-list.html');
-        $this->erwarteHttpAntwort('https://parlament.winterthur.ch/fraktionen', $html);
+        $detailHtml = $this->ladeFixture('fraktion-detail-28072.html');
+
+        $this->erwarteHttpAntwortenMitResolver(static function (string $url) use ($html, $detailHtml): string {
+            if ($url === 'https://parlament.winterthur.ch/fraktionen') {
+                return $html;
+            }
+            if ($url === 'https://parlament.winterthur.ch/_rte/behoerde/28072') {
+                return $detailHtml;
+            }
+            if (str_contains($url, '/_rte/behoerde/')) {
+                return '<html></html>';
+            }
+            throw new \RuntimeException("Unerwartete URL: {$url}");
+        });
 
         $entitaeten = $this->service->ladeFraktionen();
 
@@ -150,6 +223,11 @@ class ScraperHtmlSyncTest extends TestCase {
         $this->assertNotEmpty($aktive);
         $this->assertSame('43405', ScraperService::wert($aktive[0], ['id']));
         $this->assertSame('Die Mitte (Die Mitte)', ScraperService::wert($aktive[0], ['name']));
+
+        // CVP-Fraktion sollte Mitglieder aus der Detailseite enthalten
+        $mitglieder = $entitaeten[0]['members'] ?? [];
+        $this->assertIsArray($mitglieder);
+        $this->assertNotEmpty($mitglieder, 'CVP-Fraktion sollte Mitglieder haben');
     }
 
     public function testLadeMitgliederBeiHttpFehlerGibtLeeresArrayZurueck(): void {

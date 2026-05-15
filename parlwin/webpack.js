@@ -1,5 +1,6 @@
 const webpackConfig = require('@nextcloud/webpack-vue-config')
 const path = require('path')
+const TerserPlugin = require('terser-webpack-plugin')
 
 module.exports = {
   ...webpackConfig,
@@ -14,5 +15,9 @@ module.exports = {
     clean: {
       keep: /\.gitkeep$/,
     },
+  },
+  optimization: {
+    ...(webpackConfig.optimization || {}),
+    minimizer: [new TerserPlugin({ extractComments: false })],
   },
 }

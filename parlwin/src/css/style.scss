@@ -420,6 +420,7 @@ ul.app-navigation__list {
 .pw-kommission-karte,
 .pw-mitglied-karte {
   align-content: start;
+  padding: var(--pw-gap-2);
 }
 
 .pw-data-card-header,
@@ -585,6 +586,24 @@ ul.app-navigation__list {
 
 .pw-members-table {
   inline-size: 100%;
+  /* Spaltenbreiten nach Inhalt ausrichten */
+  table-layout: auto;
+}
+
+.pw-members-table .pw-col-select {
+  inline-size: 1%;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.pw-members-table .pw-col-select input[type="checkbox"] {
+  margin: 0;
+}
+
+.pw-members-select-all-label {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
 }
 
 .pw-tabelle th,
@@ -831,27 +850,36 @@ ul.app-navigation__list {
   justify-content: flex-start;
 }
 
-.pw-mitglied-avatar {
-  inline-size: 3.75rem;
-  block-size: 3.75rem;
-  flex: 0 0 auto;
-  border-radius: 999rem;
-  overflow: hidden;
-  background: color-mix(in srgb, var(--color-primary-element) 10%, var(--pw-surface-soft));
-  display: grid;
-  place-items: center;
+.pw-mitglied-partei {
+  color: var(--pw-muted);
+  font-size: 0.9em;
 }
 
-.pw-mitglied-avatar img {
-  inline-size: 100%;
-  block-size: 100%;
-  object-fit: cover;
-}
-
-.pw-mitglied-initial {
-  font-size: 1.5rem;
-  font-weight: 700;
+.pw-mitglied-fraktionsrolle {
+  display: inline-block;
+  font-size: 0.85em;
+  font-weight: 600;
   color: var(--color-primary-element);
+}
+
+.pw-mitglied-kommissionen strong {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.pw-mitglied-kommission-eintrag {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
+.pw-mitglied-kommission-rolle {
+  font-size: 0.8em;
+  color: var(--color-primary-element);
+  font-weight: 600;
+  font-style: italic;
 }
 
 .pw-mitglied-kopftext,
@@ -874,12 +902,23 @@ ul.app-navigation__list {
 
   li {
     display: grid;
-    grid-template-columns: auto auto 1fr auto;
+    grid-template-columns: auto auto 1fr;
     gap: 0.5rem;
     align-items: baseline;
     padding: 0.25rem 0.5rem;
     border-radius: var(--border-radius, 0.25rem);
     background: var(--pw-surface-soft);
+  }
+
+  .pw-kommission-geschaeft-eintrag {
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+
+    &:hover,
+    &:focus-visible {
+      background: var(--color-background-hover, var(--pw-surface));
+      outline: none;
+    }
   }
 
   .pw-nr {
@@ -891,12 +930,6 @@ ul.app-navigation__list {
     overflow-wrap: anywhere;
     hyphens: auto;
     -webkit-hyphens: auto;
-  }
-
-  .pw-status {
-    font-size: 0.75rem;
-    color: var(--color-text-maxcontrast, var(--pw-fg-muted));
-    white-space: nowrap;
   }
 }
 
@@ -917,9 +950,75 @@ ul.app-navigation__list {
   border-color: color-mix(in srgb, var(--color-warning, var(--pw-border)) 60%, var(--pw-border));
 }
 
+.pw-chip-inaktiv {
+  opacity: 0.55;
+  border-style: dashed;
+  font-style: italic;
+}
+
 .pw-chip-list {
   display: flex;
   flex-wrap: wrap;
+}
+
+.pw-kommission-mitglied-liste {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 0.5rem;
+  margin-block-start: 0.35rem;
+}
+
+.pw-kommission-mitglied-karte {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.5rem 0.75rem;
+  border: 0.0625rem solid var(--pw-border);
+  border-radius: var(--pw-radius, 0.5rem);
+  background: var(--pw-surface-soft);
+  font-size: 0.85em;
+  line-height: 1.3;
+}
+
+.pw-kommission-mitglied-eigen {
+  border-color: color-mix(in srgb, var(--color-primary-element) 55%, var(--pw-border));
+  background: color-mix(in srgb, var(--color-primary-element) 6%, var(--pw-surface-soft));
+}
+
+.pw-kommission-mitglied-inaktiv {
+  opacity: 0.55;
+  border-style: dashed;
+  font-style: italic;
+}
+
+.pw-kommission-mitglied-kopf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.pw-kommission-mitglied-rolle {
+  color: var(--pw-muted);
+  font-weight: 400;
+}
+
+.pw-kommission-mitglied-zeile {
+  color: var(--pw-muted);
+}
+
+.pw-kommission-mitglied-kopf strong {
+  color: var(--color-main-text);
+}
+
+.pw-kommission-mitglied-email {
+  color: var(--color-primary-element);
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.pw-kommission-mitglied-email:hover {
+  text-decoration: underline;
 }
 
 .pw-member-local-exists {

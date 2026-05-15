@@ -31,7 +31,7 @@
             <th @click="sortiereNach('nummer')" class="pw-sortierbar pw-col-nr">Nr.</th>
             <th @click="sortiereNach('titel')" class="pw-sortierbar pw-col-titel">Titel</th>
             <th @click="sortiereNach('typ')" class="pw-sortierbar">Typ</th>
-            <th @click="sortiereNach('status')" class="pw-sortierbar">Status</th>
+            <th v-if="statusSpalteAnzeigen" @click="sortiereNach('status')" class="pw-sortierbar">Status</th>
             <th @click="sortiereNach('datum')" class="pw-sortierbar">Datum</th>
             <th>Zuständig</th>
             <th>Beschluss</th>
@@ -55,7 +55,7 @@
                 {{ g.titel }}
               </td>
               <td data-label="Typ">{{ g.typ }}</td>
-              <td data-label="Status">
+              <td v-if="statusSpalteAnzeigen" data-label="Status">
                 <span :class="['pw-status-' + statusKlasse(g.status), 'pw-status-text']" :title="g.status">{{ g.status }}</span>
               </td>
               <td data-label="Datum">{{ formatieredatum(g.datum) }}</td>
@@ -185,6 +185,10 @@ export default {
     alleStatus() {
       return [...new Set(this.geschaefte.map(g => g.status).filter(Boolean))].sort()
     },
+    statusSpalteAnzeigen() {
+      // Wenn genau ein Status gefiltert ist, wäre die Spalte redundant.
+      return !(Array.isArray(this.filterStatus) && this.filterStatus.length === 1)
+    },
     alleTypen() {
       return [...new Set(this.geschaefte.map(g => g.typ).filter(Boolean))].sort()
     },
@@ -269,8 +273,8 @@ export default {
       }
 
       liste.sort((a, b) => {
-        const av = a[this.sortFeld] || ''
-        const bv = b[this.sortFeld] || ''
+        const av = this.sortWert(a, this.sortFeld)
+        const bv = this.sortWert(b, this.sortFeld)
         return this.sortRichtung === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av)
       })
 
@@ -360,6 +364,15 @@ export default {
         this.sortFeld = feld
         this.sortRichtung = 'asc'
       }
+    },
+    sortWert(g, feld) {
+      const v = g[feld] || ''
+      if (feld === 'nummer') {
+        // Zweite Komponente nach dem Punkt auf 4 Stellen mit führenden Nullen
+        // auffüllen, damit "2026.9" vor "2026.10" landet.
+        return String(v).replace(/^(\d+)\.(\d+)/, (_, jahr, nr) => `${jahr}.${nr.padStart(4, '0')}`)
+      }
+      return String(v)
     },
     oeffneDetail(geschaeftId) {
       this.ausgewaehlteGeschaeftId = geschaeftId

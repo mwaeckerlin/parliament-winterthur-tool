@@ -328,6 +328,7 @@ class SettingsControllerTest extends TestCase {
         $mitgliedService->method('eins')->with(7)->willReturn($mitglied);
         $mitgliedService->method('setzeNextcloudUid')->with(7, 'max-muster')->willReturn($mitglied);
         $mitgliedService->method('aktiveDerFraktion')->with('SP/Grüne')->willReturn([$mitglied]);
+        $mitgliedService->method('gehoertZurFraktion')->willReturn(true);
 
         $localUser = $this->createMock(IUser::class);
         $localUser->method('getUID')->willReturn('max-muster');

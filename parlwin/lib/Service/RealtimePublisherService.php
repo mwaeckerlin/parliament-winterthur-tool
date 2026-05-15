@@ -16,7 +16,7 @@ use Psr\Log\LoggerInterface;
  */
 class RealtimePublisherService {
     private const APP_ID = 'parlwin';
-    private const DEFAULT_PUBLISH_URL = 'http://parlwin-realtime:3001/publish';
+    private const DEFAULT_PUBLISH_URL = 'http://parlwin-ws:3001/publish';
 
     public function __construct(
         private readonly IClientService $clientService,

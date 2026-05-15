@@ -267,7 +267,31 @@ class MitgliedService
             ]);
         }
 
+        $this->bereinigePseudoFraktionen();
+
         return $statistik;
+    }
+
+    /**
+     * Soft-löscht Fraktionen in der DB, deren Name kein echter Fraktionsname ist
+     * (z.B. "Fraktionspräsident/innen" — eine Rollen-Sammlung von der Parlaments-Seite).
+     */
+    private function bereinigePseudoFraktionen(): void
+    {
+        foreach ($this->fraktionMapper->findAll() as $fraktion) {
+            $name = (string) $fraktion->getName();
+            if (!ScraperService::istPseudoFraktionsname($name)) {
+                continue;
+            }
+            if ($fraktion->getGeloescht() === true && $fraktion->getAktiv() !== true) {
+                continue;
+            }
+            $fraktion->setGeloescht(true);
+            if (method_exists($fraktion, 'setAktiv')) {
+                $fraktion->setAktiv(false);
+            }
+            $this->fraktionMapper->update($fraktion);
+        }
     }
 
     /**
@@ -280,11 +304,49 @@ class MitgliedService
         $jetzt = (new \DateTime())->format('Y-m-d H:i:s');
         $fraktion->setName((string) ScraperService::wert($daten, ['name', 'Name', 'bezeichnung']));
         $fraktion->setBeschreibung((string) ScraperService::wert($daten, ['description', 'beschreibung']));
-        $fraktion->setMitglieder(json_encode(ScraperService::wert($daten, ['members', 'mitglieder', 'persons'], [])));
+        $mitgliederListe = ScraperService::wert($daten, ['members', 'mitglieder', 'persons'], []);
+        $fraktion->setMitglieder(json_encode($mitgliederListe));
         $fraktion->setDatumVon((string) ScraperService::wert($daten, ['datumVon', 'dateFrom', '_datumVon']));
         $fraktion->setDatumBis((string) ScraperService::wert($daten, ['datumBis', 'dateTo', '_datumBis']));
         $fraktion->setAktiv((bool) ScraperService::wert($daten, ['aktiv', 'active', 'isActive', 'is_active'], true));
         $fraktion->setAktualisiertAm($jetzt);
+
+        $this->uebertrageFraktionAufMitglieder($fraktion->getName(), $mitgliederListe);
+    }
+
+    /**
+     * Setzt bei allen in der Fraktions-Mitgliederliste aufgeführten Personen
+     * das Mitglied->fraktion-Feld auf den Namen dieser Fraktion. Damit erhalten
+     * auch Fraktionspräsident/innen, deren Funktion auf der Mitgliederliste
+     * die echte Fraktion verdeckt, die korrekte Zuordnung.
+     *
+     * @param mixed $mitgliederListe
+     */
+    private function uebertrageFraktionAufMitglieder(string $fraktionName, $mitgliederListe): void
+    {
+        if ($fraktionName === '' || !is_array($mitgliederListe)) {
+            return;
+        }
+        foreach ($mitgliederListe as $eintrag) {
+            if (!is_array($eintrag)) {
+                continue;
+            }
+            $externId = trim((string) ($eintrag['externId'] ?? $eintrag['id'] ?? ''));
+            if ($externId === '') {
+                continue;
+            }
+            try {
+                $mitglied = $this->mitgliedMapper->findByExternId($externId);
+            } catch (DoesNotExistException) {
+                continue;
+            }
+            if ((string) $mitglied->getFraktion() === $fraktionName) {
+                continue;
+            }
+            $mitglied->setFraktion($fraktionName);
+            $mitglied->setAktualisiertAm((new \DateTime())->format('Y-m-d H:i:s'));
+            $this->mitgliedMapper->update($mitglied);
+        }
     }
 
     /**
@@ -522,11 +584,134 @@ class MitgliedService
     /**
      * Gibt aktive Mitglieder einer Fraktion zurück.
      *
+     * Bevorzugte Quelle ist die in der Fraktions-Entität gespeicherte Mitglieder-
+     * liste (mit externId). Damit funktioniert das Matching auch dann zuverlässig,
+     * wenn die Schreibweise des Fraktionsnamens im Mitgliedsdatensatz von der
+     * offiziellen Bezeichnung abweicht (z.B. "Die Mitte (Die Mitte)" auf der
+     * Fraktionsliste vs. "Die Mitte / EVP" im Tätig-in-Feld des Mitglieds).
+     *
      * @return Mitglied[]
      */
     public function aktiveDerFraktion(string $fraktion): array
     {
-        return $this->mitgliedMapper->findByFraktion($fraktion);
+        $name = trim($fraktion);
+        if ($name === '') {
+            return [];
+        }
+
+        try {
+            $fraktionEntity = $this->fraktionMapper->findByName($name);
+            $mitglieder = $this->mitgliederAusFraktionsEntitaet($fraktionEntity);
+            if ($mitglieder !== []) {
+                return $mitglieder;
+            }
+        } catch (DoesNotExistException) {
+            // Fallback unten.
+        }
+
+        return $this->mitgliedMapper->findByFraktion($name);
+    }
+
+    /**
+     * Prüft, ob ein Mitglied zu der gegebenen Fraktion gehört.
+     *
+     * Berücksichtigt sowohl die in der Fraktions-Entität gespeicherte Mitglieder-
+     * liste (externId-basiert) als auch den `fraktion`-String am Mitglied selbst.
+     */
+    public function gehoertZurFraktion(Mitglied $mitglied, string $fraktion): bool
+    {
+        $name = trim($fraktion);
+        if ($name === '') {
+            return false;
+        }
+
+        $externId = trim((string) $mitglied->getExternId());
+        if ($externId !== '') {
+            try {
+                $fraktionEntity = $this->fraktionMapper->findByName($name);
+                if ($this->externIdInFraktion($externId, $fraktionEntity)) {
+                    return true;
+                }
+            } catch (DoesNotExistException) {
+                // Fallback unten.
+            }
+        }
+
+        return strcasecmp(trim((string) $mitglied->getFraktion()), $name) === 0;
+    }
+
+    /**
+     * @return Mitglied[]
+     */
+    private function mitgliederAusFraktionsEntitaet(Fraktion $fraktion): array
+    {
+        $eintraege = $this->dekodiereFraktionsmitglieder($fraktion);
+        $mitglieder = [];
+        $gesehen = [];
+
+        foreach ($eintraege as $eintrag) {
+            $externId = trim((string) ($eintrag['externId'] ?? $eintrag['id'] ?? ''));
+            if ($externId === '' || isset($gesehen[$externId])) {
+                continue;
+            }
+            $aktiv = (bool) ($eintrag['aktiv'] ?? true);
+            if (!$aktiv) {
+                continue;
+            }
+            try {
+                $mitglied = $this->mitgliedMapper->findByExternId($externId);
+            } catch (DoesNotExistException) {
+                continue;
+            }
+            if ($mitglied->getGeloescht() === true) {
+                continue;
+            }
+            if ($mitglied->getAktiv() !== true) {
+                continue;
+            }
+            $gesehen[$externId] = true;
+            $mitglieder[] = $mitglied;
+        }
+
+        usort(
+            $mitglieder,
+            static fn (Mitglied $a, Mitglied $b): int => strcmp((string) $a->getName(), (string) $b->getName())
+        );
+
+        return $mitglieder;
+    }
+
+    private function externIdInFraktion(string $externId, Fraktion $fraktion): bool
+    {
+        foreach ($this->dekodiereFraktionsmitglieder($fraktion) as $eintrag) {
+            $kandidat = trim((string) ($eintrag['externId'] ?? $eintrag['id'] ?? ''));
+            if ($kandidat !== '' && $kandidat === $externId) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function dekodiereFraktionsmitglieder(Fraktion $fraktion): array
+    {
+        $roh = (string) $fraktion->getMitglieder();
+        if ($roh === '') {
+            return [];
+        }
+        $liste = json_decode($roh, true);
+        if (!is_array($liste)) {
+            return [];
+        }
+        $ergebnis = [];
+        foreach ($liste as $eintrag) {
+            if (is_array($eintrag)) {
+                $ergebnis[] = $eintrag;
+            }
+        }
+        return $ergebnis;
     }
 
     /**
@@ -593,7 +778,11 @@ class MitgliedService
         $mitglied->setName((string) ScraperService::wert($daten, ['lastName', 'name', 'Name', 'nachname', 'Nachname']));
         $mitglied->setVorname((string) ScraperService::wert($daten, ['firstName', 'vorname', 'Vorname', 'firstname']));
         $mitglied->setPartei((string) ScraperService::wert($daten, ['party', 'Party', 'partei', 'Partei']));
-        $mitglied->setFraktion((string) ScraperService::wert($daten, ['faction', 'Faction', 'fraktion', 'Fraktion', 'group']));
+        $fraktionWert = (string) ScraperService::wert($daten, ['faction', 'Faction', 'fraktion', 'Fraktion', 'group']);
+        if (ScraperService::istPseudoFraktionsname($fraktionWert)) {
+            $fraktionWert = '';
+        }
+        $mitglied->setFraktion($fraktionWert);
         $mitglied->setEmail((string) ScraperService::wert($daten, ['email', 'Email', 'mail', 'Mail']));
         $mitglied->setFotoUrl((string) ScraperService::wert($daten, ['photo', 'Photo', 'photoUrl', 'foto', 'image', 'imageUrl']));
         $mitglied->setAktiv($this->normalisiereBool(
