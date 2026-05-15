@@ -40,6 +40,15 @@ if (!waitForInstalled('http://nextcloud-nginx:8080/status.php')) {
 // Legacy-App stilllegen (best effort)
 runOcc('app:disable parliamentwinterthur --no-interaction');
 
+// Federated Requests (z.B. Circles' GroupMemberAdded-Listener) machen interne
+// HTTP-Calls auf die eigene Cloud-URL. Die Standard-`overwrite.cli.url` zeigt
+// auf den externen Host:Port (z.B. http://localhost:29824), der aus den
+// Containern aus nicht erreichbar ist → RequestNetworkException / Timeouts bei
+// Gruppenoperationen. Wir biegen die CLI-URL auf den internen nginx-Service,
+// damit Loopback-Calls funktionieren. Die externe URL (overwriteprotocol/
+// overwritehost) bleibt unverändert für Browser/Mail-Links.
+runOcc('config:system:set overwrite.cli.url --value=http://nextcloud-nginx:8080');
+
 $enableResult = runOcc('app:enable parlwin --no-interaction');
 if (
     $enableResult['code'] !== 0

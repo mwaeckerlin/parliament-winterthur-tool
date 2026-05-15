@@ -219,8 +219,9 @@ class SettingsController extends Controller
         }
 
         $auswahlIds = $this->leseAuswahlIdsAusRequest();
-        if ($auswahlIds === []) {
-            return new DataResponse(['fehler' => 'Bitte mindestens ein Mitglied auswählen.'], Http::STATUS_BAD_REQUEST);
+        $orphanUids = $this->leseOrphanUidsAusRequest();
+        if ($auswahlIds === [] && $orphanUids === []) {
+            return new DataResponse(['fehler' => 'Bitte mindestens einen Eintrag auswählen.'], Http::STATUS_BAD_REQUEST);
         }
 
         $mappingsById = [];
@@ -236,8 +237,9 @@ class SettingsController extends Controller
         $statistik = [
             'ausgewaehlt' => count($auswahlIds),
             'angelegt' => 0,
+            'abgeglichen' => 0,
+            'deaktiviert' => 0,
             'zurGruppeHinzugefuegt' => 0,
-            'bereitsVorhanden' => 0,
             'warnungen' => [],
         ];
 
@@ -259,30 +261,77 @@ class SettingsController extends Controller
                 continue;
             }
 
-            $username = $this->normalisiereUsername((string) ($mappingsById[$mitgliedId] ?? ''), $mitglied);
-            $this->mitgliedService->setzeNextcloudUid($mitgliedId, $username);
+            $manuelleZuweisung = trim((string) ($mappingsById[$mitgliedId] ?? ''));
+            $vorschlag = $manuelleZuweisung !== ''
+                ? $this->normalisiereUsername($manuelleZuweisung, $mitglied)
+                : $this->vorschlagUsernameFuerMitglied($mitglied);
 
-            $user = $this->userManager->get($username);
-            if ($user === null) {
-                $this->letzterCreateUserFehler = '';
-                $user = $this->erstelleNextcloudUser($username, $mitglied);
-                if ($user === null) {
-                    $statistik['warnungen'][] = sprintf(
-                        'User "%s" konnte nicht angelegt werden%s.',
-                        $username,
-                        $this->letzterCreateUserFehler !== ''
-                            ? ': ' . $this->letzterCreateUserFehler
-                            : ''
-                    );
-                    continue;
+            $match = $this->findeLokalenUserFuerMitglied($mitglied, $vorschlag);
+            $user = $match['user'];
+
+            if ($user instanceof IUser) {
+                // Fall 2: existiert lokal → abgleichen ohne Mail
+                $this->mitgliedService->setzeNextcloudUid($mitgliedId, $user->getUID());
+                $this->setzeUserProfilfelder($user, $mitglied);
+                if (method_exists($user, 'setEnabled') && !$user->isEnabled()) {
+                    try {
+                        $user->setEnabled(true);
+                    } catch (\Throwable $e) {
+                        $statistik['warnungen'][] = sprintf(
+                            'User "%s" konnte nicht aktiviert werden: %s',
+                            $user->getUID(),
+                            $e->getMessage()
+                        );
+                    }
                 }
-                $statistik['angelegt']++;
-            } else {
-                $statistik['bereitsVorhanden']++;
+                if ($this->fuegeUserZuGruppeHinzu($gruppe, $user)) {
+                    $statistik['zurGruppeHinzugefuegt']++;
+                }
+                $statistik['abgeglichen']++;
+                continue;
             }
 
+            // Fall 1: User existiert nirgends → neu anlegen + Willkommensmail
+            $this->mitgliedService->setzeNextcloudUid($mitgliedId, $vorschlag);
+            $this->letzterCreateUserFehler = '';
+            $user = $this->erstelleNextcloudUser($vorschlag, $mitglied);
+            if ($user === null) {
+                $statistik['warnungen'][] = sprintf(
+                    'User "%s" konnte nicht angelegt werden%s.',
+                    $vorschlag,
+                    $this->letzterCreateUserFehler !== ''
+                        ? ': ' . $this->letzterCreateUserFehler
+                        : ''
+                );
+                continue;
+            }
+            $statistik['angelegt']++;
             if ($this->fuegeUserZuGruppeHinzu($gruppe, $user)) {
                 $statistik['zurGruppeHinzugefuegt']++;
+            }
+        }
+
+        // Fall 3: verwaiste lokale User → aus Gruppe entfernen + deaktivieren, keine Mail
+        foreach ($orphanUids as $uid) {
+            $user = $this->userManager->get($uid);
+            if (!$user instanceof IUser) {
+                $statistik['warnungen'][] = sprintf('Verwaister User "%s" wurde nicht gefunden.', $uid);
+                continue;
+            }
+            if ($this->entferneUserAusGruppe($gruppe, $user)) {
+                // entfernt
+            }
+            if (method_exists($user, 'setEnabled')) {
+                try {
+                    $user->setEnabled(false);
+                    $statistik['deaktiviert']++;
+                } catch (\Throwable $e) {
+                    $statistik['warnungen'][] = sprintf(
+                        'User "%s" konnte nicht deaktiviert werden: %s',
+                        $uid,
+                        $e->getMessage()
+                    );
+                }
             }
         }
 
@@ -970,6 +1019,25 @@ class SettingsController extends Controller
         return array_values(array_unique($result));
     }
 
+    /**
+     * @return string[]
+     */
+    private function leseOrphanUidsAusRequest(): array
+    {
+        $raw = $this->request->getParam('orphan_uids', []);
+        if (!is_array($raw)) {
+            return [];
+        }
+        $result = [];
+        foreach ($raw as $uid) {
+            $clean = trim((string) $uid);
+            if ($clean !== '') {
+                $result[] = $clean;
+            }
+        }
+        return array_values(array_unique($result));
+    }
+
     private function gehoertMitgliedZuFraktion(Mitglied $mitglied, string $fraktion): bool
     {
         return $this->mitgliedService->gehoertZurFraktion($mitglied, $fraktion);
@@ -1151,6 +1219,27 @@ class SettingsController extends Controller
         }
         try {
             $gruppe->addUser($user);
+            return true;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    private function entferneUserAusGruppe(object $gruppe, IUser $user): bool
+    {
+        if (!method_exists($gruppe, 'removeUser')) {
+            return false;
+        }
+        if (method_exists($gruppe, 'inGroup')) {
+            try {
+                if (!$gruppe->inGroup($user)) {
+                    return false;
+                }
+            } catch (\Throwable) {
+            }
+        }
+        try {
+            $gruppe->removeUser($user);
             return true;
         } catch (\Throwable) {
             return false;

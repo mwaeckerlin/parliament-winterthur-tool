@@ -99,7 +99,7 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
 
                     <div class="pw-mitglied-toolbar">
                         <button type="button" id="pw-btn-members-provision" class="button">
-                            <?php p($l->t('Ausgewählte anlegen')); ?>
+                            <?php p($l->t('Ausgewählte abgleichen')); ?>
                         </button>
                         <span id="pw-members-status" class="pw-sync-status"></span>
                     </div>
@@ -217,6 +217,7 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
         let realtimeReconnectDelayMs = 1000;
         let realtimeConnected = false;
         let fraktionsMitglieder = [];
+        let fraktionsVerwaiste = [];
         let settingsSaveTimer = null;
         let memberSaveTimer = null;
         let lastSavedSettingsPayload = '';
@@ -508,7 +509,9 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
                 return;
             }
 
-            if (!Array.isArray(fraktionsMitglieder) || fraktionsMitglieder.length === 0) {
+            const hatMitglieder = Array.isArray(fraktionsMitglieder) && fraktionsMitglieder.length > 0;
+            const hatVerwaiste = Array.isArray(fraktionsVerwaiste) && fraktionsVerwaiste.length > 0;
+            if (!hatMitglieder && !hatVerwaiste) {
                 membersEmpty.textContent = t('parlwin', 'Keine aktiven Mitglieder für diese Fraktion gefunden.');
                 if (membersSelectAll) {
                     membersSelectAll.checked = false;
@@ -520,7 +523,7 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
             if (membersSelectAll) {
                 membersSelectAll.checked = true;
             }
-            fraktionsMitglieder.forEach((mitglied) => {
+            (Array.isArray(fraktionsMitglieder) ? fraktionsMitglieder : []).forEach((mitglied) => {
                 const tr = document.createElement('tr');
                 tr.dataset.memberId = String(mitglied.id);
 
@@ -548,6 +551,12 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
                 input.value = String(mitglied.username || '');
                 input.placeholder = String(mitglied.vorschlagUsername || '');
                 input.dataset.memberId = String(mitglied.id);
+                if (mitglied.lokalerUserExistiert === true) {
+                    input.disabled = true;
+                    input.title = t('parlwin', 'Lokaler User existiert bereits ({strategie})', {
+                        strategie: String(mitglied.lokaleMatchStrategie || ''),
+                    });
+                }
                 input.addEventListener('input', () => {
                     const eintrag = fraktionsMitglieder.find((m) => Number(m.id) === Number(mitglied.id));
                     if (eintrag) {
@@ -564,6 +573,52 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
                 tdLocal.classList.add('pw-member-groups');
                 tdLocal.dataset.label = t('parlwin', 'Gruppen');
                 aktualisiereGruppenZelle(tdLocal, mitglied);
+
+                tr.appendChild(tdSelect);
+                tr.appendChild(tdName);
+                tr.appendChild(tdEmail);
+                tr.appendChild(tdUser);
+                tr.appendChild(tdLocal);
+                membersBody.appendChild(tr);
+            });
+
+            (Array.isArray(fraktionsVerwaiste) ? fraktionsVerwaiste : []).forEach((verwaist) => {
+                const tr = document.createElement('tr');
+                tr.classList.add('pw-row-orphan');
+                tr.dataset.orphanUid = String(verwaist.uid);
+
+                const tdSelect = document.createElement('td');
+                tdSelect.dataset.label = t('parlwin', 'Auswahl');
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'pw-orphan-select';
+                checkbox.checked = true;
+                tdSelect.appendChild(checkbox);
+
+                const tdName = document.createElement('td');
+                tdName.dataset.label = t('parlwin', 'Mitglied');
+                tdName.textContent = String(verwaist.displayName || verwaist.uid || '').trim();
+                const hinweis = document.createElement('div');
+                hinweis.className = 'settings-hint';
+                hinweis.textContent = t('parlwin', 'Zum Löschen markiert (nicht mehr in Fraktion)');
+                tdName.appendChild(hinweis);
+
+                const tdEmail = document.createElement('td');
+                tdEmail.dataset.label = t('parlwin', 'E-Mail');
+                tdEmail.textContent = String(verwaist.email || '').trim();
+
+                const tdUser = document.createElement('td');
+                tdUser.dataset.label = t('parlwin', 'Username');
+                const uidSpan = document.createElement('span');
+                uidSpan.className = 'pw-orphan-uid';
+                uidSpan.textContent = String(verwaist.uid || '');
+                tdUser.appendChild(uidSpan);
+
+                const tdLocal = document.createElement('td');
+                tdLocal.dataset.label = t('parlwin', 'Gruppen');
+                tdLocal.textContent = verwaist.aktiv === false
+                    ? t('parlwin', 'deaktiviert')
+                    : t('parlwin', 'aktiv');
 
                 tr.appendChild(tdSelect);
                 tr.appendChild(tdName);
@@ -601,6 +656,19 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
                 .filter((id) => id > 0);
         };
 
+        const collectSelectedOrphanUids = () => {
+            if (!membersBody) {
+                return [];
+            }
+            return Array.from(membersBody.querySelectorAll('tr.pw-row-orphan'))
+                .filter((row) => {
+                    const box = row.querySelector('.pw-orphan-select');
+                    return box && box.checked;
+                })
+                .map((row) => String(row.dataset.orphanUid || '').trim())
+                .filter((uid) => uid !== '');
+        };
+
         const loadFraktionMembers = (explicitFraktion) => {
             const fraktion = String(
                 explicitFraktion !== undefined && explicitFraktion !== null
@@ -632,14 +700,19 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
                 })
                 .then((payload) => {
                     fraktionsMitglieder = Array.isArray(payload?.mitglieder) ? payload.mitglieder : [];
+                    fraktionsVerwaiste = Array.isArray(payload?.verwaiste) ? payload.verwaiste : [];
                     renderMemberRows();
                     if (membersStatus) {
                         const count = Number(payload?.summary?.anzahl || 0);
-                        membersStatus.textContent = t('parlwin', '{count} Mitglieder geladen', { count });
+                        const orphans = Number(payload?.summary?.verwaiste || 0);
+                        membersStatus.textContent = orphans > 0
+                            ? t('parlwin', '{count} Mitglieder geladen, {orphans} verwaiste lokale User', { count, orphans })
+                            : t('parlwin', '{count} Mitglieder geladen', { count });
                     }
                 })
                 .catch((err) => {
                     fraktionsMitglieder = [];
+                    fraktionsVerwaiste = [];
                     renderMemberRows();
                     if (membersStatus) {
                         membersStatus.textContent = t('parlwin', 'Fehler: {msg}', { msg: err?.message || 'unbekannt' });
@@ -678,6 +751,7 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
                 })
                 .then((payload) => {
                     fraktionsMitglieder = Array.isArray(payload?.mitglieder) ? payload.mitglieder : [];
+                    fraktionsVerwaiste = Array.isArray(payload?.verwaiste) ? payload.verwaiste : [];
                     renderMemberRows();
                     if (membersStatus) {
                         membersStatus.textContent = t('parlwin', '{count} Zuordnungen gespeichert', {
@@ -780,16 +854,17 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
                 return;
             }
             const mitglied_ids = collectSelectedMemberIds();
-            if (mitglied_ids.length === 0) {
+            const orphan_uids = collectSelectedOrphanUids();
+            if (mitglied_ids.length === 0 && orphan_uids.length === 0) {
                 if (membersStatus) {
-                    membersStatus.textContent = t('parlwin', 'Bitte mindestens ein Mitglied auswählen.');
+                    membersStatus.textContent = t('parlwin', 'Bitte mindestens einen Eintrag auswählen.');
                 }
                 return;
             }
             const mappings = collectMemberMappings();
 
             if (membersStatus) {
-                membersStatus.textContent = t('parlwin', 'Lege Benutzer an...');
+                membersStatus.textContent = t('parlwin', 'Gleiche Benutzer ab...');
             }
             queueSettingsSave(true).catch(() => { });
             fetch(generateUrl('/apps/parlwin/settings/fraktion-mitglieder/anlegen'), {
@@ -801,6 +876,7 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
                     fraktion,
                     nextcloud_gruppe: nextcloudGruppe,
                     mitglied_ids,
+                    orphan_uids,
                     mappings,
                 }),
             })
@@ -813,23 +889,22 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
                 })
                 .then((payload) => {
                     fraktionsMitglieder = Array.isArray(payload?.mitglieder) ? payload.mitglieder : [];
+                    fraktionsVerwaiste = Array.isArray(payload?.verwaiste) ? payload.verwaiste : [];
                     renderMemberRows();
                     const provision = payload?.provision || {};
                     const warnungen = Array.isArray(provision?.warnungen) ? provision.warnungen : [];
                     if (membersStatus) {
-                        let msg = t('parlwin', 'Angelegt: {newCount}, Gruppe ergänzt: {groupCount}', {
-                            newCount: Number(provision?.angelegt || 0),
-                            groupCount: Number(provision?.zurGruppeHinzugefuegt || 0),
-                        });
+                        let msg = t(
+                            'parlwin',
+                            'Angelegt: {newCount}, abgeglichen: {syncCount}, deaktiviert: {disabledCount}',
+                            {
+                                newCount: Number(provision?.angelegt || 0),
+                                syncCount: Number(provision?.abgeglichen || 0),
+                                disabledCount: Number(provision?.deaktiviert || 0),
+                            }
+                        );
                         if (warnungen.length > 0) {
                             msg += ' — ' + warnungen.join('; ');
-                        } else if (
-                            Number(provision?.ausgewaehlt || 0) > 0
-                            && Number(provision?.angelegt || 0) === 0
-                            && Number(provision?.zurGruppeHinzugefuegt || 0) === 0
-                            && Number(provision?.bereitsVorhanden || 0) === 0
-                        ) {
-                            msg += ' — ' + t('parlwin', 'Keines der ausgewählten Mitglieder gehört zur gewählten Fraktion.');
                         }
                         membersStatus.textContent = msg;
                     }
@@ -1177,7 +1252,7 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
         });
         membersSelectAll?.addEventListener('change', () => {
             const checked = membersSelectAll.checked;
-            document.querySelectorAll('.pw-member-select').forEach((checkbox) => {
+            document.querySelectorAll('.pw-member-select, .pw-orphan-select').forEach((checkbox) => {
                 checkbox.checked = checked;
             });
         });
