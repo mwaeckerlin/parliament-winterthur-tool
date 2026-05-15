@@ -300,15 +300,18 @@ class ScraperHtmlSyncTest extends TestCase {
         $this->assertNotEmpty($fristen);
     }
 
-    private function ladeFixture(string $datei): string {
+    private function ladeFixture(string $datei): string
+    {
         $pfad = __DIR__ . '/../Fixtures/html/' . $datei;
         $inhalt = @file_get_contents($pfad);
         $this->assertIsString($inhalt, "Fixture konnte nicht geladen werden: {$pfad}");
         return $inhalt;
     }
 
-    private function erwarteHttpAntwort(string $url, string $html): void {
-        $this->erwarteHttpAntwortenMitResolver(static fn (string $aufgerufeneUrl): string => $aufgerufeneUrl === $url
+    private function erwarteHttpAntwort(string $url, string $html): void
+    {
+        $this->erwarteHttpAntwortenMitResolver(
+            static fn(string $aufgerufeneUrl): string => $aufgerufeneUrl === $url
             ? $html
             : throw new \RuntimeException("Unerwartete URL: {$aufgerufeneUrl}")
         );

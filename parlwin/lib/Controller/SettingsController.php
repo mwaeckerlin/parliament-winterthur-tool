@@ -758,28 +758,37 @@ class SettingsController extends Controller
     }
 
     /**
-     * @return array{fraktion: string, mitglieder: array<int, array<string, mixed>>, summary: array{anzahl: int, mitLokalemUser: int}}
+     * @return array{fraktion: string, mitglieder: array<int, array<string, mixed>>, verwaiste: array<int, array<string, mixed>>, summary: array{anzahl: int, mitLokalemUser: int, verwaiste: int}}
      */
     private function baueFraktionsMitgliederPayload(string $fraktion): array
     {
+        $gruppeName = trim($this->config->getAppValue(Application::APP_ID, 'nextcloud_gruppe', ''));
         $mitglieder = $this->mitgliedService->aktiveDerFraktion($fraktion);
         $eintraege = [];
         $mitLokalemUser = 0;
+        $matchedUids = [];
 
         foreach ($mitglieder as $mitglied) {
             $eintrag = $this->baueFraktionsMitgliedEintrag($mitglied);
             if (($eintrag['lokalerUserExistiert'] ?? false) === true) {
                 $mitLokalemUser++;
+                $matchedUids[strtolower((string) $eintrag['lokaleUid'])] = true;
             }
             $eintraege[] = $eintrag;
         }
 
+        $verwaiste = $gruppeName !== ''
+            ? $this->findeVerwaisteGruppenmitglieder($gruppeName, $matchedUids)
+            : [];
+
         return [
             'fraktion' => $fraktion,
             'mitglieder' => $eintraege,
+            'verwaiste' => $verwaiste,
             'summary' => [
                 'anzahl' => count($eintraege),
                 'mitLokalemUser' => $mitLokalemUser,
+                'verwaiste' => count($verwaiste),
             ],
         ];
     }
@@ -793,8 +802,11 @@ class SettingsController extends Controller
         $gespeichert = trim((string) $mitglied->getNextcloudUid());
         $username = $gespeichert !== '' ? $this->normalisiereUsername($gespeichert, $mitglied) : $vorschlag;
 
-        $user = $username !== '' ? $this->userManager->get($username) : null;
+        $match = $this->findeLokalenUserFuerMitglied($mitglied, $username);
+        $user = $match['user'] ?? null;
         $gruppen = $user instanceof IUser ? $this->gruppenIdsFuerUser($user) : [];
+
+        $effektiverUsername = $user instanceof IUser ? $user->getUID() : $username;
 
         return [
             'id' => $mitglied->getId(),
@@ -803,11 +815,113 @@ class SettingsController extends Controller
             'name' => $mitglied->getName(),
             'displayName' => $mitglied->getVollerName(),
             'email' => $mitglied->getEmail(),
-            'username' => $username,
+            'username' => $effektiverUsername,
             'vorschlagUsername' => $vorschlag,
             'lokalerUserExistiert' => $user instanceof IUser,
+            'lokaleUid' => $user instanceof IUser ? $user->getUID() : '',
+            'lokaleMatchStrategie' => $match['strategie'] ?? null,
+            'lokaleDisplayName' => $user instanceof IUser ? (string) $user->getDisplayName() : '',
+            'lokaleEmail' => $user instanceof IUser ? (string) $user->getEMailAddress() : '',
+            'lokalerUserAktiv' => $user instanceof IUser ? $user->isEnabled() : false,
             'lokaleGruppen' => $gruppen,
         ];
+    }
+
+    /**
+     * Sucht einen passenden lokalen Nextcloud-User für ein Mitglied via drei Strategien:
+     * 1. Gespeicherte/normalisierte UID stimmt überein.
+     * 2. E-Mail-Adresse stimmt überein.
+     * 3. Anzeigename stimmt überein.
+     *
+     * @return array{user: IUser|null, strategie: ?string}
+     */
+    private function findeLokalenUserFuerMitglied(Mitglied $mitglied, string $username): array
+    {
+        if ($username !== '') {
+            $user = $this->userManager->get($username);
+            if ($user instanceof IUser) {
+                return ['user' => $user, 'strategie' => 'uid'];
+            }
+        }
+
+        $email = trim((string) $mitglied->getEmail());
+        if ($email !== '' && method_exists($this->userManager, 'getByEmail')) {
+            try {
+                $treffer = $this->userManager->getByEmail($email);
+                if (is_array($treffer)) {
+                    foreach ($treffer as $user) {
+                        if ($user instanceof IUser) {
+                            return ['user' => $user, 'strategie' => 'email'];
+                        }
+                    }
+                }
+            } catch (\Throwable) {
+            }
+        }
+
+        $displayName = trim((string) $mitglied->getVollerName());
+        if ($displayName !== '' && method_exists($this->userManager, 'searchDisplayName')) {
+            try {
+                $treffer = $this->userManager->searchDisplayName($displayName);
+                if (is_array($treffer)) {
+                    $needle = mb_strtolower($displayName, 'UTF-8');
+                    foreach ($treffer as $user) {
+                        if (!$user instanceof IUser) {
+                            continue;
+                        }
+                        $kandidat = mb_strtolower(trim((string) $user->getDisplayName()), 'UTF-8');
+                        if ($kandidat === $needle) {
+                            return ['user' => $user, 'strategie' => 'displayName'];
+                        }
+                    }
+                }
+            } catch (\Throwable) {
+            }
+        }
+
+        return ['user' => null, 'strategie' => null];
+    }
+
+    /**
+     * Lokale User in der konfigurierten Fraktions-Gruppe, denen kein Mitglied
+     * der aktuellen Fraktion zugeordnet ist. Solche User sollen beim Abgleich
+     * deaktiviert und aus der Gruppe entfernt werden.
+     *
+     * @param array<string, true> $matchedUidsLower
+     * @return array<int, array<string, mixed>>
+     */
+    private function findeVerwaisteGruppenmitglieder(string $gruppeName, array $matchedUidsLower): array
+    {
+        $gruppe = $this->groupManager->get($gruppeName);
+        if (!is_object($gruppe) || !method_exists($gruppe, 'getUsers')) {
+            return [];
+        }
+        try {
+            $users = $gruppe->getUsers();
+        } catch (\Throwable) {
+            return [];
+        }
+        if (!is_array($users)) {
+            return [];
+        }
+
+        $verwaiste = [];
+        foreach ($users as $user) {
+            if (!$user instanceof IUser) {
+                continue;
+            }
+            $uid = $user->getUID();
+            if (isset($matchedUidsLower[strtolower($uid)])) {
+                continue;
+            }
+            $verwaiste[] = [
+                'uid' => $uid,
+                'displayName' => (string) $user->getDisplayName(),
+                'email' => (string) $user->getEMailAddress(),
+                'aktiv' => $user->isEnabled(),
+            ];
+        }
+        return $verwaiste;
     }
 
     /**

@@ -565,8 +565,8 @@ ul.app-navigation__list {
   inline-size: 100%;
   max-inline-size: 100%;
   border-collapse: collapse;
-  /* fixed sorgt dafür, dass Spalten 100% Containerbreite einhalten und Inhalt wrappt */
-  table-layout: fixed;
+  /* Spaltenbreiten passen sich dynamisch an den Inhalt an. */
+  table-layout: auto;
 }
 
 .pw-tabelle th,
@@ -1055,13 +1055,22 @@ ul.app-navigation__list {
 }
 
 .pw-tabelle .pw-col-nr {
-  inline-size: 5rem;
   white-space: nowrap;
 }
 
 .pw-tabelle .pw-col-titel {
-  /* nimmt den verbleibenden Platz */
+  /* Titel-Spalte darf grosszügig wachsen, restliche Spalten passen sich an. */
   inline-size: auto;
+}
+
+.pw-tabelle .pw-col-inline-edit {
+  /* Inline-Editor-Spalten: kompakt halten, aber genug Platz für Multiselect. */
+  min-inline-size: 12rem;
+}
+
+.pw-tabelle .pw-inline-select {
+  inline-size: 100%;
+  min-inline-size: 10rem;
 }
 
 .pw-status-text {

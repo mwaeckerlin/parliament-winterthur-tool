@@ -94,7 +94,13 @@ services:
       - nginx-realtime
 
   smtp-relay:
-    image: mwaeckerlin/smtp-relay
+    image: mwaeckerlin/fake-smtp
+    # Fake-SMTP-Server: nimmt Mails entgegen, sendet sie aber NICHT
+    # weiter. Empfangene Nachrichten landen als Textdateien unter ./mails/.
+    # So bleiben Test-Setups stumm, aber wir können jederzeit prüfen,
+    # ob/welche Mails der Nextcloud-Stack versendet hätte.
+    volumes:
+      - mails:/mails
     networks:
       - php-smtp
 
@@ -142,6 +148,7 @@ volumes:
   data:
   config:
   db:
+  mails:
 
 networks:
   nxinx-php:

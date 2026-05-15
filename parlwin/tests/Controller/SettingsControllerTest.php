@@ -41,7 +41,7 @@ class SettingsControllerTest extends TestCase {
         ];
         $config = $this->createMock(IConfig::class);
         $config->method('getAppValue')->willReturnCallback(
-            static fn (string $_app, string $key, string $default = ''): string => $store[$key] ?? $default
+            static fn(string $_app, string $key, string $default = ''): string => $store[$key] ?? $default
         );
         $config->method('setAppValue')->willReturnCallback(
             static function (string $_app, string $key, string $value) use (&$store): void {
@@ -97,7 +97,7 @@ class SettingsControllerTest extends TestCase {
         ];
         $config = $this->createMock(IConfig::class);
         $config->method('getAppValue')->willReturnCallback(
-            static fn (string $_app, string $key, string $default = ''): string => $store[$key] ?? $default
+            static fn(string $_app, string $key, string $default = ''): string => $store[$key] ?? $default
         );
         $config->method('setAppValue')->willReturnCallback(
             static function (string $_app, string $key, string $value) use (&$store): void {
@@ -231,9 +231,10 @@ class SettingsControllerTest extends TestCase {
         self::assertSame(['FDP', 'SP/Grüne'], $data['optionen']['fraktionen'] ?? []);
     }
 
-    public function testFraktionMitgliederLiefertUsernameUndLokaleGruppen(): void {
+    public function testFraktionMitgliederLiefertUsernameUndLokaleGruppen(): void
+    {
         $request = $this->createMock(IRequest::class);
-        $request->method('getParam')->willReturnCallback(static fn (string $key, mixed $default = null): mixed => [
+        $request->method('getParam')->willReturnCallback(static fn(string $key, mixed $default = null): mixed => [
             'fraktion' => 'SP/Grüne',
         ][$key] ?? $default);
 
@@ -299,9 +300,10 @@ class SettingsControllerTest extends TestCase {
         self::assertSame(['Fraktion-SP-Gruene', 'users'], $data['mitglieder'][0]['lokaleGruppen'] ?? []);
     }
 
-    public function testProvisionFraktionMitgliederLegtUserAnUndFuegtGruppeHinzu(): void {
+    public function testProvisionFraktionMitgliederLegtUserAnUndFuegtGruppeHinzu(): void
+    {
         $request = $this->createMock(IRequest::class);
-        $request->method('getParam')->willReturnCallback(static fn (string $key, mixed $default = null): mixed => [
+        $request->method('getParam')->willReturnCallback(static fn(string $key, mixed $default = null): mixed => [
             'fraktion' => 'SP/Grüne',
             'nextcloud_gruppe' => 'Fraktion-SP-Gruene',
             'mitglied_ids' => [7],
@@ -393,10 +395,11 @@ class SettingsControllerTest extends TestCase {
      * @param array<string, IUser> $benutzer
      * @return array{0: SettingsController, 1: MockObject&IConfig, 2: MockObject&RealtimePublisherService}
      */
-    private function buildController(array $requestParams, array $fraktionen, array $benutzer): array {
+    private function buildController(array $requestParams, array $fraktionen, array $benutzer): array
+    {
         $request = $this->createMock(IRequest::class);
-        $request->method('offsetExists')->willReturnCallback(static fn (string $key): bool => array_key_exists($key, $requestParams));
-        $request->method('getParam')->willReturnCallback(static fn (string $key, mixed $default = null): mixed => $requestParams[$key] ?? $default);
+        $request->method('offsetExists')->willReturnCallback(static fn(string $key): bool => array_key_exists($key, $requestParams));
+        $request->method('getParam')->willReturnCallback(static fn(string $key, mixed $default = null): mixed => $requestParams[$key] ?? $default);
 
         $store = [
             'fraktion' => '',
@@ -428,7 +431,7 @@ class SettingsControllerTest extends TestCase {
         $fraktionMapper->method('findAll')->willReturn($fraktionEntities);
 
         $userManager = $this->createMock(IUserManager::class);
-        $userManager->method('get')->willReturnCallback(static fn (string $uid): ?IUser => $benutzer[$uid] ?? null);
+        $userManager->method('get')->willReturnCallback(static fn(string $uid): ?IUser => $benutzer[$uid] ?? null);
         $userManager->method('search')->willReturn([]);
         $userManager->method('getByEmail')->willReturn([]);
         $userManager->method('createUser')->willReturn(null);

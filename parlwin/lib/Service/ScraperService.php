@@ -1151,8 +1151,9 @@ class ScraperService {
      * @param array<int, string> $urls
      * @return array<string, string>
      */
-    private function ladeHtmlParallel(array $urls, int $parallel, bool $mitSequenziellemFallback = true): array {
-        $urls = array_values(array_unique(array_filter($urls, static fn (string $u): bool => $u !== '')));
+    private function ladeHtmlParallel(array $urls, int $parallel, bool $mitSequenziellemFallback = true): array
+    {
+        $urls = array_values(array_unique(array_filter($urls, static fn(string $u): bool => $u !== '')));
         if ($urls === []) {
             return [];
         }
@@ -1259,11 +1260,13 @@ class ScraperService {
         return $ergebnisse;
     }
 
-    private function kannNativeParallelDownloads(): bool {
+    private function kannNativeParallelDownloads(): bool
+    {
         if (!function_exists('curl_multi_init') || !function_exists('curl_multi_exec') || !function_exists('curl_init')) {
             return false;
         }
-        if (interface_exists('\\PHPUnit\\Framework\\MockObject\\MockObject')
+        if (
+            interface_exists('\\PHPUnit\\Framework\\MockObject\\MockObject')
             && $this->clientService instanceof \PHPUnit\Framework\MockObject\MockObject
         ) {
             return false;

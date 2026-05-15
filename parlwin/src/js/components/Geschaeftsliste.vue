@@ -59,8 +59,30 @@
                 <span :class="['pw-status-' + statusKlasse(g.status), 'pw-status-text']" :title="g.status">{{ g.status }}</span>
               </td>
               <td data-label="Datum">{{ formatieredatum(g.datum) }}</td>
-              <td data-label="Zuständig">{{ g.hauptZustaendigePerson || '—' }}</td>
-              <td data-label="Beschluss">{{ g.letzterBeschluss?.titel || '—' }}</td>
+              <td data-label="Zuständig" class="pw-col-inline-edit" @click.stop>
+                <NcSelect
+                  class="pw-inline-select"
+                  :model-value="zustaendigOptionenFuer(g)"
+                  :options="zustaendigeOptionenFuerSelect"
+                  multiple
+                  :close-on-select="false"
+                  :clearable="true"
+                  placeholder="—"
+                  label="label"
+                  @update:model-value="aenderungZustaendig(g, $event || [])"
+                />
+              </td>
+              <td data-label="Beschluss" class="pw-col-inline-edit" @click.stop>
+                <NcSelect
+                  class="pw-inline-select"
+                  :model-value="beschlussOptionFuer(g)"
+                  :options="beschlussOptionenFuer(g)"
+                  :clearable="false"
+                  placeholder="—"
+                  label="label"
+                  @update:model-value="aenderungBeschluss(g, $event)"
+                />
+              </td>
             </tr>
           </tbody>
           </table>
@@ -236,6 +258,17 @@ export default {
     zustaendigeLabels() {
       return this.zustaendigeOptionen.map((p) => p.label)
     },
+    zustaendigeOptionenFuerSelect() {
+      return this.mitglieder
+        .filter((m) => m.aktiv !== false && !!(m.nextcloudUid || m.nextcloud_uid))
+        .map((member) => ({
+          label: this.vollerName(member),
+          value: this.personKey(member),
+          mitglied: member,
+        }))
+        .filter((o) => !!o.label)
+        .sort((a, b) => a.label.localeCompare(b.label))
+    },
     beschlussOptionsList() {
       return this.alleBeschluesse.map((b) => ({ label: b.label, value: b.code }))
     },
@@ -315,6 +348,66 @@ export default {
     },
     vollerName(m) {
       return `${m.vorname || ''} ${m.name || ''}`.trim()
+    },
+    personKey(m) {
+      const externId = m.externId || m.extern_id || ''
+      if (externId) return `mitglied:${externId}`
+      return `name:${this.vollerName(m)}`
+    },
+    zustaendigOptionenFuer(geschaeft) {
+      const zust = Array.isArray(geschaeft.zustaendigkeiten) ? geschaeft.zustaendigkeiten : []
+      return zust.map((z) => {
+        const treffer = this.zustaendigeOptionenFuerSelect.find((o) => o.value === z.personKey)
+        return treffer || { label: z.personName || z.personKey, value: z.personKey, mitglied: null }
+      })
+    },
+    beschlussOptionenFuer(geschaeft) {
+      const erlaubt = Array.isArray(geschaeft.erlaubteBeschluesse) ? geschaeft.erlaubteBeschluesse : []
+      return erlaubt.map((b) => ({ label: b.label || b.code, value: b.code }))
+    },
+    beschlussOptionFuer(geschaeft) {
+      const code = geschaeft.letzterBeschluss?.aktionCode || ''
+      if (!code) return null
+      const optionen = this.beschlussOptionenFuer(geschaeft)
+      return optionen.find((o) => o.value === code) || { label: geschaeft.letzterBeschluss?.titel || code, value: code }
+    },
+    async aenderungZustaendig(geschaeft, optionen) {
+      const optList = Array.isArray(optionen) ? optionen : (optionen ? [optionen] : [])
+      const keys = optList.map((o) => o.value).filter(Boolean)
+      const vorhandeneHaupt = (geschaeft.zustaendigkeiten || []).find((z) => z.istHaupt)?.personKey || ''
+      const haupt = keys.includes(vorhandeneHaupt) ? vorhandeneHaupt : (keys[0] || '')
+      const payload = keys.map((key) => {
+        const member = this.mitglieder.find((m) => this.personKey(m) === key)
+        const fallback = optList.find((o) => o.value === key)
+        return {
+          mitgliedExternId: member?.externId || member?.extern_id || '',
+          personName: member ? this.vollerName(member) : (fallback?.label || ''),
+        }
+      })
+      try {
+        await axios.put(generateUrl(`/apps/parlwin/geschaefte/${geschaeft.id}`), {
+          zustaendigkeiten: payload,
+          haupt_person_key: haupt,
+        })
+        await this.ladeGeschaefte()
+        this.$emit('aktualisiert')
+      } catch (fehler) {
+        console.error('Fehler beim Speichern der Zuständigkeit:', fehler)
+      }
+    },
+    async aenderungBeschluss(geschaeft, option) {
+      const code = option?.value || ''
+      if (!code) return
+      try {
+        await axios.post(generateUrl(`/apps/parlwin/geschaefte/${geschaeft.id}/beschluesse`), {
+          code,
+          text: '',
+        })
+        await this.ladeGeschaefte()
+        this.$emit('aktualisiert')
+      } catch (fehler) {
+        console.error('Fehler beim Speichern des Beschlusses:', fehler)
+      }
     },
     async initialisiereAnsicht() {
       try {
