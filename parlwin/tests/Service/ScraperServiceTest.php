@@ -301,13 +301,17 @@ class ScraperServiceTest extends TestCase {
         $responseListe = $this->createMock(IResponse::class);
         $responseListe->method('getBody')->willReturn($listenHtml);
 
-        $clientService->expects($this->once())
-            ->method('newClient')
-            ->willReturn($client);
-        $client->expects($this->once())
-            ->method('get')
-            ->with($this->identicalTo('https://parlament.winterthur.ch/fraktionen'))
-            ->willReturn($responseListe);
+        $responseLeer = $this->createMock(IResponse::class);
+        $responseLeer->method('getBody')->willReturn('<html></html>');
+
+        $clientService->method('newClient')->willReturn($client);
+        $client->method('get')
+            ->willReturnCallback(function (string $url) use ($responseListe, $responseLeer): IResponse {
+                if ($url === 'https://parlament.winterthur.ch/fraktionen') {
+                    return $responseListe;
+                }
+                return $responseLeer;
+            });
 
         $fraktionen = $service->ladeFraktionen();
 

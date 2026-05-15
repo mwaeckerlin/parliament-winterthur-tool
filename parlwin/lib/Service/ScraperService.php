@@ -272,6 +272,55 @@ class ScraperService {
     }
 
     /**
+     * Lädt mehrere Sitzungs-Detailseiten parallel und extrahiert je Sitzung
+     * die normalisierten Traktanden.
+     *
+     * @param array<int, string> $sitzungsUrls
+     * @return array<string, array> Map: absolute URL → Traktanden-Array
+     */
+    public function ladeTraktandenJeUrlParallel(array $sitzungsUrls): array {
+        $absoluteUrls = [];
+        foreach ($sitzungsUrls as $roh) {
+            $abs = self::absolutUrl((string) $roh);
+            if ($abs !== '') {
+                $absoluteUrls[$abs] = true;
+            }
+        }
+        if ($absoluteUrls === []) {
+            return [];
+        }
+        $urls = array_keys($absoluteUrls);
+        $parallel = $this->leseParallelitaetAusEnv('PARLWIN_SYNC_SITZUNG_PARALLEL', 6, 1, 20);
+        $htmlJeUrl = $this->ladeHtmlParallel($urls, $parallel);
+
+        $ergebnisse = [];
+        foreach ($urls as $url) {
+            $html = $htmlJeUrl[$url] ?? '';
+            if ($html === '') {
+                $ergebnisse[$url] = [];
+                continue;
+            }
+            try {
+                $entitaeten = $this->extrahiereEntitaeten($html, 'Traktanden');
+                $eintraege = $this->normalisiereListenEntitaeten($entitaeten);
+                $normalisiert = $this->normalisiereTraktandenEntitaeten($eintraege);
+                if ($normalisiert === []) {
+                    $normalisiert = $this->extrahiereTraktandenAusHtml($html);
+                }
+                $ergebnisse[$url] = $normalisiert;
+            } catch (\Throwable $e) {
+                $this->logger->error(
+                    'Parlament Winterthur: Fehler beim parallelen Laden von Traktanden: ' . $e->getMessage(),
+                    ['url' => $url, 'exception' => $e]
+                );
+                $ergebnisse[$url] = [];
+            }
+        }
+
+        return $ergebnisse;
+    }
+
+    /**
      * Lädt alle Parlamentsmitglieder.
      *
      * @return array[] Array von Mitgliederdaten
@@ -302,7 +351,9 @@ class ScraperService {
     }
 
     /**
-     * Lädt alle Kommissionen.
+     * Lädt alle Kommissionen inklusive ihrer Mitgliederliste (aktuelle und
+     * ehemalige). Die Mitgliederlisten stammen aus der Behörden-Detailseite
+     * `/_rte/behoerde/{externId}` und werden parallel geladen.
      *
      * @return array[] Array von Kommissionsdaten
      */
@@ -322,7 +373,157 @@ class ScraperService {
             $normalisiert[] = $this->normalisiereBehoerdenzeile($daten);
         }
 
+        return $this->reichereBehoerdenMitMitgliedernAn(
+            $normalisiert,
+            'PARLWIN_SYNC_KOMMISSION_PARALLEL',
+            'Kommission'
+        );
+    }
+
+    /**
+     * Reichert eine Liste normalisierter Behörden um deren Mitgliederlisten an,
+     * indem die Detailseiten parallel geladen und ausgewertet werden.
+     *
+     * @param array<int, array<string, mixed>> $normalisiert
+     * @return array<int, array<string, mixed>>
+     */
+    private function reichereBehoerdenMitMitgliedernAn(
+        array $normalisiert,
+        string $envName,
+        string $labelPrefix
+    ): array {
+        $urlJeIndex = [];
+        foreach ($normalisiert as $idx => $daten) {
+            $externId = (string) ($daten['id'] ?? '');
+            if ($externId !== '') {
+                $urlJeIndex[$idx] = self::BASE_URL . '/_rte/behoerde/' . rawurlencode($externId);
+            }
+        }
+
+        if ($urlJeIndex === []) {
+            return $normalisiert;
+        }
+
+        $htmlJeUrl = $this->ladeHtmlParallel(
+            array_values(array_unique($urlJeIndex)),
+            $this->leseParallelitaetAusEnv($envName, 6, 1, 20)
+        );
+        foreach ($urlJeIndex as $idx => $url) {
+            if (!isset($htmlJeUrl[$url])) {
+                continue;
+            }
+            $normalisiert[$idx]['members'] = $this->extrahiereBehoerdenMitgliederAusHtml(
+                $htmlJeUrl[$url],
+                $labelPrefix . ' ' . ($normalisiert[$idx]['id'] ?? '')
+            );
+        }
+
         return $normalisiert;
+    }
+
+    /**
+     * Lädt die Mitgliederliste einer einzelnen Behörde (Kommission, Fraktion,
+     * Stadtparlament usw.) von der Detailseite `/_rte/behoerde/{externId}`.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function ladeBehoerdenMitglieder(string $externId): array {
+        $externId = trim($externId);
+        if ($externId === '') {
+            return [];
+        }
+        $url = self::BASE_URL . '/_rte/behoerde/' . rawurlencode($externId);
+        try {
+            $html = $this->ladeHtml($url);
+            return $this->extrahiereBehoerdenMitgliederAusHtml($html, "Behoerde {$externId}");
+        } catch (\Throwable $e) {
+            $this->logger->error(
+                "Parlament Winterthur: Fehler beim Laden der Behörden-Mitglieder {$externId}: " . $e->getMessage(),
+                ['url' => $url, 'exception' => $e]
+            );
+            return [];
+        }
+    }
+
+    /**
+     * Extrahiert aus der Behörden-Detailseite die Personenliste (aktive und
+     * ehemalige Mitglieder). Pro Person wird genau ein Eintrag zurückgegeben;
+     * falls die Person sowohl aktiv als auch ehemals gelistet ist, gewinnt
+     * der aktive Eintrag.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function extrahiereBehoerdenMitgliederAusHtml(string $html, string $label = 'Behoerde'): array {
+        $entitaeten = $this->extrahiereEntitaeten($html, $label);
+        $zeilen = $this->normalisiereListenEntitaeten($entitaeten);
+        $mitglieder = [];
+        $indexJeExternId = [];
+
+        foreach ($zeilen as $zeile) {
+            if (!is_array($zeile)) {
+                continue;
+            }
+            if (!array_key_exists('_nameVorname', $zeile) && !array_key_exists('_mandatPersonDatumVon', $zeile)) {
+                continue;
+            }
+            $mitglied = $this->normalisiereBehoerdenMitgliedszeile($zeile);
+            if ($mitglied === null) {
+                continue;
+            }
+            $externId = (string) $mitglied['externId'];
+            if (isset($indexJeExternId[$externId])) {
+                $vorhandenIdx = $indexJeExternId[$externId];
+                if (!$mitglieder[$vorhandenIdx]['aktiv'] && $mitglied['aktiv']) {
+                    $mitglieder[$vorhandenIdx] = $mitglied;
+                }
+                continue;
+            }
+            $indexJeExternId[$externId] = count($mitglieder);
+            $mitglieder[] = $mitglied;
+        }
+
+        return $mitglieder;
+    }
+
+    /**
+     * @param array<string, mixed> $daten
+     * @return array<string, mixed>|null
+     */
+    private function normalisiereBehoerdenMitgliedszeile(array $daten): ?array {
+        $nameHtml = (string) self::wert($daten, ['_nameVorname', 'name', 'Name'], '');
+        $link = self::extrahiereLinkAusHtml($nameHtml);
+        $externId = $link['externId'];
+        if ($externId === '') {
+            $externId = (string) self::wert($daten, ['id', 'Id', 'ID', 'personId'], '');
+        }
+        if ($externId === '') {
+            return null;
+        }
+
+        [$nachname, $vorname] = $this->normalisiereMitgliedsName($link['titel']);
+        $funktionAktiv = self::bereinigeHtmlText((string) self::wert($daten, ['_funktionAktiv', 'funktionAktiv'], ''));
+        $funktionInaktiv = self::bereinigeHtmlText((string) self::wert($daten, ['_funktionInaktiv', 'funktionInaktiv'], ''));
+        $partei = self::bereinigeHtmlText((string) self::wert($daten, ['_partei', 'partei', 'party'], ''));
+        $datumVon = $this->normalisiereIsoDatumOderLeer((string) self::wert($daten, ['_mandatPersonDatumVon', 'mandatPersonDatumVon', 'datumVon'], ''));
+        $datumBis = $this->normalisiereIsoDatumOderLeer((string) self::wert($daten, ['_mandatPersonDatumBis', 'mandatPersonDatumBis', 'datumBis'], ''));
+        $aktiv = $funktionAktiv !== '';
+
+        $label = trim($vorname . ' ' . $nachname);
+        if ($label === '') {
+            $label = $link['titel'] !== '' ? $link['titel'] : self::bereinigeHtmlText($nameHtml);
+        }
+
+        return [
+            'externId' => $externId,
+            'name' => $nachname !== '' ? $nachname : $link['titel'],
+            'vorname' => $vorname,
+            'label' => $label,
+            'funktion' => $aktiv ? $funktionAktiv : $funktionInaktiv,
+            'partei' => $partei,
+            'datumVon' => $datumVon,
+            'datumBis' => $datumBis,
+            'aktiv' => $aktiv,
+        ];
     }
 
     /**
@@ -343,10 +544,48 @@ class ScraperService {
             if (!is_array($daten)) {
                 continue;
             }
-            $normalisiert[] = $this->normalisiereBehoerdenzeile($daten);
+            $zeile = $this->normalisiereBehoerdenzeile($daten);
+            if (self::istPseudoFraktionsname((string) ($zeile['name'] ?? ''))) {
+                continue;
+            }
+            $normalisiert[] = $zeile;
         }
 
-        return $normalisiert;
+        return $this->reichereBehoerdenMitMitgliedernAn(
+            $normalisiert,
+            'PARLWIN_SYNC_FRAKTION_PARALLEL',
+            'Fraktion'
+        );
+    }
+
+    /**
+     * Erkennt Pseudo-Fraktionen (Rollen-Sammlungen wie "Fraktionspräsident/innen"),
+     * die auf der Fraktionen-Seite gelistet sind, aber keine eigene Fraktion darstellen.
+     */
+    private function istKeineEchteFraktion(string $name): bool {
+        $normalisiert = trim($name);
+        if ($normalisiert === '') {
+            return true;
+        }
+        $lower = function_exists('mb_strtolower') ? mb_strtolower($normalisiert, 'UTF-8') : strtolower($normalisiert);
+        return str_contains($lower, 'präsident')
+            || str_contains($lower, 'praesident')
+            || str_contains($lower, 'protokoll');
+    }
+
+    /**
+     * Erkennt Pseudo-Fraktionen (Rollen-Sammlungen wie "Fraktionspräsident/innen"),
+     * die auf der Fraktionen-Seite gelistet sind, aber keine eigene Fraktion darstellen.
+     */
+    public static function istPseudoFraktionsname(string $name): bool {
+        $normalisiert = trim($name);
+        if ($normalisiert === '') {
+            return true;
+        }
+        $lower = function_exists('mb_strtolower') ? mb_strtolower($normalisiert, 'UTF-8') : strtolower($normalisiert);
+        return str_contains($lower, 'präsident')
+            || str_contains($lower, 'praesident')
+            || str_contains($lower, 'protokoll');
     }
 
     /**

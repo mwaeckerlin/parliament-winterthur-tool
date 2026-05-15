@@ -98,10 +98,6 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
                     </p>
 
                     <div class="pw-mitglied-toolbar">
-                        <label class="pw-mitglied-select-all">
-                            <input type="checkbox" id="pw-members-select-all" />
-                            <?php p($l->t('Alle wählen')); ?>
-                        </label>
                         <button type="button" id="pw-btn-members-provision" class="button">
                             <?php p($l->t('Ausgewählte anlegen')); ?>
                         </button>
@@ -116,11 +112,15 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
                         <table class="pw-members-table" id="pw-members-table" aria-live="polite">
                             <thead>
                                 <tr>
-                                    <th><?php p($l->t('Auswahl')); ?></th>
+                                    <th class="pw-col-select">
+                                        <label class="pw-members-select-all-label">
+                                            <input type="checkbox" id="pw-members-select-all" aria-label="<?php p($l->t('Alle wählen')); ?>" />
+                                        </label>
+                                    </th>
                                     <th><?php p($l->t('Mitglied')); ?></th>
                                     <th><?php p($l->t('E-Mail')); ?></th>
-                                    <th><?php p($l->t('Username (editierbar)')); ?></th>
-                                    <th><?php p($l->t('Lokaler User / Gruppen')); ?></th>
+                                    <th><?php p($l->t('Username')); ?></th>
+                                    <th><?php p($l->t('Gruppen')); ?></th>
                                 </tr>
                             </thead>
                             <tbody id="pw-members-body"></tbody>
@@ -182,8 +182,7 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
 <script nonce="<?php p(\OC::$server->getContentSecurityPolicyNonceManager()->getNonce()); ?>">
     window.PARLWIN_ADMIN_CONFIG = <?php print_unescaped(json_encode([
         'realtimeWsUrl' => (string) ($_['realtime_ws_url'] ?? ''),
-        'realtimePort' => (int) ($_['realtime_ws_port'] ?? 29825),
-        'realtimePath' => (string) ($_['realtime_ws_path'] ?? '/ws'),
+        'webroot' => rtrim((string) \OC::$WEBROOT, '/'),
     ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT)); ?>;
     window.PARLWIN_ADMIN_BOOTSTRAP = <?php print_unescaped(json_encode([
         'nextcloudGruppen' => $gruppenOptionen,
@@ -221,19 +220,66 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
         let memberSaveTimer = null;
         let lastSavedSettingsPayload = '';
 
+        // Fallback fuer die globale Uebersetzungsfunktion `t`. In Nextcloud 33 ist
+        // sie in manchen Page-Kontexten nicht mehr als globale Variable im IIFE-Scope
+        // verfuegbar (sondern nur als ES-Modul-Export `@nextcloud/l10n`). Ohne diesen
+        // Fallback wuerde der erste t()-Aufruf einen ReferenceError werfen und den
+        // gesamten Init-Block (inkl. pollSyncStatus / connectRealtime) abbrechen.
+        const t = (typeof window !== 'undefined' && typeof window.t === 'function')
+            ? window.t
+            : ((app, text, vars) => {
+                let result = String(text);
+                if (typeof window !== 'undefined' && window.OC?.L10N && typeof window.OC.L10N.translate === 'function') {
+                    try {
+                        return window.OC.L10N.translate(app, text, vars);
+                    } catch (_e) {
+                        // Fallback unten benutzen.
+                    }
+                }
+                if (vars && typeof vars === 'object') {
+                    Object.keys(vars).forEach((key) => {
+                        result = result.split('{' + key + '}').join(String(vars[key]));
+                    });
+                }
+                return result;
+            });
+        const n = (typeof window !== 'undefined' && typeof window.n === 'function')
+            ? window.n
+            : ((app, singular, plural, count, vars) => {
+                const text = count === 1 ? singular : plural;
+                return t(app, text, Object.assign({ count: count }, vars || {}));
+            });
+
+        // Fallback fuer das globale `OC`-Objekt. In NC33 ist es in vielen
+        // Page-Kontexten nicht mehr global verfuegbar.
+        const ncOC = (typeof window !== 'undefined' && window.OC) ? window.OC : null;
+        const generateUrl = (path) => {
+            if (ncOC && typeof ncOC.generateUrl === 'function') {
+                try { return ncOC.generateUrl(path); } catch (_e) { /* fall through */ }
+            }
+            const cleaned = String(path || '').replace(/^\/+/, '');
+            return '/index.php/' + cleaned;
+        };
+        const notifyTemporary = (message) => {
+            if (ncOC && ncOC.Notification && typeof ncOC.Notification.showTemporary === 'function') {
+                try { ncOC.Notification.showTemporary(message); return; } catch (_e) { /* fall through */ }
+            }
+            console.warn('[parlwin]', message);
+        };
+
         const bootstrap = window.PARLWIN_ADMIN_BOOTSTRAP || {};
         const knownGroups = new Set((bootstrap.nextcloudGruppen || []).map((name) => String(name).toLowerCase().trim()).filter(Boolean));
         const activeCalendarUsers = new Map((bootstrap.kalenderNutzerAktiv || []).map((user) => [String(user.uid || '').toLowerCase(), user]));
         const inactiveCalendarUsers = new Map((bootstrap.kalenderNutzerInaktiv || []).map((user) => [String(user.uid || '').toLowerCase(), user]));
 
         const resolveRequestToken = () => {
-            if (OC?.Util && typeof OC.Util.getRequestToken === 'function') {
-                const utilToken = String(OC.Util.getRequestToken() || '').trim();
+            if (ncOC?.Util && typeof ncOC.Util.getRequestToken === 'function') {
+                const utilToken = String(ncOC.Util.getRequestToken() || '').trim();
                 if (utilToken !== '') {
                     return utilToken;
                 }
             }
-            const direct = typeof OC?.requestToken === 'string' ? OC.requestToken.trim() : '';
+            const direct = typeof ncOC?.requestToken === 'string' ? ncOC.requestToken.trim() : '';
             if (direct !== '') {
                 return direct;
             }
@@ -387,6 +433,69 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
             setSelectionState(kalenderState, 'invalid', t('parlwin', 'Benutzer nicht gefunden'));
         };
 
+        const aktuelleFraktionsGruppe = () => {
+            return inputGruppe ? String(inputGruppe.value || '').trim() : '';
+        };
+
+        const vereinigeGruppen = (...listen) => {
+            const seen = new Set();
+            const ergebnis = [];
+            listen.forEach((liste) => {
+                if (!Array.isArray(liste)) {
+                    return;
+                }
+                liste.forEach((eintrag) => {
+                    const name = String(eintrag || '').trim();
+                    if (name === '' || seen.has(name)) {
+                        return;
+                    }
+                    seen.add(name);
+                    ergebnis.push(name);
+                });
+            });
+            return ergebnis;
+        };
+
+        const aktualisiereGruppenZelle = (tdLocal, mitglied) => {
+            if (!tdLocal) {
+                return;
+            }
+            const exists = mitglied && mitglied.lokalerUserExistiert === true;
+            const groups = mitglied && Array.isArray(mitglied.lokaleGruppen)
+                ? mitglied.lokaleGruppen.filter(Boolean)
+                : [];
+            const username = String((mitglied && mitglied.username) || '').trim();
+            tdLocal.classList.add('pw-member-groups');
+            if (exists) {
+                tdLocal.textContent = vereinigeGruppen([aktuelleFraktionsGruppe()], groups).join(', ');
+                tdLocal.className = 'pw-member-groups pw-member-local-exists';
+            } else if (username === '') {
+                tdLocal.textContent = t('parlwin', 'Bitte Username setzen');
+                tdLocal.className = 'pw-member-groups pw-member-local-missing';
+            } else {
+                tdLocal.textContent = aktuelleFraktionsGruppe();
+                tdLocal.className = 'pw-member-groups pw-member-local-pending';
+            }
+        };
+
+        const aktualisiereAlleGruppenZellen = () => {
+            if (!membersBody) {
+                return;
+            }
+            membersBody.querySelectorAll('tr').forEach((row) => {
+                const memberId = Number(row.dataset.memberId || 0);
+                if (!(memberId > 0)) {
+                    return;
+                }
+                const eintrag = fraktionsMitglieder.find((m) => Number(m.id) === memberId);
+                if (!eintrag) {
+                    return;
+                }
+                const tdLocal = row.querySelector('.pw-member-groups');
+                aktualisiereGruppenZelle(tdLocal, eintrag);
+            });
+        };
+
         const renderMemberRows = () => {
             if (!membersBody || !membersEmpty) {
                 return;
@@ -445,33 +554,15 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
                         eintrag.lokalerUserExistiert = false;
                         eintrag.lokaleGruppen = [];
                     }
-                    if (String(input.value || '').trim() === '') {
-                        tdLocal.textContent = t('parlwin', 'Bitte Username setzen');
-                        tdLocal.className = 'pw-member-local-missing';
-                    } else {
-                        tdLocal.textContent = t('parlwin', 'Wird beim Anlegen geprüft');
-                        tdLocal.className = 'pw-member-local-pending';
-                    }
+                    aktualisiereGruppenZelle(tdLocal, eintrag || mitglied);
                     queueMemberMappingSave();
                 });
                 tdUser.appendChild(input);
 
                 const tdLocal = document.createElement('td');
-                tdLocal.dataset.label = t('parlwin', 'Lokaler User / Gruppen');
-                const exists = mitglied.lokalerUserExistiert === true;
-                const groups = Array.isArray(mitglied.lokaleGruppen) ? mitglied.lokaleGruppen.filter(Boolean) : [];
-                if (exists) {
-                    tdLocal.textContent = groups.length > 0
-                        ? `${t('parlwin', 'Existiert')} (${groups.join(', ')})`
-                        : t('parlwin', 'Existiert (ohne Gruppen)');
-                    tdLocal.className = 'pw-member-local-exists';
-                } else if (String(mitglied.username || '').trim() === '') {
-                    tdLocal.textContent = t('parlwin', 'Bitte Username setzen');
-                    tdLocal.className = 'pw-member-local-missing';
-                } else {
-                    tdLocal.textContent = t('parlwin', 'Wird beim Anlegen geprüft');
-                    tdLocal.className = 'pw-member-local-pending';
-                }
+                tdLocal.classList.add('pw-member-groups');
+                tdLocal.dataset.label = t('parlwin', 'Gruppen');
+                aktualisiereGruppenZelle(tdLocal, mitglied);
 
                 tr.appendChild(tdSelect);
                 tr.appendChild(tdName);
@@ -520,7 +611,7 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
             if (membersStatus) {
                 membersStatus.textContent = t('parlwin', 'Lade Mitglieder...');
             }
-            return fetch(`${OC.generateUrl('/apps/parlwin/settings/fraktion-mitglieder')}?fraktion=${encodeURIComponent(fraktion)}`, {
+            return fetch(`${generateUrl('/apps/parlwin/settings/fraktion-mitglieder')}?fraktion=${encodeURIComponent(fraktion)}`, {
                 method: 'GET',
                 headers: authHeaders(),
             })
@@ -560,7 +651,7 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
             if (membersStatus) {
                 membersStatus.textContent = t('parlwin', 'Speichere Zuordnungen...');
             }
-            fetch(OC.generateUrl('/apps/parlwin/settings/fraktion-mitglieder/mappings'), {
+            fetch(generateUrl('/apps/parlwin/settings/fraktion-mitglieder/mappings'), {
                 method: 'POST',
                 headers: authHeaders({
                     'Content-Type': 'application/json',
@@ -621,7 +712,7 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
             }
 
             setAutosaveStatus(t('parlwin', 'Speichere automatisch...'));
-            return fetch(OC.generateUrl('/apps/parlwin/settings'), {
+            return fetch(generateUrl('/apps/parlwin/settings'), {
                 method: 'POST',
                 headers: authHeaders({
                     'Content-Type': 'application/json',
@@ -644,7 +735,7 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
                 })
                 .catch((err) => {
                     setAutosaveStatus(t('parlwin', 'Auto-Save fehlgeschlagen'));
-                    OC.Notification.showTemporary(t('parlwin', 'Fehler beim Speichern: {msg}', { msg: err?.message || 'unbekannt' }));
+                    notifyTemporary(t('parlwin', 'Fehler beim Speichern: {msg}', { msg: err?.message || 'unbekannt' }));
                     console.error(err);
                 });
         };
@@ -692,7 +783,8 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
             if (membersStatus) {
                 membersStatus.textContent = t('parlwin', 'Lege Benutzer an...');
             }
-            fetch(OC.generateUrl('/apps/parlwin/settings/fraktion-mitglieder/anlegen'), {
+            queueSettingsSave(true).catch(() => { });
+            fetch(generateUrl('/apps/parlwin/settings/fraktion-mitglieder/anlegen'), {
                 method: 'POST',
                 headers: authHeaders({
                     'Content-Type': 'application/json',
@@ -715,11 +807,23 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
                     fraktionsMitglieder = Array.isArray(payload?.mitglieder) ? payload.mitglieder : [];
                     renderMemberRows();
                     const provision = payload?.provision || {};
+                    const warnungen = Array.isArray(provision?.warnungen) ? provision.warnungen : [];
                     if (membersStatus) {
-                        membersStatus.textContent = t('parlwin', 'Angelegt: {newCount}, Gruppe ergänzt: {groupCount}', {
+                        let msg = t('parlwin', 'Angelegt: {newCount}, Gruppe ergänzt: {groupCount}', {
                             newCount: Number(provision?.angelegt || 0),
                             groupCount: Number(provision?.zurGruppeHinzugefuegt || 0),
                         });
+                        if (warnungen.length > 0) {
+                            msg += ' — ' + warnungen.join('; ');
+                        } else if (
+                            Number(provision?.ausgewaehlt || 0) > 0
+                            && Number(provision?.angelegt || 0) === 0
+                            && Number(provision?.zurGruppeHinzugefuegt || 0) === 0
+                            && Number(provision?.bereitsVorhanden || 0) === 0
+                        ) {
+                            msg += ' — ' + t('parlwin', 'Keines der ausgewählten Mitglieder gehört zur gewählten Fraktion.');
+                        }
+                        membersStatus.textContent = msg;
                     }
                 })
                 .catch((err) => {
@@ -730,14 +834,12 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
         };
 
         const defaultWsUrl = () => {
+            // Same-origin WebSocket via the /ws/<appid>/ reverse-proxy
+            // convention shipped by mwaeckerlin/nextcloud:nginx.
             const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
-            const host = window.location.hostname || 'localhost';
-            const port = String(window.PARLWIN_ADMIN_CONFIG?.realtimePort || 29825);
-            let path = String(window.PARLWIN_ADMIN_CONFIG?.realtimePath || '/ws').trim() || '/ws';
-            if (!path.startsWith('/')) {
-                path = `/${path}`;
-            }
-            return `${scheme}://${host}:${port}${path}`;
+            const host = window.location.host || 'localhost';
+            const webroot = String(window.PARLWIN_ADMIN_CONFIG?.webroot || '').replace(/\/$/, '');
+            return `${scheme}://${host}${webroot}/ws/parlwin/`;
         };
 
         const resolveWsUrl = () => {
@@ -845,7 +947,7 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
         };
 
         const pollSyncStatus = () => {
-            return fetch(OC.generateUrl('/apps/parlwin/sync/status'), {
+            return fetch(generateUrl('/apps/parlwin/sync/status'), {
                 method: 'GET',
                 headers: authHeaders(),
             })
@@ -956,7 +1058,7 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
             syncPercent.textContent = '0%';
             btnSyncCancel.disabled = false;
             startPolling();
-            fetch(OC.generateUrl('/apps/parlwin/sync'), {
+            fetch(generateUrl('/apps/parlwin/sync'), {
                 method: 'POST',
                 headers: authHeaders(),
             })
@@ -1033,7 +1135,7 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
             btnSyncCancel.disabled = true;
             syncStatus.textContent = t('parlwin', 'Abbruch wird angefordert...');
 
-            fetch(OC.generateUrl('/apps/parlwin/sync/cancel'), {
+            fetch(generateUrl('/apps/parlwin/sync/cancel'), {
                 method: 'POST',
                 headers: authHeaders(),
             })
@@ -1058,6 +1160,8 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
         });
 
         inputGruppe?.addEventListener('input', updateGroupState);
+        inputGruppe?.addEventListener('input', aktualisiereAlleGruppenZellen);
+        inputGruppe?.addEventListener('change', aktualisiereAlleGruppenZellen);
         inputKalenderNutzer?.addEventListener('input', updateKalenderState);
         selectFraktion?.addEventListener('change', () => {
             queueSettingsSave(true).catch(() => { });

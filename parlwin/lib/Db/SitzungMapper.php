@@ -14,8 +14,10 @@ use OCP\IDBConnection;
  *
  * @extends QBMapper<Sitzung>
  */
-class SitzungMapper extends QBMapper {
-    public function __construct(IDBConnection $db) {
+class SitzungMapper extends QBMapper
+{
+    public function __construct(IDBConnection $db)
+    {
         parent::__construct($db, 'pw_sitzungen', Sitzung::class);
     }
 
@@ -24,7 +26,8 @@ class SitzungMapper extends QBMapper {
      *
      * @return Sitzung[]
      */
-    public function findAll(int $limit = 100, int $offset = 0): array {
+    public function findAll(int $limit = 100, int $offset = 0): array
+    {
         $qb = $this->db->getQueryBuilder();
         $qb->select('*')
             ->from($this->getTableName())
@@ -40,7 +43,8 @@ class SitzungMapper extends QBMapper {
      *
      * @return Sitzung[]
      */
-    public function findKuenftige(): array {
+    public function findKuenftige(): array
+    {
         $qb = $this->db->getQueryBuilder();
         $heute = (new \DateTime())->format('Y-m-d');
         $qb->select('*')
@@ -56,7 +60,8 @@ class SitzungMapper extends QBMapper {
      *
      * @throws DoesNotExistException wenn nicht gefunden
      */
-    public function find(int $id): Sitzung {
+    public function find(int $id): Sitzung
+    {
         $qb = $this->db->getQueryBuilder();
         $qb->select('*')
             ->from($this->getTableName())
@@ -69,7 +74,8 @@ class SitzungMapper extends QBMapper {
      *
      * @throws DoesNotExistException wenn nicht gefunden
      */
-    public function findByExternId(string $externId): Sitzung {
+    public function findByExternId(string $externId): Sitzung
+    {
         $qb = $this->db->getQueryBuilder();
         $qb->select('*')
             ->from($this->getTableName())
@@ -82,7 +88,8 @@ class SitzungMapper extends QBMapper {
      *
      * @return string[]
      */
-    public function findAllExternIds(): array {
+    public function findAllExternIds(): array
+    {
         $qb = $this->db->getQueryBuilder();
         $qb->select('extern_id')
             ->from($this->getTableName());
@@ -98,20 +105,41 @@ class SitzungMapper extends QBMapper {
     /**
      * Markiert alle Sitzungen, deren externe IDs nicht in $bekannteIds sind, als gelöscht.
      *
+     * Chunkweise IN-Abfrage statt NOT IN, um Nextclouds Oracle-kompatibles
+     * 1000-Element-Limit nicht zu überschreiten.
+     *
      * @param string[] $bekannteIds
      */
-    public function markiereNichtMehrVorhandeneAlsGeloescht(array $bekannteIds): int {
+    public function markiereNichtMehrVorhandeneAlsGeloescht(array $bekannteIds): int
+    {
         $qb = $this->db->getQueryBuilder();
-        $qb->update($this->getTableName())
-            ->set('geloescht', $qb->createNamedParameter(true, IQueryBuilder::PARAM_BOOL))
-            ->set('aktualisiert_am', $qb->createNamedParameter((new \DateTime())->format('Y-m-d H:i:s')))
+        $qb->select('extern_id')
+            ->from($this->getTableName())
             ->where($qb->expr()->eq('geloescht', $qb->createNamedParameter(false, IQueryBuilder::PARAM_BOOL)));
-        if (!empty($bekannteIds)) {
-            $qb->andWhere($qb->expr()->notIn(
-                'extern_id',
-                $qb->createNamedParameter($bekannteIds, IQueryBuilder::PARAM_STR_ARRAY)
-            ));
+        $result = $qb->executeQuery();
+        $aktive = [];
+        while ($row = $result->fetch()) {
+            $aktive[] = (string) $row['extern_id'];
         }
-        return $qb->executeStatement();
+        $result->closeCursor();
+
+        $bekanntSet = array_flip(array_map('strval', $bekannteIds));
+        $zuLoeschen = array_values(array_filter($aktive, static fn(string $id): bool => !isset($bekanntSet[$id])));
+        if ($zuLoeschen === []) {
+            return 0;
+        }
+
+        $jetzt = (new \DateTime())->format('Y-m-d H:i:s');
+        $total = 0;
+        foreach (array_chunk($zuLoeschen, 900) as $chunk) {
+            $qbu = $this->db->getQueryBuilder();
+            $qbu->update($this->getTableName())
+                ->set('geloescht', $qbu->createNamedParameter(true, IQueryBuilder::PARAM_BOOL))
+                ->set('aktualisiert_am', $qbu->createNamedParameter($jetzt))
+                ->where($qbu->expr()->eq('geloescht', $qbu->createNamedParameter(false, IQueryBuilder::PARAM_BOOL)))
+                ->andWhere($qbu->expr()->in('extern_id', $qbu->createNamedParameter($chunk, IQueryBuilder::PARAM_STR_ARRAY)));
+            $total += $qbu->executeStatement();
+        }
+        return $total;
     }
 }

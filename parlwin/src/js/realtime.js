@@ -1,14 +1,12 @@
 const EVENT_NAME = 'parlwin:realtime-event'
 
 function defaultWsUrl() {
+  // Same-origin WebSocket via the /ws/<appid>/ reverse-proxy convention
+  // shipped by mwaeckerlin/nextcloud:nginx.
   const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws'
-  const host = window.location.hostname || 'localhost'
-  const port = String(window.PARLWIN_CONFIG?.realtimePort || 29825)
-  let path = String(window.PARLWIN_CONFIG?.realtimePath || '/ws').trim() || '/ws'
-  if (!path.startsWith('/')) {
-    path = `/${path}`
-  }
-  return `${scheme}://${host}:${port}${path}`
+  const host = window.location.host || 'localhost'
+  const webroot = String(window.PARLWIN_CONFIG?.webroot || '').replace(/\/$/, '')
+  return `${scheme}://${host}${webroot}/ws/parlwin/`
 }
 
 function resolveWsUrl() {

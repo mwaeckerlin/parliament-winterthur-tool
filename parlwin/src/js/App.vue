@@ -38,6 +38,8 @@
     <Mitgliederliste
       v-else-if="aktiveAnsicht === 'mitglieder'"
       :mitglieder="mitglieder"
+      :fraktionen="fraktionen"
+      :kommissionen="kommissionen"
     />
     <Kommissionsliste
       v-else-if="aktiveAnsicht === 'kommissionen'"
@@ -81,6 +83,8 @@ export default {
     return {
       aktiveAnsicht: 'geschaefte',
       mitglieder: [],
+      fraktionen: [],
+      kommissionen: [],
       syncMeldung: '',
       syncFehler: false,
       ansichten: [
@@ -94,6 +98,8 @@ export default {
   },
   mounted() {
     this.ladeMitglieder()
+    this.ladeFraktionen()
+    this.ladeKommissionen()
     this.unsubRealtime = subscribeRealtime(this.handleRealtimeEvent)
   },
   beforeUnmount() {
@@ -118,6 +124,22 @@ export default {
         console.error('Fehler beim Laden der Mitglieder:', fehler)
       }
     },
+    async ladeFraktionen() {
+      try {
+        const { data } = await axios.get(generateUrl('/apps/parlwin/fraktionen'))
+        this.fraktionen = Array.isArray(data) ? data : []
+      } catch (fehler) {
+        console.error('Fehler beim Laden der Fraktionen:', fehler)
+      }
+    },
+    async ladeKommissionen() {
+      try {
+        const { data } = await axios.get(generateUrl('/apps/parlwin/kommissionen'))
+        this.kommissionen = Array.isArray(data) ? data : []
+      } catch (fehler) {
+        console.error('Fehler beim Laden der Kommissionen:', fehler)
+      }
+    },
     async ladeGeschaefte() {
       // Wird durch Geschaeftsliste selbst geladen; hier nur als Hook
     },
@@ -129,6 +151,8 @@ export default {
         type === 'fraktion.roles.updated'
       ) {
         this.ladeMitglieder()
+        this.ladeFraktionen()
+        this.ladeKommissionen()
       }
     },
   },

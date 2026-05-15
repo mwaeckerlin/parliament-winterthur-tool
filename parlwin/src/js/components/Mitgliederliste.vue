@@ -25,19 +25,29 @@
         :class="{ inaktiv: !m.aktiv }"
       >
         <div class="pw-mitglied-kopf">
-          <div class="pw-mitglied-avatar">
-            <img v-if="m.fotoUrl" :src="m.fotoUrl" :alt="m.vorname + ' ' + m.name" loading="lazy" />
-            <div v-else class="pw-mitglied-initial">{{ (m.vorname || '?')[0] }}{{ (m.name || '?')[0] }}</div>
-          </div>
           <div class="pw-mitglied-kopftext">
             <strong>{{ m.vorname }} {{ m.name }}</strong>
             <span class="pw-mitglied-partei">{{ m.partei || 'Ohne Partei' }}</span>
+            <span v-if="fraktionsRolle(m)" class="pw-mitglied-fraktionsrolle">{{ fraktionsRolle(m) }}</span>
           </div>
         </div>
         <div class="pw-mitglied-info">
           <div class="pw-data-pair">
             <span>Fraktion</span>
             <strong>{{ m.fraktion || '—' }}</strong>
+          </div>
+          <div v-if="kommissionenVon(m).length" class="pw-data-pair pw-mitglied-kommissionen">
+            <span>Kommission</span>
+            <strong>
+              <span
+                v-for="(k, idx) in kommissionenVon(m)"
+                :key="idx"
+                class="pw-mitglied-kommission-eintrag"
+              >
+                <span class="pw-mitglied-kommission-name">{{ k.name }}</span>
+                <span v-if="k.rolle" class="pw-mitglied-kommission-rolle">{{ k.rolle }}</span>
+              </span>
+            </strong>
           </div>
           <a v-if="m.email" :href="'mailto:' + m.email" class="pw-mitglied-email">{{ m.email }}</a>
           <span v-if="!m.aktiv" class="pw-badge inaktiv">Ehemaliges Mitglied</span>
@@ -60,6 +70,8 @@ export default {
   components: { NcTextField, NcSelect, NcCheckboxRadioSwitch, NcEmptyContent },
   props: {
     mitglieder: { type: Array, default: () => [] },
+    fraktionen: { type: Array, default: () => [] },
+    kommissionen: { type: Array, default: () => [] },
   },
   data() {
     return {
@@ -112,6 +124,93 @@ export default {
         liste = liste.filter(m => m.partei === this.filterPartei)
       }
       return liste.sort((a, b) => `${a.name}${a.vorname}`.localeCompare(`${b.name}${b.vorname}`))
+    },
+    fraktionsrolleNachExternId() {
+      const map = new Map()
+      for (const f of this.fraktionen || []) {
+        if (f?.aktiv === false) continue
+        const eintraege = this.parseBehoerdenMitglieder(f?.mitglieder)
+        for (const e of eintraege) {
+          if (!e.externId || e.aktiv === false) continue
+          const rolle = this.kategorisiereFraktionsfunktion(e.funktion)
+          if (rolle) {
+            map.set(e.externId, rolle)
+          }
+        }
+      }
+      return map
+    },
+    kommissionenNachExternId() {
+      const map = new Map()
+      for (const k of this.kommissionen || []) {
+        if (k?.aktiv === false) continue
+        const name = k?.name || ''
+        const eintraege = this.parseBehoerdenMitglieder(k?.mitglieder)
+        for (const e of eintraege) {
+          if (!e.externId || e.aktiv === false) continue
+          const rolle = this.kategorisiereKommissionsfunktion(e.funktion)
+          const liste = map.get(e.externId) || []
+          liste.push({ name, rolle })
+          map.set(e.externId, liste)
+        }
+      }
+      // Sortierung: Präsident zuerst, dann Vize, dann alphabetisch
+      const rang = (eintrag) => {
+        if (eintrag.rolle === 'Präsident:in') return 0
+        if (eintrag.rolle === 'Vizepräsident:in') return 1
+        return 2
+      }
+      for (const [k, v] of map) {
+        v.sort((a, b) => rang(a) - rang(b) || a.name.localeCompare(b.name, 'de'))
+        map.set(k, v)
+      }
+      return map
+    },
+  },
+  methods: {
+    parseBehoerdenMitglieder(raw) {
+      if (!raw) return []
+      let arr
+      try {
+        arr = typeof raw === 'string' ? JSON.parse(raw) : raw
+      } catch {
+        return []
+      }
+      if (!Array.isArray(arr)) return []
+      return arr.map((e) => {
+        if (e && typeof e === 'object') {
+          return {
+            externId: String(e.externId ?? e.extern_id ?? e.id ?? ''),
+            funktion: String(e.funktion ?? ''),
+            aktiv: e.aktiv !== false,
+          }
+        }
+        return { externId: String(e ?? ''), funktion: '', aktiv: true }
+      })
+    },
+    kategorisiereFraktionsfunktion(funktion) {
+      const v = (funktion || '').toLowerCase()
+      if (!v) return ''
+      const istPraesident = v.includes('präsiden') || v.includes('praesiden')
+      if (!istPraesident) return ''
+      const istVize = v.includes('vize') || v.includes('stellvert')
+      return istVize ? 'Vize Fraktionspräsident' : 'Fraktionspräsident'
+    },
+    kategorisiereKommissionsfunktion(funktion) {
+      const v = (funktion || '').toLowerCase()
+      if (!v) return ''
+      const istPraesident = v.includes('präsiden') || v.includes('praesiden')
+      if (!istPraesident) return ''
+      const istVize = v.includes('vize') || v.includes('stellvert')
+      return istVize ? 'Vizepräsident:in' : 'Präsident:in'
+    },
+    fraktionsRolle(m) {
+      const id = String(m?.externId || m?.extern_id || '')
+      return id ? (this.fraktionsrolleNachExternId.get(id) || '') : ''
+    },
+    kommissionenVon(m) {
+      const id = String(m?.externId || m?.extern_id || '')
+      return id ? (this.kommissionenNachExternId.get(id) || []) : []
     },
   },
   mounted() {

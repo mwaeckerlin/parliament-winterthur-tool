@@ -19,7 +19,7 @@ Funktionen:
 - Automatische Kalendereinträge für Sitzungen
 - Synchronisation der Fraktionsmitglieder als Nextcloud-Gruppe
     ]]></description>
-    <version>1.0.1</version>
+    <version>1.0.5</version>
     <licence>mit</licence>
     <author mail="marc@waeckerlin.org" homepage="https://github.com/mwaeckerlin">Marc Wäckerlin</author>
     <namespace>ParliamentWinterthur</namespace>

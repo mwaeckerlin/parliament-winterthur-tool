@@ -290,30 +290,53 @@ Netzwerkaufteilung im Compose (wie im Parent-Projekt-Muster, je Verbindung ein N
 - `php-smtp`: `nextcloud-php-fpm` ↔ `smtp-relay`
 - `nginx-collabora`: `nextcloud-nginx` ↔ `collabora`
 - `php-collabora`: `nextcloud-php-fpm` ↔ `collabora`
-- `php-realtime`: `nextcloud-php-fpm` ↔ `parlwin-realtime`
-- `nginx-realtime`: `nextcloud-nginx` ↔ `parlwin-realtime`
+- `php-realtime`: `nextcloud-php-fpm` ↔ `parlwin-ws`
+- `nginx-realtime`: `nextcloud-nginx` ↔ `parlwin-ws`
 
 Alle Netze sind wie im Referenz-Setup mit `driver_opts.encrypted=1` definiert.
+
+### WebSocket-Backend (`parlwin-ws`)
+
+Die App folgt der **WebSocket-App-Convention** von `mwaeckerlin/nextcloud:nginx`
+(siehe README dort, Abschnitt „WebSocket Apps“):
+
+- Compose-Service heisst **`parlwin-ws`** und hört intern auf Port **`3001`**.
+- Kein externer Port-Mapping nötig — der Browser erreicht den WS-Server
+  **am gleichen Host und Port wie Nextcloud selbst** über den Pfad
+  **`/ws/parlwin/`**. `nextcloud-nginx` macht den WebSocket-Upgrade
+  transparent und proxied auf `http://parlwin-ws:3001/`.
+- Das eliminiert Cross-Port-CSP-Probleme: die Browser-Verbindung läuft
+  same-origin, und Nextclouds Default-CSP (`connect-src 'self'`) deckt sie
+  ohne Override automatisch ab.
+- Service-zu-Service-Calls aus PHP (z.B. Event-Publish) verwenden
+  weiterhin den internen Hostnamen direkt (`http://parlwin-ws:3001/publish`),
+  nginx wird hier umgangen.
+
+Wer Parlwin in einem bestehenden Nextcloud-Setup einsetzt, muss
+**keinen nginx editieren** — es reicht, den `parlwin-ws`-Service zur
+eigenen Compose-Datei hinzuzufügen und ans gleiche Netzwerk wie
+`nextcloud-nginx` zu hängen.
 
 Die Services `nextcloud-nginx` und `nextcloud-php-fpm` werden über das
 projektinterne `Dockerfile` gebaut (Targets `nginx`/`php-fpm`) und basieren auf:
 - `mwaeckerlin/nodejs-build` (Build-Stage für Frontend-Build in `Dockerfile` und `Dockerfile.realtime`)
   - Build-Artefakte werden mit dem dedizierten Build-User (`BUILD_USER`) erzeugt.
-- `mwaeckerlin/nodejs` (Runtime-Basis für `parlwin-realtime`, dedizierter Runtime-User `RUN_USER`)
+- `mwaeckerlin/nodejs` (Runtime-Basis für `parlwin-ws`, dedizierter Runtime-User `RUN_USER`)
 - `mwaeckerlin/nextcloud:nginx`
 - `mwaeckerlin/nextcloud:php-fpm`
 - `mariadb` (`latest`)
 - `collabora/code`
-- `parlwin-realtime` (Node-WebSocket-Broker, gebaut aus `Dockerfile.realtime`)
+- `parlwin-ws` (Node-WebSocket-Broker, gebaut aus `Dockerfile.realtime`)
 
 Pflicht-Umgebungsvariablen (z. B. in `.env` im Projektroot):
 - `NEXTCLOUD_DB_PASSWORD`
 - `NEXTCLOUD_ADMIN_PASSWORD`
 
 Realtime-Variablen (werden automatisch vorbelegt):
-- `PARLWIN_REALTIME_PORT` (Default: `29825`)
-- `PARLWIN_REALTIME_WS_URL` (Default: `ws://localhost:29825/ws`)
-- `PARLWIN_REALTIME_PUBLISH_URL` (Default: `http://parlwin-realtime:3001/publish`)
+- `PARLWIN_REALTIME_WS_URL` (Default: leer → automatisch aus aktuellem
+  Origin: `ws(s)://<host>[<WEBROOT>]/ws/parlwin/`; nur setzen, falls
+  Nextcloud unter einem abweichenden öffentlichen Origin erreichbar ist)
+- `PARLWIN_REALTIME_PUBLISH_URL` (Default: `http://parlwin-ws:3001/publish`)
 - `PARLWIN_REALTIME_SECRET` (optional, Shared Secret für `/publish`)
 - `PARLWIN_REALTIME_AUTH_REQUIRED` (Default: `1`, WS-Auth ist aktiv)
 - `PARLWIN_NEXTCLOUD_BASE_URL` (Default: `http://nextcloud-nginx:8080`, für WS-Auth-Check)
@@ -375,7 +398,9 @@ npm stop
 ```
 
 Standard-HTTP-Port lokal: `29824` (anpassbar über `NEXTCLOUD_HTTP_PORT`).
-Standard-Realtime-Port lokal: `29825` (anpassbar über `PARLWIN_REALTIME_PORT`).
+Der WebSocket-Server (`parlwin-ws`) wird **nicht** nach aussen exponiert;
+der Browser erreicht ihn am gleichen Port wie Nextcloud über
+`ws://localhost:29824/ws/parlwin/`.
 
 Plugin manuell aktivieren (nur falls Init-Service deaktiviert wurde):
 
