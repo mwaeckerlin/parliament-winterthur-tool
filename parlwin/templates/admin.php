@@ -114,7 +114,8 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
                                 <tr>
                                     <th class="pw-col-select">
                                         <label class="pw-members-select-all-label">
-                                            <input type="checkbox" id="pw-members-select-all" aria-label="<?php p($l->t('Alle wählen')); ?>" />
+                                            <input type="checkbox" id="pw-members-select-all"
+                                                aria-label="<?php p($l->t('Alle wählen')); ?>" />
                                         </label>
                                     </th>
                                     <th><?php p($l->t('Mitglied')); ?></th>
@@ -600,8 +601,15 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
                 .filter((id) => id > 0);
         };
 
-        const loadFraktionMembers = () => {
-            const fraktion = String(selectFraktion?.value || '').trim();
+        const loadFraktionMembers = (explicitFraktion) => {
+            const fraktion = String(
+                explicitFraktion !== undefined && explicitFraktion !== null
+                    ? explicitFraktion
+                    : (selectFraktion?.value || '')
+            ).trim();
+            if (selectFraktion && fraktion && selectFraktion.value !== fraktion) {
+                selectFraktion.value = fraktion;
+            }
             if (!fraktion) {
                 fraktionsMitglieder = [];
                 renderMemberRows();
@@ -1177,9 +1185,13 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
 
         updateGroupState();
         updateKalenderState();
+        const initialFraktion = <?php print_unescaped(json_encode((string) ($_['fraktion'] ?? ''), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE)); ?>;
+        if (selectFraktion && initialFraktion && selectFraktion.value !== initialFraktion) {
+            selectFraktion.value = initialFraktion;
+        }
         renderMemberRows();
         lastSavedSettingsPayload = JSON.stringify(collectSettingsFormData());
-        loadFraktionMembers().catch(() => { });
+        loadFraktionMembers(initialFraktion).catch(() => { });
         connectRealtime();
         startPolling();
         pollSyncStatus().catch(() => { });

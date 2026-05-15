@@ -81,6 +81,12 @@ class FraktionsarbeitService {
 
             $eintrag['letzterBeschluss'] = $letzterBeschluss !== null ? $this->mapAktion($letzterBeschluss) : null;
             $eintrag['hauptZustaendigePerson'] = $haupt !== null ? $haupt->getPersonName() : '';
+            $aktiveZustaendigkeiten = $this->zustaendigkeitMapper->findAktiveByGeschaeft((int) $geschaeft->getId());
+            $eintrag['zustaendigkeiten'] = array_map(
+                fn(GeschaeftZustaendigkeit $z): array => $this->mapZustaendigkeit($z),
+                $aktiveZustaendigkeiten
+            );
+            $eintrag['erlaubteBeschluesse'] = $this->ermittleErlaubteBeschluesse($geschaeft);
             $this->fuelleFraktionsstatus($eintrag, $geschaeft, $letzterBeschluss);
 
             if ($filterLetzterBeschluss !== '') {
@@ -348,15 +354,18 @@ class FraktionsarbeitService {
             || $this->rollenMapper->hasAktiveRolle($uid, self::ROLLE_FRAKTIONSPRAESIDENT_STV);
     }
 
-    private function kannProtokollfuehrungHandeln(): bool {
+    private function kannProtokollfuehrungHandeln(): bool
+    {
         $user = $this->userSession->getUser();
         if ($user === null) {
             return false;
         }
 
         $uid = $user->getUID();
-        if ($this->rollenMapper->hasAktiveRolle($uid, self::ROLLE_PROTOKOLLFUEHRER)
-            || $this->rollenMapper->hasAktiveRolle($uid, self::ROLLE_PROTOKOLLFUEHRER_STV)) {
+        if (
+            $this->rollenMapper->hasAktiveRolle($uid, self::ROLLE_PROTOKOLLFUEHRER)
+            || $this->rollenMapper->hasAktiveRolle($uid, self::ROLLE_PROTOKOLLFUEHRER_STV)
+        ) {
             return true;
         }
 

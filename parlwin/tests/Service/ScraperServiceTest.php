@@ -184,12 +184,14 @@ class ScraperServiceTest extends TestCase {
 
         $listenRohdaten = [
             'emptyColumns' => [],
-            'data' => [[
+            'data' => [
+                [
                 'title' => '<a href="/_rte/information/1388420">Beispiel Geschäft</a>',
                 '_nummer' => '2026.1',
                 '_geschaeftsdatum-sort' => '2026-01-15',
                 '_kategorieId' => 'Motion',
-            ]],
+                ]
+            ],
         ];
         $listenJson = htmlspecialchars((string) json_encode($listenRohdaten), ENT_QUOTES);
         $listenHtml = "<div data-entities=\"{$listenJson}\"></div>";
@@ -245,10 +247,12 @@ class ScraperServiceTest extends TestCase {
 
         $listenRohdaten = [
             'emptyColumns' => [],
-            'data' => [[
+            'data' => [
+                [
                 'name' => '<a href="/_rte/anlass/7524445">2./3. Sitzungen</a>',
                 '_datum' => '<span class="text-nowrap">01.06.2026, 16.15 Uhr - 22.00 Uhr </span>',
-            ]],
+                ]
+            ],
         ];
         $listenJson = htmlspecialchars((string) json_encode($listenRohdaten), ENT_QUOTES);
         $listenHtml = "<div data-entities=\"{$listenJson}\"></div>";
@@ -322,17 +326,20 @@ class ScraperServiceTest extends TestCase {
         $this->assertTrue((bool) $fraktionen[1]['aktiv']);
     }
 
-    public function testPrefetchTopLevelListenVerwendetCacheBeimNachfolgendenLaden(): void {
+    public function testPrefetchTopLevelListenVerwendetCacheBeimNachfolgendenLaden(): void
+    {
         $clientService = $this->createMock(IClientService::class);
         $client = $this->createMock(IClient::class);
         $logger = $this->createMock(LoggerInterface::class);
         $service = new ScraperService($clientService, $logger);
 
         $listenRohdaten = [
-            'data' => [[
+            'data' => [
+                [
                 'name' => '<a href="/_rte/anlass/7524445">2./3. Sitzungen</a>',
                 '_datum' => '<span class="text-nowrap">01.06.2026, 16.15 Uhr - 22.00 Uhr </span>',
-            ]],
+                ]
+            ],
         ];
         $listenJson = htmlspecialchars((string) json_encode($listenRohdaten), ENT_QUOTES);
         $listenHtml = "<div data-entities=\"{$listenJson}\"></div>";
@@ -356,19 +363,22 @@ class ScraperServiceTest extends TestCase {
         $this->assertSame('7524445', $sitzungen[0]['id']);
     }
 
-    public function testVorabTotalsFuerSyncVerdoppeltGeschaefteFuerZweiphasenFortschritt(): void {
+    public function testVorabTotalsFuerSyncVerdoppeltGeschaefteFuerZweiphasenFortschritt(): void
+    {
         $clientService = $this->createMock(IClientService::class);
         $client = $this->createMock(IClient::class);
         $logger = $this->createMock(LoggerInterface::class);
         $service = new ScraperService($clientService, $logger);
 
         $listenRohdaten = [
-            'data' => [[
+            'data' => [
+                [
                 'title' => '<a href="/_rte/information/1388420">Beispiel Geschäft</a>',
                 '_nummer' => '2026.1',
                 '_geschaeftsdatum-sort' => '2026-01-15',
                 '_kategorieId' => 'Motion',
-            ]],
+                ]
+            ],
         ];
         $listenJson = htmlspecialchars((string) json_encode($listenRohdaten), ENT_QUOTES);
         $listenHtml = "<div data-entities=\"{$listenJson}\"></div>";
@@ -487,10 +497,12 @@ class ScraperServiceTest extends TestCase {
 
         $sitzungenBlock = htmlspecialchars((string) json_encode([
             'emptyColumns' => [],
-            'data' => [[
+            'data' => [
+                [
                 'name' => '<a href="/_rte/anlass/7524445">2./3. Sitzungen</a>',
                 '_datum' => '01.06.2026',
-            ]],
+                ]
+            ],
         ]), ENT_QUOTES);
 
         $html = "<div data-entities=\"{$mitgliederBlock}\"></div><div data-entities=\"{$sitzungenBlock}\"></div>";
