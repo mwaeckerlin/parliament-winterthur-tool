@@ -88,6 +88,38 @@ Interne, beschreibbare Felder liegen nicht in den Importfeldern, sondern in sepa
   - `entschieden` (kein neuer externer Änderungsstand seit letztem Beschluss)
 - Daraus wird `entscheidungsbedarf` (bool) für Fraktionssitzungslisten abgeleitet
 
+#### Rich-Text-Votum (WYSIWYG)
+
+Das «Votum im Rat» wird mit einem TipTap/ProseMirror-basierten Editor
+(`PwWysiwyg.vue`) erfasst. TipTap ist der gleiche Industriestandard, den u. a.
+Nextcloud Text intern nutzt; es liefert sauberes, semantisches HTML ohne
+Office-Detour. Verfügbar sind: Fett/Kursiv/Unterstrichen/Durchgestrichen,
+Überschriften H2/H3, ungeordnete/geordnete Listen, Blockzitat, Links mit
+Auto-Erkennung, Undo/Redo und «Formatierung entfernen». Die Toolbar verwendet
+inline SVG-Icons (Material Design Icons, Apache 2.0), so dass keine externen
+Icon-Fonts oder zusätzliche Webserver-Requests nötig sind.
+
+#### Votum als PDF herunterladen
+
+Über einen PDF-Button in der WYSIWYG-Toolbar (nur sichtbar, sobald Inhalt
+vorhanden ist) öffnet sich `/apps/parlwin/geschaefte/{id}/votum/pdf` in einem
+neuen Tab. Diese Route rendert das aktuelle Votum als druckoptimiertes A4-HTML
+(Helvetica 11pt, Header/Footer mit Linien, Meta-Tabelle mit Geschäfts-Daten und
+letztem gültigen Beschluss) und triggert automatisch `window.print()` —
+moderne Browser bieten dort «Als PDF speichern» an. Dieser Weg vermeidet eine
+zusätzliche PHP-PDF-Bibliothek inkl. Composer-Abhängigkeit.
+
+#### Automatische Zuständigkeit über Kommissionsmitgliedschaft
+
+Wenn ein Geschäft aktuell in einer Kommission hängig ist (letztes
+Verfahrensereignis nennt das Kommissions-Organ) und niemand der eigenen
+Fraktion zugewiesen ist, weist der Sync nach erfolgreichem Mitglieder- und
+Geschäftsabgleich automatisch alle Mitglieder dieser Kommission zu, die zur
+eigenen Fraktion gehören. Die erste gefundene Person wird als Hauptzuständige
+markiert; jede Zuweisung wird als reguläre Aktion (Typ `zuweisung`) in der
+Geschäftszeitleiste protokolliert. Bereits vorhandene Zuständigkeiten werden
+nie überschrieben.
+
 Fraktionssitzungsmodus:
 - Notizen sind immer für alle möglich
 - Beschlüsse sind im Modus `Fraktionssitzung` nur für Protokollführer oder aktive Protokoll-Stellvertretung schreibbar

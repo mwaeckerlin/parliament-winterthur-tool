@@ -7,11 +7,14 @@ namespace OCA\ParliamentWinterthur\Service;
 use OCA\ParliamentWinterthur\Db\Geschaeft;
 use OCA\ParliamentWinterthur\Db\GeschaeftAktion;
 use OCA\ParliamentWinterthur\Db\GeschaeftAktionMapper;
+use OCA\ParliamentWinterthur\Db\GeschaeftEreignisMapper;
 use OCA\ParliamentWinterthur\Db\GeschaeftMapper;
 use OCA\ParliamentWinterthur\Db\Fraktionsrolle;
 use OCA\ParliamentWinterthur\Db\FraktionsrolleMapper;
 use OCA\ParliamentWinterthur\Db\GeschaeftZustaendigkeit;
 use OCA\ParliamentWinterthur\Db\GeschaeftZustaendigkeitMapper;
+use OCA\ParliamentWinterthur\Db\Kommission;
+use OCA\ParliamentWinterthur\Db\KommissionMapper;
 use OCA\ParliamentWinterthur\Db\MitgliedMapper;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\IConfig;
@@ -64,6 +67,8 @@ class FraktionsarbeitService
         private readonly GeschaeftZustaendigkeitMapper $zustaendigkeitMapper,
         private readonly FraktionsrolleMapper $rollenMapper,
         private readonly MitgliedMapper $mitgliedMapper,
+        private readonly KommissionMapper $kommissionMapper,
+        private readonly GeschaeftEreignisMapper $ereignisMapper,
         private readonly IConfig $config,
         private readonly IUserSession $userSession,
         private readonly IGroupManager $groupManager,
@@ -424,6 +429,136 @@ class FraktionsarbeitService
 
         $neu = $this->zustaendigkeitMapper->findAktiveByGeschaeft($geschaeftId);
         return array_map(fn(GeschaeftZustaendigkeit $z): array => $this->mapZustaendigkeit($z), $neu);
+    }
+
+    /**
+     * Weist allen nicht-erledigten Geschäften OHNE aktuell zugewiesene
+     * Zuständigkeit automatisch die Kommissionsmitglieder der eigenen
+     * Fraktion zu, sofern das Geschäft aktuell in einer bekannten Kommission
+     * hängig ist (letztes Verfahrensereignis mit passendem Organ).
+     *
+     * Wird vom Sync nach erfolgreicher Aktualisierung von Geschäften und
+     * Mitgliedern aufgerufen.
+     *
+     * @return array{gepruet:int, zugewiesen:int, uebersprungen:int, ohne_kommission:int, ohne_passendes_mitglied:int}
+     */
+    public function autoZuweisenKommissionsmitglieder(): array
+    {
+        $statistik = [
+            'gepruet' => 0,
+            'zugewiesen' => 0,
+            'uebersprungen' => 0,
+            'ohne_kommission' => 0,
+            'ohne_passendes_mitglied' => 0,
+        ];
+
+        $eigeneFraktion = $this->config->getAppValue(self::APP_ID, 'fraktion', '');
+        if ($eigeneFraktion === '') {
+            return $statistik;
+        }
+
+        // Kommissionen indizieren: lower(name) -> Kommission (nur aktive, nicht gelöschte)
+        $kommissionByName = [];
+        foreach ($this->kommissionMapper->findAll() as $kommission) {
+            if (!$kommission->getAktiv()) {
+                continue;
+            }
+            $name = trim($kommission->getName());
+            if ($name === '') {
+                continue;
+            }
+            $kommissionByName[mb_strtolower($name)] = $kommission;
+        }
+        if ($kommissionByName === []) {
+            return $statistik;
+        }
+
+        // Mitglieder der eigenen Fraktion nach extern_id indizieren.
+        $mitgliedByExternId = [];
+        foreach ($this->mitgliedMapper->findByFraktion($eigeneFraktion) as $mitglied) {
+            $extId = (string) $mitglied->getExternId();
+            if ($extId !== '') {
+                $mitgliedByExternId[$extId] = $mitglied;
+            }
+        }
+        if ($mitgliedByExternId === []) {
+            return $statistik;
+        }
+
+        // Nur Geschäfte mit nicht-finalem Status (= "hängig").
+        $geschaefte = $this->geschaeftMapper->findAll(10000, 0, false);
+
+        foreach ($geschaefte as $geschaeft) {
+            if ($geschaeft->getGeloescht()) {
+                continue;
+            }
+            $statistik['gepruet']++;
+            $geschaeftId = (int) $geschaeft->getId();
+
+            // Bereits zugewiesen? -> nichts tun.
+            $aktiveZust = $this->zustaendigkeitMapper->findAktiveByGeschaeft($geschaeftId);
+            if ($aktiveZust !== []) {
+                $statistik['uebersprungen']++;
+                continue;
+            }
+
+            // Letztes Ereignis mit passendem Organ suchen.
+            $ereignisse = $this->ereignisMapper->findByGeschaeft($geschaeftId);
+            $zugehoerigeKommission = null;
+            foreach (array_reverse($ereignisse) as $ereignis) {
+                $organ = trim($ereignis->getOrgan());
+                if ($organ === '') {
+                    continue;
+                }
+                $organLower = mb_strtolower($organ);
+                if (isset($kommissionByName[$organLower])) {
+                    $zugehoerigeKommission = $kommissionByName[$organLower];
+                    break;
+                }
+                foreach ($kommissionByName as $kommissionsname => $kommission) {
+                    if (str_contains($organLower, $kommissionsname)
+                        || str_contains($kommissionsname, $organLower)) {
+                        $zugehoerigeKommission = $kommission;
+                        break 2;
+                    }
+                }
+            }
+            if ($zugehoerigeKommission === null) {
+                $statistik['ohne_kommission']++;
+                continue;
+            }
+
+            // Mitglieder dieser Kommission, die zugleich in unserer Fraktion sind.
+            $personen = [];
+            foreach ($zugehoerigeKommission->getMitgliederArray() as $mitgliedExternId) {
+                $extId = (string) $mitgliedExternId;
+                if (!isset($mitgliedByExternId[$extId])) {
+                    continue;
+                }
+                $mitglied = $mitgliedByExternId[$extId];
+                $angezeigterName = trim(
+                    trim((string) $mitglied->getVorname()) . ' ' . trim((string) $mitglied->getName())
+                );
+                $personen[] = [
+                    'mitgliedExternId' => $extId,
+                    'personName' => $angezeigterName,
+                ];
+            }
+            if ($personen === []) {
+                $statistik['ohne_passendes_mitglied']++;
+                continue;
+            }
+
+            $hauptKey = 'mitglied:' . $personen[0]['mitgliedExternId'];
+            try {
+                $this->zustaendigkeitenSetzen($geschaeftId, $personen, $hauptKey);
+                $statistik['zugewiesen']++;
+            } catch (\Throwable) {
+                $statistik['uebersprungen']++;
+            }
+        }
+
+        return $statistik;
     }
 
     /**

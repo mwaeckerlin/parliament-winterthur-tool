@@ -17,6 +17,7 @@ return [
         ['name' => 'geschaeft#addVotum', 'url' => '/geschaefte/{id}/voten', 'verb' => 'POST'],
         ['name' => 'geschaeft#updateVotum', 'url' => '/geschaefte/{id}/votum', 'verb' => 'PUT'],
         ['name' => 'geschaeft#archiviereVotum', 'url' => '/geschaefte/{id}/votum/archivieren', 'verb' => 'POST'],
+        ['name' => 'geschaeft#votumPdf', 'url' => '/geschaefte/{id}/votum/pdf', 'verb' => 'GET'],
 
         // Sitzungen
         ['name' => 'sitzung#index',    'url' => '/sitzungen',            'verb' => 'GET'],

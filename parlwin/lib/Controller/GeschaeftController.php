@@ -10,7 +10,9 @@ use OCA\ParliamentWinterthur\Service\GeschaeftService;
 use OCA\ParliamentWinterthur\Service\RealtimePublisherService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
+use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\DataResponse;
+use OCP\AppFramework\Http\TemplateResponse;
 use OCP\AppFramework\Http;
 use OCP\IRequest;
 
@@ -211,5 +213,29 @@ class GeschaeftController extends Controller {
         } catch (\RuntimeException $e) {
             return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_FORBIDDEN);
         }
+    }
+
+    /**
+     * Liefert eine druckoptimierte HTML-Ansicht des aktuellen Votums.
+     * Browser kann diese via "Drucken -> Als PDF speichern" als PDF
+     * exportieren (vermeidet zusätzliche PHP-PDF-Bibliotheken und
+     * Composer-Abhängigkeiten).
+     */
+    #[NoAdminRequired]
+    #[NoCSRFRequired]
+    public function votumPdf(int $id): TemplateResponse {
+        try {
+            $daten = $this->fraktionsarbeitService->angereichertesGeschaeft($id);
+        } catch (\OCP\AppFramework\Db\DoesNotExistException) {
+            return new TemplateResponse(
+                Application::APP_ID,
+                'votum_pdf',
+                ['id' => $id, 'titel' => 'Nicht gefunden'],
+                'blank'
+            );
+        }
+        $response = new TemplateResponse(Application::APP_ID, 'votum_pdf', $daten, 'blank');
+        // Erlaubt Inline-Skripte des Templates (window.print()).
+        return $response;
     }
 }

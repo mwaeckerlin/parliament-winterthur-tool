@@ -28,6 +28,11 @@
     "@nextcloud/axios": "^2.5.0",
     "@nextcloud/router": "^3.0.1",
     "@nextcloud/vue": "^9.8.0",
+    "@tiptap/extension-link": "^3.23.4",
+    "@tiptap/extension-placeholder": "^3.23.4",
+    "@tiptap/extension-underline": "^3.23.4",
+    "@tiptap/starter-kit": "^3.23.4",
+    "@tiptap/vue-3": "^3.23.4",
     "vue": "^3.5.13"
   },
   "devDependencies": {

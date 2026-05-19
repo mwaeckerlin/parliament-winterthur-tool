@@ -1671,12 +1671,22 @@ class SettingsController extends Controller
                 $this->sitzungService->alleAktiven()
             );
 
+            // Automatische Zuständigkeit: Geschäfte ohne Zuständigkeit, die in
+            // einer bekannten Kommission hängig sind, bekommen die
+            // Kommissionsmitglieder der eigenen Fraktion als zuständig.
+            try {
+                $autoZustaendigkeit = $this->fraktionsarbeitService->autoZuweisenKommissionsmitglieder();
+            } catch (\Throwable $e) {
+                $autoZustaendigkeit = ['fehler' => $e->getMessage()];
+            }
+
             $jetzt = (new \DateTime())->format('Y-m-d H:i:s');
             $this->config->setAppValue(Application::APP_ID, 'letzte_synchronisation', $jetzt);
             $statistik = [
                 'mitglieder' => $mitglieder,
                 'geschaefte' => $geschaefte,
                 'sitzungen' => $sitzungen,
+                'auto_zustaendigkeit' => $autoZustaendigkeit,
             ];
             $this->realtimePublisher->publish('sync.completed', [
                 'quelle' => 'admin-ui',

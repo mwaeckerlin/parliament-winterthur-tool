@@ -92,7 +92,8 @@
 
   /* Sidebar-Breite (NcAppNavigation) – bewusst schmaler als der
      Nextcloud-Default von 300px, damit Filter-Selects schmal bleiben. */
-  --pw-sidebar-width: 14rem;       /* 224px */
+  --pw-sidebar-width: 300px;
+  /* 224px */
   /* Nextcloud-Server-Variable ueberschreiben (nur fuer parlwin geladen). */
   --app-navigation-width: var(--pw-sidebar-width);
 
@@ -223,6 +224,17 @@ ul.app-navigation__list {
   inline-size: var(--pw-sidebar-width);
   width: var(--pw-sidebar-width);
   min-inline-size: var(--pw-sidebar-width);
+}
+
+/* Beim Schliessen verschiebt Nextcloud die Navigation per
+   `margin-inline-start: -300px` (hartkodiert in der Quelle) nach links.
+   Da unsere Sidebar nur `--pw-sidebar-width` breit ist, wuerde der
+   Differenzbetrag (300px - 14rem) den NcAppContent-Bereich nach links
+   aus dem Viewport schieben. Wir setzen den negativen Margin daher
+   exakt auf unsere Sidebar-Breite, damit der Inhalt nach dem Schliessen
+   buendig bei 0 startet und 100 % Breite einnimmt. */
+#content .app-navigation.app-navigation--closed {
+  margin-inline-start: calc(-1 * var(--pw-sidebar-width));
 }
 
 /* Falls Splitpanes-basierter Master/Detail-Pane verwendet wird, ebenfalls
@@ -971,7 +983,8 @@ ul.app-navigation__list {
 .pw-timeline-html {
   white-space: normal;
 
-  ul, ol {
+  ul,
+  ol {
     padding-inline-start: var(--pw-space-lg, 1.5rem);
     margin: var(--pw-space-xs, 0.25rem) 0;
   }
@@ -991,35 +1004,202 @@ ul.app-navigation__list {
   }
 }
 
+/* WYSIWYG-Editor (TipTap / ProseMirror) ------------------------------- */
 .pw-wysiwyg {
-  min-block-size: 6rem;
-  padding: var(--pw-space-sm, 0.5rem) var(--pw-space-md, 0.75rem);
+  display: block;
+  inline-size: 100%;
+  width: 100%;
+  box-sizing: border-box;
   border: var(--pw-border-thin) solid var(--pw-border);
   border-radius: var(--pw-radius-small);
   background: var(--color-main-background, #fff);
-  outline: none;
-  cursor: text;
+  overflow: hidden;
 
-  &:focus {
+  &:focus-within {
     border-color: var(--color-primary-element, currentColor);
-  }
-
-  &:empty::before {
-    content: attr(data-placeholder);
-    color: var(--pw-muted);
-    pointer-events: none;
-  }
-
-  ul, ol {
-    padding-inline-start: var(--pw-space-lg, 1.5rem);
-    margin: var(--pw-space-xs, 0.25rem) 0;
+    box-shadow: 0 0 0 1px var(--color-primary-element, transparent);
   }
 }
 
-.pw-wysiwyg-readonly {
-  background: var(--pw-surface-soft, transparent);
-  cursor: default;
-  opacity: 0.85;
+.pw-wysiwyg__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+  inline-size: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.35rem 0.5rem;
+  background: var(--pw-surface-soft, var(--color-background-hover, #f5f5f5));
+  border-block-end: var(--pw-border-thin) solid var(--pw-border);
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 1;
+}
+
+.pw-wysiwyg__gruppe {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  padding: 0 0.35rem;
+  border-inline-end: var(--pw-border-thin) solid var(--pw-border);
+
+  &:last-child,
+  &.pw-wysiwyg__gruppe--rechts {
+    border-inline-end: 0;
+  }
+
+  &.pw-wysiwyg__gruppe--rechts {
+    margin-inline-start: auto;
+  }
+}
+
+.pw-wysiwyg__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 2rem;
+  min-block-size: 2rem;
+  padding: 0 0.4rem;
+  border: var(--pw-border-thin) solid transparent;
+  border-radius: var(--pw-radius-small);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: none;
+
+  &:hover:not(:disabled) {
+    background: var(--color-background-hover, rgba(0, 0, 0, 0.06));
+    border-color: var(--pw-border);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary-element, currentColor);
+    outline-offset: 1px;
+  }
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  &.aktiv {
+    background: var(--color-primary-element-light, rgba(0, 102, 158, 0.18));
+    border-color: var(--color-primary-element, currentColor);
+    color: var(--color-primary-element, currentColor);
+  }
+}
+
+.pw-wysiwyg-icon {
+  display: block;
+  inline-size: 20px;
+  block-size: 20px;
+  fill: currentColor;
+}
+
+.pw-wysiwyg__status {
+  margin-inline-start: auto;
+  padding-inline: 0.5rem;
+  color: var(--pw-muted);
+  font-size: var(--pw-font-sm, 0.85em);
+}
+
+.pw-wysiwyg__body {
+  display: block;
+  inline-size: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  block-size: clamp(8rem, 60vh, 60em);
+  max-block-size: 60em;
+  overflow: auto;
+  background: var(--color-main-background, #fff);
+}
+
+/* EditorContent rendert ein <div> ohne unsere Klasse zuverlässig.
+   Daher zwingen wir ALLE direkten Kinder + ProseMirror auf 100% Breite. */
+.pw-wysiwyg__body>* {
+  display: block;
+  inline-size: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  min-block-size: 100%;
+}
+
+.pw-wysiwyg__editor,
+.pw-wysiwyg__body .ProseMirror {
+  display: block;
+  inline-size: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  min-block-size: 100%;
+  padding: 0.85rem 1rem;
+  outline: none;
+  cursor: text;
+  line-height: 1.55;
+}
+
+.pw-wysiwyg__body .ProseMirror {
+  >*+* {
+    margin-block-start: 0.6em;
+  }
+
+  >*:first-child {
+    margin-block-start: 0;
+  }
+
+  p {
+    margin: 0;
+  }
+
+  h2 {
+    font-size: 1.3rem;
+    font-weight: 600;
+    margin-block: 0.6em 0.3em;
+  }
+
+  h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-block: 0.6em 0.3em;
+  }
+
+  ul,
+  ol {
+    padding-inline-start: 1.5rem;
+    margin: 0.3em 0;
+  }
+
+  li>p {
+    margin: 0;
+  }
+
+  blockquote {
+    border-inline-start: 3px solid var(--pw-border);
+    padding-inline-start: 0.75rem;
+    margin: 0.4em 0;
+    color: var(--pw-muted);
+  }
+
+  a {
+    color: var(--color-primary-element, #00679e);
+    text-decoration: underline;
+  }
+
+  p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    float: left;
+    color: var(--pw-muted);
+    pointer-events: none;
+    block-size: 0;
+  }
+}
+
+.pw-wysiwyg.pw-wysiwyg--readonly {
+  background: var(--pw-surface-soft, var(--color-main-background, #fff));
+
+  .pw-wysiwyg__body .ProseMirror {
+    cursor: default;
+  }
 }
 
 .pw-votum-aktionen {

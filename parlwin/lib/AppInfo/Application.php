@@ -98,6 +98,8 @@ class Application extends App implements IBootstrap {
                 $c->get(GeschaeftZustaendigkeitMapper::class),
                 $c->get(FraktionsrolleMapper::class),
                 $c->get(MitgliedMapper::class),
+                $c->get(KommissionMapper::class),
+                $c->get(GeschaeftEreignisMapper::class),
                 $c->get(\OCP\IConfig::class),
                 $c->get(\OCP\IUserSession::class),
                 $c->get(\OCP\IGroupManager::class),
