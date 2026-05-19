@@ -99,6 +99,26 @@ class MitgliedMapper extends QBMapper
     }
 
     /**
+     * Sucht ein Mitglied anhand der Nextcloud-UID.
+     */
+    public function findByNextcloudUid(string $uid): ?Mitglied
+    {
+        if ($uid === '') {
+            return null;
+        }
+        $qb = $this->db->getQueryBuilder();
+        $qb->select('*')
+            ->from($this->getTableName())
+            ->where($qb->expr()->eq('nextcloud_uid', $qb->createNamedParameter($uid)))
+            ->setMaxResults(1);
+        try {
+            return $this->findEntity($qb);
+        } catch (DoesNotExistException) {
+            return null;
+        }
+    }
+
+    /**
      * Markiert alle Mitglieder als nicht mehr aktiv, wenn sie nicht in $bekannteIds vorkommen.
      *
      * Chunkweise IN-Abfrage statt NOT IN, um Nextclouds Oracle-kompatibles

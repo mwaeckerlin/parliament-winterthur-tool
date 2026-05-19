@@ -133,6 +133,23 @@ class GeschaeftController extends Controller {
     }
 
     #[NoAdminRequired]
+    public function removeBeschluss(int $id): DataResponse {
+        try {
+            $aktion = $this->fraktionsarbeitService->beschlussZuruecknehmen($id);
+            $this->realtimePublisher->publish('geschaefte.action', [
+                'id' => $id,
+                'aktionTyp' => 'beschluss',
+                'aktionCode' => 'beschluss_zurueckgenommen',
+            ]);
+            return new DataResponse($aktion);
+        } catch (\InvalidArgumentException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+        } catch (\RuntimeException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_FORBIDDEN);
+        }
+    }
+
+    #[NoAdminRequired]
     public function addVotum(int $id): DataResponse {
         $text = (string) $this->request->getParam('text', '');
 
@@ -141,6 +158,52 @@ class GeschaeftController extends Controller {
             $this->realtimePublisher->publish('geschaefte.action', [
                 'id' => $id,
                 'aktionTyp' => 'votum',
+            ]);
+            return new DataResponse($aktion);
+        } catch (\InvalidArgumentException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+        } catch (\RuntimeException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_FORBIDDEN);
+        }
+    }
+
+    /**
+     * Aktualisiert den Text des aktuell aktiven Votums (Autosave) oder
+     * erstellt ein neues, falls keines existiert. Nur die zuständige Person
+     * darf das Votum bearbeiten.
+     */
+    #[NoAdminRequired]
+    public function updateVotum(int $id): DataResponse {
+        $text = (string) $this->request->getParam('text', '');
+
+        try {
+            $aktion = $this->fraktionsarbeitService->votumAktualisieren($id, $text);
+            $this->realtimePublisher->publish('geschaefte.action', [
+                'id' => $id,
+                'aktionTyp' => 'votum',
+                'aktionCode' => 'votum_im_rat',
+            ]);
+            return new DataResponse($aktion);
+        } catch (\InvalidArgumentException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+        } catch (\RuntimeException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_FORBIDDEN);
+        }
+    }
+
+    /**
+     * Archiviert das aktuell aktive Votum (entscheid_gueltig -> false).
+     * Damit bleibt es als historischer Eintrag in der Zeitleiste und ein
+     * neues Votum kann erfasst werden.
+     */
+    #[NoAdminRequired]
+    public function archiviereVotum(int $id): DataResponse {
+        try {
+            $aktion = $this->fraktionsarbeitService->votumArchivieren($id);
+            $this->realtimePublisher->publish('geschaefte.action', [
+                'id' => $id,
+                'aktionTyp' => 'votum',
+                'aktionCode' => 'votum_archiviert',
             ]);
             return new DataResponse($aktion);
         } catch (\InvalidArgumentException $e) {

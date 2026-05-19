@@ -12,6 +12,7 @@ use OCA\ParliamentWinterthur\Db\Fraktionsrolle;
 use OCA\ParliamentWinterthur\Db\FraktionsrolleMapper;
 use OCA\ParliamentWinterthur\Db\GeschaeftZustaendigkeit;
 use OCA\ParliamentWinterthur\Db\GeschaeftZustaendigkeitMapper;
+use OCA\ParliamentWinterthur\Db\MitgliedMapper;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\IConfig;
 use OCP\IGroupManager;
@@ -21,7 +22,8 @@ use OCP\IUserSession;
  * Kapselt die fraktionsinterne Arbeit: Aktionen, Beschlüsse, Zuständigkeiten,
  * Fraktionssitzungsmodus und Protokollführer-Regeln.
  */
-class FraktionsarbeitService {
+class FraktionsarbeitService
+{
     private const APP_ID = 'parlwin';
 
     private const CFG_SITZUNGSMODUS = 'fraktionssitzung_modus';
@@ -35,6 +37,10 @@ class FraktionsarbeitService {
     public const ROLLE_PROTOKOLLFUEHRER_STV = 'protokollfuehrer_stellvertretung';
 
     /**
+     * Beschriftungen für die internen Beschluss-Codes. Hart kodiert gemäss
+     * Gemeindeordnung; eine spätere Erweiterung muss zusammen mit
+     * {@see GeschaeftWorkflow::erlaubteBeschluesse()} angepasst werden.
+     *
      * @var array<string, string>
      */
     private const BESCHLUSS_LABELS = [
@@ -57,6 +63,7 @@ class FraktionsarbeitService {
         private readonly GeschaeftAktionMapper $aktionMapper,
         private readonly GeschaeftZustaendigkeitMapper $zustaendigkeitMapper,
         private readonly FraktionsrolleMapper $rollenMapper,
+        private readonly MitgliedMapper $mitgliedMapper,
         private readonly IConfig $config,
         private readonly IUserSession $userSession,
         private readonly IGroupManager $groupManager,
@@ -112,7 +119,8 @@ class FraktionsarbeitService {
     /**
      * @return array<string, mixed>
      */
-    public function angereichertesGeschaeft(int $geschaeftId): array {
+    public function angereichertesGeschaeft(int $geschaeftId): array
+    {
         $geschaeft = $this->geschaeftMapper->find($geschaeftId);
         $daten = $geschaeft->jsonSerialize();
 
@@ -120,9 +128,12 @@ class FraktionsarbeitService {
         $zustaendigkeiten = $this->zustaendigkeitMapper->findAktiveByGeschaeft($geschaeftId);
         $letzterBeschluss = $this->aktionMapper->findLetzterGueltigerBeschluss($geschaeftId);
 
-        $daten['aktionen'] = array_map(fn (GeschaeftAktion $a): array => $this->mapAktion($a), $aktionen);
-        $daten['zustaendigkeiten'] = array_map(fn (GeschaeftZustaendigkeit $z): array => $this->mapZustaendigkeit($z), $zustaendigkeiten);
+        $daten['aktionen'] = array_map(fn(GeschaeftAktion $a): array => $this->mapAktion($a), $aktionen);
+        $daten['zustaendigkeiten'] = array_map(fn(GeschaeftZustaendigkeit $z): array => $this->mapZustaendigkeit($z), $zustaendigkeiten);
         $daten['letzterBeschluss'] = $letzterBeschluss !== null ? $this->mapAktion($letzterBeschluss) : null;
+        $aktuellesVotum = $this->aktionMapper->findAktuellesVotum($geschaeftId);
+        $daten['aktuellesVotum'] = $aktuellesVotum !== null ? $this->mapAktion($aktuellesVotum) : null;
+        $daten['istNutzerZustaendig'] = $this->istNutzerZustaendig($geschaeftId, $zustaendigkeiten);
         $daten['erlaubteBeschluesse'] = $this->ermittleErlaubteBeschluesse($geschaeft);
         $daten['fraktionssitzung'] = $this->fraktionssitzungKontext();
         $this->fuelleFraktionsstatus($daten, $geschaeft, $letzterBeschluss);
@@ -133,7 +144,8 @@ class FraktionsarbeitService {
     /**
      * @return array<string, mixed>
      */
-    public function notizHinzufuegen(int $geschaeftId, string $text): array {
+    public function notizHinzufuegen(int $geschaeftId, string $text): array
+    {
         $text = trim($text);
         if ($text === '') {
             throw new \InvalidArgumentException('Notiztext darf nicht leer sein');
@@ -146,7 +158,8 @@ class FraktionsarbeitService {
     /**
      * @return array<string, mixed>
      */
-    public function votumHinzufuegen(int $geschaeftId, string $votum): array {
+    public function votumHinzufuegen(int $geschaeftId, string $votum): array
+    {
         $votum = trim($votum);
         if ($votum === '') {
             throw new \InvalidArgumentException('Votum darf nicht leer sein');
@@ -157,9 +170,114 @@ class FraktionsarbeitService {
     }
 
     /**
+     * Erstellt oder aktualisiert das aktuell aktive Votum (entscheid_gueltig = true).
+     * Nur die zuständige Person darf das Votum bearbeiten.
+     *
+     * Liefert das aktuelle Votum oder null, wenn der Text leer ist und kein
+     * aktives Votum existierte.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function votumAktualisieren(int $geschaeftId, string $text): ?array
+    {
+        $this->pruefeVotumSchreibrecht($geschaeftId);
+
+        $text = trim($text);
+        $aktuell = $this->aktionMapper->findAktuellesVotum($geschaeftId);
+
+        if ($text === '') {
+            // Leerer Text bei bestehendem Votum: nicht archivieren (das geht
+            // explizit über archivieren) – nur Text auf leer setzen.
+            if ($aktuell === null) {
+                return null;
+            }
+            $aktuell->setText('');
+            $this->aktionMapper->update($aktuell);
+            return $this->mapAktion($aktuell);
+        }
+
+        if ($aktuell !== null) {
+            $aktuell->setText($text);
+            $this->aktionMapper->update($aktuell);
+            return $this->mapAktion($aktuell);
+        }
+
+        $aktion = $this->erstelleAktion(
+            $geschaeftId,
+            'votum',
+            'votum_im_rat',
+            'Votum im Rat',
+            $text,
+            true,
+        );
+        return $this->mapAktion($aktion);
+    }
+
+    /**
+     * Archiviert das aktuell aktive Votum (entscheid_gueltig -> false), so
+     * dass es als historischer Eintrag in der Zeitleiste verbleibt und ein
+     * neues Votum gestartet werden kann.
+     *
+     * @return array<string, mixed>|null Das archivierte Votum oder null,
+     *                                   falls keines aktiv war.
+     */
+    public function votumArchivieren(int $geschaeftId): ?array
+    {
+        $this->pruefeVotumSchreibrecht($geschaeftId);
+
+        $aktuell = $this->aktionMapper->findAktuellesVotum($geschaeftId);
+        if ($aktuell === null) {
+            return null;
+        }
+
+        $aktuell->setEntscheidGueltig(false);
+        $this->aktionMapper->update($aktuell);
+
+        return $this->mapAktion($aktuell);
+    }
+
+    /**
+     * Prüft, ob der aktuelle Benutzer für das Geschäft zuständig ist.
+     *
+     * @param GeschaeftZustaendigkeit[]|null $zustaendigkeiten Optionaler Cache.
+     */
+    public function istNutzerZustaendig(int $geschaeftId, ?array $zustaendigkeiten = null): bool
+    {
+        $user = $this->userSession->getUser();
+        if ($user === null) {
+            return false;
+        }
+        $uid = $user->getUID();
+        $mitglied = $this->mitgliedMapper->findByNextcloudUid($uid);
+        if ($mitglied === null) {
+            return false;
+        }
+        $externId = (string) $mitglied->getExternId();
+        if ($externId === '') {
+            return false;
+        }
+
+        $zustaendigkeiten = $zustaendigkeiten ?? $this->zustaendigkeitMapper->findAktiveByGeschaeft($geschaeftId);
+        foreach ($zustaendigkeiten as $z) {
+            if ((string) $z->getMitgliedExternId() === $externId) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function pruefeVotumSchreibrecht(int $geschaeftId): void
+    {
+        if (!$this->istNutzerZustaendig($geschaeftId)) {
+            throw new \RuntimeException('Nur die zuständige Person darf das Votum bearbeiten');
+        }
+    }
+
+    /**
      * @return array<string, mixed>
      */
-    public function beschlussHinzufuegen(int $geschaeftId, string $beschlussCode, string $begruendung = ''): array {
+    public function beschlussHinzufuegen(int $geschaeftId, string $beschlussCode, string $begruendung = ''): array
+    {
         $this->pruefeBeschlussSchreibrecht();
 
         $geschaeft = $this->geschaeftMapper->find($geschaeftId);
@@ -182,10 +300,43 @@ class FraktionsarbeitService {
     }
 
     /**
+     * Nimmt den aktuell gültigen Beschluss zurück (entscheid_gueltig = false)
+     * und legt eine Audit-Aktion an. Liefert die neue Audit-Aktion oder null,
+     * falls kein gültiger Beschluss vorhanden war.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function beschlussZuruecknehmen(int $geschaeftId): ?array
+    {
+        $this->pruefeBeschlussSchreibrecht();
+
+        $letzter = $this->aktionMapper->findLetzterGueltigerBeschluss($geschaeftId);
+        if ($letzter === null) {
+            return null;
+        }
+
+        $letzter->setEntscheidGueltig(false);
+        $this->aktionMapper->update($letzter);
+
+        $label = self::BESCHLUSS_LABELS[$letzter->getAktionCode()] ?? $letzter->getAktionCode();
+        $aktion = $this->erstelleAktion(
+            $geschaeftId,
+            'beschluss',
+            'beschluss_zurueckgenommen',
+            'Beschluss zurückgenommen',
+            sprintf('Beschluss "%s" zurückgenommen', $label),
+            false,
+        );
+
+        return $this->mapAktion($aktion);
+    }
+
+    /**
      * @param array<int, array<string, string>> $personen
      * @return array<int, array<string, mixed>>
      */
-    public function zustaendigkeitenSetzen(int $geschaeftId, array $personen, string $hauptPersonKey = ''): array {
+    public function zustaendigkeitenSetzen(int $geschaeftId, array $personen, string $hauptPersonKey = ''): array
+    {
         $normalisiert = [];
 
         foreach ($personen as $person) {
@@ -218,22 +369,68 @@ class FraktionsarbeitService {
             }
         }
 
+        // Vorher-Zustand für Diff ermitteln (wer war drin, wer war Haupt)
+        $vorher = $this->zustaendigkeitMapper->findAktiveByGeschaeft($geschaeftId);
+        $vorherMap = [];
+        $vorherHauptKey = '';
+        $vorherHauptName = '';
+        foreach ($vorher as $z) {
+            $key = (string) $z->getPersonKey();
+            $vorherMap[$key] = (string) $z->getPersonName();
+            if ($z->getIstHaupt()) {
+                $vorherHauptKey = $key;
+                $vorherHauptName = (string) $z->getPersonName();
+            }
+        }
+
         $this->zustaendigkeitMapper->ersetzeAktive($geschaeftId, array_values($normalisiert));
 
-        $zuweisungsText = implode(', ', array_map(
-            static fn (array $p): string => $p['person_name'] !== '' ? $p['person_name'] : $p['mitglied_extern_id'],
-            array_values($normalisiert)
-        ));
-        $this->erstelleAktion($geschaeftId, 'zuweisung', 'zustaendigkeit_gesetzt', 'Zuständigkeiten aktualisiert', $zuweisungsText, false);
+        // Diff berechnen: neu hinzugefügt vs. entfernt
+        $nachherMap = [];
+        $nachherHauptKey = '';
+        $nachherHauptName = '';
+        foreach ($normalisiert as $key => $p) {
+            $nachherMap[$key] = $p['person_name'] !== '' ? $p['person_name'] : $p['mitglied_extern_id'];
+            if (!empty($p['ist_haupt'])) {
+                $nachherHauptKey = $key;
+                $nachherHauptName = $nachherMap[$key];
+            }
+        }
+
+        $hinzugefuegt = array_values(array_diff_key($nachherMap, $vorherMap));
+        $entfernt = array_values(array_diff_key($vorherMap, $nachherMap));
+
+        $teile = [];
+        foreach ($hinzugefuegt as $name) {
+            $teile[] = sprintf('Zuständigkeit "%s" gesetzt', $name);
+        }
+        foreach ($entfernt as $name) {
+            $teile[] = sprintf('Zuständigkeit "%s" entfernt', $name);
+        }
+        if ($vorherHauptKey !== $nachherHauptKey && $nachherHauptKey !== '' && !in_array($nachherHauptKey, array_keys(array_diff_key($nachherMap, $vorherMap)), true)) {
+            // Hauptzuständigkeit hat innerhalb bestehender Personen gewechselt
+            $teile[] = sprintf('Hauptzuständigkeit auf "%s" geändert', $nachherHauptName);
+        }
+
+        if ($teile === []) {
+            // Kein effektiver Diff – Aktion trotzdem festhalten (Audit)
+            $teile[] = $nachherMap === []
+                ? 'Alle Zuständigkeiten entfernt'
+                : 'Zuständigkeiten unverändert bestätigt';
+        }
+
+        $zuweisungsText = implode('; ', $teile);
+        $this->erstelleAktion($geschaeftId, 'zuweisung', 'zustaendigkeit_geaendert', 'Zuständigkeiten geändert', $zuweisungsText, false);
 
         $neu = $this->zustaendigkeitMapper->findAktiveByGeschaeft($geschaeftId);
-        return array_map(fn (GeschaeftZustaendigkeit $z): array => $this->mapZustaendigkeit($z), $neu);
+        return array_map(fn(GeschaeftZustaendigkeit $z): array => $this->mapZustaendigkeit($z), $neu);
     }
 
     /**
      * @return array<string, mixed>
      */
-    public function fraktionssitzungKontext(): array {
+    public function fraktionssitzungKontext(): array
+    {
         $modus = $this->istFraktionssitzungModusAktiv();
         $protokollfuehrer = $this->rollenMapper->findAktiveByRolle(self::ROLLE_PROTOKOLLFUEHRER);
         $protokollfuehrerUid = '';
@@ -260,15 +457,16 @@ class FraktionsarbeitService {
             'kannProtokollfuehrerSetzen' => $this->kannPraesidiumHandeln(),
             'kannPraesidiumHandeln' => $this->kannPraesidiumHandeln(),
             'kannProtokollfuehrungHandeln' => $this->kannProtokollfuehrungHandeln(),
-            'praesidenten' => array_map(fn ($r): array => $this->mapRolle($r), $praesidenten),
-            'praesidiumStellvertretungen' => array_map(fn ($r): array => $this->mapRolle($r), $praesidiumStv),
-            'protokollfuehrer' => array_map(fn ($r): array => $this->mapRolle($r), $protokollfuehrer),
-            'protokollfuehrerStellvertretungen' => array_map(fn ($r): array => $this->mapRolle($r), $protokollStv),
-            'kommissionsmitglieder' => array_map(fn ($r): array => $this->mapRolle($r), $kommissionsmitglieder),
+            'praesidenten' => array_map(fn($r): array => $this->mapRolle($r), $praesidenten),
+            'praesidiumStellvertretungen' => array_map(fn($r): array => $this->mapRolle($r), $praesidiumStv),
+            'protokollfuehrer' => array_map(fn($r): array => $this->mapRolle($r), $protokollfuehrer),
+            'protokollfuehrerStellvertretungen' => array_map(fn($r): array => $this->mapRolle($r), $protokollStv),
+            'kommissionsmitglieder' => array_map(fn($r): array => $this->mapRolle($r), $kommissionsmitglieder),
         ];
     }
 
-    public function setzeFraktionssitzungModus(bool $aktiv): void {
+    public function setzeFraktionssitzungModus(bool $aktiv): void
+    {
         if (!$this->kannPraesidiumHandeln()) {
             throw new \RuntimeException('Nur Fraktionspräsidium (oder aktive Stellvertretung) darf den Modus ändern');
         }
@@ -276,7 +474,8 @@ class FraktionsarbeitService {
         $this->config->setAppValue(self::APP_ID, self::CFG_SITZUNGSMODUS, $aktiv ? '1' : '0');
     }
 
-    public function setzeFraktionspraesident(string $uid, string $name = ''): void {
+    public function setzeFraktionspraesident(string $uid, string $name = ''): void
+    {
         if (!$this->istFraktionsGruppenAdmin()) {
             throw new \RuntimeException('Nur Fraktions-Gruppen-Admin darf das Fraktionspräsidium setzen');
         }
@@ -286,7 +485,8 @@ class FraktionsarbeitService {
         $this->rollenMapper->insert($this->erstelleRolle(self::ROLLE_FRAKTIONSPRAESIDENT, $uid, $name, null, null));
     }
 
-    public function setzeProtokollfuehrer(string $uid, string $name = ''): void {
+    public function setzeProtokollfuehrer(string $uid, string $name = ''): void
+    {
         if (!$this->kannPraesidiumHandeln()) {
             throw new \RuntimeException('Nur Fraktionspräsidium (oder aktive Stellvertretung) darf Protokollführer setzen');
         }
@@ -300,7 +500,8 @@ class FraktionsarbeitService {
         $this->config->setAppValue(self::APP_ID, self::CFG_PROTOKOLLFUEHRER_NAME, $name);
     }
 
-    public function setzePraesidiumStellvertretung(string $uid, string $name = '', string $gueltigVon = '', string $gueltigBis = ''): void {
+    public function setzePraesidiumStellvertretung(string $uid, string $name = '', string $gueltigVon = '', string $gueltigBis = ''): void
+    {
         if (!$this->kannPraesidiumHandeln()) {
             throw new \RuntimeException('Nur Fraktionspräsidium darf eine Präsidiums-Stellvertretung setzen');
         }
@@ -310,7 +511,8 @@ class FraktionsarbeitService {
         $this->rollenMapper->insert($this->erstelleRolle(self::ROLLE_FRAKTIONSPRAESIDENT_STV, $uid, $name, $von, $bis));
     }
 
-    public function setzeProtokollfuehrerStellvertretung(string $uid, string $name = '', string $gueltigVon = '', string $gueltigBis = ''): void {
+    public function setzeProtokollfuehrerStellvertretung(string $uid, string $name = '', string $gueltigVon = '', string $gueltigBis = ''): void
+    {
         if (!$this->kannPraesidiumHandeln() && !$this->kannProtokollfuehrungHandeln()) {
             throw new \RuntimeException('Nur Fraktionspräsidium oder Protokollführung darf eine Protokoll-Stellvertretung setzen');
         }
@@ -320,7 +522,8 @@ class FraktionsarbeitService {
         $this->rollenMapper->insert($this->erstelleRolle(self::ROLLE_PROTOKOLLFUEHRER_STV, $uid, $name, $von, $bis));
     }
 
-    public function setzeKommissionsmitglied(string $uid, string $name = '', string $gueltigVon = '', string $gueltigBis = ''): void {
+    public function setzeKommissionsmitglied(string $uid, string $name = '', string $gueltigVon = '', string $gueltigBis = ''): void
+    {
         if (!$this->kannPraesidiumHandeln()) {
             throw new \RuntimeException('Nur Fraktionspräsidium darf Kommissionsrollen setzen');
         }
@@ -330,7 +533,8 @@ class FraktionsarbeitService {
         $this->rollenMapper->insert($this->erstelleRolle(self::ROLLE_KOMMISSIONSMITGLIED, $uid, $name, $von, $bis));
     }
 
-    public function istBeschlussSchreibenErlaubt(): bool {
+    public function istBeschlussSchreibenErlaubt(): bool
+    {
         if (!$this->istFraktionssitzungModusAktiv()) {
             return true;
         }
@@ -338,11 +542,13 @@ class FraktionsarbeitService {
         return $this->kannProtokollfuehrungHandeln();
     }
 
-    private function istFraktionssitzungModusAktiv(): bool {
+    private function istFraktionssitzungModusAktiv(): bool
+    {
         return $this->config->getAppValue(self::APP_ID, self::CFG_SITZUNGSMODUS, '0') === '1';
     }
 
-    private function kannPraesidiumHandeln(): bool {
+    private function kannPraesidiumHandeln(): bool
+    {
         $user = $this->userSession->getUser();
         if ($user === null) {
             return false;
@@ -374,13 +580,15 @@ class FraktionsarbeitService {
         return $legacyUid !== '' && $legacyUid === $uid;
     }
 
-    private function pruefeBeschlussSchreibrecht(): void {
+    private function pruefeBeschlussSchreibrecht(): void
+    {
         if (!$this->istBeschlussSchreibenErlaubt()) {
             throw new \RuntimeException('Beschlüsse dürfen im Fraktionssitzungsmodus nur vom Protokollführer erfasst werden');
         }
     }
 
-    private function istFraktionsGruppenAdmin(): bool {
+    private function istFraktionsGruppenAdmin(): bool
+    {
         $user = $this->userSession->getUser();
         if ($user === null) {
             return false;
@@ -423,7 +631,8 @@ class FraktionsarbeitService {
     /**
      * @return array{0: string, 1: string}
      */
-    private function normalisiereRollenPerson(string $uid, string $name): array {
+    private function normalisiereRollenPerson(string $uid, string $name): array
+    {
         $uid = trim($uid);
         $name = trim($name);
         if ($uid === '') {
@@ -435,7 +644,8 @@ class FraktionsarbeitService {
     /**
      * @return array{0: ?string, 1: ?string}
      */
-    private function normalisiereGueltigkeit(string $gueltigVon, string $gueltigBis): array {
+    private function normalisiereGueltigkeit(string $gueltigVon, string $gueltigBis): array
+    {
         $von = $this->parseZeitpunkt($gueltigVon, false);
         $bis = $this->parseZeitpunkt($gueltigBis, true);
 
@@ -446,7 +656,8 @@ class FraktionsarbeitService {
         return [$von, $bis];
     }
 
-    private function parseZeitpunkt(string $wert, bool $endeDesTages): ?string {
+    private function parseZeitpunkt(string $wert, bool $endeDesTages): ?string
+    {
         $wert = trim($wert);
         if ($wert === '') {
             return null;
@@ -499,7 +710,8 @@ class FraktionsarbeitService {
     /**
      * @return array<string, mixed>
      */
-    private function mapRolle(Fraktionsrolle $rolle): array {
+    private function mapRolle(Fraktionsrolle $rolle): array
+    {
         return [
             'id' => $rolle->getId(),
             'uid' => $rolle->getUid(),
@@ -518,13 +730,14 @@ class FraktionsarbeitService {
     /**
      * @return array<int, array{code: string, label: string}>
      */
-    private function ermittleErlaubteBeschluesse(Geschaeft $geschaeft): array {
+    private function ermittleErlaubteBeschluesse(Geschaeft $geschaeft): array
+    {
         $codes = GeschaeftWorkflow::erlaubteBeschluesse($geschaeft->getTyp(), $geschaeft->getStatus());
 
         $codes = array_values(array_unique($codes));
 
         return array_map(
-            static fn (string $code): array => [
+            static fn(string $code): array => [
                 'code' => $code,
                 'label' => self::BESCHLUSS_LABELS[$code] ?? $code,
             ],
@@ -570,7 +783,8 @@ class FraktionsarbeitService {
     /**
      * @return array<string, mixed>
      */
-    private function mapAktion(GeschaeftAktion $aktion): array {
+    private function mapAktion(GeschaeftAktion $aktion): array
+    {
         return [
             'id' => $aktion->getId(),
             'geschaeftId' => $aktion->getGeschaeftId(),
@@ -588,7 +802,8 @@ class FraktionsarbeitService {
     /**
      * @return array<string, mixed>
      */
-    private function mapZustaendigkeit(GeschaeftZustaendigkeit $zustaendigkeit): array {
+    private function mapZustaendigkeit(GeschaeftZustaendigkeit $zustaendigkeit): array
+    {
         return [
             'id' => $zustaendigkeit->getId(),
             'geschaeftId' => $zustaendigkeit->getGeschaeftId(),
@@ -605,7 +820,8 @@ class FraktionsarbeitService {
     /**
      * @param array<string, mixed> $eintrag
      */
-    private function fuelleFraktionsstatus(array &$eintrag, Geschaeft $geschaeft, ?GeschaeftAktion $letzterBeschluss): void {
+    private function fuelleFraktionsstatus(array &$eintrag, Geschaeft $geschaeft, ?GeschaeftAktion $letzterBeschluss): void
+    {
         $letzteFraktionsentscheidungAm = $letzterBeschluss?->getErstelltAm() ?? '';
         $letzteExterneAenderungAm = (string) $geschaeft->getQuelleAktualisiertAm();
         $status = self::ableiteFraktionsstatus($letzteFraktionsentscheidungAm, $letzteExterneAenderungAm);
@@ -620,7 +836,8 @@ class FraktionsarbeitService {
     /**
      * @return array{fraktionsstatus: string, entscheidungsbedarf: bool, entscheidungsgrund: string}
      */
-    public static function ableiteFraktionsstatus(string $letzteFraktionsentscheidungAm, string $letzteExterneAenderungAm): array {
+    public static function ableiteFraktionsstatus(string $letzteFraktionsentscheidungAm, string $letzteExterneAenderungAm): array
+    {
         $letzteFraktionsentscheidungAm = trim($letzteFraktionsentscheidungAm);
         $letzteExterneAenderungAm = trim($letzteExterneAenderungAm);
 
@@ -647,7 +864,8 @@ class FraktionsarbeitService {
         ];
     }
 
-    private static function istZeitpunktSpaeter(string $kandidat, string $referenz): bool {
+    private static function istZeitpunktSpaeter(string $kandidat, string $referenz): bool
+    {
         try {
             $kandidatDt = new \DateTime($kandidat);
             $referenzDt = new \DateTime($referenz);
