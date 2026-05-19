@@ -92,21 +92,14 @@
           <div v-if="!geschaeft.istNutzerZustaendig" class="pw-hinweis pw-votum-hinweis">
             Nur die zuständige Person darf das Votum bearbeiten.
           </div>
-          <div class="pw-votum-werkzeuge" v-if="geschaeft.istNutzerZustaendig">
-            <button type="button" class="button pw-btn-klein" @click="votumFormat('bold')" title="Fett"><strong>B</strong></button>
-            <button type="button" class="button pw-btn-klein" @click="votumFormat('italic')" title="Kursiv"><em>I</em></button>
-            <button type="button" class="button pw-btn-klein" @click="votumFormat('underline')" title="Unterstrichen"><u>U</u></button>
-            <button type="button" class="button pw-btn-klein" @click="votumFormat('insertUnorderedList')" title="Aufzählung">•&nbsp;Liste</button>
-            <button type="button" class="button pw-btn-klein" @click="votumFormat('insertOrderedList')" title="Nummerierte Liste">1.&nbsp;Liste</button>
-            <span v-if="votumStatus" class="pw-votum-status">{{ votumStatus }}</span>
-          </div>
-          <div
-            ref="votumEditor"
-            class="pw-wysiwyg"
-            :contenteditable="geschaeft.istNutzerZustaendig"
-            :class="{ 'pw-wysiwyg-readonly': !geschaeft.istNutzerZustaendig }"
-            data-placeholder="Votum, Sprecher, Kernpunkte"
-            @input="votumGeaendert"
+          <PwWysiwyg
+            v-model="votumHtml"
+            :editable="!!geschaeft.istNutzerZustaendig"
+            :status="votumStatus"
+            :pdf-href="votumPdfUrl"
+            pdf-title="Votum als PDF herunterladen"
+            placeholder="Votum, Sprecher, Kernpunkte"
+            @update:model-value="votumGeaendert"
             @blur="votumSofortSpeichern"
           />
           <div v-if="geschaeft.istNutzerZustaendig && votumHatInhalt" class="pw-votum-aktionen">
@@ -145,11 +138,12 @@ import { generateUrl } from '@nextcloud/router'
 import axios from '@nextcloud/axios'
 import NcSelect from '@nextcloud/vue/components/NcSelect'
 import PwMultiSelect from './PwMultiSelect.vue'
+import PwWysiwyg from './PwWysiwyg.vue'
 import { subscribeRealtime } from '../realtime'
 
 export default {
   name: 'GeschaeftDetail',
-  components: { NcSelect, PwMultiSelect },
+  components: { NcSelect, PwMultiSelect, PwWysiwyg },
   props: {
     geschaeftId: { type: Number, required: true },
     mitglieder: { type: Array, default: () => [] },
@@ -243,6 +237,11 @@ export default {
       const t = (this.votumHtml || '').replace(/<[^>]*>/g, '').trim()
       return t.length > 0 || !!this.votumAktionId
     },
+    votumPdfUrl() {
+      if (!this.geschaeftId) return ''
+      if (!this.votumHatInhalt) return ''
+      return generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}/votum/pdf`)
+    },
   },
   watch: {
     geschaeftId: {
@@ -298,7 +297,6 @@ export default {
         this.votumHtml = av?.text || ''
         this.votumAktionId = av?.id || null
         this.votumDirty = false
-        this.$nextTick(() => this.syncVotumEditor())
       } catch (e) {
         this.geschaeft = null
         console.error(e)
@@ -404,26 +402,12 @@ export default {
       // ausserhalb dieser Komponente noch darauf verweisen sollte.
       await this.votumSofortSpeichern()
     },
-    syncVotumEditor() {
-      const el = this.$refs.votumEditor
-      if (!el) return
-      // Nur überschreiben, wenn sich der externe Stand vom Editor unterscheidet
-      // – sonst springt die Cursor-Position beim Tippen.
-      if (el.innerHTML !== (this.votumHtml || '')) {
-        el.innerHTML = this.votumHtml || ''
+    votumGeaendert(neuerHtml) {
+      // Wird von PwWysiwyg via @update:model-value ausgelöst.
+      // v-model setzt votumHtml bereits; hier nur Dirty-Flag + Autosave-Timer.
+      if (typeof neuerHtml === 'string') {
+        this.votumHtml = neuerHtml
       }
-    },
-    votumFormat(befehl) {
-      const el = this.$refs.votumEditor
-      if (!el) return
-      el.focus()
-      document.execCommand(befehl, false)
-      this.votumGeaendert()
-    },
-    votumGeaendert() {
-      const el = this.$refs.votumEditor
-      if (!el) return
-      this.votumHtml = el.innerHTML
       this.votumDirty = true
       this.votumStatus = ''
       if (this.votumSpeicherTimer) clearTimeout(this.votumSpeicherTimer)

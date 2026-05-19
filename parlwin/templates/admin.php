@@ -944,13 +944,18 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
             if (pollTimer !== null) {
                 return;
             }
+            // Polling bleibt IMMER aktiv als Sicherheitsnetz. Bei aktiver
+            // WebSocket-Verbindung wird langsamer gepollt (alle 5s), sonst
+            // alle 1.2s. So bleibt das UI niemals an einem veralteten
+            // sync.progress-Snapshot haengen, falls ein sync.completed-
+            // Event verloren geht (WS-Drop, Tab-Throttling, Hermes-Race).
+            let tick = 0;
             pollTimer = window.setInterval(() => {
-                if (realtimeConnected) {
+                tick++;
+                if (realtimeConnected && (tick % 4) !== 0) {
                     return;
                 }
-                pollSyncStatus().catch(() => {
-                    // Fallback bleibt aktiv, bis WS wieder verbunden ist.
-                });
+                pollSyncStatus().catch(() => { });
             }, 1200);
         };
 
@@ -1086,7 +1091,10 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
             realtimeSocket.addEventListener('open', () => {
                 realtimeConnected = true;
                 realtimeReconnectDelayMs = 1000;
-                stopPolling();
+                // Polling NICHT stoppen, sondern als Sicherheitsnetz weiterlaufen
+                // lassen (siehe startPolling). Direkt einen frischen Status holen,
+                // damit veraltete Snapshots aus der UI verschwinden.
+                startPolling();
                 pollSyncStatus().catch(() => { });
             });
             realtimeSocket.addEventListener('message', handleRealtimeMessage);
