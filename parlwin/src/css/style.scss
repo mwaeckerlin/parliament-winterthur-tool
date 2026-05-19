@@ -1,8 +1,110 @@
 :root {
-  --pw-gap-1: calc(var(--default-grid-baseline, 0.25rem) * 2);
-  --pw-gap-2: calc(var(--default-grid-baseline, 0.25rem) * 4);
-  --pw-gap-3: calc(var(--default-grid-baseline, 0.25rem) * 6);
-  --pw-gap-4: calc(var(--default-grid-baseline, 0.25rem) * 8);
+  /* ----------------------------------------------------------------------
+     Design-Tokens: Konsistente Skala fuer Abstaende, Schriftgroessen,
+     Linien, Klickflaechen. KEINE magischen Zahlen im Style – immer
+     diese Variablen verwenden.
+     ---------------------------------------------------------------------- */
+
+  /* Abstand-Skala (Padding / Margin / Gap) – 4px-Grid */
+  --pw-space-2xs: 0.125rem;
+  /* 2px  – Hairline-Abstand */
+  --pw-space-xs: 0.25rem;
+  /* 4px  – Mikro-Gap */
+  --pw-space-sm: 0.5rem;
+  /* 8px  – Eng */
+  --pw-space-md: 0.75rem;
+  /* 12px – Standard */
+  --pw-space-xs-plus: 0.375rem;
+  /* 6px  – halber Schritt */
+  --pw-space-sm-plus: 0.625rem;
+  /* 10px – Input-Padding */
+  --pw-space-md-plus: 0.875rem;
+  /* 14px – Card-Innen */
+  --pw-space-lg: 1rem;
+  /* 16px – Gross */
+  --pw-space-xl: 1.5rem;
+  /* 24px */
+  --pw-space-2xl: 2rem;
+  /* 32px */
+
+  /* Aliase auf die alte gap-API (Rueckwaerts-Kompat.) */
+  --pw-gap-1: var(--pw-space-sm);
+  --pw-gap-2: var(--pw-space-lg);
+  --pw-gap-3: var(--pw-space-xl);
+  --pw-gap-4: var(--pw-space-2xl);
+
+  /* Schriftgroessen */
+  --pw-font-xs: 0.75rem;
+  /* 12px */
+  --pw-font-sm: 0.8125rem;
+  /* 13px */
+  --pw-font-md: 0.875rem;
+  /* 14px – Default */
+  --pw-font-base: 0.9375rem;
+  /* 15px – Inputs */
+  --pw-font-lg: 1.125rem;
+  --pw-font-xl: 1.25rem;
+  --pw-font-2xl: 1.75rem;
+  /* Heading-Minimum (clamp) */
+
+  /* Relative Schriftgroessen (em – fuer geschachtelten Kontext) */
+  --pw-font-rel-xs: 0.75em;
+  --pw-font-rel-sm: 0.8em;
+  --pw-font-rel-md: 0.85em;
+  --pw-font-rel-lg: 0.9em;
+
+  /* Zeilenhoehen */
+  --pw-lh-tight: 1.2;
+  --pw-lh-snug: 1.25;
+  --pw-lh-heading: 1.15;
+  --pw-lh-normal: 1.45;
+
+  /* Linien / Borders */
+  --pw-border-thin: 0.0625rem;
+  /* 1px – Standard-Linie */
+  --pw-border-accent: 0.25rem;
+  /* 4px – linker Akzent-Strich */
+
+  /* Interaktive Klickflaechen */
+  --pw-click-sm: 2.25rem;
+  --pw-click-lg: 2.75rem;
+
+  /* Letter-Spacing */
+  --pw-track-wide: 0.04em;
+  --pw-track-tight: -0.02em;
+
+  /* Chip-spezifische em-Werte */
+  --pw-chip-pad-start: 0.4em;
+  --pw-chip-pad-end: 0.2em;
+  --pw-chip-font: 0.75em;
+
+  /* Pill-Radius */
+  --pw-radius-pill: 999rem;
+
+  /* Tabellen-Spalten – Mindestbreiten in em (skalieren mit Schrift) */
+  --pw-col-nr: 4em;
+  --pw-col-typ: 10em;
+  --pw-col-status: 6em;
+  --pw-col-datum: 5em;
+  --pw-col-zustaendig: 4em;
+  --pw-col-beschluss: 4em;
+  --pw-col-titel: 15em;
+
+  /* Sidebar-Breite (NcAppNavigation) – bewusst schmaler als der
+     Nextcloud-Default von 300px, damit Filter-Selects schmal bleiben. */
+  --pw-sidebar-width: 14rem;       /* 224px */
+  /* Nextcloud-Server-Variable ueberschreiben (nur fuer parlwin geladen). */
+  --app-navigation-width: var(--pw-sidebar-width);
+
+  /* Breakpoints fuer Container-/Media-Queries (em / rem) */
+  --pw-bp-card-em: 60em;
+  --pw-bp-card-rem: 60rem;
+  --pw-bp-shell-rem: 54rem;
+  --pw-bp-wide-rem: 80rem;
+
+  /* ----------------------------------------------------------------------
+     Farben / Oberflaechen (unveraendert)
+     ---------------------------------------------------------------------- */
   --pw-radius: var(--border-radius-large, 0.875rem);
   --pw-radius-small: var(--border-radius-small, 0.625rem);
   --pw-surface: var(--color-main-background);
@@ -10,8 +112,8 @@
   --pw-surface-soft: color-mix(in srgb, var(--color-main-background) 82%, var(--color-background-hover));
   --pw-border: color-mix(in srgb, var(--color-border) 88%, var(--color-main-text) 12%);
   --pw-muted: var(--color-text-maxcontrast);
-  --pw-shadow: 0 0.875rem 2.25rem color-mix(in srgb, var(--color-box-shadow, #000) 10%, transparent);
-  --pw-focus-ring: 0 0 0 0.125rem color-mix(in srgb, var(--color-primary-element) 24%, transparent);
+  --pw-shadow: 0 var(--pw-space-md-plus) 2.25rem color-mix(in srgb, var(--color-box-shadow, #000) 10%, transparent);
+  --pw-focus-ring: 0 0 0 var(--pw-space-2xs) color-mix(in srgb, var(--color-primary-element) 24%, transparent);
 }
 
 /* NcAppNavigation-List als Flex, damit margin-top:auto im letzten Item greift */
@@ -47,9 +149,9 @@ ul.app-navigation__list {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  inline-size: 1.25rem;
-  block-size: 1.25rem;
-  font-size: 1rem;
+  inline-size: var(--pw-font-xl);
+  block-size: var(--pw-font-xl);
+  font-size: var(--pw-space-lg);
   line-height: 1;
 }
 
@@ -90,10 +192,46 @@ ul.app-navigation__list {
   gap: var(--pw-gap-1);
 }
 
-/* Kompakter NcSelect im Nav-Filter – möglichst eine Zeile */
+/* Kompakter NcSelect im Nav-Filter:
+   NcSelect bringt `.v-select.select { min-width: 260px }` mit – das
+   sprengt den schmalen Sidebar. Mit (0,3,0) > (0,2,0) ueberschreiben
+   und zusaetzlich eine kleinere effektive Maximalbreite setzen. */
+.pw-nav-filter .v-select.select,
+.pw-nav-filter .v-select.select .vs__dropdown-toggle,
+.pw-nav-filter .v-select.select .vs__selected-options,
+.pw-nav-filter .v-select.select .vs__search,
+.pw-nav-filter .v-select.select .vs__actions {
+  min-width: 0;
+  min-inline-size: 0;
+}
+
+.pw-nav-filter .v-select.select {
+  inline-size: 100%;
+  max-inline-size: 100%;
+  margin: 0;
+}
+
 .pw-nav-filter .v-select,
 .pw-nav-filter .vs__dropdown-toggle {
-  min-block-size: 2.25rem;
+  min-block-size: var(--pw-click-sm);
+}
+
+/* NcAppNavigation-Sidebar schmaeler:
+   Quelle setzt `.app-navigation[data-v-3b634fbd] { width: 300px }`
+   (Spezifitaet 0,2,0). Wir kontern mit (1,1,0) ueber `#content`. */
+#content .app-navigation {
+  inline-size: var(--pw-sidebar-width);
+  width: var(--pw-sidebar-width);
+  min-inline-size: var(--pw-sidebar-width);
+}
+
+/* Falls Splitpanes-basierter Master/Detail-Pane verwendet wird, ebenfalls
+   schmaeler stellen (Quelle: [data-v-ea1e6879] ... min-width:300px). */
+#content .splitpanes.default-theme .splitpanes__pane.splitpanes__pane-list,
+#content .splitpanes .splitpanes__pane-list {
+  min-width: var(--pw-sidebar-width);
+  inline-size: var(--pw-sidebar-width);
+  max-width: var(--pw-sidebar-width);
 }
 
 .pw-filter-panel {
@@ -106,15 +244,15 @@ ul.app-navigation__list {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.5rem;
+  gap: var(--pw-space-sm);
 }
 
 .pw-filter-header h3 {
   margin: 0;
-  font-size: 0.875rem;
+  font-size: var(--pw-space-md-plus);
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: var(--pw-track-wide);
   color: var(--pw-muted);
 }
 
@@ -152,7 +290,7 @@ ul.app-navigation__list {
 .pw-app-kicker,
 .pw-app-main-kicker {
   color: var(--pw-muted);
-  font-size: 0.8125rem;
+  font-size: var(--pw-font-sm);
   line-height: 1.45;
 }
 
@@ -195,7 +333,7 @@ ul.app-navigation__list {
 .pw-app-sidebar,
 .pw-view-sidebar {
   position: sticky;
-  inset-block-start: 0.5rem;
+  inset-block-start: var(--pw-space-sm);
   display: grid;
   gap: var(--pw-gap-2);
 }
@@ -220,7 +358,7 @@ ul.app-navigation__list {
 .pw-members-table-wrap,
 .pw-table-wrap {
   background: var(--pw-surface);
-  border: 0.0625rem solid var(--pw-border);
+  border: var(--pw-border-thin) solid var(--pw-border);
   border-radius: var(--pw-radius);
   box-shadow: var(--pw-shadow);
 }
@@ -253,12 +391,12 @@ ul.app-navigation__list {
 .pw-modal-kopf h3 {
   margin: 0;
   line-height: 1.15;
-  letter-spacing: -0.02em;
+  letter-spacing: var(--pw-track-tight);
 }
 
 .pw-app-branding h1,
 #parlwin-admin-settings h2 {
-  font-size: clamp(1.75rem, 2vw, 2.25rem);
+  font-size: clamp(var(--pw-font-2xl), 2vw, var(--pw-click-sm));
 }
 
 .pw-app-branding p,
@@ -284,15 +422,15 @@ ul.app-navigation__list {
 }
 
 .pw-sidebar-nav-button.button {
-  min-block-size: 2.75rem;
+  min-block-size: var(--pw-click-lg);
   inline-size: 100%;
   justify-content: flex-start;
   flex-direction: row;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.625rem 0.75rem;
+  gap: var(--pw-space-sm);
+  padding: var(--pw-space-sm-plus) var(--pw-space-md);
   border-radius: var(--pw-radius-small);
-  border: 0.0625rem solid transparent;
+  border: var(--pw-border-thin) solid transparent;
   box-shadow: none;
   background: transparent;
   color: var(--color-main-text);
@@ -309,7 +447,7 @@ ul.app-navigation__list {
 
 .pw-sidebar-nav-hint {
   color: var(--pw-muted);
-  font-size: 0.75rem;
+  font-size: var(--pw-space-md);
   margin-inline-start: auto;
 }
 
@@ -349,7 +487,7 @@ ul.app-navigation__list {
 .pw-sidebar-block-header,
 .pw-admin-statusline {
   padding-block-end: var(--pw-gap-1);
-  border-block-end: 0.0625rem solid var(--pw-border);
+  border-block-end: var(--pw-border-thin) solid var(--pw-border);
 }
 
 .pw-sync-meldung,
@@ -358,12 +496,12 @@ ul.app-navigation__list {
 .pw-inline-note,
 .pw-selection-state {
   border-radius: var(--pw-radius-small);
-  border: 0.0625rem solid var(--pw-border);
-  padding: 0.625rem 0.875rem;
+  border: var(--pw-border-thin) solid var(--pw-border);
+  padding: var(--pw-space-sm-plus) var(--pw-space-md-plus);
 }
 
 .pw-selection-state {
-  min-block-size: 2.25rem;
+  min-block-size: var(--pw-click-sm);
   display: flex;
   align-items: center;
   color: var(--color-main-text);
@@ -430,21 +568,21 @@ ul.app-navigation__list {
 
 .pw-data-pair {
   display: grid;
-  gap: 0.25rem;
+  gap: var(--pw-space-xs);
 }
 
 .pw-data-pair span {
   color: var(--pw-muted);
-  font-size: 0.75rem;
+  font-size: var(--pw-space-md);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: var(--pw-track-wide);
 }
 
 .pw-choice-list {
   max-block-size: 15rem;
   overflow: auto;
-  padding: 0.25rem;
-  border: 0.0625rem solid var(--pw-border);
+  padding: var(--pw-space-xs);
+  border: var(--pw-border-thin) solid var(--pw-border);
   border-radius: var(--pw-radius-small);
   background: var(--pw-surface-soft);
 }
@@ -455,13 +593,13 @@ ul.app-navigation__list {
 .pw-mitglied-select-all {
   display: inline-flex;
   align-items: center;
-  gap: 0.625rem;
-  min-block-size: 2.25rem;
+  gap: var(--pw-space-sm-plus);
+  min-block-size: var(--pw-click-sm);
 }
 
 .pw-choice-item {
-  padding-inline: 0.5rem;
-  border-radius: 0.5rem;
+  padding-inline: var(--pw-space-sm);
+  border-radius: var(--pw-space-sm);
 }
 
 .pw-choice-item.ist-inaktiv {
@@ -473,7 +611,7 @@ ul.app-navigation__list {
 .pw-form-zeile>label,
 .pw-filter-feld>label {
   font-weight: 700;
-  font-size: 0.875rem;
+  font-size: var(--pw-space-md-plus);
 }
 
 .pw-suche,
@@ -484,20 +622,20 @@ ul.app-navigation__list {
 .pw-textarea-klein {
   inline-size: 100%;
   min-inline-size: 0;
-  min-block-size: 2.75rem;
-  padding: 0.75rem 0.875rem;
-  border: 0.0625rem solid color-mix(in srgb, var(--color-border-dark) 84%, var(--color-main-text) 16%);
+  min-block-size: var(--pw-click-lg);
+  padding: var(--pw-space-md) var(--pw-space-md-plus);
+  border: var(--pw-border-thin) solid color-mix(in srgb, var(--color-border-dark) 84%, var(--color-main-text) 16%);
   border-radius: var(--pw-radius-small);
   background: var(--pw-surface-soft);
   color: var(--color-main-text);
-  font-size: 0.9375rem;
+  font-size: var(--pw-font-base);
 }
 
 .pw-input-klein,
 .pw-textarea-klein,
 .pw-btn-mini.button {
-  min-block-size: 2.25rem;
-  font-size: 0.8125rem;
+  min-block-size: var(--pw-click-sm);
+  font-size: var(--pw-font-sm);
 }
 
 .pw-textarea,
@@ -529,8 +667,8 @@ ul.app-navigation__list {
 }
 
 .pw-btn-schliessen.button {
-  min-inline-size: 2.75rem;
-  min-block-size: 2.75rem;
+  min-inline-size: var(--pw-click-lg);
+  min-block-size: var(--pw-click-lg);
   padding: 0;
 }
 
@@ -557,6 +695,24 @@ ul.app-navigation__list {
 
 .pw-card-mobile {
   display: none;
+}
+
+/* Geschäfte-Ansicht ist Container für ein Inline-Size-Query: Wenn die Spalte
+   schmäler wird als Summe der Spalten-Mindestbreiten + 15em für den Titel
+   (≈ 47em), wird automatisch von Tabellen- auf Karten-Darstellung gewechselt. */
+.pw-geschaefte {
+  container-type: inline-size;
+  container-name: pw-geschaefte;
+}
+
+@container pw-geschaefte (max-width: 60em) {
+  .pw-geschaefte .pw-table-desktop {
+    display: none !important;
+  }
+
+  .pw-geschaefte .pw-card-mobile {
+    display: grid !important;
+  }
 }
 
 .pw-tabelle,
@@ -612,10 +768,10 @@ ul.app-navigation__list {
 .pw-members-table td,
 .pw-info-tabelle th,
 .pw-info-tabelle td {
-  padding: 0.875rem;
+  padding: var(--pw-space-md-plus);
   text-align: left;
   vertical-align: top;
-  border-block-end: 0.0625rem solid var(--pw-border);
+  border-block-end: var(--pw-border-thin) solid var(--pw-border);
 }
 
 .pw-tabelle thead th,
@@ -626,8 +782,8 @@ ul.app-navigation__list {
   background: color-mix(in srgb, var(--color-background-hover) 84%, var(--pw-surface));
   color: var(--pw-muted);
   text-transform: uppercase;
-  font-size: 0.75rem;
-  letter-spacing: 0.04em;
+  font-size: var(--pw-space-md);
+  letter-spacing: var(--pw-track-wide);
 }
 
 .pw-sortierbar {
@@ -670,10 +826,10 @@ ul.app-navigation__list {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 999rem;
-  padding: 0.35rem 0.75rem;
-  border: 0.0625rem solid var(--pw-border);
-  font-size: 0.75rem;
+  border-radius: var(--pw-radius-pill);
+  padding: var(--pw-space-xs-plus) var(--pw-space-md);
+  border: var(--pw-border-thin) solid var(--pw-border);
+  font-size: var(--pw-space-md);
   line-height: 1.2;
   white-space: nowrap;
   color: var(--color-main-text);
@@ -706,9 +862,16 @@ ul.app-navigation__list {
   background: color-mix(in srgb, var(--pw-surface) 35%, black);
 }
 
+// vue-select dropdown wird via appendToBody an <body> geteleportiert
+// und nutzt --vs-dropdown-z-index (default 9999) — muss ueber dem Modal (10000) liegen.
+.vs__dropdown-menu,
+.vs__dropdown-menu--floating {
+  z-index: 10010 !important;
+}
+
 .pw-modal {
   inline-size: min(72rem, 100%);
-  max-block-size: calc(100dvb - 2rem);
+  max-block-size: calc(100dvb - var(--pw-space-2xl));
   overflow: auto;
 }
 
@@ -718,7 +881,16 @@ ul.app-navigation__list {
   z-index: 1;
   padding: var(--pw-gap-2);
   background: var(--pw-surface);
-  border-block-end: 0.0625rem solid var(--pw-border);
+  border-block-end: var(--pw-border-thin) solid var(--pw-border);
+}
+
+.pw-modal-kopf-leer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding-block: var(--pw-gap-1);
+  border-block-end: none;
+  background: transparent;
 }
 
 .pw-geschaeft-detail {
@@ -728,13 +900,13 @@ ul.app-navigation__list {
 
 .pw-detail-header {
   padding-block-end: var(--pw-gap-1);
-  border-block-end: 0.0625rem solid var(--pw-border);
+  border-block-end: var(--pw-border-thin) solid var(--pw-border);
 }
 
 .pw-detail-header h3,
 .pw-data-card h3,
 .pw-kommission-kopf h3 {
-  font-size: 1.25rem;
+  font-size: var(--pw-font-xl);
 }
 
 .pw-detail-abschnitt {
@@ -745,7 +917,7 @@ ul.app-navigation__list {
 .pw-detail-abschnitt h4,
 .pw-traktanden h4 {
   margin: 0;
-  font-size: 0.9375rem;
+  font-size: var(--pw-font-base);
 }
 
 .pw-info-tabelle th {
@@ -756,17 +928,17 @@ ul.app-navigation__list {
 .pw-zustaendigkeiten-liste {
   max-block-size: 18rem;
   overflow: auto;
-  padding: 0.75rem;
-  border: 0.0625rem solid var(--pw-border);
+  padding: var(--pw-space-md);
+  border: var(--pw-border-thin) solid var(--pw-border);
   border-radius: var(--pw-radius-small);
   background: var(--pw-surface-soft);
 }
 
 .pw-zustaendigkeiten-gruppe h5 {
   margin: 0;
-  font-size: 0.75rem;
+  font-size: var(--pw-space-md);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: var(--pw-track-wide);
   color: var(--pw-muted);
 }
 
@@ -774,7 +946,7 @@ ul.app-navigation__list {
   inline-size: 100%;
   block-size: 0;
   border: 0;
-  border-block-start: 0.0625rem solid var(--pw-border);
+  border-block-start: var(--pw-border-thin) solid var(--pw-border);
 }
 
 .pw-timeline-meta,
@@ -782,8 +954,84 @@ ul.app-navigation__list {
   color: var(--pw-muted);
 }
 
+.pw-timeline-autor {
+  font-weight: 600;
+  color: var(--pw-fg, inherit);
+}
+
+.pw-timeline-zeit {
+  color: var(--pw-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .pw-timeline-text {
   white-space: pre-wrap;
+}
+
+.pw-timeline-html {
+  white-space: normal;
+
+  ul, ol {
+    padding-inline-start: var(--pw-space-lg, 1.5rem);
+    margin: var(--pw-space-xs, 0.25rem) 0;
+  }
+}
+
+.pw-votum-werkzeuge {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--pw-space-xs, 0.25rem);
+  align-items: center;
+  margin-block-end: var(--pw-space-xs, 0.25rem);
+
+  .pw-votum-status {
+    margin-inline-start: auto;
+    color: var(--pw-muted);
+    font-size: var(--pw-font-sm, 0.85em);
+  }
+}
+
+.pw-wysiwyg {
+  min-block-size: 6rem;
+  padding: var(--pw-space-sm, 0.5rem) var(--pw-space-md, 0.75rem);
+  border: var(--pw-border-thin) solid var(--pw-border);
+  border-radius: var(--pw-radius-small);
+  background: var(--color-main-background, #fff);
+  outline: none;
+  cursor: text;
+
+  &:focus {
+    border-color: var(--color-primary-element, currentColor);
+  }
+
+  &:empty::before {
+    content: attr(data-placeholder);
+    color: var(--pw-muted);
+    pointer-events: none;
+  }
+
+  ul, ol {
+    padding-inline-start: var(--pw-space-lg, 1.5rem);
+    margin: var(--pw-space-xs, 0.25rem) 0;
+  }
+}
+
+.pw-wysiwyg-readonly {
+  background: var(--pw-surface-soft, transparent);
+  cursor: default;
+  opacity: 0.85;
+}
+
+.pw-votum-aktionen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--pw-space-sm, 0.5rem);
+  align-items: center;
+  margin-block-start: var(--pw-space-xs, 0.25rem);
+}
+
+.pw-votum-hinweis {
+  font-style: italic;
 }
 
 .pw-sitzung-karte.pw-vergangen,
@@ -815,14 +1063,14 @@ ul.app-navigation__list {
 
 .pw-sitzung-datum {
   display: grid;
-  gap: 0.25rem;
+  gap: var(--pw-space-xs);
 }
 
 .pw-traktandum {
   display: grid;
   gap: var(--pw-gap-1);
-  padding: 1rem;
-  border-inline-start: 0.25rem solid var(--color-primary-element);
+  padding: var(--pw-space-lg);
+  border-inline-start: var(--pw-space-xs) solid var(--color-primary-element);
   border-radius: 0 var(--pw-radius-small) var(--pw-radius-small) 0;
   background: color-mix(in srgb, var(--pw-surface) 94%, var(--color-background-hover));
 }
@@ -852,12 +1100,12 @@ ul.app-navigation__list {
 
 .pw-mitglied-partei {
   color: var(--pw-muted);
-  font-size: 0.9em;
+  font-size: var(--pw-font-rel-lg);
 }
 
 .pw-mitglied-fraktionsrolle {
   display: inline-block;
-  font-size: 0.85em;
+  font-size: var(--pw-font-rel-md);
   font-weight: 600;
   color: var(--color-primary-element);
 }
@@ -865,18 +1113,18 @@ ul.app-navigation__list {
 .pw-mitglied-kommissionen strong {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: var(--pw-space-2xs);
 }
 
 .pw-mitglied-kommission-eintrag {
   display: inline-flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 0.35rem;
+  gap: var(--pw-space-xs-plus);
 }
 
 .pw-mitglied-kommission-rolle {
-  font-size: 0.8em;
+  font-size: var(--pw-font-rel-sm);
   color: var(--color-primary-element);
   font-weight: 600;
   font-style: italic;
@@ -885,12 +1133,12 @@ ul.app-navigation__list {
 .pw-mitglied-kopftext,
 .pw-kommission-mitglieder {
   display: grid;
-  gap: 0.25rem;
+  gap: var(--pw-space-xs);
 }
 
 .pw-kommission-geschaefte {
   display: grid;
-  gap: 0.25rem;
+  gap: var(--pw-space-xs);
 }
 
 .pw-kommission-geschaeftsliste {
@@ -898,15 +1146,15 @@ ul.app-navigation__list {
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 0.25rem;
+  gap: var(--pw-space-xs);
 
   li {
     display: grid;
     grid-template-columns: auto auto 1fr;
-    gap: 0.5rem;
+    gap: var(--pw-space-sm);
     align-items: baseline;
-    padding: 0.25rem 0.5rem;
-    border-radius: var(--border-radius, 0.25rem);
+    padding: var(--pw-space-xs) var(--pw-space-sm);
+    border-radius: var(--border-radius, var(--pw-space-xs));
     background: var(--pw-surface-soft);
   }
 
@@ -939,11 +1187,11 @@ ul.app-navigation__list {
   align-items: center;
   inline-size: max-content;
   max-inline-size: 100%;
-  padding: 0.35rem 0.75rem;
-  border: 0.0625rem solid var(--pw-border);
-  border-radius: 999rem;
+  padding: var(--pw-space-xs-plus) var(--pw-space-md);
+  border: var(--pw-border-thin) solid var(--pw-border);
+  border-radius: var(--pw-radius-pill);
   background: var(--pw-surface-soft);
-  font-size: 0.75rem;
+  font-size: var(--pw-space-md);
 }
 
 .pw-badge.inaktiv {
@@ -964,19 +1212,19 @@ ul.app-navigation__list {
 .pw-kommission-mitglied-liste {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
-  gap: 0.5rem;
-  margin-block-start: 0.35rem;
+  gap: var(--pw-space-sm);
+  margin-block-start: var(--pw-space-xs-plus);
 }
 
 .pw-kommission-mitglied-karte {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
-  padding: 0.5rem 0.75rem;
-  border: 0.0625rem solid var(--pw-border);
-  border-radius: var(--pw-radius, 0.5rem);
+  gap: var(--pw-space-2xs);
+  padding: var(--pw-space-sm) var(--pw-space-md);
+  border: var(--pw-border-thin) solid var(--pw-border);
+  border-radius: var(--pw-radius, var(--pw-space-sm));
   background: var(--pw-surface-soft);
-  font-size: 0.85em;
+  font-size: var(--pw-font-rel-md);
   line-height: 1.3;
 }
 
@@ -995,7 +1243,7 @@ ul.app-navigation__list {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 0.4rem;
+  gap: var(--pw-space-sm);
 }
 
 .pw-kommission-mitglied-rolle {
@@ -1051,7 +1299,7 @@ ul.app-navigation__list {
 
 .pw-admin-card h3 {
   margin: 0;
-  font-size: 1.125rem;
+  font-size: var(--pw-font-lg);
 }
 
 .pw-tabelle .pw-col-nr {
@@ -1063,14 +1311,180 @@ ul.app-navigation__list {
   inline-size: auto;
 }
 
-.pw-tabelle .pw-col-inline-edit {
-  /* Inline-Editor-Spalten: kompakt halten, aber genug Platz für Multiselect. */
-  min-inline-size: 12rem;
+/* Geschäftsliste: Spalten haben sinnvolle Mindestbreiten in em, die Titel-
+   Spalte nimmt den verbleibenden Platz. Sobald der verfügbare Platz nicht
+   mehr ausreicht (Summe Mindestbreiten + ~15em für den Titel), schaltet
+   ein Container-Query weiter unten auf die Card-Ansicht um. */
+.pw-tabelle-geschaefte {
+  table-layout: auto;
+  inline-size: 100%;
 }
 
-.pw-tabelle .pw-inline-select {
+.pw-tabelle-geschaefte .pw-col-nr {
+  inline-size: 1%;
+  min-inline-size: var(--pw-col-nr);
+  white-space: nowrap;
+}
+
+.pw-tabelle-geschaefte .pw-col-titel {
+  /* Titel-Spalte bekommt den restlichen Platz, mit komfortabler Mindestbreite. */
+  inline-size: auto;
+  min-inline-size: var(--pw-col-titel);
+}
+
+.pw-tabelle-geschaefte .pw-col-typ {
+  /* Wrap NUR an Whitespace – keine Silbentrennung, kein Wortbruch. */
+  inline-size: 1%;
+  min-inline-size: var(--pw-col-typ);
+  white-space: normal;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+  -webkit-hyphens: none;
+}
+
+.pw-tabelle-geschaefte .pw-col-status {
+  inline-size: 1%;
+  min-inline-size: var(--pw-col-status);
+}
+
+.pw-tabelle-geschaefte .pw-col-datum {
+  inline-size: 1%;
+  min-inline-size: var(--pw-col-datum);
+  white-space: nowrap;
+}
+
+.pw-tabelle-geschaefte .pw-col-zustaendig {
+  /* Wrap mit Silbentrennung erlaubt. */
+  inline-size: 1%;
+  min-inline-size: var(--pw-col-zustaendig);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+
+.pw-tabelle-geschaefte .pw-col-beschluss {
+  /* Wrap mit Silbentrennung erlaubt. */
+  inline-size: 1%;
+  min-inline-size: var(--pw-col-beschluss);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+
+.pw-tabelle .pw-col-inline-edit {
+  /* Inline-Editor-Spalten: keine künstliche Mindestbreite – Multiselects sollen
+     niemals breiter werden als die Spalte selbst. */
+  vertical-align: top;
+  overflow: hidden;
+}
+
+/* --------------------------------------------------------------------------
+   NcSelect in Tabellen-Zellen.
+
+   NcSelect liefert eigene Regeln mit, die das Schrumpfen blockieren:
+     .v-select.select                              { min-width: 260px; margin: …; }
+     .v-select.select.vs--single .vs__selected-options { flex-wrap: nowrap; }
+     .v-select.select .vs__selected                 { height: …; padding-inline: 12px 8px; }
+     .v-select.select .vs__search                   { height: …; }
+
+   Da diese aus einem dynamisch geladenen Chunk kommen, gewinnen sie bei
+   gleicher Spezifität gegen unsere statische CSS. Daher hier durchgehend
+   hoehere Spezifitaet (`.pw-tabelle-geschaefte` zusaetzlich vor jedem
+   NcSelect-Selektor) – kein `!important`.
+   -------------------------------------------------------------------------- */
+
+/* 1) Wrapper: Mindestbreite des NcSelect aufheben, damit die Zelle wirklich
+      schrumpfen kann. Spezifitaet (0,4,0) schlaegt `.v-select.select` (0,2,0). */
+.pw-tabelle-geschaefte .pw-inline-select.v-select.select {
+  min-width: 0;
+  min-inline-size: 0;
+  margin: 0;
+}
+
+/* 2) Single-Select darf seine Chips umbrechen. */
+.pw-tabelle-geschaefte .pw-inline-select.v-select.vs--single .vs__selected-options {
+  flex-wrap: wrap;
+}
+
+/* 3) Alle inneren Flex-Boxen ohne Mindestbreite und auf Zellbreite beschränkt. */
+.pw-tabelle-geschaefte .pw-inline-select.v-select,
+.pw-tabelle-geschaefte .pw-inline-select.v-select .vs__dropdown-toggle,
+.pw-tabelle-geschaefte .pw-inline-select.v-select .vs__selected-options,
+.pw-tabelle-geschaefte .pw-inline-select.v-select .vs__search,
+.pw-tabelle-geschaefte .pw-inline-select.v-select .vs__actions {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  box-sizing: border-box;
+}
+
+.pw-tabelle-geschaefte .pw-inline-select.v-select,
+.pw-tabelle-geschaefte .pw-inline-select.v-select .vs__dropdown-toggle {
   inline-size: 100%;
-  min-inline-size: 10rem;
+}
+
+/* 4) Chevron rechts aussen, Chips dürfen umbrechen. */
+.pw-tabelle-geschaefte .pw-inline-select.v-select .vs__selected-options {
+  flex: 1 1 auto;
+  inline-size: 100%;
+  flex-wrap: wrap;
+  row-gap: var(--pw-space-xs);
+}
+
+/* 5) Chip-Breite richtet sich am Inhalt aus, max = Zellbreite, Wrap mit
+      Silbentrennung. Spezifitaet (0,4,1) schlaegt `.v-select.select .vs__selected`
+      (0,3,0). */
+.pw-tabelle-geschaefte .pw-inline-select.v-select .vs__selected {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 1 auto;
+  inline-size: auto;
+  max-inline-size: 100%;
+  min-inline-size: 0;
+  block-size: auto;
+  height: auto;
+  font-size: var(--pw-chip-font);
+  line-height: 1.2;
+  padding-inline: var(--pw-chip-pad-start) var(--pw-chip-pad-end);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+
+.pw-tabelle-geschaefte .pw-inline-select.v-select .vs__selected>* {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+
+.pw-tabelle-geschaefte .pw-inline-select.v-select .vs__selected .vs__deselect {
+  flex: 0 0 auto;
+}
+
+/* 6) Suchfeld darf auf 0 schrumpfen, damit es die Zelle nicht aufbläht. */
+.pw-tabelle-geschaefte .pw-inline-select.v-select .vs__search {
+  inline-size: 0;
+  min-inline-size: 0;
+  flex: 1 1 0;
+}
+
+/* 7) Aussen-Wrapper bleibt simpel – nur Block-Layout in der Zelle. */
+.pw-tabelle .pw-inline-select {
+  display: block;
+  inline-size: 100%;
+  max-inline-size: 100%;
+  min-inline-size: 0;
+  box-sizing: border-box;
 }
 
 .pw-status-text {
@@ -1084,38 +1498,38 @@ ul.app-navigation__list {
 .pw-view-header {
   display: flex;
   align-items: baseline;
-  gap: 0.5rem;
+  gap: var(--pw-space-sm);
   /* Platz für Nextcloud Nav-Toggle ("Hamburger") oben links */
-  padding-inline-start: 2.75rem;
+  padding-inline-start: var(--pw-click-lg);
   padding-block-end: var(--pw-gap-1);
 }
 
 .pw-view-title {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: var(--pw-font-xl);
   font-weight: 700;
 }
 
 .pw-view-count {
   color: var(--pw-muted);
-  font-size: 0.875rem;
+  font-size: var(--pw-space-md-plus);
 }
 
 /* Multiselect (vue-select / NcSelect) – Tokens als kompakte Chips */
 .pw-nav-filter .v-select.vs--multiple .vs__selected {
   background: color-mix(in srgb, var(--color-primary-element) 18%, transparent);
   color: var(--color-main-text);
-  border: 0.0625rem solid color-mix(in srgb, var(--color-primary-element) 32%, transparent);
+  border: var(--pw-border-thin) solid color-mix(in srgb, var(--color-primary-element) 32%, transparent);
   border-radius: 999px;
-  padding: 0.125rem 0.5rem;
-  margin: 0.125rem 0.25rem 0.125rem 0;
-  font-size: 0.8125rem;
+  padding: var(--pw-space-2xs) var(--pw-space-sm);
+  margin: var(--pw-space-2xs) var(--pw-space-xs) var(--pw-space-2xs) 0;
+  font-size: var(--pw-font-sm);
   line-height: 1.25;
   max-inline-size: 100%;
 }
 
 .pw-nav-filter .v-select.vs--multiple .vs__selected .vs__deselect {
-  margin-inline-start: 0.25rem;
+  margin-inline-start: var(--pw-space-xs);
   opacity: 0.7;
 }
 
@@ -1126,17 +1540,17 @@ ul.app-navigation__list {
 .pw-nav-filter .v-select .vs__search,
 .pw-nav-filter .v-select .vs__search:focus {
   margin: 0;
-  padding: 0 0.25rem;
-  min-inline-size: 4rem;
+  padding: 0 var(--pw-space-xs);
+  min-inline-size: var(--pw-space-2xl);
 }
 
 .pw-nav-filter .v-select .vs__dropdown-toggle {
-  padding: 0.25rem 0.5rem;
-  border-radius: var(--border-radius-large, 0.5rem);
+  padding: var(--pw-space-2xs) var(--pw-space-xs);
+  border-radius: var(--border-radius-large, var(--pw-space-sm));
   /* Höhe wächst mit Inhalt – kein Drei-Zeilen-Limit */
   max-block-size: none;
   block-size: auto;
-  min-block-size: 2.25rem;
+  min-block-size: var(--pw-click-sm);
 }
 
 .pw-nav-filter .v-select .vs__selected-options {
@@ -1157,7 +1571,7 @@ ul.app-navigation__list {
   }
 }
 
-@media (max-width: 36rem) {
+@media (max-width: 60rem) {
   .pw-table-desktop {
     display: none;
   }
@@ -1180,23 +1594,23 @@ ul.app-navigation__list {
   }
 
   .pw-members-table tr {
-    padding: 0.875rem;
-    border-block-end: 0.0625rem solid var(--pw-border);
+    padding: var(--pw-space-md-plus);
+    border-block-end: var(--pw-border-thin) solid var(--pw-border);
   }
 
   .pw-members-table td {
-    padding: 0.5rem 0;
+    padding: var(--pw-space-sm) 0;
     border: 0;
   }
 
   .pw-members-table td::before {
     content: attr(data-label);
     display: block;
-    margin-block-end: 0.25rem;
+    margin-block-end: var(--pw-space-xs);
     color: var(--pw-muted);
-    font-size: 0.75rem;
+    font-size: var(--pw-space-md);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: var(--pw-track-wide);
   }
 }
 

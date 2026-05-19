@@ -36,29 +36,18 @@
 
         <div class="pw-form-zeile">
           <label>Zuständigkeit</label>
-          <div class="pw-zustaendigkeiten-liste">
-            <div class="pw-zustaendigkeiten-gruppe">
-              <h5>Aktive Mitglieder</h5>
-              <label v-for="m in aktiveMitglieder" :key="`aktiv-${m.id}`" class="pw-checkbox-row">
-                <input type="checkbox" :value="personKey(m)" v-model="ausgewaehltePersonKeys" />
-                <span>{{ vollerName(m) }}</span>
-              </label>
-            </div>
-            <template v-if="inaktiveMitglieder.length > 0">
-              <hr class="pw-zustaendigkeiten-trenner">
-              <div class="pw-zustaendigkeiten-gruppe">
-                <h5>Inaktive Mitglieder</h5>
-                <label v-for="m in inaktiveMitglieder" :key="`inaktiv-${m.id}`" class="pw-checkbox-row">
-                  <input type="checkbox" :value="personKey(m)" v-model="ausgewaehltePersonKeys" />
-                  <span>{{ vollerName(m) }}</span>
-                </label>
-              </div>
-            </template>
-          </div>
+          <PwMultiSelect
+            class="pw-zustaendigkeit-select"
+            :model-value="zustaendigOptionenAusgewaehlt"
+            :options="zustaendigOptionen"
+            :clearable="true"
+            placeholder="—"
+            label="label"
+            @update:model-value="aenderungZustaendig($event || [])"
+          />
           <small class="pw-hinweis">
             Falls mehrere Personen ausgewählt sind, wird die erste Auswahl intern als Hauptzuständigkeit geführt.
           </small>
-          <button type="button" class="button pw-btn-klein" @click="speichereZustaendigkeiten">Zuständigkeiten speichern</button>
         </div>
 
         <div class="pw-form-zeile">
@@ -69,10 +58,15 @@
 
         <div class="pw-form-zeile">
           <label>Beschluss erfassen</label>
-          <select v-model="beschlussCode" class="pw-select" :disabled="!geschaeft.fraktionssitzung?.beschlussSchreibbar">
-            <option value="">— Beschluss wählen —</option>
-            <option v-for="b in geschaeft.erlaubteBeschluesse || []" :key="b.code" :value="b.code">{{ b.label }}</option>
-          </select>
+          <NcSelect
+            :model-value="beschlussOption"
+            :options="beschlussOptionen"
+            :clearable="true"
+            :disabled="!geschaeft.fraktionssitzung?.beschlussSchreibbar"
+            placeholder="—"
+            label="label"
+            @update:model-value="aenderungBeschluss($event)"
+          />
           <textarea
             v-model="beschlussText"
             class="pw-textarea"
@@ -95,24 +89,47 @@
 
         <div class="pw-form-zeile">
           <label>Votum im Rat</label>
-          <textarea v-model="votumText" class="pw-textarea" rows="2" placeholder="Votum, Sprecher, Kernpunkte" />
-          <button type="button" class="button pw-btn-klein" @click="votumSpeichern">Votum speichern</button>
+          <div v-if="!geschaeft.istNutzerZustaendig" class="pw-hinweis pw-votum-hinweis">
+            Nur die zuständige Person darf das Votum bearbeiten.
+          </div>
+          <div class="pw-votum-werkzeuge" v-if="geschaeft.istNutzerZustaendig">
+            <button type="button" class="button pw-btn-klein" @click="votumFormat('bold')" title="Fett"><strong>B</strong></button>
+            <button type="button" class="button pw-btn-klein" @click="votumFormat('italic')" title="Kursiv"><em>I</em></button>
+            <button type="button" class="button pw-btn-klein" @click="votumFormat('underline')" title="Unterstrichen"><u>U</u></button>
+            <button type="button" class="button pw-btn-klein" @click="votumFormat('insertUnorderedList')" title="Aufzählung">•&nbsp;Liste</button>
+            <button type="button" class="button pw-btn-klein" @click="votumFormat('insertOrderedList')" title="Nummerierte Liste">1.&nbsp;Liste</button>
+            <span v-if="votumStatus" class="pw-votum-status">{{ votumStatus }}</span>
+          </div>
+          <div
+            ref="votumEditor"
+            class="pw-wysiwyg"
+            :contenteditable="geschaeft.istNutzerZustaendig"
+            :class="{ 'pw-wysiwyg-readonly': !geschaeft.istNutzerZustaendig }"
+            data-placeholder="Votum, Sprecher, Kernpunkte"
+            @input="votumGeaendert"
+            @blur="votumSofortSpeichern"
+          />
+          <div v-if="geschaeft.istNutzerZustaendig && votumHatInhalt" class="pw-votum-aktionen">
+            <button type="button" class="button pw-btn-klein" @click="votumArchivieren">Votum archivieren</button>
+            <small class="pw-hinweis">Verschiebt das aktuelle Votum in die History und leert das Feld für ein neues.</small>
+          </div>
         </div>
       </div>
 
       <div class="pw-detail-abschnitt">
         <h4>Aktionszeitleiste</h4>
-        <div v-if="(geschaeft.aktionen || []).length === 0" class="pw-hinweis">Noch keine Aktionen vorhanden.</div>
-        <div v-for="a in geschaeft.aktionen || []" :key="a.id" class="pw-timeline-eintrag">
+        <div v-if="zeitleisteAktionen.length === 0" class="pw-hinweis">Noch keine Aktionen vorhanden.</div>
+        <div v-for="a in zeitleisteAktionen" :key="a.id" class="pw-timeline-eintrag">
           <div class="pw-timeline-kopf">
             <strong>{{ a.titel || a.aktionTyp }}</strong>
-            <span>{{ a.erstelltAm }}</span>
+            <span class="pw-timeline-zeit">{{ formatiereZeitpunkt(a.erstelltAm) }}</span>
           </div>
           <div class="pw-timeline-meta">
-            <span>{{ a.autorName || a.autorUid || 'unbekannt' }}</span>
-            <span v-if="a.aktionCode">· {{ a.aktionCode }}</span>
+            <span class="pw-timeline-autor">{{ a.autorName || a.autorUid || 'unbekannt' }}</span>
+            <span v-if="a.aktionCode"> · {{ a.aktionCode }}</span>
           </div>
-          <div v-if="a.text" class="pw-timeline-text">{{ a.text }}</div>
+          <div v-if="a.text && a.aktionTyp === 'votum'" class="pw-timeline-text pw-timeline-html" v-html="a.text" />
+          <div v-else-if="a.text" class="pw-timeline-text">{{ a.text }}</div>
         </div>
       </div>
 
@@ -126,10 +143,13 @@
 <script>
 import { generateUrl } from '@nextcloud/router'
 import axios from '@nextcloud/axios'
+import NcSelect from '@nextcloud/vue/components/NcSelect'
+import PwMultiSelect from './PwMultiSelect.vue'
 import { subscribeRealtime } from '../realtime'
 
 export default {
   name: 'GeschaeftDetail',
+  components: { NcSelect, PwMultiSelect },
   props: {
     geschaeftId: { type: Number, required: true },
     mitglieder: { type: Array, default: () => [] },
@@ -142,7 +162,11 @@ export default {
       neueNotiz: '',
       beschlussCode: '',
       beschlussText: '',
-      votumText: '',
+      votumHtml: '',
+      votumAktionId: null,
+      votumSpeicherTimer: null,
+      votumStatus: '',
+      votumDirty: false,
       ausgewaehltePersonKeys: [],
       hauptPersonKey: '',
       meldung: '',
@@ -157,6 +181,12 @@ export default {
     if (this.unsubRealtime) {
       this.unsubRealtime()
       this.unsubRealtime = null
+    }
+    if (this.votumSpeicherTimer) {
+      clearTimeout(this.votumSpeicherTimer)
+      this.votumSpeicherTimer = null
+      // Letzten Stand sofort sichern.
+      this.votumSpeichernJetzt()
     }
   },
   computed: {
@@ -175,6 +205,43 @@ export default {
         .filter((mitglied) => mitglied.aktiv === false)
         .filter((mitglied) => !!(mitglied.nextcloudUid || mitglied.nextcloud_uid))
         .sort((a, b) => this.vollerName(a).localeCompare(this.vollerName(b)))
+    },
+    zustaendigOptionen() {
+      const mk = (m, aktiv) => ({
+        key: this.personKey(m),
+        label: aktiv ? this.vollerName(m) : `${this.vollerName(m)} (inaktiv)`,
+      })
+      return [
+        ...this.aktiveMitglieder.map((m) => mk(m, true)),
+        ...this.inaktiveMitglieder.map((m) => mk(m, false)),
+      ]
+    },
+    zustaendigOptionenAusgewaehlt() {
+      return this.ausgewaehltePersonKeys
+        .map((key) => this.zustaendigOptionen.find((o) => o.key === key))
+        .filter(Boolean)
+    },
+    beschlussOptionen() {
+      const erlaubt = Array.isArray(this.geschaeft?.erlaubteBeschluesse) ? this.geschaeft.erlaubteBeschluesse : []
+      return erlaubt.map((b) => ({ label: b.label || b.code, value: b.code }))
+    },
+    beschlussOption() {
+      if (!this.beschlussCode) return null
+      const treffer = this.beschlussOptionen.find((o) => o.value === this.beschlussCode)
+      if (treffer) return treffer
+      const lb = this.geschaeft?.letzterBeschluss
+      return { label: lb?.titel || this.beschlussCode, value: this.beschlussCode }
+    },
+    zeitleisteAktionen() {
+      // Das aktuell aktive Votum (entscheidGueltig=true) wird im Editor
+      // angezeigt und soll nicht zusätzlich als Timeline-Eintrag
+      // erscheinen – erst nach dem Archivieren.
+      const alle = this.geschaeft?.aktionen || []
+      return alle.filter(a => !(a.aktionTyp === 'votum' && a.entscheidGueltig))
+    },
+    votumHatInhalt() {
+      const t = (this.votumHtml || '').replace(/<[^>]*>/g, '').trim()
+      return t.length > 0 || !!this.votumAktionId
     },
   },
   watch: {
@@ -201,6 +268,18 @@ export default {
       const member = this.mitglieder.find(m => this.personKey(m) === key)
       return member ? this.vollerName(member) : key
     },
+    aenderungZustaendig(options) {
+      const keys = (Array.isArray(options) ? options : [])
+        .map((o) => (o && typeof o === 'object' ? o.key : ''))
+        .filter(Boolean)
+      // Wenn unverändert: nicht speichern (verhindert Loop nach ladeDetail).
+      const gleich = keys.length === this.ausgewaehltePersonKeys.length
+        && keys.every((k, i) => k === this.ausgewaehltePersonKeys[i])
+      if (gleich) return
+      this.ausgewaehltePersonKeys = keys
+      this.synchronisiereHauptPersonKey()
+      this.speichereZustaendigkeiten()
+    },
     async ladeDetail() {
       this.laden = true
       try {
@@ -212,6 +291,14 @@ export default {
         const haupt = zustaendigkeiten.find(z => z.istHaupt)
         this.hauptPersonKey = haupt?.personKey || ''
         this.synchronisiereHauptPersonKey()
+        const lb = data.letzterBeschluss || null
+        this.beschlussCode = lb?.aktionCode || ''
+        this.beschlussText = lb?.text || ''
+        const av = data.aktuellesVotum || null
+        this.votumHtml = av?.text || ''
+        this.votumAktionId = av?.id || null
+        this.votumDirty = false
+        this.$nextTick(() => this.syncVotumEditor())
       } catch (e) {
         this.geschaeft = null
         console.error(e)
@@ -272,6 +359,29 @@ export default {
         console.error(e)
       }
     },
+    async aenderungBeschluss(option) {
+      const code = option?.value || ''
+      try {
+        if (code) {
+          await axios.post(generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}/beschluesse`), {
+            code,
+            text: this.beschlussText,
+          })
+          this.meldung = 'Beschluss gespeichert'
+        } else {
+          await axios.delete(generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}/beschluesse`))
+          this.beschlussText = ''
+          this.meldung = 'Beschluss zurückgenommen'
+        }
+        this.fehler = false
+        await this.ladeDetail()
+        this.$emit('gespeichert')
+      } catch (e) {
+        this.meldung = 'Fehler beim Speichern des Beschlusses'
+        this.fehler = true
+        console.error(e)
+      }
+    },
     async beschlussSpeichern() {
       if (!this.beschlussCode) return
       try {
@@ -279,8 +389,6 @@ export default {
           code: this.beschlussCode,
           text: this.beschlussText,
         })
-        this.beschlussCode = ''
-        this.beschlussText = ''
         this.meldung = 'Beschluss gespeichert'
         this.fehler = false
         await this.ladeDetail()
@@ -292,18 +400,77 @@ export default {
       }
     },
     async votumSpeichern() {
-      if (!this.votumText.trim()) return
+      // Legacy: nicht mehr genutzt (Autosave). Wird beibehalten, falls etwas
+      // ausserhalb dieser Komponente noch darauf verweisen sollte.
+      await this.votumSofortSpeichern()
+    },
+    syncVotumEditor() {
+      const el = this.$refs.votumEditor
+      if (!el) return
+      // Nur überschreiben, wenn sich der externe Stand vom Editor unterscheidet
+      // – sonst springt die Cursor-Position beim Tippen.
+      if (el.innerHTML !== (this.votumHtml || '')) {
+        el.innerHTML = this.votumHtml || ''
+      }
+    },
+    votumFormat(befehl) {
+      const el = this.$refs.votumEditor
+      if (!el) return
+      el.focus()
+      document.execCommand(befehl, false)
+      this.votumGeaendert()
+    },
+    votumGeaendert() {
+      const el = this.$refs.votumEditor
+      if (!el) return
+      this.votumHtml = el.innerHTML
+      this.votumDirty = true
+      this.votumStatus = ''
+      if (this.votumSpeicherTimer) clearTimeout(this.votumSpeicherTimer)
+      this.votumSpeicherTimer = setTimeout(() => this.votumSpeichernJetzt(), 800)
+    },
+    async votumSofortSpeichern() {
+      if (!this.votumDirty) return
+      if (this.votumSpeicherTimer) {
+        clearTimeout(this.votumSpeicherTimer)
+        this.votumSpeicherTimer = null
+      }
+      await this.votumSpeichernJetzt()
+    },
+    async votumSpeichernJetzt() {
+      this.votumSpeicherTimer = null
+      if (!this.votumDirty) return
+      this.votumDirty = false
       try {
-        await axios.post(generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}/voten`), {
-          text: this.votumText,
+        const { data } = await axios.put(generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}/votum`), {
+          text: this.votumHtml,
         })
-        this.votumText = ''
-        this.meldung = 'Votum gespeichert'
+        this.votumAktionId = data?.id || this.votumAktionId
+        this.votumStatus = 'Gespeichert'
+        this.fehler = false
+        this.$emit('gespeichert')
+      } catch (e) {
+        this.votumStatus = 'Fehler beim Speichern'
+        this.meldung = 'Fehler beim Speichern des Votums'
+        this.fehler = true
+        this.votumDirty = true
+        console.error(e)
+      }
+    },
+    async votumArchivieren() {
+      await this.votumSofortSpeichern()
+      try {
+        await axios.post(generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}/votum/archivieren`))
+        this.votumHtml = ''
+        this.votumAktionId = null
+        this.votumDirty = false
+        this.votumStatus = 'Votum archiviert'
+        this.meldung = 'Votum archiviert'
         this.fehler = false
         await this.ladeDetail()
         this.$emit('gespeichert')
       } catch (e) {
-        this.meldung = 'Fehler beim Speichern des Votums'
+        this.meldung = 'Fehler beim Archivieren des Votums'
         this.fehler = true
         console.error(e)
       }

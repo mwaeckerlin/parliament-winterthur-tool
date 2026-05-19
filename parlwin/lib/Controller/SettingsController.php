@@ -129,6 +129,7 @@ class SettingsController extends Controller
         foreach ($zuSpeichern as $schluessel => $wert) {
             $this->config->setAppValue(Application::APP_ID, $schluessel, (string) $wert);
         }
+
         $this->realtimePublisher->publish('settings.updated');
         return $this->get();
     }
@@ -300,8 +301,8 @@ class SettingsController extends Controller
                     'User "%s" konnte nicht angelegt werden%s.',
                     $vorschlag,
                     $this->letzterCreateUserFehler !== ''
-                        ? ': ' . $this->letzterCreateUserFehler
-                        : ''
+                    ? ': ' . $this->letzterCreateUserFehler
+                    : ''
                 );
                 continue;
             }
@@ -1070,13 +1071,32 @@ class SettingsController extends Controller
 
         $wert = function_exists('mb_strtolower') ? mb_strtolower($wert, 'UTF-8') : strtolower($wert);
         $umlautMap = [
-            'ä' => 'ae', 'ö' => 'oe', 'ü' => 'ue', 'ß' => 'ss',
-            'à' => 'a', 'á' => 'a', 'â' => 'a', 'ã' => 'a', 'å' => 'a',
-            'è' => 'e', 'é' => 'e', 'ê' => 'e', 'ë' => 'e',
-            'ì' => 'i', 'í' => 'i', 'î' => 'i', 'ï' => 'i',
-            'ò' => 'o', 'ó' => 'o', 'ô' => 'o', 'õ' => 'o',
-            'ù' => 'u', 'ú' => 'u', 'û' => 'u',
-            'ñ' => 'n', 'ç' => 'c',
+            'ä' => 'ae',
+            'ö' => 'oe',
+            'ü' => 'ue',
+            'ß' => 'ss',
+            'à' => 'a',
+            'á' => 'a',
+            'â' => 'a',
+            'ã' => 'a',
+            'å' => 'a',
+            'è' => 'e',
+            'é' => 'e',
+            'ê' => 'e',
+            'ë' => 'e',
+            'ì' => 'i',
+            'í' => 'i',
+            'î' => 'i',
+            'ï' => 'i',
+            'ò' => 'o',
+            'ó' => 'o',
+            'ô' => 'o',
+            'õ' => 'o',
+            'ù' => 'u',
+            'ú' => 'u',
+            'û' => 'u',
+            'ñ' => 'n',
+            'ç' => 'c',
         ];
         $wert = strtr($wert, $umlautMap);
         $wert = (string) preg_replace('/\s+/u', '-', $wert);

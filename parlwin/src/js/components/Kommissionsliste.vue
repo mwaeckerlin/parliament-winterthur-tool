@@ -90,11 +90,7 @@
     <Teleport to="body">
       <div v-if="ausgewaehlteGeschaeftId" class="pw-modal-overlay" @click.self="schliesseDetail">
         <div class="pw-modal">
-          <div class="pw-modal-kopf">
-            <div>
-              <p class="pw-modal-kicker">Geschäft bearbeiten</p>
-              <h3>{{ ausgewaehltesGeschaeft?.titel || 'Geschäft' }}</h3>
-            </div>
+          <div class="pw-modal-kopf pw-modal-kopf-leer">
             <button type="button" class="button pw-btn-schliessen" aria-label="Dialog schliessen" @click="schliesseDetail">✕</button>
           </div>
           <GeschaeftDetail

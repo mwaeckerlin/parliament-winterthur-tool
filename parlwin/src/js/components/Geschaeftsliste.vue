@@ -5,10 +5,10 @@
   <Teleport v-if="filterReady" to="#pw-filter-slot">
     <div class="pw-filter-body">
       <NcSelect v-model="entscheidungsbedarfOption" :options="entscheidungsbedarfOptions" :clearable="false" input-label="Entscheidungsbedarf" />
-      <NcSelect :model-value="filterStatus" :options="alleStatus" multiple :close-on-select="false" :selectable="opt => !filterStatus.includes(opt)" input-label="Status" placeholder="Alle" @update:model-value="filterStatus = $event || []" />
-      <NcSelect :model-value="filterTyp" :options="alleTypen" multiple :close-on-select="false" :selectable="opt => !filterTyp.includes(opt)" input-label="Typ" placeholder="Alle" @update:model-value="filterTyp = $event || []" />
-      <NcSelect :model-value="filterZustaendige" :options="zustaendigeLabels" multiple :close-on-select="false" :selectable="opt => !filterZustaendige.includes(opt)" input-label="Zuständigkeit" placeholder="Alle" @update:model-value="filterZustaendige = $event || []" />
-      <NcSelect :model-value="filterBeschlussOptions" :options="beschlussOptionsList" multiple :close-on-select="false" :selectable="opt => !filterBeschluss.includes(opt.value)" input-label="Beschluss" placeholder="Alle" @update:model-value="filterBeschluss = ($event || []).map(o => o.value)" />
+      <PwMultiSelect :model-value="filterStatus" :options="alleStatus" input-label="Status" placeholder="Alle" @update:model-value="filterStatus = $event || []" />
+      <PwMultiSelect :model-value="filterTyp" :options="alleTypen" input-label="Typ" placeholder="Alle" @update:model-value="filterTyp = $event || []" />
+      <PwMultiSelect :model-value="filterZustaendige" :options="zustaendigeLabels" input-label="Zuständigkeit" placeholder="Alle" @update:model-value="filterZustaendige = $event || []" />
+      <PwMultiSelect :model-value="filterBeschlussOptions" :options="beschlussOptionsList" input-label="Beschluss" placeholder="Alle" @update:model-value="filterBeschluss = ($event || []).map(o => o.value)" />
       <NcCheckboxRadioSwitch v-model="zeigeErledigte" type="switch">
         Erledigte anzeigen
       </NcCheckboxRadioSwitch>
@@ -25,16 +25,16 @@
 
       <template v-else>
         <div class="pw-table-wrap pw-table-desktop">
-          <table class="pw-tabelle" lang="de">
+          <table class="pw-tabelle pw-tabelle-geschaefte" :class="{ 'pw-tabelle-mit-status': statusSpalteAnzeigen }" lang="de">
         <thead>
           <tr>
             <th @click="sortiereNach('nummer')" class="pw-sortierbar pw-col-nr">Nr.</th>
             <th @click="sortiereNach('titel')" class="pw-sortierbar pw-col-titel">Titel</th>
-            <th @click="sortiereNach('typ')" class="pw-sortierbar">Typ</th>
-            <th v-if="statusSpalteAnzeigen" @click="sortiereNach('status')" class="pw-sortierbar">Status</th>
-            <th @click="sortiereNach('datum')" class="pw-sortierbar">Datum</th>
-            <th>Zuständig</th>
-            <th>Beschluss</th>
+            <th @click="sortiereNach('typ')" class="pw-sortierbar pw-col-typ">Typ</th>
+            <th v-if="statusSpalteAnzeigen" @click="sortiereNach('status')" class="pw-sortierbar pw-col-status">Status</th>
+            <th @click="sortiereNach('datum')" class="pw-sortierbar pw-col-datum">Datum</th>
+            <th class="pw-col-zustaendig">Zuständig</th>
+            <th class="pw-col-beschluss">Beschluss</th>
           </tr>
         </thead>
           <tbody>
@@ -54,30 +54,28 @@
                 <a v-if="g.url" :href="g.url" target="_blank" @click.stop class="pw-inline-link" title="Extern öffnen">↗</a>
                 {{ g.titel }}
               </td>
-              <td data-label="Typ">{{ g.typ }}</td>
-              <td v-if="statusSpalteAnzeigen" data-label="Status">
+              <td data-label="Typ" class="pw-col-typ">{{ g.typ }}</td>
+              <td v-if="statusSpalteAnzeigen" data-label="Status" class="pw-col-status">
                 <span :class="['pw-status-' + statusKlasse(g.status), 'pw-status-text']" :title="g.status">{{ g.status }}</span>
               </td>
-              <td data-label="Datum">{{ formatieredatum(g.datum) }}</td>
-              <td data-label="Zuständig" class="pw-col-inline-edit" @click.stop>
-                <NcSelect
+              <td data-label="Datum" class="pw-col-datum">{{ formatieredatum(g.datum) }}</td>
+              <td data-label="Zuständig" class="pw-col-inline-edit pw-col-zustaendig" @click.stop>
+                <PwMultiSelect
                   class="pw-inline-select"
                   :model-value="zustaendigOptionenFuer(g)"
                   :options="zustaendigeOptionenFuerSelect"
-                  multiple
-                  :close-on-select="false"
                   :clearable="true"
                   placeholder="—"
                   label="label"
                   @update:model-value="aenderungZustaendig(g, $event || [])"
                 />
               </td>
-              <td data-label="Beschluss" class="pw-col-inline-edit" @click.stop>
+              <td data-label="Beschluss" class="pw-col-inline-edit pw-col-beschluss" @click.stop>
                 <NcSelect
                   class="pw-inline-select"
                   :model-value="beschlussOptionFuer(g)"
                   :options="beschlussOptionenFuer(g)"
-                  :clearable="false"
+                  :clearable="true"
                   placeholder="—"
                   label="label"
                   @update:model-value="aenderungBeschluss(g, $event)"
@@ -137,11 +135,7 @@
     <Teleport to="body">
       <div v-if="ausgewaehlteGeschaeftId" class="pw-modal-overlay" @click.self="schliesseDetail">
         <div class="pw-modal">
-          <div class="pw-modal-kopf">
-            <div>
-              <p class="pw-modal-kicker">Geschäft bearbeiten</p>
-              <h3>{{ ausgewaehltesGeschaeft?.titel || 'Geschäft' }}</h3>
-            </div>
+          <div class="pw-modal-kopf pw-modal-kopf-leer">
             <button type="button" class="button pw-btn-schliessen" aria-label="Dialog schliessen" @click="schliesseDetail">✕</button>
           </div>
           <GeschaeftDetail
@@ -161,6 +155,7 @@ import { subscribeRealtime } from '../realtime'
 import GeschaeftDetail from './GeschaeftDetail.vue'
 import NcTextField from '@nextcloud/vue/components/NcTextField'
 import NcSelect from '@nextcloud/vue/components/NcSelect'
+import PwMultiSelect from './PwMultiSelect.vue'
 import NcCheckboxRadioSwitch from '@nextcloud/vue/components/NcCheckboxRadioSwitch'
 import NcButton from '@nextcloud/vue/components/NcButton'
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
@@ -168,7 +163,7 @@ import NcEmptyContent from '@nextcloud/vue/components/NcEmptyContent'
 
 export default {
   name: 'Geschaeftsliste',
-  components: { GeschaeftDetail, NcTextField, NcSelect, NcCheckboxRadioSwitch, NcButton, NcLoadingIcon, NcEmptyContent },
+  components: { GeschaeftDetail, NcTextField, NcSelect, PwMultiSelect, NcCheckboxRadioSwitch, NcButton, NcLoadingIcon, NcEmptyContent },
   props: {
     mitglieder: { type: Array, default: () => [] },
   },
@@ -216,13 +211,25 @@ export default {
     },
     alleBeschluesse() {
       const seen = new Map()
+      let hatOhneBeschluss = false
       this.geschaefte.forEach(g => {
         const b = g.letzterBeschluss
-        if (b?.aktionCode && !seen.has(b.aktionCode)) {
-          seen.set(b.aktionCode, { code: b.aktionCode, label: b.titel || b.aktionCode })
+        const code = b?.aktionCode || ''
+        if (!code) {
+          hatOhneBeschluss = true
+          return
+        }
+        if (!seen.has(code)) {
+          seen.set(code, { code, label: b.titel || code })
         }
       })
-      return [...seen.values()].sort((a, b) => a.label.localeCompare(b.label))
+      const liste = [...seen.values()].sort((a, b) => a.label.localeCompare(b.label))
+      if (hatOhneBeschluss) {
+        // Spezialeintrag für Geschäfte ohne erfassten Beschluss: matcht den
+        // Leerstring-Vergleich in `gefilterteGeschaefte`.
+        liste.unshift({ code: '', label: '—' })
+      }
+      return liste
     },
     zustaendigeOptionen() {
       const map = new Map()
@@ -397,12 +404,12 @@ export default {
     },
     async aenderungBeschluss(geschaeft, option) {
       const code = option?.value || ''
-      if (!code) return
       try {
-        await axios.post(generateUrl(`/apps/parlwin/geschaefte/${geschaeft.id}/beschluesse`), {
-          code,
-          text: '',
-        })
+        if (code) {
+          await axios.post(generateUrl(`/apps/parlwin/geschaefte/${geschaeft.id}/beschluesse`), { code, text: '' })
+        } else {
+          await axios.delete(generateUrl(`/apps/parlwin/geschaefte/${geschaeft.id}/beschluesse`))
+        }
         await this.ladeGeschaefte()
         this.$emit('aktualisiert')
       } catch (fehler) {
@@ -485,7 +492,6 @@ export default {
     },
     async nachSpeichern() {
       await this.ladeGeschaefte()
-      this.schliesseDetail()
       this.$emit('aktualisiert')
     },
     formatieredatum(datum) {

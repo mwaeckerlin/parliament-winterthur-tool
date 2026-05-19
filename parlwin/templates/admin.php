@@ -1199,7 +1199,7 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
                         })
                         .catch(() => {
                             const msg = (err && err.message) ? err.message : t('parlwin', 'Verbindungsfehler');
-                            syncStatus.textContent = t('parlwin', 'Fehler: {msg}', { msg });
+                   syncStatus.textContent = t('parlwin', 'Fehler: {msg}', { msg });
                             syncDetails.textContent = '';
                             btnSync.disabled = false;
                             btnSyncCancel.disabled = true;

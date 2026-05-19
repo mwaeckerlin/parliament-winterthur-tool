@@ -16,7 +16,8 @@ use OCP\IUser;
 use OCP\IUserManager;
 use OCP\Util;
 
-class AdminSettings implements ISettings {
+class AdminSettings implements ISettings
+{
     public function __construct(
         private readonly IConfig $config,
         private readonly IL10N $l,
@@ -27,7 +28,8 @@ class AdminSettings implements ISettings {
     ) {
     }
 
-    public function getForm(): TemplateResponse {
+    public function getForm(): TemplateResponse
+    {
         Util::addStyle(Application::APP_ID, 'parlwin-style');
 
         $fraktion = $this->config->getAppValue(Application::APP_ID, 'fraktion', '');
@@ -58,15 +60,18 @@ class AdminSettings implements ISettings {
         return $response;
     }
 
-    public function getSection(): string {
+    public function getSection(): string
+    {
         return 'parlwin';
     }
 
-    public function getPriority(): int {
+    public function getPriority(): int
+    {
         return 50;
     }
 
-    private function realtimeWsUrl(): string {
+    private function realtimeWsUrl(): string
+    {
         $env = trim((string) getenv('PARLWIN_REALTIME_WS_URL'));
         if ($env !== '') {
             return $env;
@@ -89,7 +94,8 @@ class AdminSettings implements ISettings {
         return sprintf('%s://%s%s/ws/%s/', $scheme, $host, $webroot, Application::APP_ID);
     }
 
-    private function isHttpsRequest(): bool {
+    private function isHttpsRequest(): bool
+    {
         $forwardedProto = strtolower(trim((string) $this->request->getHeader('x-forwarded-proto')));
         if (str_contains($forwardedProto, 'https')) {
             return true;
@@ -107,7 +113,8 @@ class AdminSettings implements ISettings {
     /**
      * @return string[]
      */
-    private function fraktionsOptionen(): array {
+    private function fraktionsOptionen(): array
+    {
         $namen = [];
         foreach ($this->fraktionMapper->findAll() as $fraktion) {
             if ($fraktion->getAktiv() !== true) {
@@ -128,7 +135,8 @@ class AdminSettings implements ISettings {
     /**
      * @return string[]
      */
-    private function gruppenOptionen(): array {
+    private function gruppenOptionen(): array
+    {
         $gruppen = [];
         foreach ($this->groupManager->search('', 500, 0) as $gruppe) {
             $gid = trim((string) $gruppe->getGID());
@@ -146,7 +154,8 @@ class AdminSettings implements ISettings {
     /**
      * @return array{aktiv: array<int, array{uid: string, label: string}>, inaktiv: array<int, array{uid: string, label: string}>}
      */
-    private function kalenderNutzerOptionen(): array {
+    private function kalenderNutzerOptionen(): array
+    {
         $aktiv = [];
         $inaktiv = [];
         foreach ($this->userManager->search('', 500, 0) as $user) {
@@ -178,7 +187,8 @@ class AdminSettings implements ISettings {
     /**
      * @return array{aktiv: bool, daten: array{uid: string, label: string}}|null
      */
-    private function kalenderNutzerEintrag(IUser $user): ?array {
+    private function kalenderNutzerEintrag(IUser $user): ?array
+    {
         $uid = trim($user->getUID());
         if ($uid === '') {
             return null;
