@@ -100,7 +100,7 @@ class RealtimePublisherServiceTest extends TestCase {
         $client->expects($this->once())
             ->method('post')
             ->with(
-                'http://parlwin-ws:3001/publish',
+                'http://parlwin-realtime:3001/publish',
                 $this->callback(fn(array $options): bool => !isset($options['headers']['X-PWT-Secret']))
             );
 

@@ -5,7 +5,7 @@ services:
   # same networks, same traefik front. Differences:
   #   * nextcloud-php-fpm uses mwaeckerlin/parliament-winterthur-tool:php-fpm
   #     (seeds the app)
-  #   * an extra service mwaeckerlin/parliament-winterthur-tool:ws provides the
+  #   * an extra service mwaeckerlin/parliament-winterthur-tool:realtime provides the
   #     realtime backend
   #     reachable through the generic /ws/<appid>/ proxy of nextcloud-nginx
   #
@@ -90,8 +90,8 @@ services:
   # Realtime broadcaster for parlwin. Reached by browsers through the
   # generic /ws/<appid>/ reverse-proxy in mwaeckerlin/nextcloud:nginx
   # (same-origin, no CSP / certificate work needed).
-  parlwin-ws:
-    image: mwaeckerlin/parliament-winterthur-tool:ws
+  parlwin-realtime:
+    image: mwaeckerlin/parliament-winterthur-tool:realtime
     networks:
       - realtime-network
 
