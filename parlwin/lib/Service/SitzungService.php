@@ -16,7 +16,8 @@ use Psr\Log\LoggerInterface;
  * Sitzungs-Service: Synchronisation und Verwaltung von Parlamentssitzungen
  * und deren Traktanden.
  */
-class SitzungService {
+class SitzungService
+{
     public function __construct(
         private readonly SitzungMapper $sitzungMapper,
         private readonly TraktandumMapper $traktandumMapper,
@@ -32,7 +33,8 @@ class SitzungService {
      * @param array<string, mixed> $optionen
      * @return array{neu: int, aktualisiert: int, geloescht: int}
      */
-    public function synchronisieren(?callable $fortschritt = null, array $optionen = []): array {
+    public function synchronisieren(?callable $fortschritt = null, array $optionen = []): array
+    {
         $rohdaten = $this->scraper->ladeSitzungen();
         $statistik = ['neu' => 0, 'aktualisiert' => 0, 'geloescht' => 0];
         $bekannteExternIds = [];
@@ -65,9 +67,23 @@ class SitzungService {
                 $detailUrls[] = $url;
             }
         }
-        $traktandenCache = $detailUrls !== []
-            ? $this->scraper->ladeTraktandenJeUrlParallel($detailUrls)
-            : [];
+        $traktandenCache = [];
+        if ($detailUrls !== []) {
+            $prefetchGesamt = count(array_unique($detailUrls));
+            $progressCallback = null;
+            if ($fortschritt !== null) {
+                $progressCallback = function (string $url, bool $erfolg, int $erledigt, int $total) use ($fortschritt, $gesamt): void {
+                    $fortschritt([
+                        'scope' => 'sitzungen',
+                        'processed' => 0,
+                        'total' => $gesamt,
+                        'cursor' => 'Detailseiten laden: ' . $erledigt . '/' . $total,
+                        'final' => false,
+                    ]);
+                };
+            }
+            $traktandenCache = $this->scraper->ladeTraktandenJeUrlParallel($detailUrls, $progressCallback);
+        }
 
         foreach ($rohdaten as $daten) {
             $verarbeitet++;
@@ -157,7 +173,8 @@ class SitzungService {
     /**
      * @param array<int, array<string, mixed>> $rohdaten
      */
-    private function istResumeCursorVorhanden(array $rohdaten, string $resumeCursor): bool {
+    private function istResumeCursorVorhanden(array $rohdaten, string $resumeCursor): bool
+    {
         if ($resumeCursor === '') {
             return false;
         }
@@ -177,7 +194,8 @@ class SitzungService {
      *
      * @param array<string, array> $traktandenCache Map: absolute URL → vorab geladene Traktanden
      */
-    private function synchronisiereTraktanden(Sitzung $sitzung, string $url, array $sitzungsDaten, array $traktandenCache = []): void {
+    private function synchronisiereTraktanden(Sitzung $sitzung, string $url, array $sitzungsDaten, array $traktandenCache = []): void
+    {
         // Traktanden können direkt in den Sitzungsdaten enthalten sein
         $traktandenDaten = ScraperService::wert($sitzungsDaten, ['agenda', 'Agenda', 'traktanden', 'items'], []);
 
@@ -257,7 +275,8 @@ class SitzungService {
      *
      * @return Sitzung[]
      */
-    public function alle(int $limit = 100, int $offset = 0): array {
+    public function alle(int $limit = 100, int $offset = 0): array
+    {
         return $this->sitzungMapper->findAll($limit, $offset);
     }
 
@@ -266,7 +285,8 @@ class SitzungService {
      *
      * @return Sitzung[]
      */
-    public function alleAktiven(): array {
+    public function alleAktiven(): array
+    {
         return $this->sitzungMapper->findAll(1000, 0);
     }
 
@@ -275,7 +295,8 @@ class SitzungService {
      *
      * @return Sitzung[]
      */
-    public function kuenftige(): array {
+    public function kuenftige(): array
+    {
         return $this->sitzungMapper->findKuenftige();
     }
 
@@ -284,7 +305,8 @@ class SitzungService {
      *
      * @throws DoesNotExistException
      */
-    public function eins(int $id): Sitzung {
+    public function eins(int $id): Sitzung
+    {
         return $this->sitzungMapper->find($id);
     }
 
@@ -293,14 +315,16 @@ class SitzungService {
      *
      * @return Traktandum[]
      */
-    public function traktanden(int $sitzungId): array {
+    public function traktanden(int $sitzungId): array
+    {
         return $this->traktandumMapper->findBySitzung($sitzungId);
     }
 
     /**
      * Aktualisiert die fraktionsinternen Felder einer Sitzung.
      */
-    public function aktualisiereInterneSitzung(int $id, array $felder): Sitzung {
+    public function aktualisiereInterneSitzung(int $id, array $felder): Sitzung
+    {
         $sitzung = $this->sitzungMapper->find($id);
         if (array_key_exists('bemerkungen', $felder)) {
             $sitzung->setBemerkungen($felder['bemerkungen']);
@@ -312,7 +336,8 @@ class SitzungService {
     /**
      * Aktualisiert die fraktionsinternen Felder eines Traktandums.
      */
-    public function aktualisiereInternesTraktandum(int $id, array $felder): Traktandum {
+    public function aktualisiereInternesTraktandum(int $id, array $felder): Traktandum
+    {
         $traktandum = $this->traktandumMapper->find($id);
         if (array_key_exists('bemerkungen', $felder)) {
             $traktandum->setBemerkungen($felder['bemerkungen']);
@@ -324,7 +349,8 @@ class SitzungService {
         return $this->traktandumMapper->update($traktandum);
     }
 
-    private function erstelleAusRohdaten(string $externId, array $daten): Sitzung {
+    private function erstelleAusRohdaten(string $externId, array $daten): Sitzung
+    {
         $jetzt = (new \DateTime())->format('Y-m-d H:i:s');
         $sitzung = new Sitzung();
         $sitzung->setExternId($externId);
@@ -334,7 +360,8 @@ class SitzungService {
         return $sitzung;
     }
 
-    private function aktualisiereOeffentlicheFelder(Sitzung $sitzung, array $daten): void {
+    private function aktualisiereOeffentlicheFelder(Sitzung $sitzung, array $daten): void
+    {
         $jetzt = (new \DateTime())->format('Y-m-d H:i:s');
         $sitzung->setTitel((string) ScraperService::wert($daten, ['title', 'Title', 'bezeichnung', 'name']));
         $sitzung->setDatum((string) ScraperService::wert($daten, ['date', 'Date', 'datum', 'Datum', 'startDate']));

@@ -1,0 +1,8 @@
+# syntax=docker/dockerfile:1.4
+#
+# parlwin nginx image: erweitert mwaeckerlin/nextcloud:nginx nur um den
+# Reverse-Proxy fuer /parlwin/ws.  Die statischen App-Assets (css/js) liegen
+# zur Laufzeit im gemeinsamen `apps`-Volume und werden ueber den bereits
+# vorhandenen `/apps/<id>/...` Block der Basis ausgeliefert.
+FROM mwaeckerlin/nextcloud:nginx
+COPY docker/nginx/parlwin.conf /etc/nginx.template/locations.d/default.conf

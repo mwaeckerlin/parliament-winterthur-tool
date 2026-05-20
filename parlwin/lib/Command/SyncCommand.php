@@ -11,6 +11,7 @@ use OCA\ParliamentWinterthur\Service\RealtimePublisherService;
 use OCA\ParliamentWinterthur\Service\ScraperService;
 use OCA\ParliamentWinterthur\Service\SitzungService;
 use OCA\ParliamentWinterthur\Service\SyncLockService;
+use OCA\ParliamentWinterthur\Service\FraktionsarbeitService;
 use OCP\IConfig;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -26,7 +27,8 @@ use Symfony\Component\Console\Output\OutputInterface;
  *   php occ parlwin:sync --nur-sitzungen
  *   php occ parlwin:sync --nur-mitglieder
  */
-class SyncCommand extends Command {
+class SyncCommand extends Command
+{
     private const APP_ID = 'parlwin';
     protected static $defaultName = 'parlwin:sync';
     private const SYNC_PROGRESS_KEY = 'sync_progress';
@@ -48,12 +50,14 @@ class SyncCommand extends Command {
         private readonly RealtimePublisherService $realtimePublisher,
         private readonly ScraperService $scraperService,
         private readonly SyncLockService $syncLockService,
+        private readonly FraktionsarbeitService $fraktionsarbeitService,
         private readonly IConfig $config,
     ) {
         parent::__construct();
     }
 
-    protected function configure(): void {
+    protected function configure(): void
+    {
         $this->setDescription('Synchronisiert Daten vom Parlament Winterthur')
             ->addOption('nur-geschaefte', null, InputOption::VALUE_NONE, 'Nur Geschäfte synchronisieren')
             ->addOption('nur-sitzungen', null, InputOption::VALUE_NONE, 'Nur Sitzungen synchronisieren')
@@ -62,7 +66,8 @@ class SyncCommand extends Command {
             ->addOption('source', null, InputOption::VALUE_REQUIRED, 'Quelle des Sync-Starts (occ/admin-ui/background-job)', 'occ');
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output): int {
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
         @ignore_user_abort(true);
         @set_time_limit(0);
 
@@ -183,10 +188,33 @@ class SyncCommand extends Command {
 
                 $jetzt = (new \DateTime())->format('Y-m-d H:i:s');
                 $this->config->setAppValue(self::APP_ID, 'letzte_synchronisation', $jetzt);
+
+                // Automatische Zuständigkeit setzen: Geschäfte ohne aktive
+                // Zuweisung, die laut Status bei einer bekannten Kommission
+                // hängig sind, bekommen die Kommissionsmitglieder der
+                // eigenen Fraktion zugewiesen.  Identisch zum Admin-UI-Pfad
+                // in SettingsController::starteSyncProzess().
+                $autoZustaendigkeit = null;
+                try {
+                    $autoZustaendigkeit = $this->fraktionsarbeitService->autoZuweisenKommissionsmitglieder();
+                    $output->writeln(sprintf(
+                        '  Auto-Zuständigkeit: %d geprüft, %d zugewiesen, %d übersprungen, %d ohne Kommission, %d ohne passendes Mitglied',
+                        $autoZustaendigkeit['gepruet'],
+                        $autoZustaendigkeit['zugewiesen'],
+                        $autoZustaendigkeit['uebersprungen'],
+                        $autoZustaendigkeit['ohne_kommission'],
+                        $autoZustaendigkeit['ohne_passendes_mitglied']
+                    ));
+                } catch (\Throwable $e) {
+                    $autoZustaendigkeit = ['fehler' => $e->getMessage()];
+                    $output->writeln('<comment>Auto-Zuständigkeit fehlgeschlagen: ' . $e->getMessage() . '</comment>');
+                }
+
                 $statistik = [
                     'mitglieder' => $mitgliederStatistik,
                     'geschaefte' => $geschaefteStatistik,
                     'sitzungen' => $sitzungenStatistik,
+                    'auto_zustaendigkeit' => $autoZustaendigkeit,
                 ];
                 $this->realtimePublisher->publish('sync.completed', [
                     'quelle' => $source,
@@ -260,7 +288,8 @@ class SyncCommand extends Command {
     /**
      * @param array<string, mixed> $status
      */
-    private function throwIfCancelRequested(array &$status, \DateTimeImmutable $startZeitpunkt, string $source, bool $updateProgress): void {
+    private function throwIfCancelRequested(array &$status, \DateTimeImmutable $startZeitpunkt, string $source, bool $updateProgress): void
+    {
         if (!$this->isCancelRequested()) {
             return;
         }
@@ -298,7 +327,8 @@ class SyncCommand extends Command {
      * @param array<int, string> $aktiveScopes
      * @return array<string, mixed>
      */
-    private function initialisiereProgressStatus(\DateTimeImmutable $startZeitpunkt, array $aktiveScopes, string $source): array {
+    private function initialisiereProgressStatus(\DateTimeImmutable $startZeitpunkt, array $aktiveScopes, string $source): array
+    {
         $sections = [];
         foreach (self::SECTION_META as $scope => $meta) {
             $sections[$scope] = [
@@ -338,7 +368,8 @@ class SyncCommand extends Command {
      * @param array<string, mixed> $status
      * @param array<string, mixed> $event
      */
-    private function aktualisiereProgressStatus(array &$status, array $event): void {
+    private function aktualisiereProgressStatus(array &$status, array $event): void
+    {
         $scope = (string) ($event['scope'] ?? '');
         if ($scope === '' || !isset(self::SECTION_META[$scope])) {
             return;
@@ -399,7 +430,8 @@ class SyncCommand extends Command {
      * @param array<string, mixed> $status
      * @return array{0: int, 1: int}
      */
-    private function berechneGlobalenFortschritt(array $status): array {
+    private function berechneGlobalenFortschritt(array $status): array
+    {
         $processed = 0;
         $total = 0;
         $sections = $status['sections'] ?? [];
@@ -431,7 +463,8 @@ class SyncCommand extends Command {
     /**
      * @param array<string, mixed> $status
      */
-    private function setProgressStatus(array $status): void {
+    private function setProgressStatus(array $status): void
+    {
         $json = json_encode($status, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         if ($json === false) {
             return;
@@ -440,15 +473,18 @@ class SyncCommand extends Command {
         $this->realtimePublisher->publish('sync.progress', $status);
     }
 
-    private function isCancelRequested(): bool {
+    private function isCancelRequested(): bool
+    {
         return trim($this->config->getAppValue(self::APP_ID, self::SYNC_CANCEL_REQUESTED_KEY, '0')) === '1';
     }
 
-    private function setCancelRequested(bool $requested): void {
+    private function setCancelRequested(bool $requested): void
+    {
         $this->config->setAppValue(self::APP_ID, self::SYNC_CANCEL_REQUESTED_KEY, $requested ? '1' : '0');
     }
 
-    private function setCurrentWorkerPid(?int $pid): void {
+    private function setCurrentWorkerPid(?int $pid): void
+    {
         $this->config->setAppValue(
             self::APP_ID,
             self::SYNC_WORKER_PID_KEY,
@@ -456,7 +492,8 @@ class SyncCommand extends Command {
         );
     }
 
-    private static function formatiereDauer(int $sekunden): string {
+    private static function formatiereDauer(int $sekunden): string
+    {
         $sekunden = max(0, $sekunden);
         $h = intdiv($sekunden, 3600);
         $m = intdiv($sekunden % 3600, 60);
@@ -465,5 +502,6 @@ class SyncCommand extends Command {
     }
 }
 
-class SyncAbortedException extends \RuntimeException {
+class SyncAbortedException extends \RuntimeException
+{
 }

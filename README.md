@@ -2,13 +2,226 @@
 
 Nextcloud-Plugin für die Fraktionsarbeit im Winterthurer Parlament.
 
+
+## Für Parlamentarier: Worum geht es hier?
+
+Stell dir Nextcloud vor wie eine eigene, **private Version von Google Drive oder
+Microsoft 365** – aber sie läuft auf einem Server, den die Fraktion selbst
+kontrolliert. Niemand sonst hat Einsicht in eure Dokumente, Kalender oder
+Chats. Du erreichst Nextcloud über deinen Webbrowser (Chrome, Firefox, Safari)
+und optional über Apps für Handy und Computer.
+
+Was sich vergleichen lässt:
+
+| Was du brauchst                | Google / Microsoft        | Nextcloud (was wir nutzen)         |
+|--------------------------------|---------------------------|------------------------------------|
+| Dateien ablegen & teilen       | Google Drive / OneDrive   | **Dateien**                        |
+| Dokumente gemeinsam schreiben  | Google Docs / Word Online | **Nextcloud Office (Collabora)**   |
+| Termine                        | Google Calendar / Outlook | **Kalender**                       |
+| Adressbuch                     | Google Contacts           | **Kontakte**                       |
+| Aufgaben / To-Dos              | Google Tasks / To Do      | **Aufgaben / Deck**                |
+| Kanban-Board (Projektplanung)  | Trello / Planner          | **Deck**                           |
+| Chat                           | Google Chat / Teams       | **Talk**                           |
+| Video-Konferenz                | Meet / Teams              | **Talk**                           |
+| Umfragen / Doodle              | Forms                     | **Forms / Polls**                  |
+
+Und zusätzlich: **dieses Plugin** – das Parlament-Winterthur-Tool. Es bringt
+alle laufenden Geschäfte, Sitzungen, Traktanden, Kommissionen und
+Fraktionsmitglieder automatisch in eure Nextcloud. Niemand muss mehr selbst
+auf der Parlamentswebseite suchen.
+
+
+## Was dieses Plugin kann
+
+Das Plugin lädt einmal täglich automatisch alle öffentlichen Daten vom
+Winterthurer Parlament herunter und zeigt sie übersichtlich an. Zusätzlich
+kann die Fraktion eigene Notizen, Zuständigkeiten und Argumente dazu erfassen
+– privat, nur innerhalb der Fraktion sichtbar.
+
+### Funktionen im Überblick
+
+- **Geschäfte-Liste** – alle politischen Geschäfte (Anträge, Motionen,
+  Interpellationen …) mit Suche, Filter und aktuellem Stand.
+- **Sitzungskalender** – kommende Parlaments- und Kommissionssitzungen samt
+  Traktandenliste; automatisch in den Nextcloud-Kalender integriert.
+- **Mitgliederverzeichnis** – alle Parlamentarier mit Partei,
+  Fraktion und Kommissionszugehörigkeit.
+- **Kommissionsübersicht** – welche Kommission behandelt welches Geschäft, wer
+  sitzt drin.
+- **Fraktionsarbeit**
+  - Geschäften können **Zuständige** aus der eigenen Fraktion zugewiesen
+    werden (Hauptzuständige + Mitarbeitende).
+  - Die Zuweisung für Kommissionsgeschäfte erfolgt **automatisch**: Wer in der
+    zuständigen Kommission sitzt, wird vorgeschlagen.
+  - Pro Geschäft können **Notizen, Argumente, Hintergrund­dokumente** abgelegt
+    werden.
+- **Live-Aktualisierung** – wenn jemand in der Fraktion etwas ändert, sehen
+  alle anderen es sofort, ohne die Seite neu zu laden.
+- **Suche & Filter** über alle Geschäfte, Sitzungen und Mitglieder.
+
+### Wie nutzt die Fraktion das im Alltag?
+
+1. **Vor der Fraktionssitzung**: Der Hauptzuständige liest seine Geschäfte und
+   schreibt eine Empfehlung in die Notiz.
+2. **In der Fraktionssitzung**: Die Empfehlungen werden direkt am Bildschirm
+   diskutiert; Beschlüsse werden im Geschäft notiert.
+3. **Vor der Parlamentssitzung**: Jeder ruft die eigenen Geschäfte auf und
+   hat sofort die Argumente zur Hand.
+4. **Nach der Sitzung**: Der neue Stand erscheint automatisch beim nächsten
+   Synchronisationslauf (oder manuell per Knopfdruck).
+
+
+## Nextcloud-Funktionen für die Fraktionsarbeit
+
+Neben unserem Plugin bringt Nextcloud viele weitere Werkzeuge mit. Die
+folgenden sind für die Fraktionsarbeit besonders nützlich. Sie alle erscheinen
+als Symbole oben in der Menüleiste, sobald sie aktiviert sind.
+
+### Empfohlene Plugins (Apps)
+
+| App                | Wofür?                                                                                              |
+|--------------------|------------------------------------------------------------------------------------------------------|
+| **Dateien**        | Zentrale Ablage. Wie ein Ordner auf dem Computer, nur online.                                       |
+| **Nextcloud Office** (Collabora) | Word-, Excel- und PowerPoint-Dokumente direkt im Browser gemeinsam bearbeiten – wie Google Docs. |
+| **Kalender**       | Persönliche und gemeinsame Termine. Sitzungen aus dem Plugin erscheinen automatisch.                |
+| **Kontakte**       | Gemeinsames Adressbuch der Fraktion.                                                                |
+| **Talk**           | Chat und Videokonferenz innerhalb der Fraktion (Ersatz für WhatsApp-Gruppe + Zoom).                 |
+| **Deck**           | Kanban-Board (To-Do-Spalten): „Zu erledigen“ – „In Arbeit“ – „Erledigt“. Ideal pro Geschäft oder Kampagne. |
+| **Aufgaben**       | Einfache To-Do-Listen, synchronisiert mit Handy.                                                    |
+| **Notizen**        | Schnelle Notizen, ähnlich wie ein Notizbuch. Markdown-fähig.                                        |
+| **Forms**          | Umfragen innerhalb der Fraktion (z. B. „Wer kommt am 15. Mai?“).                                    |
+| **Polls**          | Terminfindung (Doodle-Ersatz).                                                                      |
+| **Mail**           | E-Mail-Konto in Nextcloud einbinden (optional).                                                     |
+| **Lesezeichen**    | Gemeinsame Linksammlung (z. B. wichtige Artikel, Gesetzestexte).                                    |
+
+### Empfehlung pro Zweck
+
+- **Termine koordinieren** → Kalender + Polls
+- **Dokumente gemeinsam erarbeiten** → Dateien + Nextcloud Office
+- **Schnelle Abstimmung im Vorfeld** → Talk (Chat) oder Forms
+- **Wahlkampf / Kampagnen planen** → Deck (Kanban) + Dateien
+- **Fraktionsbeschlüsse dokumentieren** → Notizen pro Geschäft (direkt im Plugin)
+
+
+## Best Practices: So organisiert ihr die Fraktionsarbeit
+
+Damit alle die Sachen finden und niemand aus Versehen etwas Privates teilt
+oder etwas Wichtiges überschreibt, hat sich die folgende Struktur bewährt.
+
+### Grundregel: Drei Bereiche
+
+1. **Mein persönlicher Bereich** – nur ich sehe es.
+2. **Fraktions-Bereich** – alle Fraktionsmitglieder sehen es.
+3. **Öffentlicher Bereich** – ein Link kann nach aussen weitergegeben werden
+   (Medien, andere Parteien). Nur bewusst nutzen.
+
+In Nextcloud erkennt man am Symbol neben dem Datei- oder Ordnernamen, in
+welchem Bereich man sich befindet (Personen-Symbol = geteilt, Welt-Symbol =
+öffentlicher Link).
+
+### Dokumente in der Fraktion teilen
+
+**Empfohlene Ordnerstruktur** (wird einmalig vom Administrator
+angelegt und an alle Fraktionsmitglieder freigegeben):
+
+```
+Fraktion/
+├── 00_Allgemein/           ← Statuten, Geschäftsordnung, Mitgliederliste
+├── 10_Sitzungen/
+│   ├── 2026/
+│   │   ├── 2026-05-20 Fraktion/  ← Protokoll, Traktanden, Vorlagen
+│   │   └── 2026-06-17 Fraktion/
+├── 20_Geschäfte/           ← Hintergrund pro Geschäft (alternativ direkt im Plugin)
+├── 30_Kommissionen/
+│   ├── Aufsichtskommission/
+│   ├── Sachkommission Bau/
+│   └── …
+├── 40_Wahlkampf/
+├── 50_Medien/              ← Pressemitteilungen, Communiqués
+└── 90_Archiv/
+```
+
+**Wer darf was?**
+
+| Ordner                | Lesen          | Schreiben                              |
+|-----------------------|----------------|----------------------------------------|
+| `00_Allgemein/`       | Alle           | Fraktionspräsidium                     |
+| `10_Sitzungen/`       | Alle           | Alle (Protokoll: Aktuar)               |
+| `20_Geschäfte/`       | Alle           | Hauptzuständige + Co-Bearbeiter        |
+| `30_Kommissionen/X/`  | Alle           | Mitglieder der Kommission X            |
+| `40_Wahlkampf/`       | Alle           | Wahlkampfleitung                       |
+| `50_Medien/`          | Alle           | Mediensprecher                         |
+| `90_Archiv/`          | Alle (nur lesen) | Fraktionspräsidium                  |
+
+> Tipp: Dokumente **nicht per E-Mail-Anhang** verschicken, sondern in Nextcloud
+> ablegen und den Link teilen. So gibt es immer nur eine aktuelle Version.
+
+### Gemeinsamen Kalender teilen
+
+Empfohlene Kalender:
+
+- **Fraktion** (geteilt, alle dürfen Termine eintragen) – Fraktionssitzungen,
+  Parlamentssitzungen, Fraktionsausflug.
+- **Parlament Winterthur** (vom Plugin verwaltet, schreibgeschützt) –
+  Sitzungen und Traktanden aus dem Plugin. **Bitte nicht von Hand
+  bearbeiten.**
+- **Kommission X** (geteilt mit Kommissionsmitgliedern) – nur, falls die
+  Kommissionsarbeit eng koordiniert wird.
+- **Persönlich** (privat) – alles, was nur dich betrifft.
+
+So fügst du den Fraktionskalender hinzu:
+
+1. Symbol „Kalender“ oben anklicken.
+2. Links unten „+ Neuer Kalender“ oder „Kalender abonnieren“ wählen
+   (Präsidium gibt den Link weiter).
+3. Auf dem Handy: in der Nextcloud-Smartphone-App den Kalender auswählen –
+   er erscheint dann in der Standard-Kalender-App.
+
+### Was teilen wir, was bleibt persönlich?
+
+**Gemeinsam (Fraktions-Bereich):**
+
+- Protokolle aller Fraktionssitzungen
+- Fraktionsbeschlüsse, Positionen, Argumentarien
+- Vorlagen (Briefkopf, Pressemitteilung, Vorstosstexte)
+- Adressbuch mit Parlamentariern und wichtigen Kontakten
+- Terminkalender (Sitzungen, Kampagnen)
+- Hintergrundunterlagen zu Geschäften
+- Medienspiegel
+
+**Persönlich (mein Bereich):**
+
+- Eigene Recherchenotizen, Entwürfe von Reden
+- Persönliche Termine
+- Private Korrespondenz mit Wählern
+- Eigene Lesezeichen / Quellen
+
+**Faustregel:** Sobald **eine zweite Person** das Dokument irgendwann braucht
+oder sehen sollte → in den Fraktionsordner. Sobald es **nur dich** betrifft
+oder es **rohes, unfertiges Material** ist → persönlicher Bereich. Bei Zweifel:
+zuerst persönlich, später in den geteilten Ordner verschieben.
+
+### Goldene Regeln
+
+1. **Eine Datei, ein Ort.** Niemals Kopien per Mail; immer der Link aus
+   Nextcloud.
+2. **Sprechende Dateinamen** mit Datum vorne: `2026-05-20_Antrag_Velobruecke.odt`.
+3. **Nichts löschen.** Veraltetes nach `90_Archiv/` verschieben. Nextcloud
+   führt zwar eine Versionsgeschichte, aber Ordnung schadet nie.
+4. **Persönliche Daten nicht über öffentliche Links teilen.** Lieber per
+   Login-geschütztem Share.
+5. **Vor dem Schreiben kurz schauen, wer das Dokument gerade geöffnet hat.**
+   Nextcloud Office zeigt das oben rechts an (mehrere Personen können
+   gleichzeitig tippen – wie in Google Docs).
+6. **Talk statt WhatsApp** für fraktionsinterne Themen – bleibt unter euch.
+
+
 ## Beschreibung
 
 Dieses Plugin synchronisiert täglich die öffentlich zugänglichen Daten des
 [Parlaments Winterthur](https://parlament.winterthur.ch/) in eine Nextcloud-Datenbank
 und stellt diese der konfigurierten Fraktion als strukturierte Arbeitsoberfläche zur Verfügung.
 
----
 
 ## Anforderungen & Funktionen
 
@@ -270,7 +483,6 @@ Notiz-/Bemerkungsfeldern für die
 Sitzungsarbeit
 ```
 
----
 
 ## Installation
 
@@ -349,9 +561,9 @@ Wer Parlwin in einem bestehenden Nextcloud-Setup einsetzt, muss
 eigenen Compose-Datei hinzuzufügen und ans gleiche Netzwerk wie
 `nextcloud-nginx` zu hängen.
 
-Die Services `nextcloud-nginx` und `nextcloud-php-fpm` werden über das
-projektinterne `Dockerfile` gebaut (Targets `nginx`/`php-fpm`) und basieren auf:
-- `mwaeckerlin/nodejs-build` (Build-Stage für Frontend-Build in `Dockerfile` und `Dockerfile.realtime`)
+Die Services `nextcloud-nginx` und `nextcloud-php-fpm` werden aus
+`Dockerfile.nginx` bzw. `Dockerfile.php-fpm` gebaut und basieren auf:
+- `mwaeckerlin/nodejs-build` (Build-Stage für Frontend-Build in `Dockerfile.php-fpm` und `Dockerfile.realtime`)
   - Build-Artefakte werden mit dem dedizierten Build-User (`BUILD_USER`) erzeugt.
 - `mwaeckerlin/nodejs` (Runtime-Basis für `parlwin-ws`, dedizierter Runtime-User `RUN_USER`)
 - `mwaeckerlin/nextcloud:nginx`
@@ -499,7 +711,6 @@ Der Cron-Job nutzt denselben Sync-Command wie das Admin-UI (`--source=background
 Damit erscheint ein Cron-gestarteter Lauf ebenfalls im Admin-Progress (`/sync/status`)
 inkl. Quelle/Progress/ETA.
 
----
 
 ## Entwicklung
 
@@ -633,7 +844,6 @@ Weiterführende Modellierung Vorstoss-Lifecycle:
 - Im Admin-UI wird ein einfacher Global-Fortschritt (0-100%) über alle aktiven
   Sync-Bereiche angezeigt (`100% = alle Bereiche vollständig synchronisiert`).
 
----
 
 ## Erkenntnisse Zur Datenstruktur Und Zum Geschäftsablauf
 
@@ -738,7 +948,6 @@ Fazit:
 
 Technisch ist das in `lib/Service/GeschaeftWorkflow.php` zentralisiert und über `tests/Service/GeschaeftWorkflowTest.php` mit den aktuell beobachteten Kategorien abgesichert.
 
----
 
 ## Lizenz
 
