@@ -14,9 +14,10 @@ use Psr\Log\LoggerInterface;
  * Das Frontend konsumiert die Ereignisse via WebSocket und aktualisiert die
  * betroffenen Ansichten sofort.
  */
-class RealtimePublisherService {
+class RealtimePublisherService
+{
     private const APP_ID = 'parlwin';
-    private const DEFAULT_PUBLISH_URL = 'http://parlwin-ws:3001/publish';
+    private const DEFAULT_PUBLISH_URL = 'http://parlwin-realtime:3001/publish';
 
     public function __construct(
         private readonly IClientService $clientService,
@@ -28,7 +29,8 @@ class RealtimePublisherService {
     /**
      * @param array<string, mixed> $payload
      */
-    public function publish(string $type, array $payload = []): void {
+    public function publish(string $type, array $payload = []): void
+    {
         $url = $this->publishUrl();
         if ($url === '') {
             return;
@@ -67,7 +69,8 @@ class RealtimePublisherService {
         }
     }
 
-    private function publishUrl(): string {
+    private function publishUrl(): string
+    {
         $env = trim((string) getenv('PARLWIN_REALTIME_PUBLISH_URL'));
         if ($env !== '') {
             return $env;
@@ -81,7 +84,8 @@ class RealtimePublisherService {
         return self::DEFAULT_PUBLISH_URL;
     }
 
-    private function publishSecret(): string {
+    private function publishSecret(): string
+    {
         $env = trim((string) getenv('PARLWIN_REALTIME_SECRET'));
         if ($env !== '') {
             return $env;

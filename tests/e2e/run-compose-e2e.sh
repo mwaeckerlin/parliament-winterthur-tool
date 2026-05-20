@@ -11,8 +11,8 @@ export NEXTCLOUD_ADMIN_PASSWORD="${NEXTCLOUD_ADMIN_PASSWORD:-parlwin_admin_local
 export NEXTCLOUD_HTTP_PORT="${NEXTCLOUD_HTTP_PORT:-29824}"
 export HOST="${HOST:-nextcloud-nginx:8080}"
 export PROTOCOL="${PROTOCOL:-http}"
-export PARLWIN_REALTIME_WS_URL="${PARLWIN_REALTIME_WS_URL:-ws://parlwin-ws:3001/ws}"
-export PARLWIN_REALTIME_PUBLISH_URL="${PARLWIN_REALTIME_PUBLISH_URL:-http://parlwin-ws:3001/publish}"
+export PARLWIN_REALTIME_WS_URL="${PARLWIN_REALTIME_WS_URL:-ws://parlwin-realtime:3001/ws}"
+export PARLWIN_REALTIME_PUBLISH_URL="${PARLWIN_REALTIME_PUBLISH_URL:-http://parlwin-realtime:3001/publish}"
 export PARLWIN_REALTIME_SECRET="${PARLWIN_REALTIME_SECRET:-parlwin_realtime_local_ChangeMe_2026}"
 export PARLWIN_REALTIME_AUTH_REQUIRED="${PARLWIN_REALTIME_AUTH_REQUIRED:-1}"
 export PARLWIN_NEXTCLOUD_BASE_URL="${PARLWIN_NEXTCLOUD_BASE_URL:-http://nextcloud-nginx:8080}"
@@ -203,7 +203,7 @@ create_app_password() {
 }
 
 websocket_expect_denied() {
-  docker compose exec -T parlwin-ws /usr/bin/node -e '
+  docker compose exec -T parlwin-realtime /usr/bin/node -e '
     const WebSocket = require("ws");
     const ws = new WebSocket("ws://127.0.0.1:3001/ws", { handshakeTimeout: 2500 });
     let opened = false;
@@ -216,7 +216,7 @@ websocket_expect_denied() {
 
 websocket_expect_authorized() {
   local auth_b64="$1"
-  docker compose exec -T -e "WS_AUTH_B64=${auth_b64}" parlwin-ws /usr/bin/node -e '
+  docker compose exec -T -e "WS_AUTH_B64=${auth_b64}" parlwin-realtime /usr/bin/node -e '
     const WebSocket = require("ws");
     const auth = process.env.WS_AUTH_B64 || "";
     if (!auth) process.exit(2);
@@ -244,11 +244,11 @@ websocket_expect_authorized() {
 }
 
 realtime_runtime_expect_non_root_and_immutable() {
-  docker compose exec -T parlwin-ws /usr/bin/node -e '
+  docker compose exec -T parlwin-realtime /usr/bin/node -e '
     const fs = require("fs");
     const uid = typeof process.getuid === "function" ? process.getuid() : -1;
     if (uid === 0) {
-      console.error("parlwin-ws läuft als root");
+      console.error("parlwin-realtime läuft als root");
       process.exit(1);
     }
     try {
@@ -266,7 +266,7 @@ realtime_runtime_expect_non_root_and_immutable() {
 }
 
 realtime_health_ok_internal() {
-  docker compose exec -T parlwin-ws /usr/bin/node -e '
+  docker compose exec -T parlwin-realtime /usr/bin/node -e '
     const http = require("http");
     const req = http.get("http://127.0.0.1:3001/health", (res) => {
       const chunks = [];
@@ -358,7 +358,7 @@ for _ in $(seq 1 60); do
   sleep 1
 done
 [[ "$REALTIME_OK" -eq 1 ]] || fail "Realtime-Broker ist nicht erreichbar"
-realtime_runtime_expect_non_root_and_immutable || fail "parlwin-ws läuft nicht mit sicherem Runtime-User oder Build-Artefakte sind schreibbar"
+realtime_runtime_expect_non_root_and_immutable || fail "parlwin-realtime läuft nicht mit sicherem Runtime-User oder Build-Artefakte sind schreibbar"
 
 echo "[E2E] Prüfe automatische App-Aktivierung und lege Testnutzer an"
 APP_ENABLED=0
