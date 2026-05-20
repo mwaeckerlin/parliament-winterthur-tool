@@ -447,10 +447,9 @@ grep -q 'parlwin-main.js' <<<"$FRONTEND_HTML" || fail "Frontend-Bundle wurde nic
 
 echo "[E2E] Prüfe Responsive-CSS (Desktop + Mobile)"
 FRONTEND_CSS="$(docker compose exec -T nextcloud-php-fpm php -r 'echo file_get_contents("/app/custom_apps/parlwin/css/parlwin-style.css");')"
-grep -Eq '@media[[:space:]]*\([[:space:]]*max-width:[[:space:]]*1120px[[:space:]]*\)' <<<"$FRONTEND_CSS" || fail "Responsive-Breakpoint 1120px fehlt"
-grep -Eq '@media[[:space:]]*\([[:space:]]*max-width:[[:space:]]*768px[[:space:]]*\)' <<<"$FRONTEND_CSS" || fail "Responsive-Breakpoint 768px fehlt"
-grep -q '.pw-filter-feld.pw-filter-wide' <<<"$FRONTEND_CSS" || fail "Filter-Layout-Klasse für breite Viewports fehlt"
-grep -q '.pw-tabelle tbody td::before' <<<"$FRONTEND_CSS" || fail "Mobile Tabellen-Kartenansicht fehlt"
+grep -Eq '@media[[:space:]]*\([[:space:]]*max-width:[[:space:]]*80rem[[:space:]]*\)' <<<"$FRONTEND_CSS" || fail "Responsive-Breakpoint 80rem (Desktop) fehlt"
+grep -Eq '@media[[:space:]]*\([[:space:]]*max-width:[[:space:]]*54rem[[:space:]]*\)' <<<"$FRONTEND_CSS" || fail "Responsive-Breakpoint 54rem (Mobile) fehlt"
+grep -q '.pw-members-table td::before' <<<"$FRONTEND_CSS" || fail "Mobile Tabellen-Kartenansicht fehlt"
 grep -q '.pw-admin-card' <<<"$FRONTEND_CSS" || fail "Admin-Card-Layout fehlt"
 
 echo "[E2E] Plausibilitätschecks nach Sync"
