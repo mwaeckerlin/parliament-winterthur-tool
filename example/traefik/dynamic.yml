@@ -1,0 +1,49 @@
+http:
+  routers:
+    collabora:
+      entryPoints:
+        - websecure
+      rule: "PathPrefix(`/browser`) || PathPrefix(`/cool`) ||
+        Path(`/hosting/discovery`) || Path(`/hosting/capabilities`)"
+      priority: 300
+      service: collabora
+      tls:
+        certResolver: letsencrypt
+
+    nextcloud-www:
+      entryPoints:
+        - websecure
+      rule: "HostRegexp(`^www\\..+$`)"
+      priority: 200
+      middlewares:
+        - redirect-www-to-apex
+      service: nextcloud
+      tls:
+        certResolver: letsencrypt
+
+    nextcloud:
+      entryPoints:
+        - websecure
+      rule: "PathPrefix(`/`)"
+      priority: 100
+      service: nextcloud
+      tls:
+        certResolver: letsencrypt
+
+  middlewares:
+    redirect-www-to-apex:
+      redirectRegex:
+        regex: "^https://www\\.(.+)"
+        replacement: "https://${1}"
+        permanent: true
+
+  services:
+    collabora:
+      loadBalancer:
+        servers:
+          - url: "http://collabora:9980"
+
+    nextcloud:
+      loadBalancer:
+        servers:
+          - url: "http://nextcloud-nginx:8080"

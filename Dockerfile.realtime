@@ -1,0 +1,16 @@
+FROM mwaeckerlin/nodejs-build AS build
+WORKDIR /app
+
+COPY --chown=${BUILD_USER} realtime-server/package*.json ./
+RUN npm install --omit=dev --no-audit --no-fund
+
+COPY --chown=${BUILD_USER} realtime-server/server.js ./server.js
+
+FROM mwaeckerlin/nodejs
+WORKDIR /app
+COPY --from=build /app/server.js /app/server.js
+COPY --from=build /app/node_modules /app/node_modules
+ENV PORT=3001
+EXPOSE 3001
+
+CMD ["server.js"]
