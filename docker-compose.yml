@@ -4,7 +4,7 @@ services:
   # Die drei parlwin-Images sind als Tags eines einzigen Docker-Hub-Repos
   # gedacht (mwaeckerlin/parliament-winterthur-tool:php-fpm,
   # mwaeckerlin/parliament-winterthur-tool:nginx,
-  # mwaeckerlin/parliament-winterthur-tool:ws).  Jedes hat genau ein Dockerfile
+  # mwaeckerlin/parliament-winterthur-tool:realtime).  Jedes hat genau ein Dockerfile
   # und keine `target:`-Aufteilung, damit die Auto-Builds funktionieren.
   # Lokal wird hier zusaetzlich `build:` angegeben, damit
   # `docker compose up --build` aus dem Source-Tree baut.
@@ -43,7 +43,7 @@ services:
       MYSQL_USER: nextcloud
       MYSQL_DATABASE: nextcloud
       PARLWIN_REALTIME_WS_URL: ${PARLWIN_REALTIME_WS_URL:-}
-      PARLWIN_REALTIME_PUBLISH_URL: ${PARLWIN_REALTIME_PUBLISH_URL:-http://parlwin-ws:3001/publish}
+      PARLWIN_REALTIME_PUBLISH_URL: ${PARLWIN_REALTIME_PUBLISH_URL:-http://parlwin-realtime:3001/publish}
       PARLWIN_REALTIME_SECRET: ${PARLWIN_REALTIME_SECRET:-}
       PARLWIN_SYNC_LIMIT_ALL: ${PARLWIN_SYNC_LIMIT_ALL:-}
       PARLWIN_SYNC_LIMIT_GESCHAEFTE: ${PARLWIN_SYNC_LIMIT_GESCHAEFTE:-}
@@ -70,11 +70,11 @@ services:
       - php-collabora
       - php-realtime
 
-  parlwin-ws:
+  parlwin-realtime:
     build:
       context: .
       dockerfile: Dockerfile.realtime
-    image: mwaeckerlin/parliament-winterthur-tool:ws
+    image: mwaeckerlin/parliament-winterthur-tool:realtime
     environment:
       PORT: 3001
       PARLWIN_REALTIME_AUTH_REQUIRED: ${PARLWIN_REALTIME_AUTH_REQUIRED:-1}

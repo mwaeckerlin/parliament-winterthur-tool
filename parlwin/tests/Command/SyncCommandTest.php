@@ -11,6 +11,7 @@ use OCA\ParliamentWinterthur\Service\MitgliedService;
 use OCA\ParliamentWinterthur\Service\RealtimePublisherService;
 use OCA\ParliamentWinterthur\Service\ScraperService;
 use OCA\ParliamentWinterthur\Service\SitzungService;
+use OCA\ParliamentWinterthur\Service\FraktionsarbeitService;
 use OCA\ParliamentWinterthur\Service\SyncLockService;
 use OCP\IConfig;
 use PHPUnit\Framework\TestCase;
@@ -56,6 +57,15 @@ class SyncCommandTest extends TestCase {
         $config = $this->createMock(IConfig::class);
         $config->expects(self::never())->method('setAppValue');
 
+        $fraktionsarbeitService = $this->createMock(FraktionsarbeitService::class);
+        $fraktionsarbeitService->method('autoZuweisenKommissionsmitglieder')->willReturn([
+            'gepruet' => 0,
+            'zugewiesen' => 0,
+            'uebersprungen' => 0,
+            'ohne_kommission' => 0,
+            'ohne_passendes_mitglied' => 0,
+        ]);
+
         $command = new SyncCommand(
             $geschaeftService,
             $sitzungService,
@@ -64,6 +74,7 @@ class SyncCommandTest extends TestCase {
             $realtimePublisher,
             $scraperService,
             new SyncLockService($this->lockFile),
+            $fraktionsarbeitService,
             $config,
         );
 
@@ -153,6 +164,15 @@ class SyncCommandTest extends TestCase {
                 self::isType('array')
             );
 
+        $fraktionsarbeitService = $this->createMock(FraktionsarbeitService::class);
+        $fraktionsarbeitService->method('autoZuweisenKommissionsmitglieder')->willReturn([
+            'gepruet' => 0,
+            'zugewiesen' => 0,
+            'uebersprungen' => 0,
+            'ohne_kommission' => 0,
+            'ohne_passendes_mitglied' => 0,
+        ]);
+
         $command = new SyncCommand(
             $geschaeftService,
             $sitzungService,
@@ -161,6 +181,7 @@ class SyncCommandTest extends TestCase {
             $realtimePublisher,
             $scraperService,
             new SyncLockService($this->lockFile),
+            $fraktionsarbeitService,
             $config,
         );
 
@@ -254,6 +275,15 @@ class SyncCommandTest extends TestCase {
                 $realtimeEvents[] = $event;
             });
 
+        $fraktionsarbeitService = $this->createMock(FraktionsarbeitService::class);
+        $fraktionsarbeitService->method('autoZuweisenKommissionsmitglieder')->willReturn([
+            'gepruet' => 0,
+            'zugewiesen' => 0,
+            'uebersprungen' => 0,
+            'ohne_kommission' => 0,
+            'ohne_passendes_mitglied' => 0,
+        ]);
+
         $command = new SyncCommand(
             $geschaeftService,
             $sitzungService,
@@ -262,6 +292,7 @@ class SyncCommandTest extends TestCase {
             $realtimePublisher,
             $scraperService,
             new SyncLockService($this->lockFile),
+            $fraktionsarbeitService,
             $config,
         );
 
@@ -366,6 +397,15 @@ class SyncCommandTest extends TestCase {
             ->method('publish')
             ->with(self::equalTo('sync.completed'), self::isType('array'));
 
+        $fraktionsarbeitService = $this->createMock(FraktionsarbeitService::class);
+        $fraktionsarbeitService->method('autoZuweisenKommissionsmitglieder')->willReturn([
+            'gepruet' => 0,
+            'zugewiesen' => 0,
+            'uebersprungen' => 0,
+            'ohne_kommission' => 0,
+            'ohne_passendes_mitglied' => 0,
+        ]);
+
         $command = new SyncCommand(
             $geschaeftService,
             $sitzungService,
@@ -374,6 +414,7 @@ class SyncCommandTest extends TestCase {
             $realtimePublisher,
             $scraperService,
             new SyncLockService($this->lockFile),
+            $fraktionsarbeitService,
             $config,
         );
 
