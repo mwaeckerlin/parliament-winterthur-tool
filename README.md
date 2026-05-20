@@ -2,6 +2,12 @@
 
 Nextcloud-Plugin für die Fraktionsarbeit im Winterthurer Parlament.
 
+## Zu Erledigen:
+
+  1. Für alle Parlaments-Sitzungen 
+  2. Unter Sitzungen ein Popup-Knopf «+ Neu» mit folgenden Optionen:
+      - Neue Fraktionssitzung
+
 
 ## Für Parlamentarier: Worum geht es hier?
 
@@ -160,11 +166,13 @@ Fraktion/
 
 Empfohlene Kalender:
 
-- **Fraktion** (geteilt, alle dürfen Termine eintragen) – Fraktionssitzungen,
-  Parlamentssitzungen, Fraktionsausflug.
-- **Parlament Winterthur** (vom Plugin verwaltet, schreibgeschützt) –
-  Sitzungen und Traktanden aus dem Plugin. **Bitte nicht von Hand
-  bearbeiten.**
+- **Fraktion `<Name>`** (vom Plugin verwaltet, mit der Fraktion geteilt) –
+  zentraler Fraktions-Kalender. Enthält automatisch alle vom Plugin
+  synchronisierten Sitzungen (Parlament, Kommissionen, künftige weitere
+  Sitzungstypen). **Plugin-generierte Einträge bitte nicht von Hand
+  bearbeiten** – sie werden beim nächsten Sync überschrieben. Eigene
+  Fraktionstermine (Fraktionssitzung, Fraktionsausflug, …) dürfen ergänzt
+  werden.
 - **Kommission X** (geteilt mit Kommissionsmitgliedern) – nur, falls die
   Kommissionsarbeit eng koordiniert wird.
 - **Persönlich** (privat) – alles, was nur dich betrifft.
@@ -354,7 +362,9 @@ Zusätzliche Rollenverwaltung:
 Felder aus der Parlamentswebseite:
 - `extern_id`, `titel`, `datum`, `zeit_von`, `zeit_bis`, `ort`, `url`
 
-Für jede Sitzung werden automatisch **Kalendereinträge** in Nextcloud Calendar erstellt.
+Für jede Sitzung werden automatisch **Kalendereinträge** im Fraktions-Kalender
+(`Fraktion <Name>`) in Nextcloud Calendar erstellt. Dieser Kalender ist als allgemeiner Fraktions-Container angelegt und wird künftig auch weitere
+Sitzungstypen aufnehmen.
 
 #### Traktanden
 
@@ -413,8 +423,10 @@ Aktuell umgesetzt:
    inaktive getrennt darunter.
 4. **Fraktionsentscheide**: Pro Geschäft können strukturierte Beschlüsse als
    Timeline-Aktionen erfasst werden.
-5. **Kalenderintegration**: Alle Sitzungen werden als Nextcloud-Kalendereinträge
-   gespeichert.
+5. **Kalenderintegration**: Alle Sitzungen werden im gemeinsamen Fraktions-Kalender
+   (`Fraktion <Name>`) als Nextcloud-Kalendereinträge gespeichert. Dieser Kalender
+   ist bewusst als allgemeiner Fraktions-Container ausgelegt und nimmt künftig auch
+   weitere Sitzungstypen auf.
 6. **Mitgliederverwaltung**: Automatische Synchronisation der Fraktionsmitglieder
    als Nextcloud-Gruppe mit E-Mail-Einladung.
 7. **Fraktionssitzungsmodus**: Beschlüsse sind im Sitzungsmodus auf

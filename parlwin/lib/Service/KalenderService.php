@@ -4,19 +4,31 @@ declare(strict_types=1);
 
 namespace OCA\ParliamentWinterthur\Service;
 
+use OCA\ParliamentWinterthur\AppInfo\Application;
 use OCA\ParliamentWinterthur\Db\Sitzung;
 use OCP\IConfig;
 use Psr\Log\LoggerInterface;
+use Sabre\DAV\PropPatch;
 
 /**
  * Kalender-Service: Erstellt und aktualisiert Nextcloud-Kalendereinträge
- * für Parlamentssitzungen.
+ * für die in den App-Einstellungen aktive Fraktion.
+ *
+ * Der Kalender ist bewusst nicht auf einen einzelnen Sitzungstyp beschränkt –
+ * es werden später weitere Typen (z. B. Fraktionssitzungen, Kommissionssitzungen)
+ * im gleichen Kalender geführt.
  *
  * Verwendet Nextclouds CalDAV-Backend über die OCA\DAV-App.
  */
-class KalenderService {
-    /** Name des Kalenders, in dem die Sitzungen gespeichert werden */
-    private const KALENDER_NAME = 'Parlament Winterthur';
+class KalenderService
+{
+    /**
+     * Stabile URI des Fraktionskalenders im Principal des konfigurierten Nutzers.
+     * Wird nicht aus der Fraktion abgeleitet, damit ein Wechsel der aktiven
+     * Fraktion vorhandene Einträge nicht verwaist und der Kalender nur umbenannt
+     * werden muss.
+     */
+    private const KALENDER_URI = 'parlwin-fraktion-kalender';
     private const KALENDER_COLOR = '#1e6c9b';
 
     public function __construct(
@@ -29,12 +41,13 @@ class KalenderService {
      * Aktualisiert alle Kalendereinträge für die gegebenen Sitzungen.
      *
      * Für jede Sitzung wird ein iCalendar-VEVENT erstellt oder aktualisiert.
-     * Der Kalender wird pro konfigurierter Fraktion geführt.
+     * Der Kalender ist der gemeinsame Fraktionskalender (siehe Klassendoc).
      *
      * @param Sitzung[] $sitzungen
      */
-    public function sitzungenAktualisieren(array $sitzungen): void {
-        $kalenderNutzer = $this->config->getAppValue('parlwin', 'kalender_nutzer', '');
+    public function sitzungenAktualisieren(array $sitzungen): void
+    {
+        $kalenderNutzer = $this->config->getAppValue(Application::APP_ID, 'kalender_nutzer', '');
         if (empty($kalenderNutzer)) {
             $this->logger->info('Parlament Winterthur: Kein Kalendernutzer konfiguriert, überspringe Kalenderaktualisierung');
             return;
@@ -58,24 +71,71 @@ class KalenderService {
     }
 
     /**
-     * Erstellt den Parlamentskalender wenn nötig und gibt seine URI zurück.
+     * Erstellt den Fraktionskalender wenn nötig und gibt seine Metadaten zurück.
+     * Aktualisiert zusätzlich Anzeigename/Beschreibung, falls die aktive
+     * Fraktion seit dem letzten Lauf gewechselt hat.
      */
-    private function sicherstelleKalender(\OCA\DAV\CalDAV\CalDavBackend $dav, string $nutzer): array {
-        $kalender = $dav->getCalendarByUri('principals/users/' . $nutzer, 'parliament-winterthur');
+    private function sicherstelleKalender(\OCA\DAV\CalDAV\CalDavBackend $dav, string $nutzer): array
+    {
+        $principal = 'principals/users/' . $nutzer;
+        $displayname = $this->kalenderAnzeigename();
+        $beschreibung = $this->kalenderBeschreibung();
+
+        $kalender = $dav->getCalendarByUri($principal, self::KALENDER_URI);
         if ($kalender === null) {
             $dav->createCalendar(
-                'principals/users/' . $nutzer,
-                'parliament-winterthur',
+                $principal,
+                self::KALENDER_URI,
                 [
-                    '{DAV:}displayname' => self::KALENDER_NAME,
+                    '{DAV:}displayname' => $displayname,
                     '{http://apple.com/ns/ical/}calendar-color' => self::KALENDER_COLOR,
-                    '{urn:ietf:params:xml:ns:caldav}calendar-description' => 'Sitzungen des Stadtparlaments Winterthur',
+                    '{urn:ietf:params:xml:ns:caldav}calendar-description' => $beschreibung,
                 ]
             );
-            $kalender = $dav->getCalendarByUri('principals/users/' . $nutzer, 'parliament-winterthur');
-            $this->logger->info("Parlament Winterthur: Kalender '{" . self::KALENDER_NAME . "}' für Nutzer '{$nutzer}' erstellt");
+            $kalender = $dav->getCalendarByUri($principal, self::KALENDER_URI);
+            $this->logger->info(
+                sprintf('Parlament Winterthur: Fraktionskalender "%s" für Nutzer "%s" erstellt', $displayname, $nutzer)
+            );
+            return $kalender;
         }
+
+        // Falls sich die aktive Fraktion geändert hat, Metadaten nachziehen.
+        $aktuellerName = (string) ($kalender['{DAV:}displayname'] ?? '');
+        $aktuelleBeschreibung = (string) ($kalender['{urn:ietf:params:xml:ns:caldav}calendar-description'] ?? '');
+        if ($aktuellerName !== $displayname || $aktuelleBeschreibung !== $beschreibung) {
+            $propPatch = new PropPatch([
+                '{DAV:}displayname' => $displayname,
+                '{urn:ietf:params:xml:ns:caldav}calendar-description' => $beschreibung,
+            ]);
+            $dav->updateCalendar((int) $kalender['id'], $propPatch);
+            $propPatch->commit();
+            $kalender = $dav->getCalendarByUri($principal, self::KALENDER_URI);
+            $this->logger->info(
+                sprintf('Parlament Winterthur: Fraktionskalender umbenannt zu "%s" für Nutzer "%s"', $displayname, $nutzer)
+            );
+        }
+
         return $kalender;
+    }
+
+    /**
+     * Anzeigename des Kalenders, abgeleitet aus der aktiv konfigurierten Fraktion.
+     */
+    private function kalenderAnzeigename(): string
+    {
+        $fraktion = trim((string) $this->config->getAppValue(Application::APP_ID, 'fraktion', ''));
+        return $fraktion !== '' ? 'Fraktion ' . $fraktion : 'Fraktion';
+    }
+
+    /**
+     * Beschreibung des Kalenders, abgeleitet aus der aktiv konfigurierten Fraktion.
+     */
+    private function kalenderBeschreibung(): string
+    {
+        $fraktion = trim((string) $this->config->getAppValue(Application::APP_ID, 'fraktion', ''));
+        return $fraktion !== ''
+            ? sprintf('Termine und Sitzungen der Fraktion %s – synchronisiert vom Stadtparlament Winterthur Tool', $fraktion)
+            : 'Termine und Sitzungen der Fraktion – synchronisiert vom Stadtparlament Winterthur Tool';
     }
 
     /**
@@ -103,7 +163,8 @@ class KalenderService {
     /**
      * Erstellt einen iCalendar-String für eine Parlamentssitzung.
      */
-    private function erstelleIcal(Sitzung $sitzung, string $uid): string {
+    private function erstelleIcal(Sitzung $sitzung, string $uid): string
+    {
         $datum = $sitzung->getDatum();
         $zeitVon = $sitzung->getZeitVon() ?: '09:00';
         $zeitBis = $sitzung->getZeitBis() ?: '12:00';
@@ -122,26 +183,27 @@ class KalenderService {
         }
 
         return "BEGIN:VCALENDAR\r\n" .
-               "VERSION:2.0\r\n" .
-               "PRODID:-//Parlament Winterthur Tool//Nextcloud//DE\r\n" .
-               "CALSCALE:GREGORIAN\r\n" .
-               "BEGIN:VEVENT\r\n" .
-               "UID:{$uid}\r\n" .
-               "DTSTAMP:{$jetzt}\r\n" .
-               "DTSTART:{$startDt}\r\n" .
-               "DTEND:{$endDt}\r\n" .
-               "SUMMARY:{$titel}\r\n" .
-               ($ort ? "LOCATION:{$ort}\r\n" : '') .
-               ($beschreibung ? "DESCRIPTION:{$beschreibung}\r\n" : '') .
-               ($url ? "URL:{$url}\r\n" : '') .
-               "END:VEVENT\r\n" .
-               "END:VCALENDAR\r\n";
+            "VERSION:2.0\r\n" .
+            "PRODID:-//Parlament Winterthur Tool//Nextcloud//DE\r\n" .
+            "CALSCALE:GREGORIAN\r\n" .
+            "BEGIN:VEVENT\r\n" .
+            "UID:{$uid}\r\n" .
+            "DTSTAMP:{$jetzt}\r\n" .
+            "DTSTART:{$startDt}\r\n" .
+            "DTEND:{$endDt}\r\n" .
+            "SUMMARY:{$titel}\r\n" .
+            ($ort ? "LOCATION:{$ort}\r\n" : '') .
+            ($beschreibung ? "DESCRIPTION:{$beschreibung}\r\n" : '') .
+            ($url ? "URL:{$url}\r\n" : '') .
+            "END:VEVENT\r\n" .
+            "END:VCALENDAR\r\n";
     }
 
     /**
      * Formatiert Datum und Zeit für iCalendar (YYYYMMDDTHHMMSS).
      */
-    private function formatiereDatumZeit(string $datum, string $zeit): string {
+    private function formatiereDatumZeit(string $datum, string $zeit): string
+    {
         $datumObj = \DateTime::createFromFormat('Y-m-d', $datum)
             ?: \DateTime::createFromFormat('d.m.Y', $datum)
             ?: new \DateTime($datum);
