@@ -85,20 +85,20 @@ als Symbole oben in der Menüleiste, sobald sie aktiviert sind.
 
 ### Empfohlene Plugins (Apps)
 
-| App                | Wofür?                                                                                              |
-|--------------------|------------------------------------------------------------------------------------------------------|
-| **Dateien**        | Zentrale Ablage. Wie ein Ordner auf dem Computer, nur online.                                       |
-| **Nextcloud Office** (Collabora) | Word-, Excel- und PowerPoint-Dokumente direkt im Browser gemeinsam bearbeiten – wie Google Docs. |
-| **Kalender**       | Persönliche und gemeinsame Termine. Sitzungen aus dem Plugin erscheinen automatisch.                |
-| **Kontakte**       | Gemeinsames Adressbuch der Fraktion.                                                                |
-| **Talk**           | Chat und Videokonferenz innerhalb der Fraktion (Ersatz für WhatsApp-Gruppe + Zoom).                 |
-| **Deck**           | Kanban-Board (To-Do-Spalten): „Zu erledigen“ – „In Arbeit“ – „Erledigt“. Ideal pro Geschäft oder Kampagne. |
-| **Aufgaben**       | Einfache To-Do-Listen, synchronisiert mit Handy.                                                    |
-| **Notizen**        | Schnelle Notizen, ähnlich wie ein Notizbuch. Markdown-fähig.                                        |
-| **Forms**          | Umfragen innerhalb der Fraktion (z. B. „Wer kommt am 15. Mai?“).                                    |
-| **Polls**          | Terminfindung (Doodle-Ersatz).                                                                      |
-| **Mail**           | E-Mail-Konto in Nextcloud einbinden (optional).                                                     |
-| **Lesezeichen**    | Gemeinsame Linksammlung (z. B. wichtige Artikel, Gesetzestexte).                                    |
+| App                              | Original (englisch)         | Wofür?                                                                                              |
+|----------------------------------|-----------------------------|------------------------------------------------------------------------------------------------------|
+| **Dateien**                      | Files                       | Zentrale Ablage. Wie ein Ordner auf dem Computer, nur online.                                       |
+| **Nextcloud Office** (Collabora) | Nextcloud Office (Collabora Online) | Word-, Excel- und PowerPoint-Dokumente direkt im Browser gemeinsam bearbeiten – wie Google Docs. |
+| **Kalender**                     | Calendar                    | Persönliche und gemeinsame Termine. Sitzungen aus dem Plugin erscheinen automatisch.                |
+| **Kontakte**                     | Contacts                    | Gemeinsames Adressbuch der Fraktion.                                                                |
+| **Talk**                         | Talk                        | Chat und Videokonferenz innerhalb der Fraktion (Ersatz für WhatsApp-Gruppe + Zoom).                 |
+| **Deck**                         | Deck                        | Kanban-Board (To-Do-Spalten): „Zu erledigen“ – „In Arbeit“ – „Erledigt“. Ideal pro Geschäft oder Kampagne. |
+| **Aufgaben**                     | Tasks                       | Einfache To-Do-Listen, synchronisiert mit Handy.                                                    |
+| **Notizen**                      | Notes                       | Schnelle Notizen, ähnlich wie ein Notizbuch. Markdown-fähig.                                        |
+| **Forms**                        | Forms                       | Umfragen innerhalb der Fraktion (z. B. „Wer kommt am 15. Mai?“).                                    |
+| **Polls**                        | Polls                       | Terminfindung (Doodle-Ersatz).                                                                      |
+| **Mail**                         | Mail                        | E-Mail-Konto in Nextcloud einbinden (optional).                                                     |
+| **Lesezeichen**                  | Bookmarks                   | Gemeinsame Linksammlung (z. B. wichtige Artikel, Gesetzestexte).                                    |
 
 ### Empfehlung pro Zweck
 
