@@ -1,0 +1,29 @@
+# syntax=docker/dockerfile:1.4
+#
+# parlwin PHP-FPM image: erweitert mwaeckerlin/nextcloud:php-fpm und legt
+# die kompilierte App ins Seed-Verzeichnis.  Die Basis-Bootstrap kopiert das
+# Seed beim ersten Start ins `apps`-Volume (`seedCustomAppsIfEmpty()`), der
+# eigene Bootstrap-Wrapper aktiviert die App danach via `occ app:enable`.
+#
+# Es gibt absichtlich keine `target:`-Splits mehr — Docker Hub Auto-Builds
+# bauen immer die finale Stage, also genau dieses Image.
+
+FROM mwaeckerlin/nodejs-build AS app-build
+WORKDIR /build
+COPY --chown=${BUILD_USER} package*.json ./
+RUN npm install --no-audit --no-fund
+
+COPY --chown=${BUILD_USER} parlwin/ ./parlwin/
+RUN npm run build:app \
+    && rm -rf node_modules \
+    parlwin/src \
+    parlwin/tests \
+    parlwin/phpunit.xml \
+    parlwin/.phpunit.result.cache
+
+FROM mwaeckerlin/nextcloud:php-fpm
+COPY --from=app-build /build/parlwin /usr/local/share/nextcloud/seed/custom_apps/parlwin
+# Bootstrap-Wrapper in PHP, weil die Basis keine Shell hat.
+COPY --chmod=644 docker/parlwin-bootstrap.php /usr/local/bin/parlwin-bootstrap.php
+COPY --chmod=644 docker/parlwin-watcher.php   /usr/local/bin/parlwin-watcher.php
+ENTRYPOINT ["/usr/bin/php", "/usr/local/bin/parlwin-bootstrap.php"]

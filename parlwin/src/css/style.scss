@@ -1,0 +1,1864 @@
+:root {
+  /* ----------------------------------------------------------------------
+     Design-Tokens: Konsistente Skala fuer Abstaende, Schriftgroessen,
+     Linien, Klickflaechen. KEINE magischen Zahlen im Style – immer
+     diese Variablen verwenden.
+     ---------------------------------------------------------------------- */
+
+  /* Abstand-Skala (Padding / Margin / Gap) – 4px-Grid */
+  --pw-space-2xs: 0.125rem;
+  /* 2px  – Hairline-Abstand */
+  --pw-space-xs: 0.25rem;
+  /* 4px  – Mikro-Gap */
+  --pw-space-sm: 0.5rem;
+  /* 8px  – Eng */
+  --pw-space-md: 0.75rem;
+  /* 12px – Standard */
+  --pw-space-xs-plus: 0.375rem;
+  /* 6px  – halber Schritt */
+  --pw-space-sm-plus: 0.625rem;
+  /* 10px – Input-Padding */
+  --pw-space-md-plus: 0.875rem;
+  /* 14px – Card-Innen */
+  --pw-space-lg: 1rem;
+  /* 16px – Gross */
+  --pw-space-xl: 1.5rem;
+  /* 24px */
+  --pw-space-2xl: 2rem;
+  /* 32px */
+
+  /* Aliase auf die alte gap-API (Rueckwaerts-Kompat.) */
+  --pw-gap-1: var(--pw-space-sm);
+  --pw-gap-2: var(--pw-space-lg);
+  --pw-gap-3: var(--pw-space-xl);
+  --pw-gap-4: var(--pw-space-2xl);
+
+  /* Schriftgroessen */
+  --pw-font-xs: 0.75rem;
+  /* 12px */
+  --pw-font-sm: 0.8125rem;
+  /* 13px */
+  --pw-font-md: 0.875rem;
+  /* 14px – Default */
+  --pw-font-base: 0.9375rem;
+  /* 15px – Inputs */
+  --pw-font-lg: 1.125rem;
+  --pw-font-xl: 1.25rem;
+  --pw-font-2xl: 1.75rem;
+  /* Heading-Minimum (clamp) */
+
+  /* Relative Schriftgroessen (em – fuer geschachtelten Kontext) */
+  --pw-font-rel-xs: 0.75em;
+  --pw-font-rel-sm: 0.8em;
+  --pw-font-rel-md: 0.85em;
+  --pw-font-rel-lg: 0.9em;
+
+  /* Zeilenhoehen */
+  --pw-lh-tight: 1.2;
+  --pw-lh-snug: 1.25;
+  --pw-lh-heading: 1.15;
+  --pw-lh-normal: 1.45;
+
+  /* Linien / Borders */
+  --pw-border-thin: 0.0625rem;
+  /* 1px – Standard-Linie */
+  --pw-border-accent: 0.25rem;
+  /* 4px – linker Akzent-Strich */
+
+  /* Interaktive Klickflaechen */
+  --pw-click-sm: 2.25rem;
+  --pw-click-lg: 2.75rem;
+
+  /* Letter-Spacing */
+  --pw-track-wide: 0.04em;
+  --pw-track-tight: -0.02em;
+
+  /* Chip-spezifische em-Werte */
+  --pw-chip-pad-start: 0.4em;
+  --pw-chip-pad-end: 0.2em;
+  --pw-chip-font: 0.75em;
+
+  /* Pill-Radius */
+  --pw-radius-pill: 999rem;
+
+  /* Tabellen-Spalten – Mindestbreiten in em (skalieren mit Schrift) */
+  --pw-col-nr: 4em;
+  --pw-col-typ: 10em;
+  --pw-col-status: 6em;
+  --pw-col-datum: 5em;
+  --pw-col-zustaendig: 4em;
+  --pw-col-beschluss: 4em;
+  --pw-col-titel: 15em;
+
+  /* Sidebar-Breite (NcAppNavigation) – bewusst schmaler als der
+     Nextcloud-Default von 300px, damit Filter-Selects schmal bleiben. */
+  --pw-sidebar-width: 300px;
+  /* 224px */
+  /* Nextcloud-Server-Variable ueberschreiben (nur fuer parlwin geladen). */
+  --app-navigation-width: var(--pw-sidebar-width);
+
+  /* Breakpoints fuer Container-/Media-Queries (em / rem) */
+  --pw-bp-card-em: 60em;
+  --pw-bp-card-rem: 60rem;
+  --pw-bp-shell-rem: 54rem;
+  --pw-bp-wide-rem: 80rem;
+
+  /* ----------------------------------------------------------------------
+     Farben / Oberflaechen (unveraendert)
+     ---------------------------------------------------------------------- */
+  --pw-radius: var(--border-radius-large, 0.875rem);
+  --pw-radius-small: var(--border-radius-small, 0.625rem);
+  --pw-surface: var(--color-main-background);
+  --pw-surface-strong: color-mix(in srgb, var(--color-main-background) 92%, var(--color-background-hover));
+  --pw-surface-soft: color-mix(in srgb, var(--color-main-background) 82%, var(--color-background-hover));
+  --pw-border: color-mix(in srgb, var(--color-border) 88%, var(--color-main-text) 12%);
+  --pw-muted: var(--color-text-maxcontrast);
+  --pw-shadow: 0 var(--pw-space-md-plus) 2.25rem color-mix(in srgb, var(--color-box-shadow, #000) 10%, transparent);
+  --pw-focus-ring: 0 0 0 var(--pw-space-2xs) color-mix(in srgb, var(--color-primary-element) 24%, transparent);
+}
+
+/* NcAppNavigation-List als Flex, damit margin-top:auto im letzten Item greift */
+.app-navigation__list,
+.app-navigation-list,
+ul.app-navigation__list {
+  display: flex !important;
+  flex-direction: column;
+  min-block-size: 0;
+}
+
+/* ---- App-Shell wie Files/Photos/Activity (via @nextcloud/vue) ---- */
+
+#parlwin-root {
+  display: flex;
+  flex: 1 1 auto;
+  inline-size: 100%;
+  block-size: 100%;
+  min-inline-size: 0;
+  min-block-size: 0;
+}
+
+#parlwin-admin-settings {
+  inline-size: 100%;
+  min-inline-size: 0;
+}
+
+.section#parlwin-admin-settings {
+  max-inline-size: none;
+}
+
+.pw-nav-emoji {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--pw-font-xl);
+  block-size: var(--pw-font-xl);
+  font-size: var(--pw-space-lg);
+  line-height: 1;
+}
+
+.pw-nav-search-item {
+  list-style: none;
+  padding: var(--pw-gap-1);
+  /* keine Trennlinie – passt zu Standard-Nextcloud-Apps */
+}
+
+.pw-nav-filter-item {
+  list-style: none;
+  /* schiebt den Filter ans Ende der Navi-Liste (Flex-Parent) */
+  margin-block-start: auto;
+  inline-size: 100%;
+  min-block-size: 0;
+  display: flex;
+}
+
+.pw-nav-search :deep(.input-field),
+.pw-nav-search .input-field {
+  margin: 0;
+}
+
+.pw-nav-filter {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: var(--pw-gap-1);
+  padding: var(--pw-gap-1);
+  inline-size: 100%;
+  min-block-size: 0;
+  overflow-y: auto;
+}
+
+.pw-nav-filter .pw-filter-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pw-gap-1);
+}
+
+/* Kompakter NcSelect im Nav-Filter:
+   NcSelect bringt `.v-select.select { min-width: 260px }` mit – das
+   sprengt den schmalen Sidebar. Mit (0,3,0) > (0,2,0) ueberschreiben
+   und zusaetzlich eine kleinere effektive Maximalbreite setzen. */
+.pw-nav-filter .v-select.select,
+.pw-nav-filter .v-select.select .vs__dropdown-toggle,
+.pw-nav-filter .v-select.select .vs__selected-options,
+.pw-nav-filter .v-select.select .vs__search,
+.pw-nav-filter .v-select.select .vs__actions {
+  min-width: 0;
+  min-inline-size: 0;
+}
+
+.pw-nav-filter .v-select.select {
+  inline-size: 100%;
+  max-inline-size: 100%;
+  margin: 0;
+}
+
+.pw-nav-filter .v-select,
+.pw-nav-filter .vs__dropdown-toggle {
+  min-block-size: var(--pw-click-sm);
+}
+
+/* NcAppNavigation-Sidebar schmaeler:
+   Quelle setzt `.app-navigation[data-v-3b634fbd] { width: 300px }`
+   (Spezifitaet 0,2,0). Wir kontern mit (1,1,0) ueber `#content`. */
+#content .app-navigation {
+  inline-size: var(--pw-sidebar-width);
+  width: var(--pw-sidebar-width);
+  min-inline-size: var(--pw-sidebar-width);
+}
+
+/* Beim Schliessen verschiebt Nextcloud die Navigation per
+   `margin-inline-start: -300px` (hartkodiert in der Quelle) nach links.
+   Da unsere Sidebar nur `--pw-sidebar-width` breit ist, wuerde der
+   Differenzbetrag (300px - 14rem) den NcAppContent-Bereich nach links
+   aus dem Viewport schieben. Wir setzen den negativen Margin daher
+   exakt auf unsere Sidebar-Breite, damit der Inhalt nach dem Schliessen
+   buendig bei 0 startet und 100 % Breite einnimmt. */
+#content .app-navigation.app-navigation--closed {
+  margin-inline-start: calc(-1 * var(--pw-sidebar-width));
+}
+
+/* Falls Splitpanes-basierter Master/Detail-Pane verwendet wird, ebenfalls
+   schmaeler stellen (Quelle: [data-v-ea1e6879] ... min-width:300px). */
+#content .splitpanes.default-theme .splitpanes__pane.splitpanes__pane-list,
+#content .splitpanes .splitpanes__pane-list {
+  min-width: var(--pw-sidebar-width);
+  inline-size: var(--pw-sidebar-width);
+  max-width: var(--pw-sidebar-width);
+}
+
+.pw-filter-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pw-gap-1);
+}
+
+.pw-filter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pw-space-sm);
+}
+
+.pw-filter-header h3 {
+  margin: 0;
+  font-size: var(--pw-space-md-plus);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--pw-track-wide);
+  color: var(--pw-muted);
+}
+
+.pw-filter-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pw-gap-1);
+}
+
+.pw-filter-body .pw-filter-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pw-gap-1);
+}
+
+.pw-view-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pw-gap-2);
+  min-inline-size: 0;
+  inline-size: 100%;
+  padding: var(--pw-gap-2);
+}
+
+.settings-hint,
+.pw-toolbar-hint,
+.pw-hinweis,
+.pw-sync-status,
+.pw-card-note,
+.pw-inline-note,
+.pw-kommission-status,
+.pw-modal-kicker,
+.pw-detail-kicker,
+.pw-data-card-kicker,
+.pw-app-kicker,
+.pw-app-main-kicker {
+  color: var(--pw-muted);
+  font-size: var(--pw-font-sm);
+  line-height: 1.45;
+}
+
+.pw-app-shell,
+.pw-view-layout,
+.pw-admin-shell {
+  display: grid;
+  gap: var(--pw-gap-2);
+  min-inline-size: 0;
+}
+
+.pw-app-shell {
+  grid-template-columns: minmax(16rem, 17.5rem) minmax(0, 1fr);
+  align-items: start;
+}
+
+.pw-admin-shell {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+}
+
+.pw-admin-sidebar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  gap: var(--pw-gap-2);
+  position: static;
+  inset-block-start: auto;
+}
+
+.pw-admin-main {
+  min-inline-size: 0;
+  inline-size: 100%;
+}
+
+.pw-view-layout {
+  grid-template-columns: minmax(15rem, 18rem) minmax(0, 1fr);
+  align-items: start;
+}
+
+.pw-app-sidebar,
+.pw-view-sidebar {
+  position: sticky;
+  inset-block-start: var(--pw-space-sm);
+  display: grid;
+  gap: var(--pw-gap-2);
+}
+
+.pw-app-sidebar {
+  align-content: start;
+}
+
+.pw-app-branding,
+.pw-sidebar-block,
+.pw-admin-sidecard,
+.pw-admin-card,
+.pw-sitzung-karte,
+.pw-kommission-karte,
+.pw-mitglied-karte,
+.pw-data-card,
+.pw-oeffentlich,
+.pw-fraktion,
+.pw-timeline-eintrag,
+.pw-modal,
+.pw-traktandum-notizen,
+.pw-members-table-wrap,
+.pw-table-wrap {
+  background: var(--pw-surface);
+  border: var(--pw-border-thin) solid var(--pw-border);
+  border-radius: var(--pw-radius);
+  box-shadow: var(--pw-shadow);
+}
+
+.pw-app-branding,
+.pw-sidebar-block,
+.pw-admin-sidecard,
+.pw-admin-card,
+.pw-sitzung-details,
+.pw-kommission-details,
+.pw-geschaeft-detail,
+.pw-data-card,
+.pw-members-table-wrap,
+.pw-table-wrap {
+  padding: var(--pw-gap-2);
+}
+
+.pw-app-branding,
+.pw-sidebar-block,
+.pw-admin-sidecard {
+  box-shadow: none;
+}
+
+.pw-app-branding h1,
+.pw-app-main-header h2,
+.pw-toolbar h2,
+#parlwin-admin-settings h2,
+.pw-detail-header h3,
+.pw-data-card h3,
+.pw-modal-kopf h3 {
+  margin: 0;
+  line-height: 1.15;
+  letter-spacing: var(--pw-track-tight);
+}
+
+.pw-app-branding h1,
+#parlwin-admin-settings h2 {
+  font-size: clamp(var(--pw-font-2xl), 2vw, var(--pw-click-sm));
+}
+
+.pw-app-branding p,
+.pw-app-main-header p,
+.pw-toolbar p {
+  margin: 0;
+}
+
+.pw-sidebar-nav,
+.pw-filter-stack,
+.pw-panel-content,
+.pw-admin-form,
+.pw-toolbar,
+.pw-zustaendigkeiten-liste,
+.pw-zustaendigkeiten-gruppe,
+.pw-form-zeile,
+.pw-data-card-grid,
+.pw-mitglied-info,
+.pw-choice-list,
+.pw-chip-list {
+  display: grid;
+  gap: var(--pw-gap-1);
+}
+
+.pw-sidebar-nav-button.button {
+  min-block-size: var(--pw-click-lg);
+  inline-size: 100%;
+  justify-content: flex-start;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--pw-space-sm);
+  padding: var(--pw-space-sm-plus) var(--pw-space-md);
+  border-radius: var(--pw-radius-small);
+  border: var(--pw-border-thin) solid transparent;
+  box-shadow: none;
+  background: transparent;
+  color: var(--color-main-text);
+}
+
+.pw-sidebar-nav-button.aktiv.button {
+  border-color: color-mix(in srgb, var(--color-primary-element) 40%, var(--pw-border));
+  background: color-mix(in srgb, var(--color-primary-element) 14%, var(--pw-surface));
+}
+
+.pw-sidebar-nav-label {
+  font-weight: 700;
+}
+
+.pw-sidebar-nav-hint {
+  color: var(--pw-muted);
+  font-size: var(--pw-space-md);
+  margin-inline-start: auto;
+}
+
+.pw-app-main,
+.pw-admin-main {
+  min-inline-size: 0;
+  display: grid;
+  gap: var(--pw-gap-2);
+}
+
+.pw-app-main-header,
+.pw-toolbar-inline,
+.pw-sidebar-block-header,
+.pw-admin-statusline,
+.pw-sync-actions,
+.pw-sync-progress-row,
+.pw-mitglied-toolbar,
+.pw-detail-header,
+.pw-modal-kopf,
+.pw-traktandum-kopf,
+.pw-data-card-header,
+.pw-timeline-kopf,
+.pw-detail-aktionen,
+.pw-mitglied-kopf,
+.pw-sitzung-kopf,
+.pw-kommission-kopf,
+.pw-neue-notiz-klein,
+.pw-notiz-klein {
+  display: flex;
+  gap: var(--pw-gap-1);
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.pw-app-main-header,
+.pw-toolbar-inline,
+.pw-sidebar-block-header,
+.pw-admin-statusline {
+  padding-block-end: var(--pw-gap-1);
+  border-block-end: var(--pw-border-thin) solid var(--pw-border);
+}
+
+.pw-sync-meldung,
+.pw-meldung,
+.pw-fehler,
+.pw-inline-note,
+.pw-selection-state {
+  border-radius: var(--pw-radius-small);
+  border: var(--pw-border-thin) solid var(--pw-border);
+  padding: var(--pw-space-sm-plus) var(--pw-space-md-plus);
+}
+
+.pw-selection-state {
+  min-block-size: var(--pw-click-sm);
+  display: flex;
+  align-items: center;
+  color: var(--color-main-text);
+  background: var(--pw-surface-soft);
+}
+
+.pw-selection-state.existing {
+  border-color: color-mix(in srgb, var(--color-success, var(--color-primary-element)) 52%, var(--pw-border));
+}
+
+.pw-selection-state.new {
+  border-color: color-mix(in srgb, var(--color-warning, var(--color-primary-element)) 56%, var(--pw-border));
+  background: color-mix(in srgb, var(--color-warning, var(--color-primary-element)) 12%, var(--pw-surface));
+}
+
+.pw-selection-state.invalid {
+  border-color: color-mix(in srgb, var(--color-error) 66%, var(--pw-border));
+  background: color-mix(in srgb, var(--color-error) 10%, var(--pw-surface));
+}
+
+.pw-selection-state.inactive {
+  border-color: var(--pw-border);
+}
+
+.pw-sync-meldung.erfolg,
+.pw-meldung.erfolg {
+  border-color: color-mix(in srgb, var(--color-success, var(--color-primary-element)) 60%, var(--pw-border));
+}
+
+.pw-sync-meldung.fehler,
+.pw-meldung.fehler,
+.pw-fehler {
+  border-color: color-mix(in srgb, var(--color-error) 60%, var(--pw-border));
+}
+
+.pw-admin-grid,
+.pw-data-card-grid,
+.pw-mitglieder-grid,
+.pw-card-grid {
+  display: grid;
+  gap: var(--pw-gap-2);
+}
+
+.pw-admin-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(18rem, 100%), 1fr));
+}
+
+.pw-card-grid,
+.pw-mitglieder-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(22rem, 100%), 1fr));
+}
+
+.pw-data-card,
+.pw-kommission-karte,
+.pw-mitglied-karte {
+  align-content: start;
+  padding: var(--pw-gap-2);
+}
+
+.pw-data-card-header,
+.pw-mitglied-kopf {
+  margin-block-end: var(--pw-gap-1);
+}
+
+.pw-data-pair {
+  display: grid;
+  gap: var(--pw-space-xs);
+}
+
+.pw-data-pair span {
+  color: var(--pw-muted);
+  font-size: var(--pw-space-md);
+  text-transform: uppercase;
+  letter-spacing: var(--pw-track-wide);
+}
+
+.pw-choice-list {
+  max-block-size: 15rem;
+  overflow: auto;
+  padding: var(--pw-space-xs);
+  border: var(--pw-border-thin) solid var(--pw-border);
+  border-radius: var(--pw-radius-small);
+  background: var(--pw-surface-soft);
+}
+
+.pw-choice-item,
+.pw-filter-checkbox,
+.pw-checkbox-row,
+.pw-mitglied-select-all {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pw-space-sm-plus);
+  min-block-size: var(--pw-click-sm);
+}
+
+.pw-choice-item {
+  padding-inline: var(--pw-space-sm);
+  border-radius: var(--pw-space-sm);
+}
+
+.pw-choice-item.ist-inaktiv {
+  color: var(--pw-muted);
+}
+
+.pw-filter-label,
+.pw-admin-field>label,
+.pw-form-zeile>label,
+.pw-filter-feld>label {
+  font-weight: 700;
+  font-size: var(--pw-space-md-plus);
+}
+
+.pw-suche,
+.pw-select,
+.pw-input,
+.pw-input-klein,
+.pw-textarea,
+.pw-textarea-klein {
+  inline-size: 100%;
+  min-inline-size: 0;
+  min-block-size: var(--pw-click-lg);
+  padding: var(--pw-space-md) var(--pw-space-md-plus);
+  border: var(--pw-border-thin) solid color-mix(in srgb, var(--color-border-dark) 84%, var(--color-main-text) 16%);
+  border-radius: var(--pw-radius-small);
+  background: var(--pw-surface-soft);
+  color: var(--color-main-text);
+  font-size: var(--pw-font-base);
+}
+
+.pw-input-klein,
+.pw-textarea-klein,
+.pw-btn-mini.button {
+  min-block-size: var(--pw-click-sm);
+  font-size: var(--pw-font-sm);
+}
+
+.pw-textarea,
+.pw-textarea-klein {
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.pw-suche:focus,
+.pw-select:focus,
+.pw-input:focus,
+.pw-input-klein:focus,
+.pw-textarea:focus,
+.pw-textarea-klein:focus,
+.pw-sidebar-nav-button.button:focus-visible,
+.pw-table-row-clickable:focus-visible,
+.pw-data-card:focus-visible,
+.pw-kommission-karte:focus-visible {
+  outline: none;
+  box-shadow: var(--pw-focus-ring);
+}
+
+.pw-filter-clear.button,
+.pw-traktandum-link.button,
+.pw-btn-klein.button,
+.pw-btn-mini.button,
+.pw-btn-schliessen.button {
+  box-shadow: none;
+}
+
+.pw-btn-schliessen.button {
+  min-inline-size: var(--pw-click-lg);
+  min-block-size: var(--pw-click-lg);
+  padding: 0;
+}
+
+.pw-laden,
+.pw-leer {
+  padding: calc(var(--pw-gap-4) * 1.25);
+  text-align: center;
+  color: var(--pw-muted);
+}
+
+.pw-table-wrap,
+.pw-members-table-wrap {
+  /* Tabelle darf NIE aus dem Bild laufen */
+  overflow: hidden;
+  inline-size: 100%;
+  max-inline-size: 100%;
+  min-inline-size: 0;
+}
+
+.pw-table-desktop,
+.pw-card-mobile {
+  display: block;
+}
+
+.pw-card-mobile {
+  display: none;
+}
+
+/* Geschäfte-Ansicht ist Container für ein Inline-Size-Query: Wenn die Spalte
+   schmäler wird als Summe der Spalten-Mindestbreiten + 15em für den Titel
+   (≈ 47em), wird automatisch von Tabellen- auf Karten-Darstellung gewechselt. */
+.pw-geschaefte {
+  container-type: inline-size;
+  container-name: pw-geschaefte;
+}
+
+@container pw-geschaefte (max-width: 60em) {
+  .pw-geschaefte .pw-table-desktop {
+    display: none !important;
+  }
+
+  .pw-geschaefte .pw-card-mobile {
+    display: grid !important;
+  }
+}
+
+.pw-tabelle,
+.pw-members-table,
+.pw-info-tabelle {
+  inline-size: 100%;
+  max-inline-size: 100%;
+  border-collapse: collapse;
+  /* Spaltenbreiten passen sich dynamisch an den Inhalt an. */
+  table-layout: auto;
+}
+
+.pw-tabelle th,
+.pw-tabelle td,
+.pw-members-table th,
+.pw-members-table td {
+  overflow-wrap: anywhere;
+  word-break: normal;
+  white-space: normal;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+
+.pw-tabelle {
+  inline-size: 100%;
+}
+
+.pw-members-table {
+  inline-size: 100%;
+  /* Spaltenbreiten nach Inhalt ausrichten */
+  table-layout: auto;
+}
+
+.pw-members-table .pw-col-select {
+  inline-size: 1%;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.pw-members-table .pw-col-select input[type="checkbox"] {
+  margin: 0;
+}
+
+.pw-members-select-all-label {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+}
+
+.pw-tabelle th,
+.pw-tabelle td,
+.pw-members-table th,
+.pw-members-table td,
+.pw-info-tabelle th,
+.pw-info-tabelle td {
+  padding: var(--pw-space-md-plus);
+  text-align: left;
+  vertical-align: top;
+  border-block-end: var(--pw-border-thin) solid var(--pw-border);
+}
+
+.pw-tabelle thead th,
+.pw-members-table thead th {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 1;
+  background: color-mix(in srgb, var(--color-background-hover) 84%, var(--pw-surface));
+  color: var(--pw-muted);
+  text-transform: uppercase;
+  font-size: var(--pw-space-md);
+  letter-spacing: var(--pw-track-wide);
+}
+
+.pw-sortierbar {
+  cursor: pointer;
+  user-select: none;
+}
+
+.pw-tabelle tbody tr:nth-child(even),
+.pw-members-table tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--pw-surface) 92%, var(--color-background-hover));
+}
+
+.pw-tabelle tbody tr:hover,
+.pw-members-table tbody tr:hover {
+  background: var(--color-background-hover);
+}
+
+.pw-titel,
+.pw-notiz-klein,
+.pw-neue-notiz-klein {
+  align-items: center;
+}
+
+.pw-cell-ellipsis {
+  display: block;
+  max-inline-size: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pw-inline-link,
+.pw-extern-link,
+.pw-mitglied-email {
+  color: var(--color-primary-element);
+  text-decoration: none;
+}
+
+[class^="pw-status-"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--pw-radius-pill);
+  padding: var(--pw-space-xs-plus) var(--pw-space-md);
+  border: var(--pw-border-thin) solid var(--pw-border);
+  font-size: var(--pw-space-md);
+  line-height: 1.2;
+  white-space: nowrap;
+  color: var(--color-main-text);
+  background: color-mix(in srgb, var(--pw-surface) 88%, var(--color-background-hover));
+}
+
+.pw-status-offen {
+  border-color: color-mix(in srgb, var(--color-warning, var(--color-primary-element)) 62%, var(--pw-border));
+  background: color-mix(in srgb, var(--color-warning, var(--color-primary-element)) 14%, var(--pw-surface));
+}
+
+.pw-status-erledigt {
+  border-color: color-mix(in srgb, var(--color-success, var(--color-primary-element)) 64%, var(--pw-border));
+  background: color-mix(in srgb, var(--color-success, var(--color-primary-element)) 14%, var(--pw-surface));
+}
+
+.pw-status-abgelehnt {
+  border-color: color-mix(in srgb, var(--color-error) 66%, var(--pw-border));
+  background: color-mix(in srgb, var(--color-error) 12%, var(--pw-surface));
+}
+
+.pw-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: var(--pw-gap-2);
+  background: color-mix(in srgb, var(--pw-surface) 35%, black);
+}
+
+// vue-select dropdown wird via appendToBody an <body> geteleportiert
+// und nutzt --vs-dropdown-z-index (default 9999) — muss ueber dem Modal (10000) liegen.
+.vs__dropdown-menu,
+.vs__dropdown-menu--floating {
+  z-index: 10010 !important;
+}
+
+.pw-modal {
+  inline-size: min(72rem, 100%);
+  max-block-size: calc(100dvb - var(--pw-space-2xl));
+  overflow: auto;
+}
+
+.pw-modal-kopf {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 1;
+  padding: var(--pw-gap-2);
+  background: var(--pw-surface);
+  border-block-end: var(--pw-border-thin) solid var(--pw-border);
+}
+
+.pw-modal-kopf-leer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding-block: var(--pw-gap-1);
+  border-block-end: none;
+  background: transparent;
+}
+
+.pw-geschaeft-detail {
+  display: grid;
+  gap: var(--pw-gap-2);
+}
+
+.pw-detail-header {
+  padding-block-end: var(--pw-gap-1);
+  border-block-end: var(--pw-border-thin) solid var(--pw-border);
+}
+
+.pw-detail-header h3,
+.pw-data-card h3,
+.pw-kommission-kopf h3 {
+  font-size: var(--pw-font-xl);
+}
+
+.pw-detail-abschnitt {
+  display: grid;
+  gap: var(--pw-gap-1);
+}
+
+.pw-detail-abschnitt h4,
+.pw-traktanden h4 {
+  margin: 0;
+  font-size: var(--pw-font-base);
+}
+
+.pw-info-tabelle th {
+  inline-size: 12rem;
+  color: var(--pw-muted);
+}
+
+.pw-zustaendigkeiten-liste {
+  max-block-size: 18rem;
+  overflow: auto;
+  padding: var(--pw-space-md);
+  border: var(--pw-border-thin) solid var(--pw-border);
+  border-radius: var(--pw-radius-small);
+  background: var(--pw-surface-soft);
+}
+
+.pw-zustaendigkeiten-gruppe h5 {
+  margin: 0;
+  font-size: var(--pw-space-md);
+  text-transform: uppercase;
+  letter-spacing: var(--pw-track-wide);
+  color: var(--pw-muted);
+}
+
+.pw-zustaendigkeiten-trenner {
+  inline-size: 100%;
+  block-size: 0;
+  border: 0;
+  border-block-start: var(--pw-border-thin) solid var(--pw-border);
+}
+
+.pw-timeline-meta,
+.pw-traktandum-beschr {
+  color: var(--pw-muted);
+}
+
+.pw-timeline-autor {
+  font-weight: 600;
+  color: var(--pw-fg, inherit);
+}
+
+.pw-timeline-zeit {
+  color: var(--pw-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.pw-timeline-text {
+  white-space: pre-wrap;
+}
+
+.pw-timeline-html {
+  white-space: normal;
+
+  ul,
+  ol {
+    padding-inline-start: var(--pw-space-lg, 1.5rem);
+    margin: var(--pw-space-xs, 0.25rem) 0;
+  }
+}
+
+.pw-votum-werkzeuge {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--pw-space-xs, 0.25rem);
+  align-items: center;
+  margin-block-end: var(--pw-space-xs, 0.25rem);
+
+  .pw-votum-status {
+    margin-inline-start: auto;
+    color: var(--pw-muted);
+    font-size: var(--pw-font-sm, 0.85em);
+  }
+}
+
+/* WYSIWYG-Editor (TipTap / ProseMirror) ------------------------------- */
+.pw-wysiwyg {
+  display: block;
+  inline-size: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  border: var(--pw-border-thin) solid var(--pw-border);
+  border-radius: var(--pw-radius-small);
+  background: var(--color-main-background, #fff);
+  overflow: hidden;
+
+  &:focus-within {
+    border-color: var(--color-primary-element, currentColor);
+    box-shadow: 0 0 0 1px var(--color-primary-element, transparent);
+  }
+}
+
+.pw-wysiwyg__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+  inline-size: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.35rem 0.5rem;
+  background: var(--pw-surface-soft, var(--color-background-hover, #f5f5f5));
+  border-block-end: var(--pw-border-thin) solid var(--pw-border);
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 1;
+}
+
+.pw-wysiwyg__gruppe {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  padding: 0 0.35rem;
+  border-inline-end: var(--pw-border-thin) solid var(--pw-border);
+
+  &:last-child,
+  &.pw-wysiwyg__gruppe--rechts {
+    border-inline-end: 0;
+  }
+
+  &.pw-wysiwyg__gruppe--rechts {
+    margin-inline-start: auto;
+  }
+}
+
+.pw-wysiwyg__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 2rem;
+  min-block-size: 2rem;
+  padding: 0 0.4rem;
+  border: var(--pw-border-thin) solid transparent;
+  border-radius: var(--pw-radius-small);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: none;
+
+  &:hover:not(:disabled) {
+    background: var(--color-background-hover, rgba(0, 0, 0, 0.06));
+    border-color: var(--pw-border);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-primary-element, currentColor);
+    outline-offset: 1px;
+  }
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  &.aktiv {
+    background: var(--color-primary-element-light, rgba(0, 102, 158, 0.18));
+    border-color: var(--color-primary-element, currentColor);
+    color: var(--color-primary-element, currentColor);
+  }
+}
+
+.pw-wysiwyg-icon {
+  display: block;
+  inline-size: 20px;
+  block-size: 20px;
+  fill: currentColor;
+}
+
+.pw-wysiwyg__status {
+  margin-inline-start: auto;
+  padding-inline: 0.5rem;
+  color: var(--pw-muted);
+  font-size: var(--pw-font-sm, 0.85em);
+}
+
+.pw-wysiwyg__body {
+  display: block;
+  inline-size: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  block-size: clamp(8rem, 60vh, 60em);
+  max-block-size: 60em;
+  overflow: auto;
+  background: var(--color-main-background, #fff);
+}
+
+/* EditorContent rendert ein <div> ohne unsere Klasse zuverlässig.
+   Daher zwingen wir ALLE direkten Kinder + ProseMirror auf 100% Breite. */
+.pw-wysiwyg__body>* {
+  display: block;
+  inline-size: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  min-block-size: 100%;
+}
+
+.pw-wysiwyg__editor,
+.pw-wysiwyg__body .ProseMirror {
+  display: block;
+  inline-size: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  min-block-size: 100%;
+  padding: 0.85rem 1rem;
+  outline: none;
+  cursor: text;
+  line-height: 1.55;
+}
+
+.pw-wysiwyg__body .ProseMirror {
+  >*+* {
+    margin-block-start: 0.6em;
+  }
+
+  >*:first-child {
+    margin-block-start: 0;
+  }
+
+  p {
+    margin: 0;
+  }
+
+  h2 {
+    font-size: 1.3rem;
+    font-weight: 600;
+    margin-block: 0.6em 0.3em;
+  }
+
+  h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-block: 0.6em 0.3em;
+  }
+
+  ul,
+  ol {
+    padding-inline-start: 1.5rem;
+    margin: 0.3em 0;
+  }
+
+  li>p {
+    margin: 0;
+  }
+
+  blockquote {
+    border-inline-start: 3px solid var(--pw-border);
+    padding-inline-start: 0.75rem;
+    margin: 0.4em 0;
+    color: var(--pw-muted);
+  }
+
+  a {
+    color: var(--color-primary-element, #00679e);
+    text-decoration: underline;
+  }
+
+  p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    float: left;
+    color: var(--pw-muted);
+    pointer-events: none;
+    block-size: 0;
+  }
+}
+
+.pw-wysiwyg.pw-wysiwyg--readonly {
+  background: var(--pw-surface-soft, var(--color-main-background, #fff));
+
+  .pw-wysiwyg__body .ProseMirror {
+    cursor: default;
+  }
+}
+
+.pw-votum-aktionen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--pw-space-sm, 0.5rem);
+  align-items: center;
+  margin-block-start: var(--pw-space-xs, 0.25rem);
+}
+
+.pw-votum-hinweis {
+  font-style: italic;
+}
+
+.pw-sitzung-karte.pw-vergangen,
+.pw-mitglied-karte.inaktiv,
+.pw-kommission-karte.ist-inaktiv,
+.pw-geloescht {
+  opacity: 0.68;
+}
+
+.pw-sitzung-kopf,
+.pw-kommission-kopf {
+  cursor: pointer;
+  padding: var(--pw-gap-2);
+  background: var(--pw-surface-soft);
+  border-radius: var(--pw-radius) var(--pw-radius) 0 0;
+}
+
+.pw-sitzung-kopf {
+  display: grid;
+  grid-template-columns: minmax(10rem, 12rem) minmax(0, 1fr) minmax(8rem, auto) auto auto;
+  gap: var(--pw-gap-1) var(--pw-gap-2);
+}
+
+.pw-sitzung-datum,
+.pw-sitzung-ort,
+.pw-toggle {
+  color: var(--pw-muted);
+}
+
+.pw-sitzung-datum {
+  display: grid;
+  gap: var(--pw-space-xs);
+}
+
+.pw-traktandum {
+  display: grid;
+  gap: var(--pw-gap-1);
+  padding: var(--pw-space-lg);
+  border-inline-start: var(--pw-space-xs) solid var(--color-primary-element);
+  border-radius: 0 var(--pw-radius-small) var(--pw-radius-small) 0;
+  background: color-mix(in srgb, var(--pw-surface) 94%, var(--color-background-hover));
+}
+
+.pw-traktandum-link.button {
+  padding: 0;
+  min-block-size: auto;
+  border: 0;
+  background: transparent;
+  color: var(--color-primary-element);
+  font-weight: 700;
+}
+
+.pw-traktandum-aktion {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.pw-notiz-datum {
+  color: var(--pw-muted);
+  min-inline-size: 8rem;
+}
+
+.pw-mitglied-kopf {
+  justify-content: flex-start;
+}
+
+.pw-mitglied-partei {
+  color: var(--pw-muted);
+  font-size: var(--pw-font-rel-lg);
+}
+
+.pw-mitglied-fraktionsrolle {
+  display: inline-block;
+  font-size: var(--pw-font-rel-md);
+  font-weight: 600;
+  color: var(--color-primary-element);
+}
+
+.pw-mitglied-kommissionen strong {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pw-space-2xs);
+}
+
+.pw-mitglied-kommission-eintrag {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--pw-space-xs-plus);
+}
+
+.pw-mitglied-kommission-rolle {
+  font-size: var(--pw-font-rel-sm);
+  color: var(--color-primary-element);
+  font-weight: 600;
+  font-style: italic;
+}
+
+.pw-mitglied-kopftext,
+.pw-kommission-mitglieder {
+  display: grid;
+  gap: var(--pw-space-xs);
+}
+
+.pw-kommission-geschaefte {
+  display: grid;
+  gap: var(--pw-space-xs);
+}
+
+.pw-kommission-geschaeftsliste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--pw-space-xs);
+
+  li {
+    display: grid;
+    grid-template-columns: auto auto 1fr;
+    gap: var(--pw-space-sm);
+    align-items: baseline;
+    padding: var(--pw-space-xs) var(--pw-space-sm);
+    border-radius: var(--border-radius, var(--pw-space-xs));
+    background: var(--pw-surface-soft);
+  }
+
+  .pw-kommission-geschaeft-eintrag {
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+
+    &:hover,
+    &:focus-visible {
+      background: var(--color-background-hover, var(--pw-surface));
+      outline: none;
+    }
+  }
+
+  .pw-nr {
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .pw-titel {
+    overflow-wrap: anywhere;
+    hyphens: auto;
+    -webkit-hyphens: auto;
+  }
+}
+
+.pw-badge,
+.pw-chip {
+  display: inline-flex;
+  align-items: center;
+  inline-size: max-content;
+  max-inline-size: 100%;
+  padding: var(--pw-space-xs-plus) var(--pw-space-md);
+  border: var(--pw-border-thin) solid var(--pw-border);
+  border-radius: var(--pw-radius-pill);
+  background: var(--pw-surface-soft);
+  font-size: var(--pw-space-md);
+}
+
+.pw-badge.inaktiv {
+  border-color: color-mix(in srgb, var(--color-warning, var(--pw-border)) 60%, var(--pw-border));
+}
+
+.pw-chip-inaktiv {
+  opacity: 0.55;
+  border-style: dashed;
+  font-style: italic;
+}
+
+.pw-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.pw-kommission-mitglied-liste {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: var(--pw-space-sm);
+  margin-block-start: var(--pw-space-xs-plus);
+}
+
+.pw-kommission-mitglied-karte {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pw-space-2xs);
+  padding: var(--pw-space-sm) var(--pw-space-md);
+  border: var(--pw-border-thin) solid var(--pw-border);
+  border-radius: var(--pw-radius, var(--pw-space-sm));
+  background: var(--pw-surface-soft);
+  font-size: var(--pw-font-rel-md);
+  line-height: 1.3;
+}
+
+.pw-kommission-mitglied-eigen {
+  border-color: color-mix(in srgb, var(--color-primary-element) 55%, var(--pw-border));
+  background: color-mix(in srgb, var(--color-primary-element) 6%, var(--pw-surface-soft));
+}
+
+.pw-kommission-mitglied-inaktiv {
+  opacity: 0.55;
+  border-style: dashed;
+  font-style: italic;
+}
+
+.pw-kommission-mitglied-kopf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--pw-space-sm);
+}
+
+.pw-kommission-mitglied-rolle {
+  color: var(--pw-muted);
+  font-weight: 400;
+}
+
+.pw-kommission-mitglied-zeile {
+  color: var(--pw-muted);
+}
+
+.pw-kommission-mitglied-kopf strong {
+  color: var(--color-main-text);
+}
+
+.pw-kommission-mitglied-email {
+  color: var(--color-primary-element);
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.pw-kommission-mitglied-email:hover {
+  text-decoration: underline;
+}
+
+.pw-member-local-exists {
+  color: color-mix(in srgb, var(--color-success, var(--color-primary-element)) 80%, var(--color-main-text));
+}
+
+.pw-member-local-missing {
+  color: color-mix(in srgb, var(--color-error) 84%, var(--color-main-text));
+}
+
+.pw-member-local-pending {
+  color: var(--pw-muted);
+}
+
+.pw-member-username {
+  min-inline-size: 14rem;
+}
+
+.pw-admin-actions {
+  display: none;
+}
+
+.pw-admin-statusline {
+  flex-wrap: wrap;
+}
+
+.pw-admin-autosave {
+  color: var(--pw-muted);
+}
+
+.pw-admin-card h3 {
+  margin: 0;
+  font-size: var(--pw-font-lg);
+}
+
+.pw-tabelle .pw-col-nr {
+  white-space: nowrap;
+}
+
+.pw-tabelle .pw-col-titel {
+  /* Titel-Spalte darf grosszügig wachsen, restliche Spalten passen sich an. */
+  inline-size: auto;
+}
+
+/* Geschäftsliste: Spalten haben sinnvolle Mindestbreiten in em, die Titel-
+   Spalte nimmt den verbleibenden Platz. Sobald der verfügbare Platz nicht
+   mehr ausreicht (Summe Mindestbreiten + ~15em für den Titel), schaltet
+   ein Container-Query weiter unten auf die Card-Ansicht um. */
+.pw-tabelle-geschaefte {
+  table-layout: auto;
+  inline-size: 100%;
+}
+
+.pw-tabelle-geschaefte .pw-col-nr {
+  inline-size: 1%;
+  min-inline-size: var(--pw-col-nr);
+  white-space: nowrap;
+}
+
+.pw-tabelle-geschaefte .pw-col-titel {
+  /* Titel-Spalte bekommt den restlichen Platz, mit komfortabler Mindestbreite. */
+  inline-size: auto;
+  min-inline-size: var(--pw-col-titel);
+}
+
+.pw-tabelle-geschaefte .pw-col-typ {
+  /* Wrap NUR an Whitespace – keine Silbentrennung, kein Wortbruch. */
+  inline-size: 1%;
+  min-inline-size: var(--pw-col-typ);
+  white-space: normal;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+  -webkit-hyphens: none;
+}
+
+.pw-tabelle-geschaefte .pw-col-status {
+  inline-size: 1%;
+  min-inline-size: var(--pw-col-status);
+}
+
+.pw-tabelle-geschaefte .pw-col-datum {
+  inline-size: 1%;
+  min-inline-size: var(--pw-col-datum);
+  white-space: nowrap;
+}
+
+.pw-tabelle-geschaefte .pw-col-zustaendig {
+  /* Wrap mit Silbentrennung erlaubt. */
+  inline-size: 1%;
+  min-inline-size: var(--pw-col-zustaendig);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+
+.pw-tabelle-geschaefte .pw-col-beschluss {
+  /* Wrap mit Silbentrennung erlaubt. */
+  inline-size: 1%;
+  min-inline-size: var(--pw-col-beschluss);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+
+.pw-tabelle .pw-col-inline-edit {
+  /* Inline-Editor-Spalten: keine künstliche Mindestbreite – Multiselects sollen
+     niemals breiter werden als die Spalte selbst. */
+  vertical-align: top;
+  overflow: hidden;
+}
+
+/* --------------------------------------------------------------------------
+   NcSelect in Tabellen-Zellen.
+
+   NcSelect liefert eigene Regeln mit, die das Schrumpfen blockieren:
+     .v-select.select                              { min-width: 260px; margin: …; }
+     .v-select.select.vs--single .vs__selected-options { flex-wrap: nowrap; }
+     .v-select.select .vs__selected                 { height: …; padding-inline: 12px 8px; }
+     .v-select.select .vs__search                   { height: …; }
+
+   Da diese aus einem dynamisch geladenen Chunk kommen, gewinnen sie bei
+   gleicher Spezifität gegen unsere statische CSS. Daher hier durchgehend
+   hoehere Spezifitaet (`.pw-tabelle-geschaefte` zusaetzlich vor jedem
+   NcSelect-Selektor) – kein `!important`.
+   -------------------------------------------------------------------------- */
+
+/* 1) Wrapper: Mindestbreite des NcSelect aufheben, damit die Zelle wirklich
+      schrumpfen kann. Spezifitaet (0,4,0) schlaegt `.v-select.select` (0,2,0). */
+.pw-tabelle-geschaefte .pw-inline-select.v-select.select {
+  min-width: 0;
+  min-inline-size: 0;
+  margin: 0;
+}
+
+/* 2) Single-Select darf seine Chips umbrechen. */
+.pw-tabelle-geschaefte .pw-inline-select.v-select.vs--single .vs__selected-options {
+  flex-wrap: wrap;
+}
+
+/* 3) Alle inneren Flex-Boxen ohne Mindestbreite und auf Zellbreite beschränkt. */
+.pw-tabelle-geschaefte .pw-inline-select.v-select,
+.pw-tabelle-geschaefte .pw-inline-select.v-select .vs__dropdown-toggle,
+.pw-tabelle-geschaefte .pw-inline-select.v-select .vs__selected-options,
+.pw-tabelle-geschaefte .pw-inline-select.v-select .vs__search,
+.pw-tabelle-geschaefte .pw-inline-select.v-select .vs__actions {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  box-sizing: border-box;
+}
+
+.pw-tabelle-geschaefte .pw-inline-select.v-select,
+.pw-tabelle-geschaefte .pw-inline-select.v-select .vs__dropdown-toggle {
+  inline-size: 100%;
+}
+
+/* 4) Chevron rechts aussen, Chips dürfen umbrechen. */
+.pw-tabelle-geschaefte .pw-inline-select.v-select .vs__selected-options {
+  flex: 1 1 auto;
+  inline-size: 100%;
+  flex-wrap: wrap;
+  row-gap: var(--pw-space-xs);
+}
+
+/* 5) Chip-Breite richtet sich am Inhalt aus, max = Zellbreite, Wrap mit
+      Silbentrennung. Spezifitaet (0,4,1) schlaegt `.v-select.select .vs__selected`
+      (0,3,0). */
+.pw-tabelle-geschaefte .pw-inline-select.v-select .vs__selected {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 1 auto;
+  inline-size: auto;
+  max-inline-size: 100%;
+  min-inline-size: 0;
+  block-size: auto;
+  height: auto;
+  font-size: var(--pw-chip-font);
+  line-height: 1.2;
+  padding-inline: var(--pw-chip-pad-start) var(--pw-chip-pad-end);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+
+.pw-tabelle-geschaefte .pw-inline-select.v-select .vs__selected>* {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+
+.pw-tabelle-geschaefte .pw-inline-select.v-select .vs__selected .vs__deselect {
+  flex: 0 0 auto;
+}
+
+/* 6) Suchfeld darf auf 0 schrumpfen, damit es die Zelle nicht aufbläht. */
+.pw-tabelle-geschaefte .pw-inline-select.v-select .vs__search {
+  inline-size: 0;
+  min-inline-size: 0;
+  flex: 1 1 0;
+}
+
+/* 7) Aussen-Wrapper bleibt simpel – nur Block-Layout in der Zelle. */
+.pw-tabelle .pw-inline-select {
+  display: block;
+  inline-size: 100%;
+  max-inline-size: 100%;
+  min-inline-size: 0;
+  box-sizing: border-box;
+}
+
+.pw-status-text {
+  display: inline-block;
+  max-inline-size: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.pw-view-header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--pw-space-sm);
+  /* Platz für Nextcloud Nav-Toggle ("Hamburger") oben links */
+  padding-inline-start: var(--pw-click-lg);
+  padding-block-end: var(--pw-gap-1);
+}
+
+.pw-view-title {
+  margin: 0;
+  font-size: var(--pw-font-xl);
+  font-weight: 700;
+}
+
+.pw-view-count {
+  color: var(--pw-muted);
+  font-size: var(--pw-space-md-plus);
+}
+
+/* Multiselect (vue-select / NcSelect) – Tokens als kompakte Chips */
+.pw-nav-filter .v-select.vs--multiple .vs__selected {
+  background: color-mix(in srgb, var(--color-primary-element) 18%, transparent);
+  color: var(--color-main-text);
+  border: var(--pw-border-thin) solid color-mix(in srgb, var(--color-primary-element) 32%, transparent);
+  border-radius: 999px;
+  padding: var(--pw-space-2xs) var(--pw-space-sm);
+  margin: var(--pw-space-2xs) var(--pw-space-xs) var(--pw-space-2xs) 0;
+  font-size: var(--pw-font-sm);
+  line-height: 1.25;
+  max-inline-size: 100%;
+}
+
+.pw-nav-filter .v-select.vs--multiple .vs__selected .vs__deselect {
+  margin-inline-start: var(--pw-space-xs);
+  opacity: 0.7;
+}
+
+.pw-nav-filter .v-select.vs--multiple .vs__selected .vs__deselect:hover {
+  opacity: 1;
+}
+
+.pw-nav-filter .v-select .vs__search,
+.pw-nav-filter .v-select .vs__search:focus {
+  margin: 0;
+  padding: 0 var(--pw-space-xs);
+  min-inline-size: var(--pw-space-2xl);
+}
+
+.pw-nav-filter .v-select .vs__dropdown-toggle {
+  padding: var(--pw-space-2xs) var(--pw-space-xs);
+  border-radius: var(--border-radius-large, var(--pw-space-sm));
+  /* Höhe wächst mit Inhalt – kein Drei-Zeilen-Limit */
+  max-block-size: none;
+  block-size: auto;
+  min-block-size: var(--pw-click-sm);
+}
+
+.pw-nav-filter .v-select .vs__selected-options {
+  flex-wrap: wrap;
+  overflow: visible;
+  padding: 0;
+  max-block-size: none;
+  block-size: auto;
+}
+
+@media (max-width: 80rem) {
+  .pw-sitzung-kopf {
+    grid-template-columns: 1fr 1fr auto;
+  }
+
+  .pw-sitzung-ort {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 60rem) {
+  .pw-table-desktop {
+    display: none;
+  }
+
+  .pw-card-mobile {
+    display: grid;
+  }
+
+  .pw-members-table,
+  .pw-members-table thead,
+  .pw-members-table tbody,
+  .pw-members-table tr,
+  .pw-members-table th,
+  .pw-members-table td {
+    display: block;
+  }
+
+  .pw-members-table thead {
+    display: none;
+  }
+
+  .pw-members-table tr {
+    padding: var(--pw-space-md-plus);
+    border-block-end: var(--pw-border-thin) solid var(--pw-border);
+  }
+
+  .pw-members-table td {
+    padding: var(--pw-space-sm) 0;
+    border: 0;
+  }
+
+  .pw-members-table td::before {
+    content: attr(data-label);
+    display: block;
+    margin-block-end: var(--pw-space-xs);
+    color: var(--pw-muted);
+    font-size: var(--pw-space-md);
+    text-transform: uppercase;
+    letter-spacing: var(--pw-track-wide);
+  }
+}
+
+@media (max-width: 54rem) {
+
+  .pw-app-shell,
+  .pw-view-layout,
+  .pw-admin-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .pw-app-sidebar,
+  .pw-view-sidebar,
+  .pw-admin-sidebar {
+    position: static;
+  }
+
+  .pw-sidebar-nav {
+    grid-template-columns: 1fr;
+  }
+
+  .pw-app-branding,
+  .pw-sidebar-block,
+  .pw-admin-sidecard,
+  .pw-admin-card,
+  .pw-sitzung-details,
+  .pw-kommission-details,
+  .pw-geschaeft-detail,
+  .pw-data-card,
+  .pw-members-table-wrap,
+  .pw-table-wrap,
+  .pw-modal-kopf {
+    padding: var(--pw-gap-1);
+  }
+
+  .pw-sitzung-kopf,
+  .pw-kommission-kopf,
+  .pw-app-main-header,
+  .pw-toolbar-inline,
+  .pw-detail-header,
+  .pw-data-card-header,
+  .pw-modal-kopf,
+  .pw-neue-notiz-klein,
+  .pw-notiz-klein {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .pw-sitzung-kopf {
+    grid-template-columns: 1fr;
+  }
+
+  .pw-mitglieder-grid,
+  .pw-card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pw-info-tabelle,
+  .pw-info-tabelle tbody,
+  .pw-info-tabelle tr,
+  .pw-info-tabelle th,
+  .pw-info-tabelle td {
+    display: block;
+    inline-size: 100%;
+  }
+
+  .pw-info-tabelle th,
+  .pw-info-tabelle td {
+    padding-inline: 0;
+  }
+}
