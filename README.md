@@ -766,7 +766,7 @@ Der Test führt bewusst einen vollständigen End-to-End-Ablauf aus:
 - prüft Plausibilität der importierten Listen (Geschäfte, Sitzungen, Mitglieder, Kommissionen, Fraktionen)
 - prüft die Frontend-Startseite (`/apps/parlwin/`)
 - prüft den Realtime-Broker (`/health`) und die Frontend-Auslieferung der Realtime-Config
-- prüft die ausgelieferte App-CSS auf responsive Breakpoints (Desktop/Mobile) und zentrale Layout-Klassen (`1120px`, `768px`, Admin-Card- und mobile Tabellenansicht)
+- prüft die ausgelieferte App-CSS auf responsive Breakpoints (Desktop/Mobile) und zentrale Layout-Klassen (`80rem`, `54rem`, Admin-Card- und mobile Tabellenansicht)
 - prüft den Realtime-Runtime-Sicherheitsmodus (nicht-root, Build-Artefakte im Runtime-Container nicht schreibbar)
 - prüft den manuellen Sync inkl. Fortschritt (`POST /sync` + `GET /sync/status`) mit Live-Zählwerten `processed/total`
 - führt frontend-nahe Schreibaktionen via API aus (Notiz, Beschluss, Votum, Zuständigkeiten)
