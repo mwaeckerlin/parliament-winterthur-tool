@@ -452,6 +452,72 @@ grep -Eq '@media[[:space:]]*\([[:space:]]*max-width:[[:space:]]*54rem[[:space:]]
 grep -q '.pw-members-table td::before' <<<"$FRONTEND_CSS" || fail "Mobile Tabellen-Kartenansicht fehlt"
 grep -q '.pw-admin-card' <<<"$FRONTEND_CSS" || fail "Admin-Card-Layout fehlt"
 
+echo "[E2E] Prüfe Collabora-Integration (richdocuments + WOPI)"
+RICH_ENABLED="$(docker compose exec -T nextcloud-php-fpm php occ --no-ansi --no-warnings config:app:get richdocuments enabled 2>/dev/null | tr -d '\r' | tail -n1)"
+[[ "$RICH_ENABLED" == "yes" ]] || fail "richdocuments-App ist nicht aktiviert (Status='${RICH_ENABLED}')"
+
+WOPI_INTERNAL="$(docker compose exec -T nextcloud-php-fpm php occ --no-ansi --no-warnings config:app:get richdocuments wopi_url 2>/dev/null | tr -d '\r' | tail -n1)"
+WOPI_PUBLIC="$(docker compose exec -T nextcloud-php-fpm php occ --no-ansi --no-warnings config:app:get richdocuments public_wopi_url 2>/dev/null | tr -d '\r' | tail -n1)"
+WOPI_CALLBACK="$(docker compose exec -T nextcloud-php-fpm php occ --no-ansi --no-warnings config:app:get richdocuments wopi_callback_url 2>/dev/null | tr -d '\r' | tail -n1)"
+[[ "$WOPI_INTERNAL" == http://collabora:9980* ]] || fail "wopi_url falsch konfiguriert: '${WOPI_INTERNAL}'"
+[[ "$WOPI_PUBLIC" == ${PROTOCOL}://${HOST}* ]] || fail "public_wopi_url falsch konfiguriert: '${WOPI_PUBLIC}' (erwartet Prefix ${PROTOCOL}://${HOST})"
+[[ "$WOPI_CALLBACK" == http://nextcloud-nginx:8080* ]] || fail "wopi_callback_url falsch konfiguriert: '${WOPI_CALLBACK}'"
+
+WOPI_WEBROOT="${WOPI_CALLBACK#http://nextcloud-nginx:8080}"
+WOPI_WEBROOT="${WOPI_WEBROOT%/}"
+
+DISCOVERY_XML="$(docker compose exec -T nextcloud-php-fpm php -r 'echo @file_get_contents("http://collabora:9980/hosting/discovery");')"
+grep -q '<wopi-discovery>' <<<"$DISCOVERY_XML" || fail "Collabora /hosting/discovery liefert kein wopi-discovery"
+grep -Eq '(name="edit"[^>]*ext="odt")|(ext="odt"[^>]*name="edit")' <<<"$DISCOVERY_XML" || fail "Collabora bietet keine edit-Action für odt an"
+grep -Eq '(name="edit"[^>]*ext="docx")|(ext="docx"[^>]*name="edit")' <<<"$DISCOVERY_XML" || fail "Collabora bietet keine edit-Action für docx an"
+
+CAPS_JSON="$(docker compose exec -T nextcloud-php-fpm php -r 'echo @file_get_contents("http://collabora:9980/hosting/capabilities");')"
+jq -e '.hasMobileSupport == true' <<<"$CAPS_JSON" >/dev/null || fail "Collabora capabilities ohne hasMobileSupport"
+jq -e '."convert-to".available == true' <<<"$CAPS_JSON" >/dev/null || fail "Collabora capabilities ohne convert-to"
+
+WOPI_TEST_DOC="parlwin-e2e-collabora.odt"
+WOPI_DAV_URL="${PROTOCOL}://${HOST}${WOPI_WEBROOT}/remote.php/dav/files/admin/${WOPI_TEST_DOC}"
+WOPI_UPLOAD_STATUS="$(docker compose exec -T -e WOPI_URL="${WOPI_DAV_URL}" -e WOPI_USER="admin" -e WOPI_PASS="${NEXTCLOUD_ADMIN_PASSWORD}" nextcloud-php-fpm php -r '
+$ctx = stream_context_create(["http" => [
+  "method" => "PUT",
+  "header" => "Authorization: Basic ".base64_encode(getenv("WOPI_USER").":".getenv("WOPI_PASS"))."\r\nContent-Type: application/octet-stream\r\n",
+  "content" => "",
+  "ignore_errors" => true,
+  "timeout" => 30,
+]]);
+@file_get_contents(getenv("WOPI_URL"), false, $ctx);
+if (isset($http_response_header[0]) && preg_match("/\s(\d{3})\s/", $http_response_header[0], $m)) {
+  echo $m[1];
+}')"
+[[ "$WOPI_UPLOAD_STATUS" =~ ^(201|204)$ ]] || fail "WebDAV-Upload des Testdokuments fehlgeschlagen (Status='${WOPI_UPLOAD_STATUS}')"
+
+WOPI_FILE_ID="$(docker compose exec -T -e WOPI_URL="${WOPI_DAV_URL}" -e WOPI_USER="admin" -e WOPI_PASS="${NEXTCLOUD_ADMIN_PASSWORD}" nextcloud-php-fpm php -r '
+$ctx = stream_context_create(["http" => [
+  "method" => "PROPFIND",
+  "header" => "Authorization: Basic ".base64_encode(getenv("WOPI_USER").":".getenv("WOPI_PASS"))."\r\nDepth: 0\r\nContent-Type: application/xml\r\n",
+  "content" => "<d:propfind xmlns:d=\"DAV:\" xmlns:oc=\"http://owncloud.org/ns\"><d:prop><oc:fileid/></d:prop></d:propfind>",
+  "ignore_errors" => true,
+  "timeout" => 30,
+]]);
+$body = @file_get_contents(getenv("WOPI_URL"), false, $ctx) ?: "";
+if (preg_match("#<oc:fileid>(\d+)</oc:fileid>#", $body, $m)) { echo $m[1]; }')"
+assert_non_empty "$WOPI_FILE_ID" "Konnte fileid des WOPI-Testdokuments nicht ermitteln"
+
+WOPI_EDITOR_URL="${PROTOCOL}://${HOST}${WOPI_WEBROOT}/index.php/apps/richdocuments/index?fileId=${WOPI_FILE_ID}"
+EDITOR_HTML="$(docker compose exec -T -e WOPI_URL="${WOPI_EDITOR_URL}" -e WOPI_USER="admin" -e WOPI_PASS="${NEXTCLOUD_ADMIN_PASSWORD}" nextcloud-php-fpm php -r '
+$ctx = stream_context_create(["http" => [
+  "method" => "GET",
+  "header" => "Authorization: Basic ".base64_encode(getenv("WOPI_USER").":".getenv("WOPI_PASS"))."\r\nOCS-APIRequest: true\r\n",
+  "follow_location" => 1,
+  "ignore_errors" => true,
+  "timeout" => 30,
+]]);
+echo @file_get_contents(getenv("WOPI_URL"), false, $ctx);')"
+grep -Eq 'richdocuments-document\.js|initial-state-richdocuments|collabora[^"]*:?9980|/cool/|wopi(Src|_src|_token|_url)' <<<"$EDITOR_HTML" \
+  || fail "richdocuments-Editor-Seite enthält keine Collabora-/WOPI-Hinweise"
+grep -Eq "fileId=${WOPI_FILE_ID}|initial-state-richdocuments" <<<"$EDITOR_HTML" \
+  || fail "richdocuments-Editor-Seite referenziert FileID ${WOPI_FILE_ID} nicht"
+
 echo "[E2E] Plausibilitätschecks nach Sync"
 api_expect_status GET "admin" "$ADMIN_TOKEN" "/geschaefte?limit=200" "200"
 GESCHAEFTE_COUNT_DEFAULT="$(jq 'length' <<<"$LAST_BODY")"
