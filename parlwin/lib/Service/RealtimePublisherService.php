@@ -46,7 +46,7 @@ class RealtimePublisherService {
             'Accept' => 'application/json',
         ];
         if ($secret !== '') {
-            $headers['X-PWT-Secret'] = $secret;
+            $headers['X-Parlwin-Secret'] = $secret;
         }
 
         try {

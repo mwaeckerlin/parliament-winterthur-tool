@@ -434,8 +434,9 @@ class FraktionsarbeitService
     /**
      * Weist allen nicht-erledigten Geschäften OHNE aktuell zugewiesene
      * Zuständigkeit automatisch die Kommissionsmitglieder der eigenen
-     * Fraktion zu, sofern das Geschäft aktuell in einer bekannten Kommission
-     * hängig ist (letztes Verfahrensereignis mit passendem Organ).
+     * Fraktion zu, sofern der aktuelle Geschäftsstatus auf eine bekannte
+     * Kommission verweist (z.B. „Bei der Aufsichtskommission pendent" oder
+     * „Bei der Kommission Soziales und Sicherheit pendent").
      *
      * Wird vom Sync nach erfolgreicher Aktualisierung von Geschäften und
      * Mitgliedern aufgerufen.
@@ -457,8 +458,10 @@ class FraktionsarbeitService
             return $statistik;
         }
 
-        // Kommissionen indizieren: lower(name) -> Kommission (nur aktive, nicht gelöschte)
-        $kommissionByName = [];
+        // Aktive Kommissionen indizieren mit denselben Tokens, die auch das
+        // Frontend (Kommissionsliste.vue → geschaefteFuer) verwendet, damit
+        // hier und dort dieselben Status→Kommission-Zuordnungen gelten.
+        $kommissionsIndex = [];
         foreach ($this->kommissionMapper->findAll() as $kommission) {
             if (!$kommission->getAktiv()) {
                 continue;
@@ -467,9 +470,13 @@ class FraktionsarbeitService
             if ($name === '') {
                 continue;
             }
-            $kommissionByName[mb_strtolower($name)] = $kommission;
+            $kommissionsIndex[] = [
+                'kommission' => $kommission,
+                'nameLower' => mb_strtolower($name),
+                'tokens' => self::tokensFuerKommissionsname($name),
+            ];
         }
-        if ($kommissionByName === []) {
+        if ($kommissionsIndex === []) {
             return $statistik;
         }
 
@@ -502,27 +509,10 @@ class FraktionsarbeitService
                 continue;
             }
 
-            // Letztes Ereignis mit passendem Organ suchen.
-            $ereignisse = $this->ereignisMapper->findByGeschaeft($geschaeftId);
-            $zugehoerigeKommission = null;
-            foreach (array_reverse($ereignisse) as $ereignis) {
-                $organ = trim($ereignis->getOrgan());
-                if ($organ === '') {
-                    continue;
-                }
-                $organLower = mb_strtolower($organ);
-                if (isset($kommissionByName[$organLower])) {
-                    $zugehoerigeKommission = $kommissionByName[$organLower];
-                    break;
-                }
-                foreach ($kommissionByName as $kommissionsname => $kommission) {
-                    if (str_contains($organLower, $kommissionsname)
-                        || str_contains($kommissionsname, $organLower)) {
-                        $zugehoerigeKommission = $kommission;
-                        break 2;
-                    }
-                }
-            }
+            $zugehoerigeKommission = self::findeKommissionFuerStatus(
+                (string) $geschaeft->getStatus(),
+                $kommissionsIndex
+            );
             if ($zugehoerigeKommission === null) {
                 $statistik['ohne_kommission']++;
                 continue;
@@ -530,9 +520,16 @@ class FraktionsarbeitService
 
             // Mitglieder dieser Kommission, die zugleich in unserer Fraktion sind.
             $personen = [];
-            foreach ($zugehoerigeKommission->getMitgliederArray() as $mitgliedExternId) {
-                $extId = (string) $mitgliedExternId;
-                if (!isset($mitgliedByExternId[$extId])) {
+            foreach ($zugehoerigeKommission->getMitgliederArray() as $eintrag) {
+                if (is_array($eintrag)) {
+                    if (array_key_exists('aktiv', $eintrag) && $eintrag['aktiv'] === false) {
+                        continue;
+                    }
+                    $extId = (string) ($eintrag['externId'] ?? $eintrag['extern_id'] ?? '');
+                } else {
+                    $extId = (string) $eintrag;
+                }
+                if ($extId === '' || !isset($mitgliedByExternId[$extId])) {
                     continue;
                 }
                 $mitglied = $mitgliedByExternId[$extId];
@@ -559,6 +556,101 @@ class FraktionsarbeitService
         }
 
         return $statistik;
+    }
+
+    /**
+     * Entfernt aus einem String alle "*kommission*"-Tokens und liefert
+     * den normalisierten Rest.  Identisch zur JS-Funktion
+     * `stripKommissionWords` in `src/js/components/Kommissionsliste.vue`.
+     */
+    private static function stripKommissionWords(string $s): string
+    {
+        $s = mb_strtolower($s);
+        $s = preg_replace('/[,.;:()\/]/u', ' ', $s) ?? $s;
+        $s = preg_replace('/\S*kommission\S*/u', ' ', $s) ?? $s;
+        $s = preg_replace('/\s+/u', ' ', $s) ?? $s;
+        return trim($s);
+    }
+
+    /**
+     * Tokenisiert einen Kommissionsnamen wie das Frontend
+     * (`Kommissionsliste.vue → tokenize`): "Kommission"-Wörter entfernen,
+     * deutsche Stopwords filtern, nur Tokens ≥ 3 Zeichen behalten.
+     *
+     * @return string[]
+     */
+    private static function tokensFuerKommissionsname(string $name): array
+    {
+        $stopwords = [
+            'und' => true,
+            'der' => true,
+            'die' => true,
+            'das' => true,
+            'den' => true,
+            'dem' => true,
+            'bei' => true,
+            'pendent' => true,
+            'für' => true,
+            'fuer' => true,
+            'in' => true,
+            'im' => true,
+            'zur' => true,
+            'zum' => true,
+            'von' => true,
+            'vom' => true,
+        ];
+        $tokens = [];
+        foreach (preg_split('/\s+/u', self::stripKommissionWords($name)) ?: [] as $t) {
+            if ($t === '' || mb_strlen($t) < 3 || isset($stopwords[$t])) {
+                continue;
+            }
+            $tokens[] = $t;
+        }
+        return $tokens;
+    }
+
+    /**
+     * Liefert die Kommission, auf die der Status-String verweist, oder null.
+     * Spiegelt die Logik von `Kommissionsliste.vue → geschaefteFuer`:
+     *   1. Status muss überhaupt ein "*kommission*"-Wort enthalten.
+     *   2. Alle Tokens des Kommissionsnamens (ohne "*kommission*"-Wörter)
+     *      müssen im strippten Status vorkommen.
+     *   3. Bleibt nach dem Strip nichts vom Namen übrig (z.B. nur
+     *      "Aufsichtskommission"), wird der Roh-Name direkt im Status
+     *      gesucht.
+     *
+     * @param array<int, array{kommission: Kommission, nameLower: string, tokens: string[]}> $index
+     */
+    private static function findeKommissionFuerStatus(string $status, array $index): ?Kommission
+    {
+        if ($status === '') {
+            return null;
+        }
+        $statusLower = mb_strtolower($status);
+        if (!preg_match('/\S*kommission\S*/u', $statusLower)) {
+            return null;
+        }
+        $stripped = self::stripKommissionWords($status);
+        foreach ($index as $eintrag) {
+            $tokens = $eintrag['tokens'];
+            if ($tokens === []) {
+                if (str_contains($statusLower, $eintrag['nameLower'])) {
+                    return $eintrag['kommission'];
+                }
+                continue;
+            }
+            $alleVorhanden = true;
+            foreach ($tokens as $t) {
+                if (!str_contains($stripped, $t)) {
+                    $alleVorhanden = false;
+                    break;
+                }
+            }
+            if ($alleVorhanden) {
+                return $eintrag['kommission'];
+            }
+        }
+        return null;
     }
 
     /**

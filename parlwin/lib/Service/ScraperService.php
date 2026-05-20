@@ -14,16 +14,17 @@ use Psr\Log\LoggerInterface;
  * HTML-Attribute bereit, vor allem in data-entities="[...]" Attributen,
  * die JSON-kodierte Arrays mit den Entitätsdaten enthalten.
  */
-class ScraperService {
+class ScraperService
+{
     private const BASE_URL = 'https://parlament.winterthur.ch';
 
     /** URLs der verschiedenen Datenquellen */
     private const URLS = [
-        'geschaefte'  => self::BASE_URL . '/politbusiness',
-        'sitzungen'   => self::BASE_URL . '/sitzung',
-        'mitglieder'  => self::BASE_URL . '/stadtparlament/27428',
+        'geschaefte' => self::BASE_URL . '/politbusiness',
+        'sitzungen' => self::BASE_URL . '/sitzung',
+        'mitglieder' => self::BASE_URL . '/stadtparlament/27428',
         'kommissionen' => self::BASE_URL . '/kommissionen',
-        'fraktionen'  => self::BASE_URL . '/fraktionen',
+        'fraktionen' => self::BASE_URL . '/fraktionen',
     ];
 
     /**
@@ -52,7 +53,8 @@ class ScraperService {
      *
      * @param array<int, string> $bereiche
      */
-    public function prefetchTopLevelListen(array $bereiche = ['geschaefte', 'sitzungen', 'mitglieder', 'kommissionen', 'fraktionen']): void {
+    public function prefetchTopLevelListen(array $bereiche = ['geschaefte', 'sitzungen', 'mitglieder', 'kommissionen', 'fraktionen']): void
+    {
         $ziele = [];
         foreach ($bereiche as $bereich) {
             if (!isset(self::URLS[$bereich])) {
@@ -88,7 +90,8 @@ class ScraperService {
      *
      * @return array<string, int>
      */
-    public function vorabTotalsFuerSync(): array {
+    public function vorabTotalsFuerSync(): array
+    {
         $totals = [];
         foreach ($this->prefetchedListen as $bereich => $eintraege) {
             $begrenzt = $this->wendeSyncLimitAn($bereich, $eintraege);
@@ -107,7 +110,8 @@ class ScraperService {
      *
      * @return array[] Array von Geschäftsdaten
      */
-    public function ladeGeschaefte(?callable $fortschritt = null): array {
+    public function ladeGeschaefte(?callable $fortschritt = null): array
+    {
         $eintraege = $this->holePrefetchedListenEintraege('geschaefte');
         if ($eintraege === null) {
             $roh = $this->ladeEntitaeten(self::URLS['geschaefte'], 'Geschäfte');
@@ -221,7 +225,8 @@ class ScraperService {
      *
      * @return array[] Array von Sitzungsdaten
      */
-    public function ladeSitzungen(): array {
+    public function ladeSitzungen(): array
+    {
         $eintraege = $this->holePrefetchedListenEintraege('sitzungen');
         if ($eintraege === null) {
             $roh = $this->ladeEntitaeten(self::URLS['sitzungen'], 'Sitzungen');
@@ -246,7 +251,8 @@ class ScraperService {
      * @param string $sitzungUrl URL der Sitzungsdetailseite
      * @return array[] Array von Traktandumsdaten
      */
-    public function ladeTraktanden(string $sitzungUrl): array {
+    public function ladeTraktanden(string $sitzungUrl): array
+    {
         $url = self::absolutUrl($sitzungUrl);
         if ($url === '') {
             return [];
@@ -276,9 +282,11 @@ class ScraperService {
      * die normalisierten Traktanden.
      *
      * @param array<int, string> $sitzungsUrls
+     * @param callable|null $onProgress Wird nach jedem geladenen Detail aufgerufen ($url, $erfolg, $erledigt, $gesamt)
      * @return array<string, array> Map: absolute URL → Traktanden-Array
      */
-    public function ladeTraktandenJeUrlParallel(array $sitzungsUrls): array {
+    public function ladeTraktandenJeUrlParallel(array $sitzungsUrls, ?callable $onProgress = null): array
+    {
         $absoluteUrls = [];
         foreach ($sitzungsUrls as $roh) {
             $abs = self::absolutUrl((string) $roh);
@@ -291,7 +299,7 @@ class ScraperService {
         }
         $urls = array_keys($absoluteUrls);
         $parallel = $this->leseParallelitaetAusEnv('PARLWIN_SYNC_SITZUNG_PARALLEL', 6, 1, 20);
-        $htmlJeUrl = $this->ladeHtmlParallel($urls, $parallel);
+        $htmlJeUrl = $this->ladeHtmlParallel($urls, $parallel, true, $onProgress);
 
         $ergebnisse = [];
         foreach ($urls as $url) {
@@ -325,7 +333,8 @@ class ScraperService {
      *
      * @return array[] Array von Mitgliederdaten
      */
-    public function ladeMitglieder(): array {
+    public function ladeMitglieder(): array
+    {
         $eintraege = $this->holePrefetchedListenEintraege('mitglieder');
         if ($eintraege === null) {
             $roh = $this->ladeEntitaeten(self::URLS['mitglieder'], 'Mitglieder');
@@ -357,7 +366,8 @@ class ScraperService {
      *
      * @return array[] Array von Kommissionsdaten
      */
-    public function ladeKommissionen(): array {
+    public function ladeKommissionen(): array
+    {
         $eintraege = $this->holePrefetchedListenEintraege('kommissionen');
         if ($eintraege === null) {
             $roh = $this->ladeEntitaeten(self::URLS['kommissionen'], 'Kommissionen');
@@ -427,7 +437,8 @@ class ScraperService {
      *
      * @return array<int, array<string, mixed>>
      */
-    public function ladeBehoerdenMitglieder(string $externId): array {
+    public function ladeBehoerdenMitglieder(string $externId): array
+    {
         $externId = trim($externId);
         if ($externId === '') {
             return [];
@@ -453,7 +464,8 @@ class ScraperService {
      *
      * @return array<int, array<string, mixed>>
      */
-    public function extrahiereBehoerdenMitgliederAusHtml(string $html, string $label = 'Behoerde'): array {
+    public function extrahiereBehoerdenMitgliederAusHtml(string $html, string $label = 'Behoerde'): array
+    {
         $entitaeten = $this->extrahiereEntitaeten($html, $label);
         $zeilen = $this->normalisiereListenEntitaeten($entitaeten);
         $mitglieder = [];
@@ -489,7 +501,8 @@ class ScraperService {
      * @param array<string, mixed> $daten
      * @return array<string, mixed>|null
      */
-    private function normalisiereBehoerdenMitgliedszeile(array $daten): ?array {
+    private function normalisiereBehoerdenMitgliedszeile(array $daten): ?array
+    {
         $nameHtml = (string) self::wert($daten, ['_nameVorname', 'name', 'Name'], '');
         $link = self::extrahiereLinkAusHtml($nameHtml);
         $externId = $link['externId'];
@@ -531,7 +544,8 @@ class ScraperService {
      *
      * @return array[] Array von Fraktionsdaten
      */
-    public function ladeFraktionen(): array {
+    public function ladeFraktionen(): array
+    {
         $eintraege = $this->holePrefetchedListenEintraege('fraktionen');
         if ($eintraege === null) {
             $roh = $this->ladeEntitaeten(self::URLS['fraktionen'], 'Fraktionen');
@@ -562,7 +576,8 @@ class ScraperService {
      * Erkennt Pseudo-Fraktionen (Rollen-Sammlungen wie "Fraktionspräsident/innen"),
      * die auf der Fraktionen-Seite gelistet sind, aber keine eigene Fraktion darstellen.
      */
-    private function istKeineEchteFraktion(string $name): bool {
+    private function istKeineEchteFraktion(string $name): bool
+    {
         $normalisiert = trim($name);
         if ($normalisiert === '') {
             return true;
@@ -577,7 +592,8 @@ class ScraperService {
      * Erkennt Pseudo-Fraktionen (Rollen-Sammlungen wie "Fraktionspräsident/innen"),
      * die auf der Fraktionen-Seite gelistet sind, aber keine eigene Fraktion darstellen.
      */
-    public static function istPseudoFraktionsname(string $name): bool {
+    public static function istPseudoFraktionsname(string $name): bool
+    {
         $normalisiert = trim($name);
         if ($normalisiert === '') {
             return true;
@@ -598,7 +614,8 @@ class ScraperService {
      * @param string $label Bezeichnung für Log-Meldungen
      * @return array[]
      */
-    private function ladeEntitaeten(string $url, string $label): array {
+    private function ladeEntitaeten(string $url, string $label): array
+    {
         try {
             $this->logger->debug("Parlament Winterthur: Lade {$label} von {$url}");
 
@@ -613,7 +630,8 @@ class ScraperService {
         }
     }
 
-    private function ladeHtml(string $url): string {
+    private function ladeHtml(string $url): string
+    {
         $client = $this->clientService->newClient();
         $connectTimeout = $this->leseIntAusEnv('PARLWIN_SYNC_HTTP_CONNECT_TIMEOUT', 8, 1, 60);
         $timeout = $this->leseIntAusEnv('PARLWIN_SYNC_HTTP_TIMEOUT', 25, 5, 180);
@@ -640,7 +658,8 @@ class ScraperService {
      * @param string $label Bezeichnung für Log-Meldungen
      * @return array[]
      */
-    public function extrahiereEntitaeten(string $html, string $label = ''): array {
+    public function extrahiereEntitaeten(string $html, string $label = ''): array
+    {
         $entitaeten = [];
 
         // Suche nach data-entities="..." Attributen im HTML
@@ -690,7 +709,8 @@ class ScraperService {
      * @param string[] $schluessel Mögliche Schlüsselnamen (in Reihenfolge der Präferenz)
      * @param mixed    $standard Standardwert wenn nicht gefunden
      */
-    public static function wert(array $daten, array $schluessel, mixed $standard = ''): mixed {
+    public static function wert(array $daten, array $schluessel, mixed $standard = ''): mixed
+    {
         foreach ($schluessel as $key) {
             if (isset($daten[$key]) && $daten[$key] !== null && $daten[$key] !== '') {
                 return $daten[$key];
@@ -703,7 +723,8 @@ class ScraperService {
      * @param array<int, array<string, mixed>> $entitaeten
      * @return array<int, array<string, mixed>>
      */
-    private function normalisiereGeschaeftslistenEntitaeten(array $entitaeten): array {
+    private function normalisiereGeschaeftslistenEntitaeten(array $entitaeten): array
+    {
         return $this->normalisiereListenEntitaeten($entitaeten);
     }
 
@@ -711,7 +732,8 @@ class ScraperService {
      * @param array<int, array<string, mixed>> $entitaeten
      * @return array<int, array<string, mixed>>
      */
-    private function normalisiereListenEntitaeten(array $entitaeten): array {
+    private function normalisiereListenEntitaeten(array $entitaeten): array
+    {
         $eintraege = [];
 
         foreach ($entitaeten as $entitaet) {
@@ -734,7 +756,8 @@ class ScraperService {
      * @param array<string, mixed> $daten
      * @return array<string, mixed>
      */
-    private function normalisiereSitzungszeile(array $daten): array {
+    private function normalisiereSitzungszeile(array $daten): array
+    {
         $nameHtml = (string) self::wert($daten, ['name', 'title', 'Name', 'Title'], '');
         $link = self::extrahiereLinkAusHtml($nameHtml);
         $url = $link['url'] !== ''
@@ -762,7 +785,8 @@ class ScraperService {
      * @param array<string, mixed> $daten
      * @return array<string, mixed>
      */
-    private function normalisiereMitgliedszeile(array $daten): array {
+    private function normalisiereMitgliedszeile(array $daten): array
+    {
         $nameHtml = (string) self::wert($daten, ['_nameVorname', 'name', 'Name'], '');
         $link = self::extrahiereLinkAusHtml($nameHtml);
         [$nachname, $vorname] = $this->normalisiereMitgliedsName($link['titel']);
@@ -815,7 +839,8 @@ class ScraperService {
      * @param array<string, mixed> $daten
      * @return array<string, mixed>
      */
-    private function normalisiereBehoerdenzeile(array $daten): array {
+    private function normalisiereBehoerdenzeile(array $daten): array
+    {
         $nameHtml = (string) self::wert($daten, ['name', 'title', 'Name', 'Title'], '');
         $link = self::extrahiereLinkAusHtml($nameHtml);
         $url = $link['url'] !== ''
@@ -846,7 +871,8 @@ class ScraperService {
      * @param array<int, array<string, mixed>> $eintraege
      * @return array<int, array<string, mixed>>
      */
-    private function normalisiereTraktandenEntitaeten(array $eintraege): array {
+    private function normalisiereTraktandenEntitaeten(array $eintraege): array
+    {
         $normalisiert = [];
 
         foreach ($eintraege as $daten) {
@@ -890,7 +916,8 @@ class ScraperService {
     /**
      * @return array<int, array<string, mixed>>
      */
-    public function extrahiereTraktandenAusHtml(string $html): array {
+    public function extrahiereTraktandenAusHtml(string $html): array
+    {
         $dom = new \DOMDocument();
         $vorherigeErrors = libxml_use_internal_errors(true);
         $geladen = $dom->loadHTML($html);
@@ -951,7 +978,8 @@ class ScraperService {
      * @param array<string, mixed> $daten
      * @return array<string, mixed>
      */
-    private function normalisiereGeschaeftszeile(array $daten): array {
+    private function normalisiereGeschaeftszeile(array $daten): array
+    {
         $titelHtml = (string) self::wert($daten, ['title', 'Title', 'name', 'Name'], '');
         $link = self::extrahiereLinkAusHtml($titelHtml);
         $url = $link['url'] !== ''
@@ -977,7 +1005,8 @@ class ScraperService {
     /**
      * @return array{titel: string, url: string, externId: string}
      */
-    public static function extrahiereLinkAusHtml(string $html): array {
+    public static function extrahiereLinkAusHtml(string $html): array
+    {
         $result = ['titel' => '', 'url' => '', 'externId' => ''];
 
         if (preg_match('/<a[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)<\/a>/is', $html, $match) === 1) {
@@ -996,7 +1025,8 @@ class ScraperService {
         return $result;
     }
 
-    public static function extrahiereExternIdAusUrl(string $url): string {
+    public static function extrahiereExternIdAusUrl(string $url): string
+    {
         if ($url === '') {
             return '';
         }
@@ -1006,13 +1036,15 @@ class ScraperService {
         return '';
     }
 
-    public static function bereinigeHtmlText(string $text): string {
+    public static function bereinigeHtmlText(string $text): string
+    {
         $dekodiert = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         $ohneTags = strip_tags($dekodiert);
         return trim((string) preg_replace('/\s+/u', ' ', $ohneTags));
     }
 
-    public static function absolutUrl(string $url): string {
+    public static function absolutUrl(string $url): string
+    {
         if ($url === '') {
             return '';
         }
@@ -1028,7 +1060,8 @@ class ScraperService {
     /**
      * @return array{0: string, 1: string, 2: string}
      */
-    private function extrahiereSitzungsDatumZeit(string $datumHtml): array {
+    private function extrahiereSitzungsDatumZeit(string $datumHtml): array
+    {
         $datumText = self::bereinigeHtmlText($datumHtml);
         if (
             preg_match(
@@ -1049,7 +1082,8 @@ class ScraperService {
     /**
      * @return array{0: string, 1: string}
      */
-    private function normalisiereMitgliedsName(string $name): array {
+    private function normalisiereMitgliedsName(string $name): array
+    {
         $name = trim($name);
         if ($name === '') {
             return ['', ''];
@@ -1065,7 +1099,8 @@ class ScraperService {
         return [$nachname, $vorname];
     }
 
-    private function extrahiereFraktionAusTaetigIn(string $html): string {
+    private function extrahiereFraktionAusTaetigIn(string $html): string
+    {
         if ($html === '') {
             return '';
         }
@@ -1082,7 +1117,8 @@ class ScraperService {
         return '';
     }
 
-    private function extrahiereMailAusHtml(string $html): string {
+    private function extrahiereMailAusHtml(string $html): string
+    {
         if ($html === '') {
             return '';
         }
@@ -1097,18 +1133,21 @@ class ScraperService {
     /**
      * @return array<int, array<string, mixed>>|null
      */
-    private function holePrefetchedListenEintraege(string $bereich): ?array {
+    private function holePrefetchedListenEintraege(string $bereich): ?array
+    {
         if (!isset($this->prefetchedListen[$bereich])) {
             return null;
         }
         return $this->prefetchedListen[$bereich];
     }
 
-    private function leseParallelitaetAusEnv(string $envKey, int $standard, int $min, int $max): int {
+    private function leseParallelitaetAusEnv(string $envKey, int $standard, int $min, int $max): int
+    {
         return $this->leseIntAusEnv($envKey, $standard, $min, $max);
     }
 
-    private function leseIntAusEnv(string $envKey, int $standard, int $min, int $max): int {
+    private function leseIntAusEnv(string $envKey, int $standard, int $min, int $max): int
+    {
         $wert = trim((string) getenv($envKey));
         if ($wert === '') {
             return $standard;
@@ -1130,7 +1169,8 @@ class ScraperService {
      * @param array<string, string> $ziele
      * @return array<string, string>
      */
-    private function ladeHtmlFuerBereicheParallel(array $ziele, int $parallel): array {
+    private function ladeHtmlFuerBereicheParallel(array $ziele, int $parallel): array
+    {
         if ($ziele === []) {
             return [];
         }
@@ -1149,9 +1189,10 @@ class ScraperService {
 
     /**
      * @param array<int, string> $urls
+     * @param callable|null $onComplete Wird nach jedem fertigen Download aufgerufen ($url, $erfolg, $erledigt, $gesamt)
      * @return array<string, string>
      */
-    private function ladeHtmlParallel(array $urls, int $parallel, bool $mitSequenziellemFallback = true): array
+    private function ladeHtmlParallel(array $urls, int $parallel, bool $mitSequenziellemFallback = true, ?callable $onComplete = null): array
     {
         $urls = array_values(array_unique(array_filter($urls, static fn(string $u): bool => $u !== '')));
         if ($urls === []) {
@@ -1210,8 +1251,10 @@ class ScraperService {
                 $body = (string) curl_multi_getcontent($ch);
                 $errno = curl_errno($ch);
                 $httpCode = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+                $erfolg = false;
                 if ($url !== '' && $errno === 0 && $httpCode >= 200 && $httpCode < 400 && $body !== '') {
                     $ergebnisse[$url] = $body;
+                    $erfolg = true;
                 } elseif ($url !== '') {
                     $this->logger->warning('Parlament Winterthur: Parallel-Download fehlgeschlagen', [
                         'url' => $url,
@@ -1223,6 +1266,14 @@ class ScraperService {
                 curl_multi_remove_handle($mh, $ch);
                 curl_close($ch);
                 unset($aktiv[$id]);
+
+                if ($onComplete !== null && $url !== '') {
+                    try {
+                        $onComplete($url, $erfolg, count($ergebnisse), count($urls));
+                    } catch (\Throwable $e) {
+                        $this->logger->warning('Parlament Winterthur: onComplete-Callback fehlgeschlagen: ' . $e->getMessage());
+                    }
+                }
             }
 
             if ($running > 0) {
@@ -1245,7 +1296,8 @@ class ScraperService {
      * @param array<int, string> $urls
      * @return array<string, string>
      */
-    private function ladeHtmlSequenziell(array $urls): array {
+    private function ladeHtmlSequenziell(array $urls): array
+    {
         $ergebnisse = [];
         foreach ($urls as $url) {
             try {
@@ -1278,7 +1330,8 @@ class ScraperService {
      * @param array<int, string> $urls
      * @return array<string, array<string, mixed>>
      */
-    private function ladeGeschaeftDetailsParallel(array $urls, int $parallel, ?callable $beiErfolg = null): array {
+    private function ladeGeschaeftDetailsParallel(array $urls, int $parallel, ?callable $beiErfolg = null): array
+    {
         $result = [];
         $zuLaden = [];
 
@@ -1346,7 +1399,8 @@ class ScraperService {
     /**
      * @return array<string, string>
      */
-    private function ladeGeschaeftDetails(string $url): array {
+    private function ladeGeschaeftDetails(string $url): array
+    {
         if (isset($this->geschaeftDetailCache[$url])) {
             return $this->geschaeftDetailCache[$url];
         }
@@ -1369,7 +1423,8 @@ class ScraperService {
     /**
      * @return array<string, mixed>
      */
-    public function extrahiereGeschaeftDetailsAusHtml(string $html): array {
+    public function extrahiereGeschaeftDetailsAusHtml(string $html): array
+    {
         $details = [];
         $detailPaare = [];
         $detailFelder = [];
@@ -1433,7 +1488,8 @@ class ScraperService {
      * @param array<string, mixed> $details
      * @return array<string, mixed>
      */
-    private function uebernehmeDetailDaten(array $daten, array $details): array {
+    private function uebernehmeDetailDaten(array $daten, array $details): array
+    {
         $mitDetails = $daten;
 
         foreach ($details as $key => $value) {
@@ -1455,7 +1511,8 @@ class ScraperService {
     /**
      * @return array<string, mixed>|null
      */
-    private function klassifiziereGeschaeftDetailEintrag(int $index, string $label, string $wert): ?array {
+    private function klassifiziereGeschaeftDetailEintrag(int $index, string $label, string $wert): ?array
+    {
         if ($label === '' && $wert === '') {
             return null;
         }
@@ -1518,7 +1575,8 @@ class ScraperService {
         ];
     }
 
-    private function normalisiereDatum(string $datum): string {
+    private function normalisiereDatum(string $datum): string
+    {
         $datum = trim($datum);
         if ($datum === '') {
             return '';
@@ -1563,7 +1621,8 @@ class ScraperService {
         return $datum;
     }
 
-    private function normalisiereIsoDatumOderLeer(string $datum): string {
+    private function normalisiereIsoDatumOderLeer(string $datum): string
+    {
         $normalisiert = $this->normalisiereDatum($datum);
         if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $normalisiert) === 1) {
             return $normalisiert;
@@ -1571,7 +1630,8 @@ class ScraperService {
         return '';
     }
 
-    private function istEintragAktiv(string $datumVon, string $datumBis, mixed $aktivRoh): bool {
+    private function istEintragAktiv(string $datumVon, string $datumBis, mixed $aktivRoh): bool
+    {
         if (is_bool($aktivRoh)) {
             return $aktivRoh;
         }
@@ -1601,7 +1661,8 @@ class ScraperService {
      * @param array<int, array<string, mixed>> $eintraege
      * @return array<int, array<string, mixed>>
      */
-    private function wendeSyncLimitAn(string $bereich, array $eintraege): array {
+    private function wendeSyncLimitAn(string $bereich, array $eintraege): array
+    {
         $limit = $this->liesSyncLimit($bereich);
         if ($limit === null) {
             return $eintraege;
@@ -1609,7 +1670,8 @@ class ScraperService {
         return array_slice($eintraege, 0, $limit);
     }
 
-    private function liesSyncLimit(string $bereich): ?int {
+    private function liesSyncLimit(string $bereich): ?int
+    {
         $bereich = strtoupper(trim($bereich));
         $bereichsLimit = getenv('PARLWIN_SYNC_LIMIT_' . $bereich);
         $globalesLimit = getenv('PARLWIN_SYNC_LIMIT_ALL');

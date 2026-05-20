@@ -1,28 +1,40 @@
 services:
+  # Dev-/Test-Stack fuer parlwin.
+  #
+  # Die drei parlwin-Images sind als Tags eines einzigen Docker-Hub-Repos
+  # gedacht (mwaeckerlin/parliament-winterthur-tool:php-fpm,
+  # mwaeckerlin/parliament-winterthur-tool:nginx,
+  # mwaeckerlin/parliament-winterthur-tool:ws).  Jedes hat genau ein Dockerfile
+  # und keine `target:`-Aufteilung, damit die Auto-Builds funktionieren.
+  # Lokal wird hier zusaetzlich `build:` angegeben, damit
+  # `docker compose up --build` aus dem Source-Tree baut.
+  #
+  # Fuer ein reines Deployment ohne lokalen Build siehe `example/`.
+
   nextcloud-nginx:
     build:
       context: .
-      dockerfile: Dockerfile
-      target: nginx
-    image: parlwin-nginx
+      dockerfile: Dockerfile.nginx
+    image: mwaeckerlin/parliament-winterthur-tool:nginx
     environment:
       WEBROOT: ${WEBROOT:-}
     ports:
       - "${NEXTCLOUD_HTTP_PORT:-29824}:8080"
+    volumes:
+      - apps:/app/custom_apps:ro
     depends_on:
       nextcloud-php-fpm:
         condition: service_started
     networks:
-      - nxinx-php
+      - nginx-php
       - nginx-collabora
       - nginx-realtime
 
   nextcloud-php-fpm:
     build:
       context: .
-      dockerfile: Dockerfile
-      target: php-fpm
-    image: parlwin-php-fpm
+      dockerfile: Dockerfile.php-fpm
+    image: mwaeckerlin/parliament-winterthur-tool:php-fpm
     environment:
       HOST: ${HOST:-localhost:${NEXTCLOUD_HTTP_PORT:-29824}}
       PROTOCOL: ${PROTOCOL:-http}
@@ -45,44 +57,24 @@ services:
     volumes:
       - data:/app/data
       - config:/app/config
+      - apps:/app/custom_apps
     depends_on:
       nextcloud-db:
         condition: service_started
       collabora:
         condition: service_started
-      parlwin-ws:
-        condition: service_started
     networks:
-      - nxinx-php
+      - nginx-php
       - php-db
       - php-smtp
       - php-collabora
       - php-realtime
 
-  parlwin-app-init:
-    image: parlwin-php-fpm
-    restart: on-failure
-    entrypoint:
-      - /usr/bin/php
-      - /tmp/init-enable-parlwin.php
-    depends_on:
-      nextcloud-php-fpm:
-        condition: service_started
-      nextcloud-nginx:
-        condition: service_started
-    volumes:
-      - ./docker/init-enable-parlwin.php:/tmp/init-enable-parlwin.php:ro
-      - data:/app/data
-      - config:/app/config
-    networks:
-      - nxinx-php
-      - php-db
-
   parlwin-ws:
     build:
       context: .
       dockerfile: Dockerfile.realtime
-    image: parlwin-ws
+    image: mwaeckerlin/parliament-winterthur-tool:ws
     environment:
       PORT: 3001
       PARLWIN_REALTIME_AUTH_REQUIRED: ${PARLWIN_REALTIME_AUTH_REQUIRED:-1}
@@ -95,10 +87,6 @@ services:
 
   smtp-relay:
     image: mwaeckerlin/fake-smtp
-    # Fake-SMTP-Server: nimmt Mails entgegen, sendet sie aber NICHT
-    # weiter. Empfangene Nachrichten landen als Textdateien unter ./mails/.
-    # So bleiben Test-Setups stumm, aber wir können jederzeit prüfen,
-    # ob/welche Mails der Nextcloud-Stack versendet hätte.
     volumes:
       - mails:/mails
     networks:
@@ -137,6 +125,7 @@ services:
     volumes:
       - data:/app/data
       - config:/app/config
+      - apps:/app/custom_apps
 
 secrets:
   nextcloud_db_password:
@@ -147,11 +136,12 @@ secrets:
 volumes:
   data:
   config:
+  apps:
   db:
   mails:
 
 networks:
-  nxinx-php:
+  nginx-php:
     driver_opts:
       encrypted: 1
   php-db:

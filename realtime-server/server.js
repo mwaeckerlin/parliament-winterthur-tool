@@ -8,7 +8,7 @@ const AUTH_REQUIRED = !['0', 'false', 'no', 'off'].includes(
   (process.env.PARLWIN_REALTIME_AUTH_REQUIRED || '1').trim().toLowerCase()
 )
 const AUTH_TIMEOUT_MS = Number(process.env.PARLWIN_REALTIME_AUTH_TIMEOUT_MS || 2500)
-const NEXTCLOUD_BASE_URL = (process.env.PARLWIN_NEXTCLOUD_BASE_URL || '').trim().replace(/\/+$/, '')
+const NEXTCLOUD_BASE_URL = (process.env.PARLWIN_NEXTCLOUD_BASE_URL || 'http://nextcloud-nginx:8080').trim().replace(/\/+$/, '')
 const NEXTCLOUD_AUTH_URL = (process.env.PARLWIN_NEXTCLOUD_AUTH_URL || '').trim()
 
 const clients = new Set()
@@ -204,7 +204,10 @@ wss.on('connection', (ws) => {
 
 server.on('upgrade', async (req, socket, head) => {
   const requestUrl = new URL(req.url || '/', 'http://localhost')
-  if (requestUrl.pathname !== '/ws') {
+  // The mwaeckerlin/nextcloud:nginx reverse-proxy strips `/ws/<appid>` from
+  // the path before forwarding, so this service typically sees `/` here.
+  // For backwards compatibility we also accept the legacy `/ws` path.
+  if (requestUrl.pathname !== '/' && requestUrl.pathname !== '/ws') {
     socket.write('HTTP/1.1 404 Not Found\r\n\r\n')
     socket.destroy()
     return

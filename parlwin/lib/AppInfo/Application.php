@@ -32,14 +32,17 @@ use OCP\AppFramework\Bootstrap\IBootContext;
 use OCP\AppFramework\Bootstrap\IBootstrap;
 use OCP\AppFramework\Bootstrap\IRegistrationContext;
 
-class Application extends App implements IBootstrap {
+class Application extends App implements IBootstrap
+{
     public const APP_ID = 'parlwin';
 
-    public function __construct(array $urlParams = []) {
+    public function __construct(array $urlParams = [])
+    {
         parent::__construct(self::APP_ID, $urlParams);
     }
 
-    public function register(IRegistrationContext $context): void {
+    public function register(IRegistrationContext $context): void
+    {
         // Mapper
         $context->registerService(GeschaeftMapper::class, function ($c) {
             return new GeschaeftMapper($c->get(\OCP\IDBConnection::class));
@@ -155,6 +158,7 @@ class Application extends App implements IBootstrap {
                 $c->get(RealtimePublisherService::class),
                 $c->get(ScraperService::class),
                 $c->get(SyncLockService::class),
+                $c->get(FraktionsarbeitService::class),
                 $c->get(\OCP\IConfig::class),
             );
         });
@@ -168,6 +172,7 @@ class Application extends App implements IBootstrap {
         });
     }
 
-    public function boot(IBootContext $context): void {
+    public function boot(IBootContext $context): void
+    {
     }
 }
