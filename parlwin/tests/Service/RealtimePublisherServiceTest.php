@@ -41,7 +41,7 @@ class RealtimePublisherServiceTest extends TestCase {
             ->with(
                 'http://realtime.local/publish',
                 $this->callback(function (array $options): bool {
-                    if (($options['headers']['X-PWT-Secret'] ?? '') !== 'shared-secret') {
+                    if (($options['headers']['X-Parlwin-Secret'] ?? '') !== 'shared-secret') {
                         return false;
                     }
                     $decoded = json_decode((string) ($options['body'] ?? ''), true);
@@ -72,7 +72,7 @@ class RealtimePublisherServiceTest extends TestCase {
             ->method('post')
             ->with(
                 'http://env-realtime/publish',
-                $this->callback(fn(array $options): bool => ($options['headers']['X-PWT-Secret'] ?? '') === 'env-secret')
+                $this->callback(fn(array $options): bool => ($options['headers']['X-Parlwin-Secret'] ?? '') === 'env-secret')
             );
 
         $service = new RealtimePublisherService($clientService, $config, $logger);
@@ -100,8 +100,8 @@ class RealtimePublisherServiceTest extends TestCase {
         $client->expects($this->once())
             ->method('post')
             ->with(
-                'http://parlwin-ws:3001/publish',
-                $this->callback(fn(array $options): bool => !isset($options['headers']['X-PWT-Secret']))
+                'http://parlwin-realtime:3001/publish',
+                $this->callback(fn(array $options): bool => !isset($options['headers']['X-Parlwin-Secret']))
             );
 
         $service = new RealtimePublisherService($clientService, $config, $logger);

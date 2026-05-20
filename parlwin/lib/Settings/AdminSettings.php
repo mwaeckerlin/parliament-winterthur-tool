@@ -84,7 +84,7 @@ class AdminSettings implements ISettings
 
         // Default: same-origin reverse-proxy convention provided by
         // mwaeckerlin/nextcloud:nginx. The /ws/<appid>/ location is
-        // proxied to the parlwin-ws service on the internal port 3001.
+        // proxied to the parlwin-realtime service on the internal port 3001.
         $host = trim((string) $this->request->getServerHost());
         if ($host === '') {
             $host = 'localhost';
