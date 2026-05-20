@@ -4,9 +4,30 @@ Nextcloud-Plugin für die Fraktionsarbeit im Winterthurer Parlament.
 
 ## Zu Erledigen:
 
-  1. Für alle Parlaments-Sitzungen 
-  2. Unter Sitzungen ein Popup-Knopf «+ Neu» mit folgenden Optionen:
+  1. Traktanmdenliste: Geschäfte aus der Geschäftsliste werden genau gleich angezeigt, wie die Geschäfte auf deren Hauptseite.
+  2. Wir haben nun Bemerkungen und Notizen zu den Trakranden. Notizen reichen aus.
+  3. Notizen in Traktranden werden nicht gespeichert!
+  4. Globale Suche funktioniert nicht.
+  5. **Sitzungstypen / Sitzungs-Vorlagen** – aktuell nicht vorhanden, komplett
+     neu zu bauen. Eine Sitzungstyp-Vorlage soll definieren:
+      - Name (z.B. „Fraktionssitzung“) und Zweck
+      - Standard-Traktanden (Liste, in Reihenfolge, mit Titel/Beschreibung)
+      - Eingeladene: Einzelpersonen (Mitglieder) und/oder Gruppen
+        (Fraktion, Kommission, Rolle wie „Fraktionspräsidium“)
+      - Optionen: Kalendereintrag anlegen, Einladung versenden
+        (`ATTENDEE`/`ORGANIZER` im VEVENT, iTIP via Nextcloud-Mail)
+
+     Beim Erstellen einer konkreten Sitzung aus der Vorlage werden Traktanden
+     kopiert und Teilnehmerliste materialisiert (Gruppen → Einzelpersonen
+     auflösen). Notwendige Bausteine: neue Tabellen (`sitzungstypen`,
+     `sitzungstyp_traktanden`, `sitzungstyp_teilnehmer`), `Sitzung.typ_id`,
+     `SitzungstypService::sitzungAusTyp(...)`, CRUD-Endpunkte, Verwaltungs-UI,
+     Erweiterung `KalenderService::erstelleIcal()` um `ATTENDEE`/`ORGANIZER`.
+  6. Unter Sitzungen ein Popup-Knopf «+ Neu», um eine neue Sitzung festzulegen aus den definierten Sitzungstypen-Vorlagen als Optionen, z.B.:
       - Neue Fraktionssitzung
+
+## Bugs
+
 
 
 ## Für Parlamentarier: Worum geht es hier?
