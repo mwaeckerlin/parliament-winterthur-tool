@@ -4,25 +4,24 @@ Nextcloud-Plugin für die Fraktionsarbeit im Winterthurer Parlament.
 
 ## Zu Erledigen:
 
-
-## Fail:
-
+  - Suche bei den Kommissionen: Suche nach Namen, Titeln, GGR-NR in allen sichtbaren Kommissionen, auch wenn sie nicht ausgeklappt sind (also normal die aktiven, wenn di einaktiven auch angezeigt werden, suche auch da)
+  - Sitzungen: Traktandum Protokoll-Abnahme, und generell bei allen Nicht-Geschäften (also wo kein Geschäft mir Nr vorliegt): Verlinke auf vorhandene PDFs oder verlinke zum Originaltraktandum wenn keine Dokumente da sind.
+  - Neuer Sitzungstyp: Z-Index-Fehler: ![alt text](image-5.png)
+  - Notiz: Kein : nach dem Namen, Name nicht Fett, Name Lenks ausgerichtet, Datum und Name sollen nach content gesized sein, Notiz-Text nimmt den Rest (1fr). Notiz-Text links-bündig: ![alt text](image-6.png)
+  - Notiz: Statt löschen Knopf für alle: Nur der Urheber einer Notiz kann seine eigene Notiz löschen oder durch Klick auf den Text bearbeiten.
+  - Wo ist der Knopf für eine neue Sitzung? ![alt text](image-7.png)
+  - Auch bei Sitzung insgesamt: Statt "Bemerkung zur Sitzung" auch hier Notizen zur Sitzung.
+  - Wenn ich ein Dokument zu einem Geschäft anlegen will, sollte das Popup-Menu wieder schliessen, sobald ich etwas gewählt habe: ![alt text](image-8.png)
+  - Wenn ich das Dokument öffnen will, kommt erst: ![alt text](image-9.png)
+    Und erst einige dutzend Sekunden später kommt: ![alt text](image-10.png)
+    Warum diese Verzögerung? Kann man das Öffnen beschleunigen? Oder wenigstens das Timeout zur Fehleranzeige verlängern?
 
 ## Erledigt:
 
-  1. ✅ NcTextField-Suchfelder reagierten nicht auf Tippen, weil `:value`/`@update:value` (alte API) statt `v-model` (neue API von `@nextcloud/vue` 9.x mit `modelValue`/`update:modelValue`) verwendet wurde. Auf `v-model="suche"` umgestellt in Geschaeftsliste, Sitzungsliste, Sitzungstypenliste, Mitgliederliste, Kommissionsliste.
-  1. ✅ Suche in Traktandenliste (Nr. oder Titel) – Suchfeld in der Sitzungs-Ansicht. → Die Suche sollte mit dem ersten Tippen starten. Nichts passiert! ![alt text](image.png)
   4. ✅ Neuer Sitzungstyp, Teilnehmer-Regeln, Fraktion wählen → Die Fraktionsauswahl auch Mitgliederauswahl sollte nur aktive zur Auswahl stellen; Ausserdem fehlt eine einfache Auswahl: "Eigene Fraktion" und Nextcloud-Gruppe oder Nextcloud-User; → ergänzen / anpassen
   4. ✅ Neuer Sitzungstyp → Fehler beim Speichern: ![alt text](image-2.png)
   5. ✅ +Neu-Knopf in der Sitzungs-Ansicht öffnet Dialog: Sitzungstyp wählen,
      Datum/Zeit/Ort/Titel-Override eingeben → POST `/sitzungstypen/{id}/sitzung`. → Immer an Nextcloud-Standards halten! Kopiere Ansätze von anderen Plugins! Das Popup mit der Auswahl soll gleich erfolgen wie bei anderen, z.B. Files, es soll genau so ein Menu mit den vordefinierten Templates aufpoppen: ![alt text](image-3.png)
-  6. ✅ Notiz pro Traktandum: DAS IST EINE GENERELLE REGEL!!! ALLE NOTIZEN, ALLE AKTIONEN, HABEN IMMER: WER WANN WAS!!!! ES FEHLT DAS WER!!! ES MUSS IMMER NACHVOLLZIEHBAR SEIN, WER WANN WAS EINGEGEBEN HAT!!!
- **IMMER*** **UEBERALL**!!! Immer diese Infos: Datum, User (Display-Name), Aktion / Notiz / Text
-  7. ✅ Unified-Search-Provider `parlwin-geschaefte` (`GeschaeftSearchProvider`)
-     registriert: sucht in `nummer`/`titel` (case-insensitive LIKE),
-     liefert Treffer in die globale Nextcloud-Suche. → Nichts passiert! ![alt text](image-4.png)
-  1. ✅ Traktandenliste: zeigt Geschäfte wie auf der Geschäftsliste-Hauptseite
-     (Zuständig + Beschluss-Inline, Status-Farbe, Detail-Modal); Traktandennummer bleibt.
   3. ✅ Bemerkungen pro Traktandum entfernt – nur Notizen pro Traktandum bleiben.
   4. ✅ Sitzungstypen / Sitzungs-Vorlagen: neue Tabellen `pw_sitzungstypen`,
      `pw_sitzungstyp_traktanden`, `pw_sitzungstyp_teilnehmer`, neues Feld
