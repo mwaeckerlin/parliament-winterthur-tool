@@ -131,9 +131,12 @@ class TraktandumController extends Controller
             $uid = (string) ($eintrag['uid'] ?? '');
             $name = (string) ($eintrag['displayName'] ?? '');
             // Fehlende Audit-Felder mit aktueller Session befüllen.
-            if ($datum === '') $datum = $jetzt;
-            if ($uid === '') $uid = $aktUid;
-            if ($name === '') $name = $aktName !== '' ? $aktName : $uid;
+            if ($datum === '')
+                $datum = $jetzt;
+            if ($uid === '')
+                $uid = $aktUid;
+            if ($name === '')
+                $name = $aktName !== '' ? $aktName : $uid;
             $ergebnis[] = [
                 'datum' => $datum,
                 'uid' => $uid,

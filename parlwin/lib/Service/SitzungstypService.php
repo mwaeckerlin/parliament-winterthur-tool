@@ -357,13 +357,15 @@ class SitzungstypService
           if ($user === null) {
             return [];
           }
-          return [[
-            'mitgliedId' => 0,
-            'name' => $user->getDisplayName(),
-            'email' => method_exists($user, 'getEMailAddress') ? ((string) $user->getEMailAddress()) : '',
-            'rolle' => '',
-            'uid' => $uid,
-          ]];
+          return [
+            [
+              'mitgliedId' => 0,
+              'name' => $user->getDisplayName(),
+              'email' => method_exists($user, 'getEMailAddress') ? ((string) $user->getEMailAddress()) : '',
+              'rolle' => '',
+              'uid' => $uid,
+            ]
+          ];
       }
     } catch (\Throwable $e) {
       $this->logger->warning(

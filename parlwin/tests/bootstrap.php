@@ -19,7 +19,7 @@ $appDir = dirname(__DIR__);
 
 if (!interface_exists('Psr\Log\LoggerInterface')) {
     // phpcs:ignore
-    eval('namespace Psr\Log; interface LoggerInterface {
+    eval ('namespace Psr\Log; interface LoggerInterface {
         public function debug(string $message, array $context = []): void;
         public function info(string $message, array $context = []): void;
         public function notice(string $message, array $context = []): void;
@@ -36,14 +36,14 @@ if (!interface_exists('Psr\Log\LoggerInterface')) {
 
 if (!interface_exists('Symfony\Component\Console\Input\InputInterface')) {
     // phpcs:ignore
-    eval('namespace Symfony\Component\Console\Input; interface InputInterface {
+    eval ('namespace Symfony\Component\Console\Input; interface InputInterface {
         public function getOption(string $name);
     }');
 }
 
 if (!class_exists('Symfony\Component\Console\Input\ArrayInput')) {
     // phpcs:ignore
-    eval('namespace Symfony\Component\Console\Input; class ArrayInput implements InputInterface {
+    eval ('namespace Symfony\Component\Console\Input; class ArrayInput implements InputInterface {
         private array $parameters = [];
         public function __construct(array $parameters = []) { $this->parameters = $parameters; }
         public function setInteractive(bool $interactive): void {}
@@ -56,21 +56,21 @@ if (!class_exists('Symfony\Component\Console\Input\ArrayInput')) {
 
 if (!interface_exists('Symfony\Component\Console\Output\OutputInterface')) {
     // phpcs:ignore
-    eval('namespace Symfony\Component\Console\Output; interface OutputInterface {
+    eval ('namespace Symfony\Component\Console\Output; interface OutputInterface {
         public function writeln(string|array $messages, int $options = 0): void;
     }');
 }
 
 if (!class_exists('Symfony\Component\Console\Output\NullOutput')) {
     // phpcs:ignore
-    eval('namespace Symfony\Component\Console\Output; class NullOutput implements OutputInterface {
+    eval ('namespace Symfony\Component\Console\Output; class NullOutput implements OutputInterface {
         public function writeln(string|array $messages, int $options = 0): void {}
     }');
 }
 
 if (!class_exists('Symfony\Component\Console\Input\InputOption')) {
     // phpcs:ignore
-    eval('namespace Symfony\Component\Console\Input; class InputOption {
+    eval ('namespace Symfony\Component\Console\Input; class InputOption {
         public const VALUE_NONE = 1;
         public const VALUE_REQUIRED = 2;
     }');
@@ -78,12 +78,12 @@ if (!class_exists('Symfony\Component\Console\Input\InputOption')) {
 
 if (!interface_exists('OCP\AppFramework\Utility\ITimeFactory')) {
     // phpcs:ignore
-    eval('namespace OCP\AppFramework\Utility; interface ITimeFactory {}');
+    eval ('namespace OCP\AppFramework\Utility; interface ITimeFactory {}');
 }
 
 if (!class_exists('OCP\BackgroundJob\TimedJob')) {
     // phpcs:ignore
-    eval('namespace OCP\BackgroundJob; class TimedJob {
+    eval ('namespace OCP\BackgroundJob; class TimedJob {
         public const TIME_INSENSITIVE = 0;
         public function __construct(protected \OCP\AppFramework\Utility\ITimeFactory $time) {}
         protected function setInterval(int $seconds): void {}
@@ -93,7 +93,7 @@ if (!class_exists('OCP\BackgroundJob\TimedJob')) {
 
 if (!class_exists('Symfony\Component\Console\Command\Command')) {
     // phpcs:ignore
-    eval('namespace Symfony\Component\Console\Command; class Command {
+    eval ('namespace Symfony\Component\Console\Command; class Command {
         public const SUCCESS = 0;
         public const FAILURE = 1;
         public function __construct() {}
@@ -112,7 +112,7 @@ if (!class_exists('Symfony\Component\Console\Command\Command')) {
 
 if (!interface_exists('OCP\Http\Client\IClient')) {
     // phpcs:ignore
-    eval('namespace OCP\Http\Client; interface IClient {
+    eval ('namespace OCP\Http\Client; interface IClient {
         public function get(string $uri, array $options = []);
         public function post(string $uri, array $options = []);
     }');
@@ -120,28 +120,28 @@ if (!interface_exists('OCP\Http\Client\IClient')) {
 
 if (!interface_exists('OCP\Http\Client\IResponse')) {
     // phpcs:ignore
-    eval('namespace OCP\Http\Client; interface IResponse {
+    eval ('namespace OCP\Http\Client; interface IResponse {
         public function getBody(): string;
     }');
 }
 
 if (!interface_exists('OCP\Http\Client\IClientService')) {
     // phpcs:ignore
-    eval('namespace OCP\Http\Client; interface IClientService {
+    eval ('namespace OCP\Http\Client; interface IClientService {
         public function newClient(): IClient;
     }');
 }
 
 if (!interface_exists('OCP\IDBConnection')) {
     // phpcs:ignore
-    eval('namespace OCP; interface IDBConnection {
+    eval ('namespace OCP; interface IDBConnection {
         public function getQueryBuilder();
     }');
 }
 
 if (!interface_exists('OCP\IConfig')) {
     // phpcs:ignore
-    eval('namespace OCP; interface IConfig {
+    eval ('namespace OCP; interface IConfig {
         public function getAppValue(string $app, string $key, string $default = ""): string;
         public function setAppValue(string $app, string $key, string $value): void;
     }');
@@ -149,7 +149,7 @@ if (!interface_exists('OCP\IConfig')) {
 
 if (!interface_exists('OCP\IRequest')) {
     // phpcs:ignore
-    eval('namespace OCP; interface IRequest {
+    eval ('namespace OCP; interface IRequest {
         public function offsetExists($offset): bool;
         public function getParam(string $key, mixed $default = null): mixed;
         public function getServerHost(): string;
@@ -160,7 +160,7 @@ if (!interface_exists('OCP\IRequest')) {
 
 if (!interface_exists('OCP\IUser')) {
     // phpcs:ignore
-    eval('namespace OCP; interface IUser {
+    eval ('namespace OCP; interface IUser {
         public function getUID(): string;
         public function getDisplayName(): ?string;
         public function setDisplayName(string $displayName): void;
@@ -172,7 +172,7 @@ if (!interface_exists('OCP\IUser')) {
 
 if (!interface_exists('OCP\IUserManager')) {
     // phpcs:ignore
-    eval('namespace OCP; interface IUserManager {
+    eval ('namespace OCP; interface IUserManager {
         public function get(string $uid): ?IUser;
         public function createUser(string $uid, string $password);
         public function getByEmail(string $email): array;
@@ -182,7 +182,7 @@ if (!interface_exists('OCP\IUserManager')) {
 
 if (!interface_exists('OCP\IGroup')) {
     // phpcs:ignore
-    eval('namespace OCP; interface IGroup {
+    eval ('namespace OCP; interface IGroup {
         public function getGID(): string;
         public function getUsers(): array;
         public function addUser(IUser $user): void;
@@ -193,7 +193,7 @@ if (!interface_exists('OCP\IGroup')) {
 
 if (!interface_exists('OCP\IGroupManager')) {
     // phpcs:ignore
-    eval('namespace OCP; interface IGroupManager {
+    eval ('namespace OCP; interface IGroupManager {
         public function groupExists(string $gid): bool;
         public function createGroup(string $gid): ?IGroup;
         public function get(string $gid): ?IGroup;
@@ -205,7 +205,7 @@ if (!interface_exists('OCP\IGroupManager')) {
 
 if (!interface_exists('OCP\Mail\IMessage')) {
     // phpcs:ignore
-    eval('namespace OCP\Mail; interface IMessage {
+    eval ('namespace OCP\Mail; interface IMessage {
         public function setFrom(array $addresses): void;
         public function setTo(array $addresses): void;
         public function setSubject(string $subject): void;
@@ -215,14 +215,14 @@ if (!interface_exists('OCP\Mail\IMessage')) {
 
 if (!interface_exists('OCP\IUserSession')) {
     // phpcs:ignore
-    eval('namespace OCP; interface IUserSession {
+    eval ('namespace OCP; interface IUserSession {
         public function getUser(): ?\\OCP\\IUser;
     }');
 }
 
 if (!interface_exists('OCP\Files\Node')) {
     // phpcs:ignore
-    eval('namespace OCP\Files; interface Node {
+    eval ('namespace OCP\Files; interface Node {
         public function getName(): string;
         public function getId(): int;
         public function getMTime(): int;
@@ -232,7 +232,7 @@ if (!interface_exists('OCP\Files\Node')) {
 }
 if (!interface_exists('OCP\Files\Folder')) {
     // phpcs:ignore
-    eval('namespace OCP\Files; interface Folder extends Node {
+    eval ('namespace OCP\Files; interface Folder extends Node {
         public function getDirectoryListing(): array;
         public function nodeExists(string $path): bool;
         public function get(string $path);
@@ -242,24 +242,24 @@ if (!interface_exists('OCP\Files\Folder')) {
 }
 if (!interface_exists('OCP\Files\File')) {
     // phpcs:ignore
-    eval('namespace OCP\Files; interface File extends Node {
+    eval ('namespace OCP\Files; interface File extends Node {
         public function getContent(): string;
     }');
 }
 if (!class_exists('OCP\Files\NotFoundException')) {
     // phpcs:ignore
-    eval('namespace OCP\Files; class NotFoundException extends \\RuntimeException {}');
+    eval ('namespace OCP\Files; class NotFoundException extends \\RuntimeException {}');
 }
 if (!interface_exists('OCP\Files\IRootFolder')) {
     // phpcs:ignore
-    eval('namespace OCP\Files; interface IRootFolder {
+    eval ('namespace OCP\Files; interface IRootFolder {
         public function getUserFolder(string $userId): Folder;
     }');
 }
 
 if (!interface_exists('OCP\Mail\IMailer')) {
     // phpcs:ignore
-    eval('namespace OCP\Mail; interface IMailer {
+    eval ('namespace OCP\Mail; interface IMailer {
         public function createMessage(): IMessage;
         public function send(IMessage $message): void;
     }');
@@ -267,21 +267,21 @@ if (!interface_exists('OCP\Mail\IMailer')) {
 
 if (!class_exists('OCP\AppFramework\Controller')) {
     // phpcs:ignore
-    eval('namespace OCP\AppFramework; class Controller {
+    eval ('namespace OCP\AppFramework; class Controller {
         public function __construct(protected string $appName, protected \OCP\IRequest $request) {}
     }');
 }
 
 if (!class_exists('OCP\AppFramework\App')) {
     // phpcs:ignore
-    eval('namespace OCP\AppFramework; class App {
+    eval ('namespace OCP\AppFramework; class App {
         public function __construct(protected string $appName = "", protected array $urlParams = []) {}
     }');
 }
 
 if (!interface_exists('OCP\AppFramework\Bootstrap\IBootstrap')) {
     // phpcs:ignore
-    eval('namespace OCP\AppFramework\Bootstrap; interface IBootstrap {
+    eval ('namespace OCP\AppFramework\Bootstrap; interface IBootstrap {
         public function register(IRegistrationContext $context): void;
         public function boot(IBootContext $context): void;
     }');
@@ -289,19 +289,19 @@ if (!interface_exists('OCP\AppFramework\Bootstrap\IBootstrap')) {
 
 if (!interface_exists('OCP\AppFramework\Bootstrap\IRegistrationContext')) {
     // phpcs:ignore
-    eval('namespace OCP\AppFramework\Bootstrap; interface IRegistrationContext {
+    eval ('namespace OCP\AppFramework\Bootstrap; interface IRegistrationContext {
         public function registerService(string $name, \Closure $closure): void;
     }');
 }
 
 if (!interface_exists('OCP\AppFramework\Bootstrap\IBootContext')) {
     // phpcs:ignore
-    eval('namespace OCP\AppFramework\Bootstrap; interface IBootContext {}');
+    eval ('namespace OCP\AppFramework\Bootstrap; interface IBootContext {}');
 }
 
 if (!class_exists('OCP\AppFramework\Http')) {
     // phpcs:ignore
-    eval('namespace OCP\AppFramework; class Http {
+    eval ('namespace OCP\AppFramework; class Http {
         public const STATUS_OK = 200;
         public const STATUS_ACCEPTED = 202;
         public const STATUS_BAD_REQUEST = 400;
@@ -313,7 +313,7 @@ if (!class_exists('OCP\AppFramework\Http')) {
 
 if (!class_exists('OCP\AppFramework\Http\DataResponse')) {
     // phpcs:ignore
-    eval('namespace OCP\AppFramework\Http; class DataResponse {
+    eval ('namespace OCP\AppFramework\Http; class DataResponse {
         public function __construct(private mixed $data = null, private int $status = 200) {}
         public function getData(): mixed { return $this->data; }
         public function getStatus(): int { return $this->status; }
@@ -322,7 +322,7 @@ if (!class_exists('OCP\AppFramework\Http\DataResponse')) {
 
 if (!interface_exists('OCP\DB\QueryBuilder\IQueryBuilder')) {
     // phpcs:ignore
-    eval('namespace OCP\DB\QueryBuilder; interface IQueryBuilder {
+    eval ('namespace OCP\DB\QueryBuilder; interface IQueryBuilder {
         public const PARAM_INT = 1;
         public const PARAM_STR_ARRAY = 2;
         public const PARAM_BOOL = 3;
@@ -331,12 +331,12 @@ if (!interface_exists('OCP\DB\QueryBuilder\IQueryBuilder')) {
 
 if (!class_exists('OCP\AppFramework\Db\DoesNotExistException')) {
     // phpcs:ignore
-    eval('namespace OCP\AppFramework\Db; class DoesNotExistException extends \Exception {}');
+    eval ('namespace OCP\AppFramework\Db; class DoesNotExistException extends \Exception {}');
 }
 
 if (!class_exists('OCP\AppFramework\Db\Entity')) {
     // phpcs:ignore
-    eval('namespace OCP\AppFramework\Db; class Entity {
+    eval ('namespace OCP\AppFramework\Db; class Entity {
         protected array $types = [];
         protected array $data = [];
         protected function addType(string $field, string $type): void {
@@ -366,7 +366,7 @@ if (!class_exists('OCP\AppFramework\Db\Entity')) {
 
 if (!class_exists('OCP\AppFramework\Db\QBMapper')) {
     // phpcs:ignore
-    eval('namespace OCP\AppFramework\Db; class QBMapper {
+    eval ('namespace OCP\AppFramework\Db; class QBMapper {
         public function __construct(protected \OCP\IDBConnection $db, protected string $tableName, protected string $entityClass) {}
         protected function getTableName(): string { return $this->tableName; }
         protected function findEntity($qb) { throw new DoesNotExistException("Nicht gefunden"); }
@@ -394,7 +394,7 @@ spl_autoload_register(static function (string $class) use ($appDir): void {
     if (!str_starts_with($class, $prefix)) {
         return;
     }
-    $rel  = substr($class, strlen($prefix));
+    $rel = substr($class, strlen($prefix));
     $file = $appDir . '/lib/' . str_replace('\\', '/', $rel) . '.php';
     if (is_file($file)) {
         require_once $file;
@@ -407,7 +407,7 @@ spl_autoload_register(static function (string $class) use ($appDir): void {
     if (!str_starts_with($class, $prefix)) {
         return;
     }
-    $rel  = substr($class, strlen($prefix));
+    $rel = substr($class, strlen($prefix));
     $file = $appDir . '/tests/' . str_replace('\\', '/', $rel) . '.php';
     if (is_file($file)) {
         require_once $file;

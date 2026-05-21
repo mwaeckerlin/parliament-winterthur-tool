@@ -14,8 +14,10 @@ use OCP\IUserSession;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
-class GeschaeftControllerTest extends TestCase {
-    public function testIndexBlendetErledigteStandardmaessigAus(): void {
+class GeschaeftControllerTest extends TestCase
+{
+    public function testIndexBlendetErledigteStandardmaessigAus(): void
+    {
         $request = $this->createMock(IRequest::class);
         $request->method('getParam')
             ->willReturnCallback(static function (string $key, mixed $default = null): mixed {
@@ -48,7 +50,8 @@ class GeschaeftControllerTest extends TestCase {
         $this->assertSame([], $response->getData());
     }
 
-    public function testIndexZeigtErledigteBeiShowErledigtFlag(): void {
+    public function testIndexZeigtErledigteBeiShowErledigtFlag(): void
+    {
         $request = $this->createMock(IRequest::class);
         $request->method('getParam')
             ->willReturnCallback(static function (string $key, mixed $default = null): mixed {
