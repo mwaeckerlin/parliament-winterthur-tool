@@ -4,11 +4,10 @@ Nextcloud-Plugin für die Fraktionsarbeit im Winterthurer Parlament.
 
 ## Zu Erledigen:
 
-  1. Traktanmdenliste: Geschäfte aus der Geschäftsliste werden genau gleich angezeigt, wie die Geschäfte auf deren Hauptseite.
-  2. Wir haben nun Bemerkungen und Notizen zu den Trakranden. Notizen reichen aus.
-  3. Notizen in Traktranden werden nicht gespeichert!
-  4. Globale Suche funktioniert nicht.
-  5. **Sitzungstypen / Sitzungs-Vorlagen** – aktuell nicht vorhanden, komplett
+  1. Traktandenliste: Geschäfte aus der Geschäftsliste werden ähnlich angezeigt, wie die Geschäfte auf deren Hauptseite, mit denselben Daten und den beiden direkten Eingabemöglichkeiten. Die Traktandennummer bleibt angezeigt.
+  2. Traktandenliste erhält eine Suche mit der man nach Geschäftsnummern oder Titeln suchen kann,
+  3. Wir haben nun Bemerkungen und Notizen zu den Traktanden. Notizen reichen aus.
+  4. **Sitzungstypen / Sitzungs-Vorlagen** – aktuell nicht vorhanden, komplett
      neu zu bauen. Eine Sitzungstyp-Vorlage soll definieren:
       - Name (z.B. „Fraktionssitzung“) und Zweck
       - Standard-Traktanden (Liste, in Reihenfolge, mit Titel/Beschreibung)
@@ -23,9 +22,11 @@ Nextcloud-Plugin für die Fraktionsarbeit im Winterthurer Parlament.
      `sitzungstyp_traktanden`, `sitzungstyp_teilnehmer`), `Sitzung.typ_id`,
      `SitzungstypService::sitzungAusTyp(...)`, CRUD-Endpunkte, Verwaltungs-UI,
      Erweiterung `KalenderService::erstelleIcal()` um `ATTENDEE`/`ORGANIZER`.
-  6. Unter Sitzungen ein Popup-Knopf «+ Neu», um eine neue Sitzung festzulegen aus den definierten Sitzungstypen-Vorlagen als Optionen, z.B.:
+  5. Unter Sitzungen ein Popup-Knopf «+ Neu», um eine neue Sitzung festzulegen aus den definierten Sitzungstypen-Vorlagen als Optionen, z.B.:
       - Neue Fraktionssitzung
-
+  6. Notizen in Traktanden werden nicht gespeichert!
+  7. Globale Suche funktioniert nicht. Sie sollte mindestens nach Geschäftsnummer oder Titel suchen. → Gemeint ist die plugin-eigene Suche bzw. der Nextcloud-Unified-Search-Provider; falls keiner registriert ist, registriere einen.
+  
 ## Bugs
 
 
