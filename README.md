@@ -4,6 +4,8 @@ Nextcloud-Plugin für die Fraktionsarbeit im Winterthurer Parlament.
 
 ## Zu Erledigen:
 
+  - Neuer Sitzungstyp: ![alt text](image-11.png)
+
   - (offen) Falls beim Öffnen eines bereits existierenden Dokuments aus der
     Geschäfts-Ansicht weiterhin lange Wartezeiten auftreten: das ist die
     Collabora-/Office-Startzeit (Server-Cold-Start). Workaround in v1.1.0:
