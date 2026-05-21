@@ -26,15 +26,20 @@ return [
         ['name' => 'sitzung#show', 'url' => '/sitzungen/{id}', 'verb' => 'GET'],
         ['name' => 'sitzung#update', 'url' => '/sitzungen/{id}', 'verb' => 'PUT'],
 
-        // Sitzungs-Vorlagen / Sitzungstypen
-        ['name' => 'sitzungstyp#index', 'url' => '/sitzungstypen', 'verb' => 'GET'],
-        ['name' => 'sitzungstyp#show', 'url' => '/sitzungstypen/{id}', 'verb' => 'GET'],
-        ['name' => 'sitzungstyp#create', 'url' => '/sitzungstypen', 'verb' => 'POST'],
-        ['name' => 'sitzungstyp#update', 'url' => '/sitzungstypen/{id}', 'verb' => 'PUT'],
-        ['name' => 'sitzungstyp#destroy', 'url' => '/sitzungstypen/{id}', 'verb' => 'DELETE'],
-        ['name' => 'sitzungstyp#neueSitzung', 'url' => '/sitzungstypen/{id}/sitzung', 'verb' => 'POST'],
+        // Sitzungs-Vorlagen / Sitzungstypen.
+        // Hinweis: Die spezifischen /nc/groups und /nc/users Routen MUESSEN
+        // vor den generischen /{id}-Routen stehen, sonst koennte das Routing
+        // "nc" als id-Parameter interpretieren (Typkonvertierung schlaegt
+        // dann fehl und es kommt 404 / leere Antwort). Zusaetzlich ist {id}
+        // auf reine Ziffern eingeschraenkt (requirements).
         ['name' => 'sitzungstyp#ncGroups', 'url' => '/sitzungstypen/nc/groups', 'verb' => 'GET'],
         ['name' => 'sitzungstyp#ncUsers', 'url' => '/sitzungstypen/nc/users', 'verb' => 'GET'],
+        ['name' => 'sitzungstyp#index', 'url' => '/sitzungstypen', 'verb' => 'GET'],
+        ['name' => 'sitzungstyp#create', 'url' => '/sitzungstypen', 'verb' => 'POST'],
+        ['name' => 'sitzungstyp#show', 'url' => '/sitzungstypen/{id}', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
+        ['name' => 'sitzungstyp#update', 'url' => '/sitzungstypen/{id}', 'verb' => 'PUT', 'requirements' => ['id' => '\d+']],
+        ['name' => 'sitzungstyp#destroy', 'url' => '/sitzungstypen/{id}', 'verb' => 'DELETE', 'requirements' => ['id' => '\d+']],
+        ['name' => 'sitzungstyp#neueSitzung', 'url' => '/sitzungstypen/{id}/sitzung', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
 
         // Traktanden
         ['name' => 'traktandum#index', 'url' => '/sitzungen/{sitzungId}/traktanden', 'verb' => 'GET'],

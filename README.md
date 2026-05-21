@@ -4,11 +4,6 @@ Nextcloud-Plugin für die Fraktionsarbeit im Winterthurer Parlament.
 
 ## Zu Erledigen:
 
-  - Neuer Sitzungstyp: ![alt text](image-11.png)
-  - Nextcloud-Gruppe kann nicht gewählzt werden: ![](image-12.png), Benutzer ebensowenig! Fraktionsrolle hat keine Auswahl. Kommission wählen ist immer noch alte Schreisse drin!
-  - FEHLER BEIM SPEICHERN KOMMT IMMER NOCH
-
-
   - (offen) Falls beim Öffnen eines bereits existierenden Dokuments aus der
     Geschäfts-Ansicht weiterhin lange Wartezeiten auftreten: das ist die
     Collabora-/Office-Startzeit (Server-Cold-Start). Workaround in v1.1.0:
@@ -16,6 +11,30 @@ Nextcloud-Plugin für die Fraktionsarbeit im Winterthurer Parlament.
     dass die Ladezeit parallel zur Modal-Schliessung läuft.
 
 ## Erledigt:
+
+  - ✅ Sitzungstyp-Modal Z-Index endgültig (v1.1.1): das in
+    `Sitzungstypenliste.vue` lokal `scoped` definierte `.pw-modal-overlay`
+    (z-index 10000) hat das globale 100000 überschrieben — daher lag das
+    Modal in eingeklapptem Layout teilweise hinter der Nextcloud-Navigation
+    (image-11). Lokale Override entfernt, globales Overlay wirkt.
+  - ✅ Nextcloud-Gruppen & -Benutzer im Sitzungstyp-Dialog (v1.1.1):
+    Routen-Reihenfolge in `appinfo/routes.php` korrigiert
+    (`/sitzungstypen/nc/groups`, `/sitzungstypen/nc/users` stehen jetzt
+    VOR der generischen `/sitzungstypen/{id}`-Route, `{id}` ist auf `\d+`
+    eingeschränkt). Vorher matchte `nc` als `{id}` (Type-Cast) und der
+    Endpunkt blieb leer. Lade-/Leer-/Fehlerzustände werden im Dropdown
+    angezeigt.
+  - ✅ Fraktions-Rolle als Auswahl (v1.1.1): statt freiem Text gibt es jetzt
+    ein Dropdown der fünf definierten Rollen-Codes (Kommissionsmitglied,
+    Fraktionspräsident\*in (+ Stv.), Protokollführer\*in (+ Stv.)).
+  - ✅ Kommissions-Auswahl gefiltert (v1.1.1): es werden nur noch aktive,
+    nicht gelöschte Kommissionen angeboten; bei leerer Liste erscheint ein
+    Hinweistext statt eines leeren Dropdowns.
+  - ✅ Speichern-Fehler-Diagnose (v1.1.1): Controller `create()`/`update()`
+    fangen Throwables, loggen via `LoggerInterface` und liefern eine
+    sprechende `fehler`-Nachricht. Frontend zeigt HTTP-Status + Server-
+    Meldung im Alert. Leere Teilnehmer-Regeln werden vor dem Senden
+    validiert.
 
   - ✅ Z-Index-Fix Modal-Overlay (v1.1.0): `.pw-modal-overlay` z-index von
     10000 auf 100000 angehoben, damit Sitzungstyp-/Sitzung-/Dokument-Modale
