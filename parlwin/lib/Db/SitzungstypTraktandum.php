@@ -17,28 +17,28 @@ use OCP\AppFramework\Db\Entity;
  */
 class SitzungstypTraktandum extends Entity
 {
-    protected int $typId = 0;
-    protected int $position = 0;
-    protected string $titel = '';
-    protected string $beschreibung = '';
+  protected int $typId = 0;
+  protected int $position = 0;
+  protected string $titel = '';
+  protected string $beschreibung = '';
 
-    public function __construct()
-    {
-        $this->addType('typId', 'integer');
-        $this->addType('position', 'integer');
-    }
+  public function __construct()
+  {
+    $this->addType('typId', 'integer');
+    $this->addType('position', 'integer');
+  }
 
-    /**
-     * @return array<string, mixed>
-     */
-    public function jsonSerialize(): array
-    {
-        return [
-            'id' => $this->getId(),
-            'typId' => $this->getTypId(),
-            'position' => $this->getPosition(),
-            'titel' => $this->getTitel(),
-            'beschreibung' => $this->getBeschreibung(),
-        ];
-    }
+  /**
+   * @return array<string, mixed>
+   */
+  public function jsonSerialize(): array
+  {
+    return [
+      'id' => $this->getId(),
+      'typId' => $this->getTypId(),
+      'position' => $this->getPosition(),
+      'titel' => $this->getTitel(),
+      'beschreibung' => $this->getBeschreibung(),
+    ];
+  }
 }

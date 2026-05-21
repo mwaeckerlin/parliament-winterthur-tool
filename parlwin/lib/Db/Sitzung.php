@@ -24,7 +24,8 @@ use OCP\AppFramework\Db\Entity;
  * @method string getErstelltAm()
  * @method string getAktualisiertAm()
  */
-class Sitzung extends Entity {
+class Sitzung extends Entity
+{
     /** @var string ID auf der Parlamentswebseite */
     protected string $externId = '';
 
@@ -68,7 +69,8 @@ class Sitzung extends Entity {
     /** @var string Letzter Aktualisierungszeitpunkt (ISO 8601) */
     protected string $aktualisiertAm = '';
 
-    public function __construct() {
+    public function __construct()
+    {
         $this->addType('geloescht', 'boolean');
         $this->addType('typId', 'integer');
     }
@@ -76,7 +78,8 @@ class Sitzung extends Entity {
     /**
      * @return array<string, mixed>
      */
-    public function jsonSerialize(): array {
+    public function jsonSerialize(): array
+    {
         return [
             'id' => $this->getId(),
             'externId' => $this->getExternId(),
@@ -100,7 +103,8 @@ class Sitzung extends Entity {
      *
      * @return array<int, array<string, mixed>>
      */
-    public function getTeilnehmerArray(): array {
+    public function getTeilnehmerArray(): array
+    {
         $entschluesselt = json_decode($this->teilnehmer ?: '[]', true);
         return is_array($entschluesselt) ? $entschluesselt : [];
     }

@@ -8,9 +8,9 @@ return [
         ['name' => 'page#index', 'url' => '/', 'verb' => 'GET'],
 
         // Geschäfte
-        ['name' => 'geschaeft#index',  'url' => '/geschaefte',           'verb' => 'GET'],
-        ['name' => 'geschaeft#show',   'url' => '/geschaefte/{id}',      'verb' => 'GET'],
-        ['name' => 'geschaeft#update', 'url' => '/geschaefte/{id}',      'verb' => 'PUT'],
+        ['name' => 'geschaeft#index', 'url' => '/geschaefte', 'verb' => 'GET'],
+        ['name' => 'geschaeft#show', 'url' => '/geschaefte/{id}', 'verb' => 'GET'],
+        ['name' => 'geschaeft#update', 'url' => '/geschaefte/{id}', 'verb' => 'PUT'],
         ['name' => 'geschaeft#addNotiz', 'url' => '/geschaefte/{id}/notizen', 'verb' => 'POST'],
         ['name' => 'geschaeft#addBeschluss', 'url' => '/geschaefte/{id}/beschluesse', 'verb' => 'POST'],
         ['name' => 'geschaeft#removeBeschluss', 'url' => '/geschaefte/{id}/beschluesse', 'verb' => 'DELETE'],
@@ -20,37 +20,37 @@ return [
         ['name' => 'geschaeft#votumPdf', 'url' => '/geschaefte/{id}/votum/pdf', 'verb' => 'GET'],
 
         // Sitzungen
-        ['name' => 'sitzung#index',    'url' => '/sitzungen',            'verb' => 'GET'],
-        ['name' => 'sitzung#show',     'url' => '/sitzungen/{id}',       'verb' => 'GET'],
-        ['name' => 'sitzung#update',   'url' => '/sitzungen/{id}',       'verb' => 'PUT'],
+        ['name' => 'sitzung#index', 'url' => '/sitzungen', 'verb' => 'GET'],
+        ['name' => 'sitzung#show', 'url' => '/sitzungen/{id}', 'verb' => 'GET'],
+        ['name' => 'sitzung#update', 'url' => '/sitzungen/{id}', 'verb' => 'PUT'],
 
         // Sitzungs-Vorlagen / Sitzungstypen
-        ['name' => 'sitzungstyp#index',       'url' => '/sitzungstypen',                 'verb' => 'GET'],
-        ['name' => 'sitzungstyp#show',        'url' => '/sitzungstypen/{id}',            'verb' => 'GET'],
-        ['name' => 'sitzungstyp#create',      'url' => '/sitzungstypen',                 'verb' => 'POST'],
-        ['name' => 'sitzungstyp#update',      'url' => '/sitzungstypen/{id}',            'verb' => 'PUT'],
-        ['name' => 'sitzungstyp#destroy',     'url' => '/sitzungstypen/{id}',            'verb' => 'DELETE'],
-        ['name' => 'sitzungstyp#neueSitzung', 'url' => '/sitzungstypen/{id}/sitzung',    'verb' => 'POST'],
+        ['name' => 'sitzungstyp#index', 'url' => '/sitzungstypen', 'verb' => 'GET'],
+        ['name' => 'sitzungstyp#show', 'url' => '/sitzungstypen/{id}', 'verb' => 'GET'],
+        ['name' => 'sitzungstyp#create', 'url' => '/sitzungstypen', 'verb' => 'POST'],
+        ['name' => 'sitzungstyp#update', 'url' => '/sitzungstypen/{id}', 'verb' => 'PUT'],
+        ['name' => 'sitzungstyp#destroy', 'url' => '/sitzungstypen/{id}', 'verb' => 'DELETE'],
+        ['name' => 'sitzungstyp#neueSitzung', 'url' => '/sitzungstypen/{id}/sitzung', 'verb' => 'POST'],
 
         // Traktanden
-        ['name' => 'traktandum#index',  'url' => '/sitzungen/{sitzungId}/traktanden',      'verb' => 'GET'],
+        ['name' => 'traktandum#index', 'url' => '/sitzungen/{sitzungId}/traktanden', 'verb' => 'GET'],
         ['name' => 'traktandum#update', 'url' => '/sitzungen/{sitzungId}/traktanden/{id}', 'verb' => 'PUT'],
 
         // Mitglieder
-        ['name' => 'mitglied#index',   'url' => '/mitglieder',           'verb' => 'GET'],
-        ['name' => 'mitglied#show',    'url' => '/mitglieder/{id}',      'verb' => 'GET'],
+        ['name' => 'mitglied#index', 'url' => '/mitglieder', 'verb' => 'GET'],
+        ['name' => 'mitglied#show', 'url' => '/mitglieder/{id}', 'verb' => 'GET'],
 
         // Kommissionen
-        ['name' => 'kommission#index', 'url' => '/kommissionen',         'verb' => 'GET'],
-        ['name' => 'kommission#show',  'url' => '/kommissionen/{id}',    'verb' => 'GET'],
+        ['name' => 'kommission#index', 'url' => '/kommissionen', 'verb' => 'GET'],
+        ['name' => 'kommission#show', 'url' => '/kommissionen/{id}', 'verb' => 'GET'],
 
         // Fraktionen
-        ['name' => 'fraktion#index',   'url' => '/fraktionen',           'verb' => 'GET'],
-        ['name' => 'fraktion#show',    'url' => '/fraktionen/{id}',      'verb' => 'GET'],
+        ['name' => 'fraktion#index', 'url' => '/fraktionen', 'verb' => 'GET'],
+        ['name' => 'fraktion#show', 'url' => '/fraktionen/{id}', 'verb' => 'GET'],
 
         // Einstellungen (Admin-API)
-        ['name' => 'settings#get',     'url' => '/settings',             'verb' => 'GET'],
-        ['name' => 'settings#set',     'url' => '/settings',             'verb' => 'POST'],
+        ['name' => 'settings#get', 'url' => '/settings', 'verb' => 'GET'],
+        ['name' => 'settings#set', 'url' => '/settings', 'verb' => 'POST'],
         ['name' => 'settings#fraktionMitglieder', 'url' => '/settings/fraktion-mitglieder', 'verb' => 'GET'],
         ['name' => 'settings#saveFraktionMitgliederMapping', 'url' => '/settings/fraktion-mitglieder/mappings', 'verb' => 'POST'],
         ['name' => 'settings#provisionFraktionMitglieder', 'url' => '/settings/fraktion-mitglieder/anlegen', 'verb' => 'POST'],
@@ -63,8 +63,8 @@ return [
         ['name' => 'settings#addKommissionsmitglied', 'url' => '/settings/kommissionsmitglied', 'verb' => 'POST'],
 
         // Manuelle Synchronisation auslösen (SettingsController::run)
-        ['name' => 'settings#syncStatus', 'url' => '/sync/status',          'verb' => 'GET'],
-        ['name' => 'settings#cancelSync', 'url' => '/sync/cancel',          'verb' => 'POST'],
-        ['name' => 'settings#run',     'url' => '/sync',                 'verb' => 'POST'],
+        ['name' => 'settings#syncStatus', 'url' => '/sync/status', 'verb' => 'GET'],
+        ['name' => 'settings#cancelSync', 'url' => '/sync/cancel', 'verb' => 'POST'],
+        ['name' => 'settings#run', 'url' => '/sync', 'verb' => 'POST'],
     ],
 ];

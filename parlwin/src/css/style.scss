@@ -86,8 +86,8 @@
   --pw-col-typ: 10em;
   --pw-col-status: 6em;
   --pw-col-datum: 5em;
-  --pw-col-zustaendig: 4em;
-  --pw-col-beschluss: 4em;
+  --pw-col-zustaendig: 9em;
+  --pw-col-beschluss: 9em;
   --pw-col-titel: 15em;
 
   /* Sidebar-Breite (NcAppNavigation) – bewusst schmaler als der
@@ -1536,8 +1536,9 @@ ul.app-navigation__list {
 
 .pw-tabelle-geschaefte .pw-col-zustaendig {
   /* Wrap mit Silbentrennung erlaubt. */
-  inline-size: 1%;
+  inline-size: var(--pw-col-zustaendig);
   min-inline-size: var(--pw-col-zustaendig);
+  max-inline-size: var(--pw-col-zustaendig);
   white-space: normal;
   overflow-wrap: anywhere;
   word-break: normal;
@@ -1547,8 +1548,9 @@ ul.app-navigation__list {
 
 .pw-tabelle-geschaefte .pw-col-beschluss {
   /* Wrap mit Silbentrennung erlaubt. */
-  inline-size: 1%;
+  inline-size: var(--pw-col-beschluss);
   min-inline-size: var(--pw-col-beschluss);
+  max-inline-size: var(--pw-col-beschluss);
   white-space: normal;
   overflow-wrap: anywhere;
   word-break: normal;

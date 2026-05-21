@@ -18,7 +18,8 @@ use Psr\Log\LoggerInterface;
 /**
  * REST-Controller für Traktanden.
  */
-class TraktandumController extends Controller {
+class TraktandumController extends Controller
+{
     public function __construct(
         IRequest $request,
         private readonly SitzungService $service,
@@ -38,7 +39,8 @@ class TraktandumController extends Controller {
      * Geschäftsliste-Hauptseite verwenden kann.
      */
     #[NoAdminRequired]
-    public function index(int $sitzungId): DataResponse {
+    public function index(int $sitzungId): DataResponse
+    {
         $traktanden = $this->service->traktanden($sitzungId);
         $result = [];
         foreach ($traktanden as $t) {
@@ -71,7 +73,8 @@ class TraktandumController extends Controller {
      * ist entfernt – die Notizen reichen.
      */
     #[NoAdminRequired]
-    public function update(int $sitzungId, int $id): DataResponse {
+    public function update(int $sitzungId, int $id): DataResponse
+    {
         $felder = [];
         if ($this->request->offsetExists('notizen')) {
             $felder['notizen'] = $this->request->getParam('notizen', '[]');

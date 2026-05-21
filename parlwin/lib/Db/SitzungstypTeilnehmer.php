@@ -22,28 +22,28 @@ use OCP\AppFramework\Db\Entity;
  */
 class SitzungstypTeilnehmer extends Entity
 {
-    protected int $typId = 0;
-    protected string $art = 'mitglied';
-    protected int $referenzId = 0;
-    protected string $referenzName = '';
+  protected int $typId = 0;
+  protected string $art = 'mitglied';
+  protected int $referenzId = 0;
+  protected string $referenzName = '';
 
-    public function __construct()
-    {
-        $this->addType('typId', 'integer');
-        $this->addType('referenzId', 'integer');
-    }
+  public function __construct()
+  {
+    $this->addType('typId', 'integer');
+    $this->addType('referenzId', 'integer');
+  }
 
-    /**
-     * @return array<string, mixed>
-     */
-    public function jsonSerialize(): array
-    {
-        return [
-            'id' => $this->getId(),
-            'typId' => $this->getTypId(),
-            'art' => $this->getArt(),
-            'referenzId' => $this->getReferenzId(),
-            'referenzName' => $this->getReferenzName(),
-        ];
-    }
+  /**
+   * @return array<string, mixed>
+   */
+  public function jsonSerialize(): array
+  {
+    return [
+      'id' => $this->getId(),
+      'typId' => $this->getTypId(),
+      'art' => $this->getArt(),
+      'referenzId' => $this->getReferenzId(),
+      'referenzName' => $this->getReferenzName(),
+    ];
+  }
 }
