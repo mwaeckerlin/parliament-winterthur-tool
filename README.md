@@ -4,14 +4,17 @@ Nextcloud-Plugin für die Fraktionsarbeit im Winterthurer Parlament.
 
 ## Zu Erledigen:
 
- 1. Fail von unten
- 2. Geschäft, Votum im Rat: Besser als ein eingebauter WYSIWYG-Editor ist es, direkt gemeinsam geteilte Dateien einzubinden: Statt "Votum im Rat" mit Text-Editor neu eine Art Spiegel von Dokumenten aus der Files App: Alle Dokumente werden angezeigt, die unter Fraktion/20_Geschäfte/YYYY/YYYY.XXXX-* liegen passend zu Geschäft YYYY.XXXX → Wobei z.B. bei 2026.88 → 2026 ist YYYY, das Jahr; XXXX ist 88, die Nummer des Dokuments in diesem Jahr. Das heisst, für Geschäft 2026.88 werden alle Dokumente eingeblendet, die unter Fraktion/20_Geschäfte/2026/2026.88-* liegen. Es soll auch einen Button geben, um ein neues Dokument zu einem Geschäft anzulegen. Der User kann dann den `*` Teil oben als Name eingeben und den Typ wählen. Also User gibt ein: "Word-Dokument (docx)", Name "Überweisung Rede", dann wird generiert (space zu underscore): "Fraktion/20_Geschäfte/2026/2026.88-Überweisung_Rede.docx". Dokument-Typen sind gemäss "Neu" in Files zu wählen, die gleiche Auswahl, wie hier (Reuse vom Code in Files, soweit möglich): ![alt text](image-1.png) 
+  (nichts mehr offen — siehe „Erledigt" unten.)
 
 ## Fail:
 
-  2. Suche in Traktandenliste (Nr. oder Titel) – Suchfeld in der Sitzungs-Ansicht. → Die Suche sollte mit dem ersten Tippen starten. Nichts passiert! ![alt text](image.png)
-  4. Neuer Sitzungstyp, Teilnehmer-Regeln, Fraktion wählen → Die Fraktionsauswahl auch Mitgliederauswahl sollte nur aktive zur Auswahl stellen; Ausserdem fehlt eine einfache Auswahl: "Eigene Fraktion" und Nextcloud-Gruppe oder Nextcloud-User; → ergänzen / anpassen
-  4. Neuer Sitzungstyp → Fehler beim Speichern: ![alt text](image-2.png)
+  (nichts mehr offen — siehe „Erledigt" unten.)
+
+## Fail (historisch, erledigt):
+
+  2. ✅ Suche in Traktandenliste (Nr. oder Titel) – Suchfeld in der Sitzungs-Ansicht. → Die Suche sollte mit dem ersten Tippen starten. Nichts passiert! ![alt text](image.png)
+  4. ✅ Neuer Sitzungstyp, Teilnehmer-Regeln, Fraktion wählen → Die Fraktionsauswahl auch Mitgliederauswahl sollte nur aktive zur Auswahl stellen; Ausserdem fehlt eine einfache Auswahl: "Eigene Fraktion" und Nextcloud-Gruppe oder Nextcloud-User; → ergänzen / anpassen
+  4. ✅ Neuer Sitzungstyp → Fehler beim Speichern: ![alt text](image-2.png)
 ```
 {
   "log": {
@@ -505,9 +508,9 @@ Firefox kann keine Verbindung zu dem Server unter ws://localhost:29824/ws/parlwi
 ```
   5. ✅ +Neu-Knopf in der Sitzungs-Ansicht öffnet Dialog: Sitzungstyp wählen,
      Datum/Zeit/Ort/Titel-Override eingeben → POST `/sitzungstypen/{id}/sitzung`. → Immer an Nextcloud-Standards halten! Kopiere Ansätze von anderen Plugins! Das Popup mit der Auswahl soll gleich erfolgen wie bei anderen, z.B. Files, es soll genau so ein Menu mit den vordefinierten Templates aufpoppen: ![alt text](image-3.png)
-  6. Notiz pro Traktandum: DAS IST EINE GENERELLE REGEL!!! ALLE NOTIZEN, ALLE AKTIONEN, HABEN IMMER: WER WANN WAS!!!! ES FEHLT DAS WER!!! ES MUSS IMMER NACHVOLLZIEHBAR SEIN, WER WANN WAS EINGEGEBEN HAT!!!
+  6. ✅ Notiz pro Traktandum: DAS IST EINE GENERELLE REGEL!!! ALLE NOTIZEN, ALLE AKTIONEN, HABEN IMMER: WER WANN WAS!!!! ES FEHLT DAS WER!!! ES MUSS IMMER NACHVOLLZIEHBAR SEIN, WER WANN WAS EINGEGEBEN HAT!!!
  **IMMER*** **UEBERALL**!!! Immer diese Infos: Datum, User (Display-Name), Aktion / Notiz / Text
-  7. Unified-Search-Provider `parlwin-geschaefte` (`GeschaeftSearchProvider`)
+  7. ✅ Unified-Search-Provider `parlwin-geschaefte` (`GeschaeftSearchProvider`)
      registriert: sucht in `nummer`/`titel` (case-insensitive LIKE),
      liefert Treffer in die globale Nextcloud-Suche. → Nichts passiert! ![alt text](image-4.png)
 
@@ -529,11 +532,20 @@ Firefox kann keine Verbindung zu dem Server unter ws://localhost:29824/ws/parlwi
      Datum/Zeit/Ort/Titel-Override eingeben → POST `/sitzungstypen/{id}/sitzung`.
   6. ✅ Notizen pro Traktandum werden persistiert (Autosave auf Enter, Server-PUT
      auf `notizen`-Feld; nur dieses Feld wird vom Controller akzeptiert).
+  7. ✅ Audit-Trail für Notizen (Fail 6): jede Notiz trägt `datum`, `uid`,
+     `displayName` und `text`. `TraktandumController::normalisiereNotizen()`
+     ergänzt fehlende Felder serverseitig aus `IUserSession`; `Sitzungsliste.vue`
+     setzt sie via `getCurrentUser()` und rendert `datum displayName: text`.
+  8. ✅ Templates-Style Menu für „+ Neue Sitzung" (Fail 5): `NcActions` mit
+     `NcActionButton` pro Sitzungstyp (analog Files-Neu-Menü); Klick öffnet
+     vorbefüllten Dialog (Datum/Zeit/Ort/Titel) ohne Typ-Auswahl.
+  9. ✅ Geschäft-Dokumente statt WYSIWYG „Votum im Rat" (Zu Erledigen 1):
+     neue Komponente `GeschaeftDokumente.vue` spiegelt
+     `Fraktion/20_Geschäfte/{YYYY}/{YYYY.XXXX}-*` über neue Endpunkte
+     `GET/POST /geschaefte/{id}/dokumente`. „+ Neues Dokument" bietet ein
+     Templates-Menu (docx/xlsx/pptx/odt/ods/odp/md/txt); Spaces im Namen werden
+     zu Underscores.
 
-## Zu Erledigen:
-
-  (nichts mehr offen — siehe „Erledigt" oben.)
-  
 ## Bugs
 
 
