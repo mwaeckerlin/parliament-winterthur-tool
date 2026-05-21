@@ -2,11 +2,519 @@
 
 Nextcloud-Plugin für die Fraktionsarbeit im Winterthurer Parlament.
 
+## Zu Erledigen:
+
+ 1. Fail von unten
+ 2. Geschäft, Votum im Rat: Besser als ein eingebauter WYSIWYG-Editor ist es, direkt gemeinsam geteilte Dateien einzubinden: Statt "Votum im Rat" mit Text-Editor neu eine Art Spiegel von Dokumenten aus der Files App: Alle Dokumente werden angezeigt, die unter Fraktion/20_Geschäfte/YYYY/YYYY.XXXX-* liegen passend zu Geschäft YYYY.XXXX → Wobei z.B. bei 2026.88 → 2026 ist YYYY, das Jahr; XXXX ist 88, die Nummer des Dokuments in diesem Jahr. Das heisst, für Geschäft 2026.88 werden alle Dokumente eingeblendet, die unter Fraktion/20_Geschäfte/2026/2026.88-* liegen. Es soll auch einen Button geben, um ein neues Dokument zu einem Geschäft anzulegen. Der User kann dann den `*` Teil oben als Name eingeben und den Typ wählen. Also User gibt ein: "Word-Dokument (docx)", Name "Überweisung Rede", dann wird generiert (space zu underscore): "Fraktion/20_Geschäfte/2026/2026.88-Überweisung_Rede.docx". Dokument-Typen sind gemäss "Neu" in Files zu wählen, die gleiche Auswahl, wie hier (Reuse vom Code in Files, soweit möglich): ![alt text](image-1.png) 
+
+## Fail:
+
+  2. Suche in Traktandenliste (Nr. oder Titel) – Suchfeld in der Sitzungs-Ansicht. → Die Suche sollte mit dem ersten Tippen starten. Nichts passiert! ![alt text](image.png)
+  4. Neuer Sitzungstyp, Teilnehmer-Regeln, Fraktion wählen → Die Fraktionsauswahl auch Mitgliederauswahl sollte nur aktive zur Auswahl stellen; Ausserdem fehlt eine einfache Auswahl: "Eigene Fraktion" und Nextcloud-Gruppe oder Nextcloud-User; → ergänzen / anpassen
+  4. Neuer Sitzungstyp → Fehler beim Speichern: ![alt text](image-2.png)
+```
+{
+  "log": {
+    "version": "1.2",
+    "creator": {
+      "name": "Firefox",
+      "version": "150.0.3"
+    },
+    "browser": {
+      "name": "Firefox",
+      "version": "150.0.3"
+    },
+    "pages": [
+      {
+        "id": "page_1",
+        "pageTimings": {
+          "onContentLoad": -381693,
+          "onLoad": -381012
+        },
+        "startedDateTime": "2026-05-21T10:30:10.951+02:00",
+        "title": "http://localhost:29824/index.php/apps/parlwin/#"
+      }
+    ],
+    "entries": [
+      {
+        "startedDateTime": "2026-05-21T10:30:10.951+02:00",
+        "request": {
+          "bodySize": 19,
+          "method": "PUT",
+          "url": "http://localhost:29824/ocs/v2.php/apps/user_status/api/v1/heartbeat?format=json",
+          "httpVersion": "HTTP/1.1",
+          "headers": [
+            {
+              "name": "Host",
+              "value": "localhost:29824"
+            },
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:150.0) Gecko/20100101 Firefox/150.0"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json, text/plain, */*"
+            },
+            {
+              "name": "Accept-Language",
+              "value": "de,en-US;q=0.9,en;q=0.8"
+            },
+            {
+              "name": "Accept-Encoding",
+              "value": "gzip, deflate, br, zstd"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Content-Length",
+              "value": "19"
+            },
+            {
+              "name": "X-Requested-With",
+              "value": "XMLHttpRequest, XMLHttpRequest"
+            },
+            {
+              "name": "requesttoken",
+              "value": "O3OP47tylR52Hj60/KiC/Q52j/CinUzgaF9Z6Xt158A=:XEvNqt4KunwEK3/Dj+K6qH4E9ZfA2SaEWGwQvj4Q07U="
+            },
+            {
+              "name": "Origin",
+              "value": "http://localhost:29824"
+            },
+            {
+              "name": "Sec-Fetch-Dest",
+              "value": "empty"
+            },
+            {
+              "name": "Sec-Fetch-Mode",
+              "value": "cors"
+            },
+            {
+              "name": "Sec-Fetch-Site",
+              "value": "same-origin"
+            },
+            {
+              "name": "Connection",
+              "value": "keep-alive"
+            },
+            {
+              "name": "Cookie",
+              "value": "nc_sameSiteCookielax=true; nc_sameSiteCookiestrict=true; nc_username=marc-waeckerlin; nc_token=IRdbnP0AqBynsXTRQ5YWVPJwMQM1DXhO; nc_session_id=16j0ofs4721pmtrusf4lk28qak; oc_sessionPassphrase=UYq8z8x8xi015ce0Lizs3gdiWRjzQZh2LV6HxzfPFuUsi3zJf0oT3VGE3bBdUb%2FDsllXxEccaOc9fKHE5LU5uY30wghfS5ZEmfb67yf07M%2F5sj%2BCF5F5soGo9jAc6OMC; oc5upk0ufk49=16j0ofs4721pmtrusf4lk28qak"
+            },
+            {
+              "name": "DNT",
+              "value": "1"
+            },
+            {
+              "name": "Sec-GPC",
+              "value": "1"
+            }
+          ],
+          "cookies": [
+            {
+              "name": "nc_sameSiteCookielax",
+              "value": "true"
+            },
+            {
+              "name": "nc_sameSiteCookiestrict",
+              "value": "true"
+            },
+            {
+              "name": "nc_username",
+              "value": "marc-waeckerlin"
+            },
+            {
+              "name": "nc_token",
+              "value": "IRdbnP0AqBynsXTRQ5YWVPJwMQM1DXhO"
+            },
+            {
+              "name": "nc_session_id",
+              "value": "16j0ofs4721pmtrusf4lk28qak"
+            },
+            {
+              "name": "oc_sessionPassphrase",
+              "value": "UYq8z8x8xi015ce0Lizs3gdiWRjzQZh2LV6HxzfPFuUsi3zJf0oT3VGE3bBdUb/DsllXxEccaOc9fKHE5LU5uY30wghfS5ZEmfb67yf07M/5sj+CF5F5soGo9jAc6OMC"
+            },
+            {
+              "name": "oc5upk0ufk49",
+              "value": "16j0ofs4721pmtrusf4lk28qak"
+            }
+          ],
+          "queryString": [
+            {
+              "name": "format",
+              "value": "json"
+            }
+          ],
+          "headersSize": 1050,
+          "postData": {
+            "mimeType": "application/json",
+            "params": [],
+            "text": "{\"status\":\"online\"}"
+          }
+        },
+        "response": {
+          "status": 200,
+          "statusText": "OK",
+          "httpVersion": "HTTP/1.1",
+          "headers": [
+            {
+              "name": "Server",
+              "value": "nginx"
+            },
+            {
+              "name": "Date",
+              "value": "Thu, 21 May 2026 08:30:10 GMT"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            },
+            {
+              "name": "Content-Length",
+              "value": "157"
+            },
+            {
+              "name": "Connection",
+              "value": "keep-alive"
+            },
+            {
+              "name": "X-Powered-By",
+              "value": "PHP/8.4.20"
+            },
+            {
+              "name": "Referrer-Policy",
+              "value": "no-referrer"
+            },
+            {
+              "name": "X-Content-Type-Options",
+              "value": "nosniff"
+            },
+            {
+              "name": "X-Frame-Options",
+              "value": "SAMEORIGIN"
+            },
+            {
+              "name": "X-Permitted-Cross-Domain-Policies",
+              "value": "none"
+            },
+            {
+              "name": "X-Request-Id",
+              "value": "eUhchCWwLxYz6EzyI71B"
+            },
+            {
+              "name": "Cache-Control",
+              "value": "no-cache, no-store, must-revalidate"
+            },
+            {
+              "name": "Content-Security-Policy",
+              "value": "default-src 'none';base-uri 'none';manifest-src 'self';frame-ancestors 'none'"
+            },
+            {
+              "name": "Feature-Policy",
+              "value": "autoplay 'none';camera 'none';fullscreen 'none';geolocation 'none';microphone 'none';payment 'none'"
+            },
+            {
+              "name": "X-Robots-Tag",
+              "value": "noindex, nofollow"
+            },
+            {
+              "name": "X-User-Id",
+              "value": "marc-waeckerlin"
+            },
+            {
+              "name": "Content-Encoding",
+              "value": "gzip"
+            },
+            {
+              "name": "Strict-Transport-Security",
+              "value": "max-age=63072000; includeSubDomains; preload"
+            },
+            {
+              "name": "X-Frame-Options",
+              "value": "DENY"
+            },
+            {
+              "name": "X-Content-Type-Options",
+              "value": "nosniff"
+            },
+            {
+              "name": "X-XSS-Protection",
+              "value": "1; mode=block"
+            }
+          ],
+          "cookies": [],
+          "content": {
+            "mimeType": "application/json; charset=utf-8",
+            "size": 233,
+            "text": "{\"ocs\":{\"meta\":{\"status\":\"ok\",\"statuscode\":200,\"message\":\"OK\"},\"data\":{\"userId\":\"marc-waeckerlin\",\"message\":null,\"messageId\":null,\"messageIsPredefined\":false,\"icon\":null,\"clearAt\":null,\"status\":\"online\",\"statusIsUserDefined\":false}}}"
+          },
+          "redirectURL": "",
+          "headersSize": 837,
+          "bodySize": 994
+        },
+        "cache": {},
+        "timings": {
+          "blocked": 0,
+          "dns": 0,
+          "connect": 0,
+          "ssl": 0,
+          "send": 0,
+          "wait": 22,
+          "receive": 0
+        },
+        "time": 22,
+        "_securityState": "insecure",
+        "serverIPAddress": "127.0.0.1",
+        "connection": "29824",
+        "pageref": "page_1"
+      },
+      {
+        "startedDateTime": "2026-05-21T10:30:56.950+02:00",
+        "request": {
+          "bodySize": 507,
+          "method": "POST",
+          "url": "http://localhost:29824/index.php/apps/parlwin/sitzungstypen",
+          "httpVersion": "HTTP/1.1",
+          "headers": [
+            {
+              "name": "Host",
+              "value": "localhost:29824"
+            },
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:150.0) Gecko/20100101 Firefox/150.0"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json, text/plain, */*"
+            },
+            {
+              "name": "Accept-Language",
+              "value": "de,en-US;q=0.9,en;q=0.8"
+            },
+            {
+              "name": "Accept-Encoding",
+              "value": "gzip, deflate, br, zstd"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Content-Length",
+              "value": "511"
+            },
+            {
+              "name": "X-Requested-With",
+              "value": "XMLHttpRequest, XMLHttpRequest"
+            },
+            {
+              "name": "requesttoken",
+              "value": "O3OP47tylR52Hj60/KiC/Q52j/CinUzgaF9Z6Xt158A=:XEvNqt4KunwEK3/Dj+K6qH4E9ZfA2SaEWGwQvj4Q07U="
+            },
+            {
+              "name": "Origin",
+              "value": "http://localhost:29824"
+            },
+            {
+              "name": "Sec-Fetch-Dest",
+              "value": "empty"
+            },
+            {
+              "name": "Sec-Fetch-Mode",
+              "value": "cors"
+            },
+            {
+              "name": "Sec-Fetch-Site",
+              "value": "same-origin"
+            },
+            {
+              "name": "Connection",
+              "value": "keep-alive"
+            },
+            {
+              "name": "Cookie",
+              "value": "nc_sameSiteCookielax=true; nc_sameSiteCookiestrict=true; nc_username=marc-waeckerlin; nc_token=IRdbnP0AqBynsXTRQ5YWVPJwMQM1DXhO; nc_session_id=16j0ofs4721pmtrusf4lk28qak; oc_sessionPassphrase=UYq8z8x8xi015ce0Lizs3gdiWRjzQZh2LV6HxzfPFuUsi3zJf0oT3VGE3bBdUb%2FDsllXxEccaOc9fKHE5LU5uY30wghfS5ZEmfb67yf07M%2F5sj%2BCF5F5soGo9jAc6OMC; oc5upk0ufk49=16j0ofs4721pmtrusf4lk28qak"
+            },
+            {
+              "name": "DNT",
+              "value": "1"
+            },
+            {
+              "name": "Sec-GPC",
+              "value": "1"
+            },
+            {
+              "name": "Priority",
+              "value": "u=0"
+            }
+          ],
+          "cookies": [
+            {
+              "name": "nc_sameSiteCookielax",
+              "value": "true"
+            },
+            {
+              "name": "nc_sameSiteCookiestrict",
+              "value": "true"
+            },
+            {
+              "name": "nc_username",
+              "value": "marc-waeckerlin"
+            },
+            {
+              "name": "nc_token",
+              "value": "IRdbnP0AqBynsXTRQ5YWVPJwMQM1DXhO"
+            },
+            {
+              "name": "nc_session_id",
+              "value": "16j0ofs4721pmtrusf4lk28qak"
+            },
+            {
+              "name": "oc_sessionPassphrase",
+              "value": "UYq8z8x8xi015ce0Lizs3gdiWRjzQZh2LV6HxzfPFuUsi3zJf0oT3VGE3bBdUb/DsllXxEccaOc9fKHE5LU5uY30wghfS5ZEmfb67yf07M/5sj+CF5F5soGo9jAc6OMC"
+            },
+            {
+              "name": "oc5upk0ufk49",
+              "value": "16j0ofs4721pmtrusf4lk28qak"
+            }
+          ],
+          "queryString": [],
+          "headersSize": 1047,
+          "postData": {
+            "mimeType": "application/json",
+            "params": [],
+            "text": "{\"id\":0,\"name\":\"Fraktionssitzung\",\"zweck\":\"Vorbereitung der nächsten Parlamentssitzung.\",\"kalenderAnlegen\":true,\"einladungVersenden\":true,\"standardOrt\":\"Rössli Seen\",\"standardZeitVon\":\"19:30\",\"standardZeitBis\":\"21:00\",\"traktanden\":[{\"titel\":\"Personelles\",\"beschreibung\":\"\"},{\"titel\":\"Nächste Sitzung\",\"beschreibung\":\"\"},{\"titel\":\"Offene Geschäfte\",\"beschreibung\":\"\"},{\"titel\":\"\",\"beschreibung\":\"\"}],\"teilnehmer\":[{\"art\":\"fraktion\",\"referenzId\":0,\"referenzName\":\"Schweizerische Volkspartei-Fraktion (SVP)\"}]}"
+          }
+        },
+        "response": {
+          "status": 500,
+          "statusText": "Internal Server Error",
+          "httpVersion": "HTTP/1.1",
+          "headers": [
+            {
+              "name": "Server",
+              "value": "nginx"
+            },
+            {
+              "name": "Date",
+              "value": "Thu, 21 May 2026 08:30:56 GMT"
+            },
+            {
+              "name": "Content-Type",
+              "value": "text/html; charset=UTF-8"
+            },
+            {
+              "name": "Transfer-Encoding",
+              "value": "chunked"
+            },
+            {
+              "name": "Connection",
+              "value": "keep-alive"
+            },
+            {
+              "name": "X-Powered-By",
+              "value": "PHP/8.4.20"
+            },
+            {
+              "name": "Content-Security-Policy",
+              "value": "default-src 'self'; script-src 'self' 'nonce-6aevt7W5aABrCbADeGg24gZE0EC9aLGvEw6HNDtjyKk='; style-src 'self' 'unsafe-inline'; frame-src *; img-src * data: blob:; font-src 'self' data:; media-src *; connect-src *; object-src 'none'; base-uri 'self';"
+            },
+            {
+              "name": "Referrer-Policy",
+              "value": "no-referrer"
+            },
+            {
+              "name": "X-Content-Type-Options",
+              "value": "nosniff"
+            },
+            {
+              "name": "X-Frame-Options",
+              "value": "SAMEORIGIN"
+            },
+            {
+              "name": "X-Permitted-Cross-Domain-Policies",
+              "value": "none"
+            },
+            {
+              "name": "X-Robots-Tag",
+              "value": "noindex, nofollow"
+            },
+            {
+              "name": "Strict-Transport-Security",
+              "value": "max-age=63072000; includeSubDomains; preload"
+            }
+          ],
+          "cookies": [],
+          "content": {
+            "mimeType": "text/html; charset=UTF-8",
+            "size": 3031,
+            "text": "<!DOCTYPE html>\n<html class=\"ng-csp\" data-placeholder-focus=\"false\" lang=\"de\" data-locale=\"de_CH\" translate=\"no\" >\n\t<head\n data-requesttoken=\"\">\n\t\t<meta charset=\"utf-8\">\n\t\t<title>\n\t\t\tNextcloud\t\t</title>\n\t\t<meta name=\"csp-nonce\" nonce=\"6aevt7W5aABrCbADeGg24gZE0EC9aLGvEw6HNDtjyKk=\">\n\t\t<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, minimum-scale=1.0\">\n\t\t\t\t<meta name=\"apple-itunes-app\" content=\"app-id=1125420102\">\n\t\t\t\t<meta name=\"theme-color\" content=\"#00679e\">\n\t\t<link rel=\"icon\" href=\"/index.php/apps/theming/favicon?v=01b5cee0\">\n\t\t<link rel=\"apple-touch-icon\" href=\"/index.php/apps/theming/icon?v=01b5cee0\">\n\t\t<link rel=\"mask-icon\" sizes=\"any\" href=\"/core/img/favicon-mask.svg\" color=\"#00679e\">\n\t\t<link rel=\"manifest\" href=\"/core/img/manifest.json\" crossorigin=\"use-credentials\">\n\t\t<link rel=\"stylesheet\" href=\"/core/css/styles.css?v=77816009-0\">\n<link rel=\"stylesheet\" href=\"/core/css/header.css?v=77816009-0\">\n<link rel=\"stylesheet\" href=\"/core/css/exception.css?v=77816009-0\">\n<link rel=\"stylesheet\" href=\"/apps/theming/css/default.css?v=4e70623c-0\">\n<link rel=\"stylesheet\" href=\"/core/css/guest.css?v=77816009-0\">\n\t\t<script nonce=\"6aevt7W5aABrCbADeGg24gZE0EC9aLGvEw6HNDtjyKk=\" defer src=\"/custom_apps/calendar/l10n/de.js?v=77816009-0\"></script>\n<script nonce=\"6aevt7W5aABrCbADeGg24gZE0EC9aLGvEw6HNDtjyKk=\" defer src=\"/custom_apps/calendar/js/calendar-contacts-menu.js?v=77816009-0\"></script>\n\t\t\t</head>\n\t<body id=\"body-login\" data-theme-default  data-themes=\"default\">\n\t\t<noscript>\n\t<div id=\"nojavascript\">\n\t\t<div>\n\t\t\tDiese Anwendung benötigt JavaScript zum ordnungsgemäßen Betrieb. Bitte <a href=\"https://www.enable-javascript.com/\" target=\"_blank\" rel=\"noreferrer noopener\">aktiviere JavaScript</a> und lade die Seite neu.\t\t</div>\n\t</div>\n</noscript>\n\t\t<div id=\"initial-state-container\" style=\"display: none;\">\n\t\t\t<input type=\"hidden\" id=\"initial-state-core-versionHash\" value=\"Ijc3ODE2MDA5Ig==\">\n\t\t\t<input type=\"hidden\" id=\"initial-state-comments-maxAutoCompleteResults\" value=\"MTA=\">\n\t</div>\n\t\t<div class=\"wrapper\">\n\t\t\t<div class=\"v-align\">\n\t\t\t\t\t\t\t\t\t<header>\n\t\t\t\t\t\t<div id=\"header\" class=\"header-guest\">\n\t\t\t\t\t\t\t<div class=\"logo\"></div>\n\t\t\t\t\t\t</div>\n\t\t\t\t\t</header>\n\t\t\t\t\t\t\t\t<div class=\"guest-content\">\n\t\t\t\t\t<h1 class=\"hidden-visually\">\n\t\t\t\t\t\tNextcloud\t\t\t\t\t</h1>\n\t\t\t\t\t<div class=\"guest-box wide\">\n\t<h2>Interner Serverfehler</h2>\n\t<p>Der Server konnte die Anfrage nicht fertig stellen.</p>\n\t<p>Sollte dies erneut auftreten, sende bitte die nachfolgenden technischen Einzelheiten an deine Serveradministration.</p>\n\t<p>Weitere Details können im Serverprotokoll gefunden werden.</p>\n\t\n\t<h3>Technische Details</h3>\n\t<ul>\n\t\t<li>Entfernte Adresse: 10.240.7.1</li>\n\t\t<li>Anfragekennung: HuomC7DOmZ37ujrayNgn</li>\n\t\t\t</ul>\n\n\t</div>\n\t\t\t\t</div>\n\t\t\t</div>\n\t\t</div>\n\t\t\t\t<footer class=\"guest-box \">\n\t\t\t<p class=\"info\">\n\t\t\t\t<a href=\"https://nextcloud.com\" target=\"_blank\" rel=\"noreferrer noopener\" class=\"entity-name\">Nextcloud</a> – ein sicherer Ort für all deine Daten\t\t\t</p>\n\t\t</footer>\n\t</body>\n</html>\n"
+          },
+          "redirectURL": "",
+          "headersSize": 722,
+          "bodySize": 3753
+        },
+        "cache": {},
+        "timings": {
+          "blocked": 0,
+          "dns": 0,
+          "connect": 0,
+          "ssl": 0,
+          "send": 0,
+          "wait": 28,
+          "receive": 0
+        },
+        "time": 28,
+        "_securityState": "insecure",
+        "serverIPAddress": "127.0.0.1",
+        "connection": "29824",
+        "pageref": "page_1"
+      }
+    ]
+  }
+}
+```
+```
+     [WARN] @nextcloud/vue: You need to fill either the text or the ariaLabel props in the button component. 
+Object { uid: "marc-waeckerlin", app: "@nextcloud/vue", level: 2, text: undefined, ariaLabel: null, instance: {…} }
+core-common.js:1:2942366
+[WARN] @nextcloud/vue: You need to fill either the text or the ariaLabel props in the button component. 
+Object { uid: "marc-waeckerlin", app: "@nextcloud/vue", level: 2, text: undefined, ariaLabel: null, instance: {…} }
+core-common.js:1:2942366
+Notifications require HTTPS NotificationsApp-txmmVI_P.chunk.mjs:86:59195
+Polling interval updated to 30000 NotificationsApp-txmmVI_P.chunk.mjs:86:58362
+Started background fetcher as session_keepalive is enabled NotificationsApp-txmmVI_P.chunk.mjs:86:55522
+Got notification data, restoring default polling interval. NotificationsApp-txmmVI_P.chunk.mjs:86:57317
+Fehler beim Laden der Sitzungstypen: AxiosError: Request failed with status code 500
+    Ll AxiosError.js:102
+    dc settle.js:19
+    g xhr.js:63
+parlwin-main.js:96:470636
+Firefox kann keine Verbindung zu dem Server unter ws://localhost:29824/ws/parlwin/ aufbauen. 3 parlwin-main.js:96:483214
+Fehler beim Speichern des Sitzungstyps: AxiosError: Request failed with status code 500
+    Ll AxiosError.js:102
+    dc settle.js:19
+    g xhr.js:63
+parlwin-main.js:96:471810
+Firefox kann keine Verbindung zu dem Server unter ws://localhost:29824/ws/parlwin/ aufbauen. parlwin-main.js:96:483214
+```
+  5. ✅ +Neu-Knopf in der Sitzungs-Ansicht öffnet Dialog: Sitzungstyp wählen,
+     Datum/Zeit/Ort/Titel-Override eingeben → POST `/sitzungstypen/{id}/sitzung`. → Immer an Nextcloud-Standards halten! Kopiere Ansätze von anderen Plugins! Das Popup mit der Auswahl soll gleich erfolgen wie bei anderen, z.B. Files, es soll genau so ein Menu mit den vordefinierten Templates aufpoppen: ![alt text](image-3.png)
+  6. Notiz pro Traktandum: DAS IST EINE GENERELLE REGEL!!! ALLE NOTIZEN, ALLE AKTIONEN, HABEN IMMER: WER WANN WAS!!!! ES FEHLT DAS WER!!! ES MUSS IMMER NACHVOLLZIEHBAR SEIN, WER WANN WAS EINGEGEBEN HAT!!!
+ **IMMER*** **UEBERALL**!!! Immer diese Infos: Datum, User (Display-Name), Aktion / Notiz / Text
+  7. Unified-Search-Provider `parlwin-geschaefte` (`GeschaeftSearchProvider`)
+     registriert: sucht in `nummer`/`titel` (case-insensitive LIKE),
+     liefert Treffer in die globale Nextcloud-Suche. → Nichts passiert! ![alt text](image-4.png)
+
 ## Erledigt:
 
   1. ✅ Traktandenliste: zeigt Geschäfte wie auf der Geschäftsliste-Hauptseite
      (Zuständig + Beschluss-Inline, Status-Farbe, Detail-Modal); Traktandennummer bleibt.
-  2. ✅ Suche in Traktandenliste (Nr. oder Titel) – Suchfeld in der Sitzungs-Ansicht.
   3. ✅ Bemerkungen pro Traktandum entfernt – nur Notizen pro Traktandum bleiben.
   4. ✅ Sitzungstypen / Sitzungs-Vorlagen: neue Tabellen `pw_sitzungstypen`,
      `pw_sitzungstyp_traktanden`, `pw_sitzungstyp_teilnehmer`, neues Feld
@@ -21,9 +529,6 @@ Nextcloud-Plugin für die Fraktionsarbeit im Winterthurer Parlament.
      Datum/Zeit/Ort/Titel-Override eingeben → POST `/sitzungstypen/{id}/sitzung`.
   6. ✅ Notizen pro Traktandum werden persistiert (Autosave auf Enter, Server-PUT
      auf `notizen`-Feld; nur dieses Feld wird vom Controller akzeptiert).
-  7. ✅ Unified-Search-Provider `parlwin-geschaefte` (`GeschaeftSearchProvider`)
-     registriert: sucht in `nummer`/`titel` (case-insensitive LIKE),
-     liefert Treffer in die globale Nextcloud-Suche.
 
 ## Zu Erledigen:
 
