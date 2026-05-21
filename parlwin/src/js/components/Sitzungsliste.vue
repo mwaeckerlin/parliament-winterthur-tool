@@ -22,6 +22,7 @@
     <header class="pw-view-header">
       <h2 class="pw-view-title">Sitzungen</h2>
       <span class="pw-view-count">{{ gefilterteSitzungen.length }}</span>
+      <NcButton type="primary" @click="oeffneNeuDialog">+ Neue Sitzung</NcButton>
     </header>
     <div v-if="laden" class="pw-laden"><NcLoadingIcon :size="32" /></div>
 
@@ -172,6 +173,59 @@
   </section>
 
   <Teleport to="body">
+    <div v-if="neuDialogOffen" class="pw-modal-overlay" @click.self="schliesseNeuDialog">
+      <div class="pw-modal pw-modal-neu">
+        <div class="pw-modal-kopf">
+          <h3>Neue Sitzung anlegen</h3>
+          <button type="button" class="button pw-btn-schliessen" aria-label="Dialog schliessen" @click="schliesseNeuDialog">✕</button>
+        </div>
+        <div class="pw-modal-body">
+          <div v-if="typenLaden" class="pw-laden">Sitzungstypen laden...</div>
+          <template v-else>
+            <p v-if="!verfuegbareTypen.length" class="pw-hinweis">
+              Keine Sitzungstypen vorhanden. Bitte zuerst unter „Sitzungstypen" einen Typ anlegen.
+            </p>
+            <template v-else>
+              <label>Sitzungstyp *
+                <select :value="neueSitzung.typId" class="pw-input" @change="typAusgewaehlt($event.target.value)">
+                  <option :value="0">— Sitzungstyp wählen —</option>
+                  <option v-for="t in verfuegbareTypen" :key="t.id" :value="t.id">{{ t.name }}</option>
+                </select>
+              </label>
+              <label>Datum *
+                <input v-model="neueSitzung.datum" type="date" class="pw-input" />
+              </label>
+              <div class="pw-grid-2">
+                <label>Zeit von
+                  <input v-model="neueSitzung.zeitVon" type="time" class="pw-input" />
+                </label>
+                <label>Zeit bis
+                  <input v-model="neueSitzung.zeitBis" type="time" class="pw-input" />
+                </label>
+              </div>
+              <label>Ort
+                <input v-model="neueSitzung.ort" type="text" class="pw-input" />
+              </label>
+              <label>Titel
+                <input v-model="neueSitzung.titel" type="text" class="pw-input" />
+              </label>
+            </template>
+          </template>
+        </div>
+        <div class="pw-modal-footer">
+          <button type="button" class="button" @click="schliesseNeuDialog">Abbrechen</button>
+          <button
+            type="button"
+            class="button primary"
+            :disabled="!neueSitzung.typId || !neueSitzung.datum || neueSitzungLaeuft"
+            @click="erstelleNeueSitzung"
+          >Sitzung anlegen</button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+
+  <Teleport to="body">
     <div v-if="ausgewaehlteGeschaeftId" class="pw-modal-overlay" @click.self="schliesseGeschaeft">
       <div class="pw-modal">
         <div class="pw-modal-kopf pw-modal-kopf-leer">
@@ -196,11 +250,12 @@ import NcCheckboxRadioSwitch from '@nextcloud/vue/components/NcCheckboxRadioSwit
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 import NcSelect from '@nextcloud/vue/components/NcSelect'
 import NcTextField from '@nextcloud/vue/components/NcTextField'
+import NcButton from '@nextcloud/vue/components/NcButton'
 import PwMultiSelect from './PwMultiSelect.vue'
 
 export default {
   name: 'Sitzungsliste',
-  components: { GeschaeftDetail, NcCheckboxRadioSwitch, NcLoadingIcon, NcSelect, NcTextField, PwMultiSelect },
+  components: { GeschaeftDetail, NcCheckboxRadioSwitch, NcLoadingIcon, NcSelect, NcTextField, NcButton, PwMultiSelect },
   props: {
     mitglieder: { type: Array, default: () => [] },
   },
@@ -219,6 +274,11 @@ export default {
       neueNotizen: {},
       ausgewaehlteGeschaeftId: null,
       unsubRealtime: null,
+      neuDialogOffen: false,
+      verfuegbareTypen: [],
+      typenLaden: false,
+      neueSitzung: { typId: 0, datum: '', zeitVon: '', zeitBis: '', ort: '', titel: '' },
+      neueSitzungLaeuft: false,
     }
   },
   computed: {
@@ -451,6 +511,55 @@ export default {
     },
     schliesseGeschaeft() {
       this.ausgewaehlteGeschaeftId = null
+    },
+    async oeffneNeuDialog() {
+      this.neueSitzung = { typId: 0, datum: '', zeitVon: '', zeitBis: '', ort: '', titel: '' }
+      this.neuDialogOffen = true
+      this.typenLaden = true
+      try {
+        const { data } = await axios.get(generateUrl('/apps/parlwin/sitzungstypen'))
+        this.verfuegbareTypen = Array.isArray(data) ? data : []
+      } catch (e) {
+        console.error('Fehler beim Laden der Sitzungstypen:', e)
+        this.verfuegbareTypen = []
+      } finally {
+        this.typenLaden = false
+      }
+    },
+    schliesseNeuDialog() {
+      this.neuDialogOffen = false
+    },
+    typAusgewaehlt(typId) {
+      const typ = this.verfuegbareTypen.find(t => t.id === Number(typId))
+      if (!typ) return
+      this.neueSitzung.typId = typ.id
+      if (!this.neueSitzung.ort) this.neueSitzung.ort = typ.standardOrt || ''
+      if (!this.neueSitzung.zeitVon) this.neueSitzung.zeitVon = typ.standardZeitVon || ''
+      if (!this.neueSitzung.zeitBis) this.neueSitzung.zeitBis = typ.standardZeitBis || ''
+      if (!this.neueSitzung.titel) this.neueSitzung.titel = typ.name || ''
+    },
+    async erstelleNeueSitzung() {
+      if (!this.neueSitzung.typId || !this.neueSitzung.datum) return
+      this.neueSitzungLaeuft = true
+      try {
+        await axios.post(
+          generateUrl(`/apps/parlwin/sitzungstypen/${this.neueSitzung.typId}/sitzung`),
+          {
+            datum: this.neueSitzung.datum,
+            zeitVon: this.neueSitzung.zeitVon,
+            zeitBis: this.neueSitzung.zeitBis,
+            ort: this.neueSitzung.ort,
+            titel: this.neueSitzung.titel,
+          }
+        )
+        this.neuDialogOffen = false
+        await this.ladeSitzungen()
+      } catch (e) {
+        console.error('Fehler beim Erstellen der Sitzung:', e)
+        alert('Fehler: ' + (e?.response?.data?.fehler || e.message))
+      } finally {
+        this.neueSitzungLaeuft = false
+      }
     },
     istVergangen(datum) {
       if (!datum) return false
