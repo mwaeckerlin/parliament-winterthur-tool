@@ -27,41 +27,41 @@ use OCP\AppFramework\Db\Entity;
  */
 class Sitzungstyp extends Entity
 {
-    protected string $name = '';
-    protected string $zweck = '';
-    protected bool $kalenderAnlegen = true;
-    protected bool $einladungVersenden = false;
-    protected string $standardOrt = '';
-    protected string $standardZeitVon = '';
-    protected string $standardZeitBis = '';
-    protected bool $geloescht = false;
-    protected string $erstelltAm = '';
-    protected string $aktualisiertAm = '';
+  protected string $name = '';
+  protected string $zweck = '';
+  protected bool $kalenderAnlegen = true;
+  protected bool $einladungVersenden = false;
+  protected string $standardOrt = '';
+  protected string $standardZeitVon = '';
+  protected string $standardZeitBis = '';
+  protected bool $geloescht = false;
+  protected string $erstelltAm = '';
+  protected string $aktualisiertAm = '';
 
-    public function __construct()
-    {
-        $this->addType('kalenderAnlegen', 'boolean');
-        $this->addType('einladungVersenden', 'boolean');
-        $this->addType('geloescht', 'boolean');
-    }
+  public function __construct()
+  {
+    $this->addType('kalenderAnlegen', 'boolean');
+    $this->addType('einladungVersenden', 'boolean');
+    $this->addType('geloescht', 'boolean');
+  }
 
-    /**
-     * @return array<string, mixed>
-     */
-    public function jsonSerialize(): array
-    {
-        return [
-            'id' => $this->getId(),
-            'name' => $this->getName(),
-            'zweck' => $this->getZweck(),
-            'kalenderAnlegen' => $this->getKalenderAnlegen(),
-            'einladungVersenden' => $this->getEinladungVersenden(),
-            'standardOrt' => $this->getStandardOrt(),
-            'standardZeitVon' => $this->getStandardZeitVon(),
-            'standardZeitBis' => $this->getStandardZeitBis(),
-            'geloescht' => $this->getGeloescht(),
-            'erstelltAm' => $this->getErstelltAm(),
-            'aktualisiertAm' => $this->getAktualisiertAm(),
-        ];
-    }
+  /**
+   * @return array<string, mixed>
+   */
+  public function jsonSerialize(): array
+  {
+    return [
+      'id' => $this->getId(),
+      'name' => $this->getName(),
+      'zweck' => $this->getZweck(),
+      'kalenderAnlegen' => $this->getKalenderAnlegen(),
+      'einladungVersenden' => $this->getEinladungVersenden(),
+      'standardOrt' => $this->getStandardOrt(),
+      'standardZeitVon' => $this->getStandardZeitVon(),
+      'standardZeitBis' => $this->getStandardZeitBis(),
+      'geloescht' => $this->getGeloescht(),
+      'erstelltAm' => $this->getErstelltAm(),
+      'aktualisiertAm' => $this->getAktualisiertAm(),
+    ];
+  }
 }

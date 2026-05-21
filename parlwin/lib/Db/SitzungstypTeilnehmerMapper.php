@@ -13,29 +13,29 @@ use OCP\IDBConnection;
  */
 class SitzungstypTeilnehmerMapper extends QBMapper
 {
-    public function __construct(IDBConnection $db)
-    {
-        parent::__construct($db, 'pw_sitzungstyp_teilnehmer', SitzungstypTeilnehmer::class);
-    }
+  public function __construct(IDBConnection $db)
+  {
+    parent::__construct($db, 'pw_sitzungstyp_teilnehmer', SitzungstypTeilnehmer::class);
+  }
 
-    /**
-     * @return SitzungstypTeilnehmer[]
-     */
-    public function findByTyp(int $typId): array
-    {
-        $qb = $this->db->getQueryBuilder();
-        $qb->select('*')
-            ->from($this->getTableName())
-            ->where($qb->expr()->eq('typ_id', $qb->createNamedParameter($typId, IQueryBuilder::PARAM_INT)))
-            ->orderBy('id', 'ASC');
-        return $this->findEntities($qb);
-    }
+  /**
+   * @return SitzungstypTeilnehmer[]
+   */
+  public function findByTyp(int $typId): array
+  {
+    $qb = $this->db->getQueryBuilder();
+    $qb->select('*')
+      ->from($this->getTableName())
+      ->where($qb->expr()->eq('typ_id', $qb->createNamedParameter($typId, IQueryBuilder::PARAM_INT)))
+      ->orderBy('id', 'ASC');
+    return $this->findEntities($qb);
+  }
 
-    public function deleteByTyp(int $typId): void
-    {
-        $qb = $this->db->getQueryBuilder();
-        $qb->delete($this->getTableName())
-            ->where($qb->expr()->eq('typ_id', $qb->createNamedParameter($typId, IQueryBuilder::PARAM_INT)));
-        $qb->executeStatement();
-    }
+  public function deleteByTyp(int $typId): void
+  {
+    $qb = $this->db->getQueryBuilder();
+    $qb->delete($this->getTableName())
+      ->where($qb->expr()->eq('typ_id', $qb->createNamedParameter($typId, IQueryBuilder::PARAM_INT)));
+    $qb->executeStatement();
+  }
 }

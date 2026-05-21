@@ -144,7 +144,8 @@ class Application extends App implements IBootstrap
                 $c->get(\Psr\Log\LoggerInterface::class)
             );
         });
-        $context->registerService(MitgliedService::class, function ($c) {            return new MitgliedService(
+        $context->registerService(MitgliedService::class, function ($c) {
+            return new MitgliedService(
                 $c->get(MitgliedMapper::class),
                 $c->get(FraktionMapper::class),
                 $c->get(KommissionMapper::class),
