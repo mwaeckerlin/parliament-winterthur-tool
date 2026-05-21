@@ -2,30 +2,32 @@
 
 Nextcloud-Plugin für die Fraktionsarbeit im Winterthurer Parlament.
 
+## Erledigt:
+
+  1. ✅ Traktandenliste: zeigt Geschäfte wie auf der Geschäftsliste-Hauptseite
+     (Zuständig + Beschluss-Inline, Status-Farbe, Detail-Modal); Traktandennummer bleibt.
+  2. ✅ Suche in Traktandenliste (Nr. oder Titel) – Suchfeld in der Sitzungs-Ansicht.
+  3. ✅ Bemerkungen pro Traktandum entfernt – nur Notizen pro Traktandum bleiben.
+  4. ✅ Sitzungstypen / Sitzungs-Vorlagen: neue Tabellen `pw_sitzungstypen`,
+     `pw_sitzungstyp_traktanden`, `pw_sitzungstyp_teilnehmer`, neues Feld
+     `pw_sitzungen.typ_id` und `pw_sitzungen.teilnehmer` (JSON-materialisierte
+     Liste). `SitzungstypService::sitzungAusTyp()` löst Gruppen
+     (Fraktion/Kommission/Rolle) zu Einzelpersonen auf, kopiert Vorlage-Traktanden
+     und legt eine neue Sitzung an. CRUD-Endpunkte unter `/sitzungstypen`,
+     Verwaltungs-UI (`Sitzungstypenliste.vue`). `KalenderService::erstelleIcal()`
+     emittiert `ORGANIZER:mailto:` und `ATTENDEE;…:mailto:` für jeden Teilnehmer
+     mit E-Mail.
+  5. ✅ +Neu-Knopf in der Sitzungs-Ansicht öffnet Dialog: Sitzungstyp wählen,
+     Datum/Zeit/Ort/Titel-Override eingeben → POST `/sitzungstypen/{id}/sitzung`.
+  6. ✅ Notizen pro Traktandum werden persistiert (Autosave auf Enter, Server-PUT
+     auf `notizen`-Feld; nur dieses Feld wird vom Controller akzeptiert).
+  7. ✅ Unified-Search-Provider `parlwin-geschaefte` (`GeschaeftSearchProvider`)
+     registriert: sucht in `nummer`/`titel` (case-insensitive LIKE),
+     liefert Treffer in die globale Nextcloud-Suche.
+
 ## Zu Erledigen:
 
-  1. Traktandenliste: Geschäfte aus der Geschäftsliste werden ähnlich angezeigt, wie die Geschäfte auf deren Hauptseite, mit denselben Daten und den beiden direkten Eingabemöglichkeiten. Die Traktandennummer bleibt angezeigt.
-  2. Traktandenliste erhält eine Suche mit der man nach Geschäftsnummern oder Titeln suchen kann,
-  3. Wir haben nun Bemerkungen und Notizen zu den Traktanden. Notizen reichen aus.
-  4. **Sitzungstypen / Sitzungs-Vorlagen** – aktuell nicht vorhanden, komplett
-     neu zu bauen. Eine Sitzungstyp-Vorlage soll definieren:
-      - Name (z.B. „Fraktionssitzung“) und Zweck
-      - Standard-Traktanden (Liste, in Reihenfolge, mit Titel/Beschreibung)
-      - Eingeladene: Einzelpersonen (Mitglieder) und/oder Gruppen
-        (Fraktion, Kommission, Rolle wie „Fraktionspräsidium“)
-      - Optionen: Kalendereintrag anlegen, Einladung versenden
-        (`ATTENDEE`/`ORGANIZER` im VEVENT, iTIP via Nextcloud-Mail)
-
-     Beim Erstellen einer konkreten Sitzung aus der Vorlage werden Traktanden
-     kopiert und Teilnehmerliste materialisiert (Gruppen → Einzelpersonen
-     auflösen). Notwendige Bausteine: neue Tabellen (`sitzungstypen`,
-     `sitzungstyp_traktanden`, `sitzungstyp_teilnehmer`), `Sitzung.typ_id`,
-     `SitzungstypService::sitzungAusTyp(...)`, CRUD-Endpunkte, Verwaltungs-UI,
-     Erweiterung `KalenderService::erstelleIcal()` um `ATTENDEE`/`ORGANIZER`.
-  5. Unter Sitzungen ein Popup-Knopf «+ Neu», um eine neue Sitzung festzulegen aus den definierten Sitzungstypen-Vorlagen als Optionen, z.B.:
-      - Neue Fraktionssitzung
-  6. Notizen in Traktanden werden nicht gespeichert!
-  7. Globale Suche funktioniert nicht. Sie sollte mindestens nach Geschäftsnummer oder Titel suchen. → Gemeint ist die plugin-eigene Suche bzw. der Nextcloud-Unified-Search-Provider; falls keiner registriert ist, registriere einen.
+  (nichts mehr offen — siehe „Erledigt" oben.)
   
 ## Bugs
 

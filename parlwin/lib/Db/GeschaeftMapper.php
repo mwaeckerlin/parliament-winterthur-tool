@@ -56,6 +56,27 @@ class GeschaeftMapper extends QBMapper
     }
 
     /**
+     * Volltext-Suche über Nummer und Titel (für Unified Search Provider).
+     *
+     * @return Geschaeft[]
+     */
+    public function searchByText(string $text, int $limit = 20): array
+    {
+        $qb = $this->db->getQueryBuilder();
+        $like = '%' . $this->db->escapeLikeParameter($text) . '%';
+        $qb->select('*')
+            ->from($this->getTableName())
+            ->where($qb->expr()->eq('geloescht', $qb->createNamedParameter(false, IQueryBuilder::PARAM_BOOL)))
+            ->andWhere($qb->expr()->orX(
+                $qb->expr()->iLike('titel', $qb->createNamedParameter($like)),
+                $qb->expr()->iLike('nummer', $qb->createNamedParameter($like))
+            ))
+            ->orderBy('datum', 'DESC')
+            ->setMaxResults($limit);
+        return $this->findEntities($qb);
+    }
+
+    /**
      * Gibt ein Geschäft anhand seiner ID zurück.
      *
      * @throws DoesNotExistException wenn nicht gefunden
