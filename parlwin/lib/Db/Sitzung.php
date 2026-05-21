@@ -19,6 +19,8 @@ use OCP\AppFramework\Db\Entity;
  * @method string getUrl()
  * @method bool   getGeloescht()
  * @method string getBemerkungen()
+ * @method int    getTypId()
+ * @method string getTeilnehmer()
  * @method string getErstelltAm()
  * @method string getAktualisiertAm()
  */
@@ -50,6 +52,16 @@ class Sitzung extends Entity {
     /** @var string Fraktionsinterne Bemerkungen */
     protected string $bemerkungen = '';
 
+    /** @var int Optionaler Verweis auf eine Sitzungs-Vorlage (0 = keine) */
+    protected int $typId = 0;
+
+    /**
+     * @var string Materialisierte Teilnehmerliste (JSON-Array von
+     * {mitgliedId,name,email,rolle}). Wird beim Erstellen aus einer
+     * Vorlage befüllt.
+     */
+    protected string $teilnehmer = '[]';
+
     /** @var string Erstellungszeitpunkt (ISO 8601) */
     protected string $erstelltAm = '';
 
@@ -58,6 +70,7 @@ class Sitzung extends Entity {
 
     public function __construct() {
         $this->addType('geloescht', 'boolean');
+        $this->addType('typId', 'integer');
     }
 
     /**
@@ -75,8 +88,20 @@ class Sitzung extends Entity {
             'url' => $this->getUrl(),
             'geloescht' => $this->getGeloescht(),
             'bemerkungen' => $this->getBemerkungen(),
+            'typId' => $this->getTypId(),
+            'teilnehmer' => $this->getTeilnehmerArray(),
             'erstelltAm' => $this->getErstelltAm(),
             'aktualisiertAm' => $this->getAktualisiertAm(),
         ];
+    }
+
+    /**
+     * Gibt die materialisierten Teilnehmer als Array zurück.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function getTeilnehmerArray(): array {
+        $entschluesselt = json_decode($this->teilnehmer ?: '[]', true);
+        return is_array($entschluesselt) ? $entschluesselt : [];
     }
 }
