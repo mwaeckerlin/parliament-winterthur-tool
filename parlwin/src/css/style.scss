@@ -866,7 +866,10 @@ ul.app-navigation__list {
 .pw-modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: 10000;
+  // Nextcloud's app-navigation kann je nach Layout (z.B. eingeklappt im
+  // Mobile-Modus) hohe z-index-Werte verwenden. 100000 stellt sicher, dass
+  // das Overlay sämtliche App-Shell-Elemente überdeckt.
+  z-index: 100000;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -875,10 +878,10 @@ ul.app-navigation__list {
 }
 
 // vue-select dropdown wird via appendToBody an <body> geteleportiert
-// und nutzt --vs-dropdown-z-index (default 9999) — muss ueber dem Modal (10000) liegen.
+// und nutzt --vs-dropdown-z-index (default 9999) — muss ueber dem Modal liegen.
 .vs__dropdown-menu,
 .vs__dropdown-menu--floating {
-  z-index: 10010 !important;
+  z-index: 100010 !important;
 }
 
 .pw-modal {
@@ -1730,6 +1733,13 @@ ul.app-navigation__list {
   /* Platz für Nextcloud Nav-Toggle ("Hamburger") oben links */
   padding-inline-start: var(--pw-click-lg);
   padding-block-end: var(--pw-gap-1);
+}
+
+// Primär-Aktionsknopf in Listen-Headern (z.B. „+ Neue Sitzung“) — nach
+// rechts schieben, damit er klar als Aktion erkennbar ist und nicht zwischen
+// Titel und Zähler verschwindet.
+.pw-view-header .pw-neue-sitzung {
+  margin-inline-start: auto;
 }
 
 .pw-view-title {

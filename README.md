@@ -4,14 +4,36 @@ Nextcloud-Plugin für die Fraktionsarbeit im Winterthurer Parlament.
 
 ## Zu Erledigen:
 
-  - Sitzungen: Traktandum Protokoll-Abnahme, und generell bei allen Nicht-Geschäften (also wo kein Geschäft mir Nr vorliegt): Verlinke auf vorhandene PDFs oder verlinke zum Originaltraktandum wenn keine Dokumente da sind.
-  - Neuer Sitzungstyp: Z-Index-Fehler: ![alt text](image-5.png)
-  - Wo ist der Knopf für eine neue Sitzung? ![alt text](image-7.png)
-  - Wenn ich das Dokument öffnen will, kommt erst: ![alt text](image-9.png)
-    Und erst einige dutzend Sekunden später kommt: ![alt text](image-10.png)
-    Warum diese Verzögerung? Kann man das Öffnen beschleunigen? Oder wenigstens das Timeout zur Fehleranzeige verlängern?
+  - (offen) Falls beim Öffnen eines bereits existierenden Dokuments aus der
+    Geschäfts-Ansicht weiterhin lange Wartezeiten auftreten: das ist die
+    Collabora-/Office-Startzeit (Server-Cold-Start). Workaround in v1.1.0:
+    Beim *Erstellen* wird die Datei direkt in einem neuen Tab geöffnet, so
+    dass die Ladezeit parallel zur Modal-Schliessung läuft.
 
 ## Erledigt:
+
+  - ✅ Z-Index-Fix Modal-Overlay (v1.1.0): `.pw-modal-overlay` z-index von
+    10000 auf 100000 angehoben, damit Sitzungstyp-/Sitzung-/Dokument-Modale
+    sicher über der Nextcloud-App-Navigation liegen (insbesondere im
+    eingeklappten/Mobile-Layout, wo die Sidebar einen eigenen Stacking-Context
+    aufmachte).
+  - ✅ „+ Neue Sitzung"-Knopf sichtbar (v1.1.0): NcActions mit
+    `:force-name="true"` (zeigt den Text dauerhaft) und `margin-inline-start:
+    auto` rechtsbündig. Wenn keine Sitzungstypen vorhanden sind, wird
+    stattdessen ein deaktivierter `NcButton` mit Tooltip „Zuerst unter
+    Sitzungstypen einen Typ anlegen" gerendert – statt eines unsichtbaren
+    Icons mit Tooltip.
+  - ✅ Protokoll-Abnahme & Nicht-Geschäfts-Traktanden (v1.1.0): Traktanden
+    ohne verknüpftes Geschäft (z.B. „Abnahme Parlaments-Protokolle") zeigen
+    jetzt das ↗-Symbol mit Link auf `sitzung.url` (Originaltraktandum auf
+    der Parlamentsseite), so dass die zugehörigen PDFs/Originale direkt
+    erreichbar sind.
+  - ✅ Dokument-Erstellen ohne Doppelklick-Verzögerung (v1.1.0):
+    `dokumentErstellen()` öffnet die neu angelegte Datei sofort in einem
+    parallel geöffneten Tab (`window.open` synchron im Click-Handler, dann
+    Navigation zur `/f/{fileId}`-Route, sobald die Server-Antwort da ist).
+    Damit beginnt die Collabora-Ladezeit unmittelbar, statt erst nach einem
+    weiteren manuellen Klick.
 
   - ✅ Kommissionen-Suche (v1.0.9): Suche prüft jetzt zusätzlich Mitglieder
     (Name, Partei, Fraktion, Funktion, E-Mail) sowie zugehörige Geschäfte
