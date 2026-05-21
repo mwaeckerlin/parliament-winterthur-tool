@@ -50,6 +50,7 @@
     </div>
 
     <!-- Bearbeitungs-Dialog -->
+    <Teleport to="body">
     <div v-if="bearbeitung" class="pw-modal-overlay" @click.self="abbrechen">
       <div class="pw-modal">
         <header class="pw-modal-header">
@@ -140,6 +141,7 @@
         </footer>
       </div>
     </div>
+    </Teleport>
   </section>
 </template>
 
@@ -362,10 +364,10 @@ export default {
   font-size: 0.9em;
   color: var(--color-text-maxcontrast, #666);
 }
-/* .pw-modal-overlay wird aus dem globalen style.scss übernommen (z-index 100000,
-   damit das Modal über der Nextcloud-App-Navigation liegt). Hier NICHT scoped
-   überschreiben – das lokale Style mit z-index 10000 hatte zur Folge, dass das
-   Modal in eingeklapptem Layout teilweise unter der Sidebar lag. */
+/* .pw-modal-overlay wird aus dem globalen style.scss übernommen.
+   Das Modal wird im Template via <Teleport to="body"> aus dem
+   NcAppContent-Stacking-Context herausgezogen, damit es nicht von
+   NcAppNavigation (z-index 1800) überdeckt wird. */
 .pw-modal {
   background: var(--color-main-background, #fff);
   border-radius: 8px;

@@ -866,10 +866,14 @@ ul.app-navigation__list {
 .pw-modal-overlay {
   position: fixed;
   inset: 0;
-  // Nextcloud's app-navigation kann je nach Layout (z.B. eingeklappt im
-  // Mobile-Modus) hohe z-index-Werte verwenden. 100000 stellt sicher, dass
-  // das Overlay sämtliche App-Shell-Elemente überdeckt.
-  z-index: 100000;
+  // Wichtig: Das Overlay wird in den Komponenten per <Teleport to="body">
+  // aus dem NcAppContent-Stacking-Context (position:relative + z-index:1000)
+  // herausgezogen. Andernfalls bliebe `position: fixed` an diesen Stacking-
+  // Context gebunden und NcAppNavigation (z-index:1800, Geschwister von
+  // NcAppContent) wuerde das Overlay ueberdecken.
+  // Im Body-Context reicht ein moderater z-index ueber NcAppNavigation (1800)
+  // und NcAppSidebar (1500).
+  z-index: 2000;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -881,7 +885,7 @@ ul.app-navigation__list {
 // und nutzt --vs-dropdown-z-index (default 9999) — muss ueber dem Modal liegen.
 .vs__dropdown-menu,
 .vs__dropdown-menu--floating {
-  z-index: 100010 !important;
+  z-index: 2010 !important;
 }
 
 .pw-modal {

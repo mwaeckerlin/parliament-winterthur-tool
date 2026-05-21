@@ -12,11 +12,28 @@ Nextcloud-Plugin für die Fraktionsarbeit im Winterthurer Parlament.
 
 ## Erledigt:
 
-  - ✅ Sitzungstyp-Modal Z-Index endgültig (v1.1.1): das in
+  - ✅ Sitzungstyp-Modal Stacking-Context **wirklich** behoben (v1.1.2): Das
+    in v1.1.0 / v1.1.1 verwendete „z-index immer höher drehen“ war der
+    falsche Ansatz. Die echte Ursache: `NcAppContent` ist
+    `position: relative; z-index: 1000` und erzeugt damit einen eigenen
+    *Stacking-Context*. Unser Modal-Overlay (`position: fixed`, Kind von
+    NcAppContent) bleibt an diesen Context gebunden — `position: fixed`
+    entkommt einem Vorfahren-Stacking-Context **nicht**. NcAppNavigation
+    ist Geschwister von NcAppContent und hat `z-index: 1800`, lag deshalb
+    immer über dem Modal, egal welcher z-index gesetzt war.
+
+    Korrekte Lösung: Modal in `Sitzungstypenliste.vue` per
+    `<Teleport to="body">` aus dem NcAppContent-Stacking-Context
+    herausziehen (die anderen 5 Modal-Stellen hatten den Teleport schon).
+    Der z-index in `style.scss` wurde von 100000 auf einen vernünftigen
+    Wert 2000 reduziert (über NcAppNavigation 1800 und NcAppSidebar 1500),
+    Dropdown-Z-Index entsprechend auf 2010.
+
+  - ✅ Sitzungstyp-Modal Z-Index (v1.1.1, superseded by v1.1.2): das in
     `Sitzungstypenliste.vue` lokal `scoped` definierte `.pw-modal-overlay`
     (z-index 10000) hat das globale 100000 überschrieben — daher lag das
     Modal in eingeklapptem Layout teilweise hinter der Nextcloud-Navigation
-    (image-11). Lokale Override entfernt, globales Overlay wirkt.
+    (image-11). Lokale Override entfernt — half aber nicht, siehe v1.1.2.
   - ✅ Nextcloud-Gruppen & -Benutzer im Sitzungstyp-Dialog (v1.1.1):
     Routen-Reihenfolge in `appinfo/routes.php` korrigiert
     (`/sitzungstypen/nc/groups`, `/sitzungstypen/nc/users` stehen jetzt
