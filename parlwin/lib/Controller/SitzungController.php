@@ -12,6 +12,7 @@ use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\DataResponse;
 use OCP\AppFramework\Http;
 use OCP\IRequest;
+use OCP\IUserSession;
 
 /**
  * REST-Controller für Parlamentssitzungen und Traktanden.
@@ -21,6 +22,7 @@ class SitzungController extends Controller {
         IRequest $request,
         private readonly SitzungService $service,
         private readonly RealtimePublisherService $realtimePublisher,
+        private readonly IUserSession $userSession,
     ) {
         parent::__construct(Application::APP_ID, $request);
     }
@@ -62,6 +64,10 @@ class SitzungController extends Controller {
         if ($this->request->offsetExists('bemerkungen')) {
             $felder['bemerkungen'] = $this->request->getParam('bemerkungen', '');
         }
+        if ($this->request->offsetExists('notizen')) {
+            $rohwert = $this->request->getParam('notizen', '[]');
+            $felder['notizen'] = $this->normalisiereNotizen($rohwert);
+        }
 
         try {
             $sitzung = $this->service->aktualisiereInterneSitzung($id, $felder);
@@ -72,5 +78,51 @@ class SitzungController extends Controller {
         } catch (\OCP\AppFramework\Db\DoesNotExistException) {
             return new DataResponse(['fehler' => 'Nicht gefunden'], Http::STATUS_NOT_FOUND);
         }
+    }
+
+    /**
+     * Stellt sicher, dass jede Notiz `datum`, `uid`, `displayName` und `text`
+     * trägt. Fehlende Audit-Felder werden mit der aktuellen Session
+     * befüllt. Eingaben können ein JSON-String oder ein Array sein.
+     */
+    private function normalisiereNotizen(mixed $rohwert): string
+    {
+        if (is_string($rohwert)) {
+            $arr = json_decode($rohwert, true);
+        } elseif (is_array($rohwert)) {
+            $arr = $rohwert;
+        } else {
+            $arr = [];
+        }
+        if (!is_array($arr)) {
+            $arr = [];
+        }
+        $user = $this->userSession->getUser();
+        $aktUid = $user?->getUID() ?? '';
+        $aktName = $user?->getDisplayName() ?? $aktUid;
+        $jetzt = (new \DateTime())->format('d.m.Y H:i');
+        $ergebnis = [];
+        foreach ($arr as $eintrag) {
+            if (!is_array($eintrag)) {
+                continue;
+            }
+            $text = (string) ($eintrag['text'] ?? '');
+            if ($text === '') {
+                continue;
+            }
+            $datum = (string) ($eintrag['datum'] ?? '');
+            $uid = (string) ($eintrag['uid'] ?? '');
+            $name = (string) ($eintrag['displayName'] ?? '');
+            if ($datum === '') $datum = $jetzt;
+            if ($uid === '') $uid = $aktUid;
+            if ($name === '') $name = $aktName !== '' ? $aktName : $uid;
+            $ergebnis[] = [
+                'datum' => $datum,
+                'uid' => $uid,
+                'displayName' => $name,
+                'text' => $text,
+            ];
+        }
+        return json_encode($ergebnis, JSON_UNESCAPED_UNICODE);
     }
 }

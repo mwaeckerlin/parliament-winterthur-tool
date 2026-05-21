@@ -4,19 +4,34 @@ Nextcloud-Plugin für die Fraktionsarbeit im Winterthurer Parlament.
 
 ## Zu Erledigen:
 
-  - Suche bei den Kommissionen: Suche nach Namen, Titeln, GGR-NR in allen sichtbaren Kommissionen, auch wenn sie nicht ausgeklappt sind (also normal die aktiven, wenn di einaktiven auch angezeigt werden, suche auch da)
   - Sitzungen: Traktandum Protokoll-Abnahme, und generell bei allen Nicht-Geschäften (also wo kein Geschäft mir Nr vorliegt): Verlinke auf vorhandene PDFs oder verlinke zum Originaltraktandum wenn keine Dokumente da sind.
   - Neuer Sitzungstyp: Z-Index-Fehler: ![alt text](image-5.png)
-  - Notiz: Kein : nach dem Namen, Name nicht Fett, Name Lenks ausgerichtet, Datum und Name sollen nach content gesized sein, Notiz-Text nimmt den Rest (1fr). Notiz-Text links-bündig: ![alt text](image-6.png)
-  - Notiz: Statt löschen Knopf für alle: Nur der Urheber einer Notiz kann seine eigene Notiz löschen oder durch Klick auf den Text bearbeiten.
   - Wo ist der Knopf für eine neue Sitzung? ![alt text](image-7.png)
-  - Auch bei Sitzung insgesamt: Statt "Bemerkung zur Sitzung" auch hier Notizen zur Sitzung.
-  - Wenn ich ein Dokument zu einem Geschäft anlegen will, sollte das Popup-Menu wieder schliessen, sobald ich etwas gewählt habe: ![alt text](image-8.png)
   - Wenn ich das Dokument öffnen will, kommt erst: ![alt text](image-9.png)
     Und erst einige dutzend Sekunden später kommt: ![alt text](image-10.png)
     Warum diese Verzögerung? Kann man das Öffnen beschleunigen? Oder wenigstens das Timeout zur Fehleranzeige verlängern?
 
 ## Erledigt:
+
+  - ✅ Kommissionen-Suche (v1.0.9): Suche prüft jetzt zusätzlich Mitglieder
+    (Name, Partei, Fraktion, Funktion, E-Mail) sowie zugehörige Geschäfte
+    (GGR-Nr + Titel). Treffer werden automatisch aufgeklappt, so dass die
+    Fundstelle sichtbar ist – auch bei eingeklappten Kommissionen.
+  - ✅ Notizen-Darstellung (v1.0.9): Eigene `NotizenListe.vue`-Komponente.
+    Datum und Name werden nach Inhalt gesized, Notiztext nimmt den Rest (1fr)
+    und ist linksbündig. Kein `:` mehr nach dem Namen, Name nicht mehr fett.
+  - ✅ Notiz-Berechtigungen (v1.0.9): Statt einem globalen Lösch-Knopf kann
+    nur noch der/die Urheber:in (uid-Vergleich) eigene Notizen löschen oder
+    durch Klick auf den Text inline bearbeiten (Enter speichert, Escape bricht
+    ab, leerer Text löscht).
+  - ✅ Notizen auch auf Sitzungsebene (v1.0.9): „Bemerkungen zur Sitzung"
+    (freier Textarea-Block) wurde durch eine vollwertige Notizenliste mit
+    Audit-Trail (`{datum, uid, displayName, text}`) ersetzt – analog zu den
+    Traktanden-Notizen. Neues Feld `pw_sitzungen.notizen` (Migration
+    `Version000010`).
+  - ✅ Dokument-Menu schliesst (v1.0.9): Das „+ Neues Dokument"-Popup in
+    `GeschaeftDokumente.vue` wird nach der Auswahl einer Vorlage explizit
+    geschlossen (`v-model:open`), bevor der Namensdialog erscheint.
 
   4. ✅ Neuer Sitzungstyp, Teilnehmer-Regeln, Fraktion wählen → Die Fraktionsauswahl auch Mitgliederauswahl sollte nur aktive zur Auswahl stellen; Ausserdem fehlt eine einfache Auswahl: "Eigene Fraktion" und Nextcloud-Gruppe oder Nextcloud-User; → ergänzen / anpassen
   4. ✅ Neuer Sitzungstyp → Fehler beim Speichern: ![alt text](image-2.png)

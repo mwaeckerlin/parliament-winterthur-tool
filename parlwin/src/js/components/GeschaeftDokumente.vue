@@ -19,7 +19,7 @@
     </ul>
 
     <div v-if="geschaeftNummer" class="pw-dokument-erstellen">
-      <NcActions :menu-name="'+ Neues Dokument'" type="primary">
+      <NcActions v-model:open="menuOffen" :menu-name="'+ Neues Dokument'" type="primary">
         <NcActionButton
           v-for="t in vorlagen"
           :key="t.label + t.extension"
@@ -95,6 +95,7 @@ export default {
       dokumente: [],
       laden: false,
       vorlagen: STANDARD_VORLAGEN,
+      menuOffen: false,
       dialogOffen: false,
       aktiveVorlage: null,
       neuerName: '',
@@ -139,6 +140,10 @@ export default {
       return generateUrl(`/apps/files/ajax/download.php?dir=${encodeURIComponent('/' + d.pfad.replace(/\/[^/]+$/, ''))}&files=${encodeURIComponent(d.name)}`)
     },
     vorlageGewaehlt(t) {
+      // NcActions schliesst sich auf NcActionButton-Klicks nicht immer
+      // automatisch – explizit zu, damit das Templates-Menü nach der Auswahl
+      // verschwindet und der Dialog frei steht.
+      this.menuOffen = false
       this.aktiveVorlage = t
       this.neuerName = ''
       this.dialogOffen = true

@@ -143,10 +143,26 @@ export default {
       }
       if (!this.suche) return liste
       const s = this.suche.toLowerCase()
-      return liste.filter(k =>
-        (k.name || '').toLowerCase().includes(s) ||
-        (k.beschreibung || '').toLowerCase().includes(s)
-      )
+      return liste.filter(k => {
+        if ((k.name || '').toLowerCase().includes(s)) return true
+        if ((k.beschreibung || '').toLowerCase().includes(s)) return true
+        // Mitgliedernamen / Partei / Fraktion durchsuchen.
+        const mitglieder = Array.isArray(k.mitgliederArray) ? k.mitgliederArray : []
+        if (mitglieder.some(m =>
+          (m.label || '').toLowerCase().includes(s) ||
+          (m.partei || '').toLowerCase().includes(s) ||
+          (m.fraktion || '').toLowerCase().includes(s) ||
+          (m.email || '').toLowerCase().includes(s) ||
+          (m.funktion || '').toLowerCase().includes(s),
+        )) return true
+        // Pendente Geschäfte: Nr (GGR-Nr) und Titel.
+        const geschaefte = this.geschaefteFuer(k)
+        if (geschaefte.some(g =>
+          (g.nummer || '').toLowerCase().includes(s) ||
+          (g.titel || '').toLowerCase().includes(s),
+        )) return true
+        return false
+      })
     },
     ausgewaehltesGeschaeft() {
       if (!this.ausgewaehlteGeschaeftId) return null
@@ -169,6 +185,17 @@ export default {
     },
     eigeneFraktion() {
       this.aktualisiereMitgliederArrays()
+    },
+    suche(neu) {
+      // Bei aktiver Suche alle Treffer-Kommissionen automatisch aufklappen,
+      // damit die gefundenen Mitglieder/Geschäfte sichtbar werden.
+      const term = (neu || '').trim()
+      if (!term) return
+      const treffer = this.gefilterteKommissionen.map(k => k.id)
+      const zusaetzlich = treffer.filter(id => !this.offene.includes(id))
+      if (zusaetzlich.length) {
+        this.offene = [...this.offene, ...zusaetzlich]
+      }
     },
   },
   mounted() {

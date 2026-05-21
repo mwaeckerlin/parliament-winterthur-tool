@@ -19,6 +19,7 @@ use OCP\AppFramework\Db\Entity;
  * @method string getUrl()
  * @method bool   getGeloescht()
  * @method string getBemerkungen()
+ * @method string getNotizen()
  * @method int    getTypId()
  * @method string getTeilnehmer()
  * @method string getErstelltAm()
@@ -50,8 +51,11 @@ class Sitzung extends Entity
     /** @var bool Wurde die Sitzung von der Webseite entfernt? */
     protected bool $geloescht = false;
 
-    /** @var string Fraktionsinterne Bemerkungen */
+    /** @var string Fraktionsinterne Bemerkungen (Altbestand, ersetzt durch Notizen) */
     protected string $bemerkungen = '';
+
+    /** @var string Beliebig viele Notizen als JSON-Array (Datum/Autor/Text) */
+    protected string $notizen = '[]';
 
     /** @var int Optionaler Verweis auf eine Sitzungs-Vorlage (0 = keine) */
     protected int $typId = 0;
@@ -91,6 +95,7 @@ class Sitzung extends Entity
             'url' => $this->getUrl(),
             'geloescht' => $this->getGeloescht(),
             'bemerkungen' => $this->getBemerkungen(),
+            'notizen' => $this->getNotizen(),
             'typId' => $this->getTypId(),
             'teilnehmer' => $this->getTeilnehmerArray(),
             'erstelltAm' => $this->getErstelltAm(),
@@ -106,6 +111,17 @@ class Sitzung extends Entity
     public function getTeilnehmerArray(): array
     {
         $entschluesselt = json_decode($this->teilnehmer ?: '[]', true);
+        return is_array($entschluesselt) ? $entschluesselt : [];
+    }
+
+    /**
+     * Gibt die Notizen als Array zurück.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function getNotizenArray(): array
+    {
+        $entschluesselt = json_decode($this->notizen ?: '[]', true);
         return is_array($entschluesselt) ? $entschluesselt : [];
     }
 }

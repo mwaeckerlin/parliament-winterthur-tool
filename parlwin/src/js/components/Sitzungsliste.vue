@@ -56,16 +56,14 @@
 
         <!-- Aufklappbarer Bereich mit Traktanden -->
         <div v-if="offeneSitzungen.includes(sitzung.id)" class="pw-sitzung-details">
-          <!-- Fraktionsbemerkungen zur Sitzung (bleibt erhalten, betrifft Sitzung selbst) -->
-          <div class="pw-sitzung-bemerkungen">
-            <label>Bemerkungen zur Sitzung</label>
-            <textarea
-              v-model="sitzungBemerkungen[sitzung.id]"
-              class="pw-textarea"
-              rows="2"
-              placeholder="Interne Bemerkungen zur Sitzung..."
+          <!-- Notizen zur Sitzung (ersetzt frühere „Bemerkungen zur Sitzung“). -->
+          <div class="pw-sitzung-notizen">
+            <h4>Notizen zur Sitzung</h4>
+            <NotizenListe
+              :model-value="sitzungNotizen[sitzung.id] || []"
+              placeholder="Notiz zur Sitzung hinzufügen…"
+              @update:model-value="speichereSitzungNotizen(sitzung, $event)"
             />
-            <button type="button" class="button pw-btn-klein" @click="speichereSitzungBemerkungen(sitzung)">Speichern</button>
           </div>
 
           <!-- Traktanden – Darstellung wie Geschäftsliste-Hauptseite -->
@@ -148,24 +146,11 @@
                       <tr class="pw-traktandum-notizen-zeile" @click.stop>
                         <td></td>
                         <td colspan="7">
-                          <div class="pw-traktandum-notizen">
-                            <div v-for="(n, idx) in parseTraktandumNotizen(t.id)" :key="idx" class="pw-notiz-klein">
-                              <span class="pw-notiz-datum">{{ n.datum }}</span>
-                              <span v-if="n.displayName || n.uid" class="pw-notiz-autor">{{ n.displayName || n.uid }}:</span>
-                              {{ n.text }}
-                              <button type="button" class="button pw-btn-mini" @click="loescheTraktandumNotiz(t, idx)">✕</button>
-                            </div>
-                            <div class="pw-neue-notiz-klein">
-                              <input
-                                v-model="neueNotizen[t.id]"
-                                type="text"
-                                placeholder="Notiz hinzufügen…"
-                                class="pw-input-klein"
-                                @keyup.enter="fuegeNotizHinzu(t)"
-                              />
-                              <button type="button" class="button pw-btn-mini" @click="fuegeNotizHinzu(t)">+</button>
-                            </div>
-                          </div>
+                          <NotizenListe
+                            :model-value="parseTraktandumNotizen(t.id)"
+                            placeholder="Notiz zum Traktandum hinzufügen…"
+                            @update:model-value="speichereTraktandumNotizen(t, $event)"
+                          />
                         </td>
                       </tr>
                     </template>
@@ -241,9 +226,9 @@
 <script>
 import { generateUrl } from '@nextcloud/router'
 import axios from '@nextcloud/axios'
-import { getCurrentUser } from '@nextcloud/auth'
 import { subscribeRealtime } from '../realtime'
 import GeschaeftDetail from './GeschaeftDetail.vue'
+import NotizenListe from './NotizenListe.vue'
 import NcCheckboxRadioSwitch from '@nextcloud/vue/components/NcCheckboxRadioSwitch'
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 import NcSelect from '@nextcloud/vue/components/NcSelect'
@@ -255,7 +240,7 @@ import PwMultiSelect from './PwMultiSelect.vue'
 
 export default {
   name: 'Sitzungsliste',
-  components: { GeschaeftDetail, NcCheckboxRadioSwitch, NcLoadingIcon, NcSelect, NcTextField, NcButton, NcActions, NcActionButton, PwMultiSelect },
+  components: { GeschaeftDetail, NotizenListe, NcCheckboxRadioSwitch, NcLoadingIcon, NcSelect, NcTextField, NcButton, NcActions, NcActionButton, PwMultiSelect },
   props: {
     mitglieder: { type: Array, default: () => [] },
   },
@@ -269,9 +254,8 @@ export default {
       offeneSitzungen: [],
       traktanden: {},
       ladenTraktanden: {},
-      sitzungBemerkungen: {},
+      sitzungNotizen: {},
       traktandumNotizen: {},
-      neueNotizen: {},
       ausgewaehlteGeschaeftId: null,
       unsubRealtime: null,
       neuDialogOffen: false,
@@ -370,7 +354,7 @@ export default {
         })
         this.sitzungen = data
         data.forEach(s => {
-          this.sitzungBemerkungen[s.id] = s.bemerkungen || ''
+          this.sitzungNotizen[s.id] = this.parseNotizen(s.notizen)
         })
       } catch (e) {
         console.error('Fehler beim Laden der Sitzungen:', e)
@@ -453,51 +437,30 @@ export default {
         return titel.includes(s) || nummer.includes(s)
       })
     },
-    async fuegeNotizHinzu(traktandum) {
+    async speichereTraktandumNotizen(traktandum, notizen) {
       const tId = traktandum.id
-      const text = (this.neueNotizen[tId] || '').trim()
-      if (!text) return
-      const aktuell = Array.isArray(this.traktandumNotizen[tId]) ? [...this.traktandumNotizen[tId]] : []
-      const user = getCurrentUser()
-      aktuell.push({
-        text,
-        datum: new Date().toLocaleString('de-CH'),
-        uid: user?.uid || '',
-        displayName: user?.displayName || user?.uid || '',
-      })
-      // Optimistisches Update + sofortige Persistenz – sonst gehen die Notizen
-      // verloren, falls der Benutzer nicht separat speichert.
-      this.traktandumNotizen = { ...this.traktandumNotizen, [tId]: aktuell }
-      this.neueNotizen = { ...this.neueNotizen, [tId]: '' }
-      await this.speichereNotizen(traktandum, aktuell)
-    },
-    async loescheTraktandumNotiz(traktandum, idx) {
-      const tId = traktandum.id
-      const aktuell = Array.isArray(this.traktandumNotizen[tId]) ? [...this.traktandumNotizen[tId]] : []
-      if (idx < 0 || idx >= aktuell.length) return
-      aktuell.splice(idx, 1)
-      this.traktandumNotizen = { ...this.traktandumNotizen, [tId]: aktuell }
-      await this.speichereNotizen(traktandum, aktuell)
-    },
-    async speichereNotizen(traktandum, notizen) {
+      const liste = Array.isArray(notizen) ? notizen : []
+      this.traktandumNotizen = { ...this.traktandumNotizen, [tId]: liste }
       const sitzungId = traktandum.sitzungId
       try {
         await axios.put(
           generateUrl(`/apps/parlwin/sitzungen/${sitzungId}/traktanden/${traktandum.id}`),
-          { notizen: JSON.stringify(notizen || []) }
+          { notizen: JSON.stringify(liste) }
         )
       } catch (e) {
-        console.error('Fehler beim Speichern der Notizen:', e)
+        console.error('Fehler beim Speichern der Traktandum-Notizen:', e)
       }
     },
-    async speichereSitzungBemerkungen(sitzung) {
+    async speichereSitzungNotizen(sitzung, notizen) {
+      const liste = Array.isArray(notizen) ? notizen : []
+      this.sitzungNotizen = { ...this.sitzungNotizen, [sitzung.id]: liste }
       try {
         await axios.put(
           generateUrl(`/apps/parlwin/sitzungen/${sitzung.id}`),
-          { bemerkungen: this.sitzungBemerkungen[sitzung.id] || '' }
+          { notizen: JSON.stringify(liste) }
         )
       } catch (e) {
-        console.error('Fehler beim Speichern der Sitzungsbemerkungen:', e)
+        console.error('Fehler beim Speichern der Sitzungs-Notizen:', e)
       }
     },
     zustaendigOptionenFuer(geschaeft) {

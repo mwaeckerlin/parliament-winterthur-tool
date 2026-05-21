@@ -1271,12 +1271,53 @@ ul.app-navigation__list {
 
 .pw-notiz-datum {
   color: var(--pw-muted);
-  min-inline-size: 8rem;
+  white-space: nowrap;
 }
 
 .pw-notiz-autor {
-  font-weight: 600;
+  font-weight: normal;
   margin-inline-end: 0.4rem;
+  white-space: nowrap;
+}
+
+.pw-notiz-text {
+  text-align: start;
+  word-break: break-word;
+}
+
+.pw-notiz-text-klickbar {
+  cursor: text;
+}
+
+.pw-notiz-text-klickbar:hover {
+  background: var(--color-background-hover);
+  border-radius: var(--pw-radius-small);
+}
+
+.pw-notiz-eingabe {
+  inline-size: 100%;
+}
+
+.pw-notizen {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.pw-notiz-zeile,
+.pw-neue-notiz {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto auto;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.pw-neue-notiz {
+  grid-template-columns: 1fr auto;
+}
+
+.pw-notiz-eigen .pw-notiz-text {
+  color: var(--color-main-text);
 }
 
 .pw-mitglied-kopf {

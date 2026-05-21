@@ -329,6 +329,9 @@ class SitzungService
         if (array_key_exists('bemerkungen', $felder)) {
             $sitzung->setBemerkungen($felder['bemerkungen']);
         }
+        if (array_key_exists('notizen', $felder)) {
+            $sitzung->setNotizen($felder['notizen']);
+        }
         $sitzung->setAktualisiertAm((new \DateTime())->format('Y-m-d H:i:s'));
         return $this->sitzungMapper->update($sitzung);
     }
