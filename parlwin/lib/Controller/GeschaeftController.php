@@ -14,7 +14,11 @@ use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\DataResponse;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\AppFramework\Http;
+use OCP\Files\IRootFolder;
+use OCP\Files\NotFoundException;
 use OCP\IRequest;
+use OCP\IUserSession;
+use Psr\Log\LoggerInterface;
 
 /**
  * REST-Controller für politische Geschäfte.
@@ -25,6 +29,9 @@ class GeschaeftController extends Controller {
         private readonly GeschaeftService $service,
         private readonly FraktionsarbeitService $fraktionsarbeitService,
         private readonly RealtimePublisherService $realtimePublisher,
+        private readonly IRootFolder $rootFolder,
+        private readonly IUserSession $userSession,
+        private readonly LoggerInterface $logger,
     ) {
         parent::__construct(Application::APP_ID, $request);
     }
@@ -237,5 +244,132 @@ class GeschaeftController extends Controller {
         $response = new TemplateResponse(Application::APP_ID, 'votum_pdf', $daten, 'blank');
         // Erlaubt Inline-Skripte des Templates (window.print()).
         return $response;
+    }
+
+    /**
+     * Listet die Dokumente zu einem Geschäft.
+     * Pfad: Fraktion/20_Geschäfte/{YYYY}/{YYYY.XXXX}-* relativ zum Userverzeichnis.
+     *
+     * @return DataResponse Liste mit Eintrag pro Datei: {name, pfad, mime, groesse, mtime, downloadUrl, openUrl}
+     */
+    #[NoAdminRequired]
+    public function dokumente(int $id): DataResponse {
+        try {
+            $geschaeft = $this->fraktionsarbeitService->angereichertesGeschaeft($id);
+        } catch (\OCP\AppFramework\Db\DoesNotExistException) {
+            return new DataResponse(['fehler' => 'Geschäft nicht gefunden'], Http::STATUS_NOT_FOUND);
+        }
+        $nummer = (string) ($geschaeft['nummer'] ?? '');
+        if (!preg_match('/^(\d{4})\.(\d+)$/', $nummer, $m)) {
+            return new DataResponse(['fehler' => 'Ungültige Geschäftsnummer'], Http::STATUS_BAD_REQUEST);
+        }
+        $jahr = $m[1];
+        $praefix = $nummer; // z.B. "2026.88"
+        $user = $this->userSession->getUser();
+        if ($user === null) {
+            return new DataResponse(['fehler' => 'Nicht angemeldet'], Http::STATUS_UNAUTHORIZED);
+        }
+        try {
+            $userFolder = $this->rootFolder->getUserFolder($user->getUID());
+            $ordnerPfad = 'Fraktion/20_Geschäfte/' . $jahr;
+            if (!$userFolder->nodeExists($ordnerPfad)) {
+                return new DataResponse([]);
+            }
+            $ordner = $userFolder->get($ordnerPfad);
+            if (!($ordner instanceof \OCP\Files\Folder)) {
+                return new DataResponse([]);
+            }
+            $eintraege = [];
+            foreach ($ordner->getDirectoryListing() as $node) {
+                $name = $node->getName();
+                if (!str_starts_with($name, $praefix . '-')) {
+                    continue;
+                }
+                $relPath = ltrim($ordnerPfad . '/' . $name, '/');
+                $eintraege[] = [
+                    'name' => $name,
+                    'pfad' => $relPath,
+                    'mime' => $node instanceof \OCP\Files\File ? $node->getMimeType() : 'httpd/unix-directory',
+                    'groesse' => $node->getSize(),
+                    'mtime' => $node->getMTime(),
+                    'fileId' => $node->getId(),
+                ];
+            }
+            usort($eintraege, fn(array $a, array $b): int => strcmp($a['name'], $b['name']));
+            return new DataResponse($eintraege);
+        } catch (NotFoundException) {
+            return new DataResponse([]);
+        } catch (\Throwable $e) {
+            $this->logger->warning('parlwin: dokumente() Fehler: {msg}', ['msg' => $e->getMessage()]);
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Erstellt ein neues Dokument zu einem Geschäft.
+     * Erwartete Body-Felder: `name` (Suffix nach `YYYY.XXXX-`), `extension` (z.B. "docx"), `vorlage` (optional, Pfad zu Vorlage).
+     */
+    #[NoAdminRequired]
+    public function dokumentErstellen(int $id): DataResponse {
+        $name = trim((string) $this->request->getParam('name', ''));
+        $extension = trim((string) $this->request->getParam('extension', ''));
+        $vorlage = trim((string) $this->request->getParam('vorlage', ''));
+        if ($name === '' || $extension === '') {
+            return new DataResponse(['fehler' => 'Name und Endung erforderlich'], Http::STATUS_BAD_REQUEST);
+        }
+        try {
+            $geschaeft = $this->fraktionsarbeitService->angereichertesGeschaeft($id);
+        } catch (\OCP\AppFramework\Db\DoesNotExistException) {
+            return new DataResponse(['fehler' => 'Geschäft nicht gefunden'], Http::STATUS_NOT_FOUND);
+        }
+        $nummer = (string) ($geschaeft['nummer'] ?? '');
+        if (!preg_match('/^(\d{4})\.(\d+)$/', $nummer, $m)) {
+            return new DataResponse(['fehler' => 'Ungültige Geschäftsnummer'], Http::STATUS_BAD_REQUEST);
+        }
+        $jahr = $m[1];
+        // Spaces -> Underscores, Sanity-Cleanup für Pfadtrenner.
+        $sanitisiert = str_replace([' ', '/', '\\'], ['_', '_', '_'], $name);
+        $extension = ltrim($extension, '.');
+        $dateiName = $nummer . '-' . $sanitisiert . '.' . $extension;
+        $user = $this->userSession->getUser();
+        if ($user === null) {
+            return new DataResponse(['fehler' => 'Nicht angemeldet'], Http::STATUS_UNAUTHORIZED);
+        }
+        try {
+            $userFolder = $this->rootFolder->getUserFolder($user->getUID());
+            $ordnerPfad = 'Fraktion/20_Geschäfte/' . $jahr;
+            // Ordnerkette anlegen falls noch nicht vorhanden.
+            $teile = explode('/', $ordnerPfad);
+            $aktuell = '';
+            foreach ($teile as $teil) {
+                $aktuell = $aktuell === '' ? $teil : $aktuell . '/' . $teil;
+                if (!$userFolder->nodeExists($aktuell)) {
+                    $userFolder->newFolder($aktuell);
+                }
+            }
+            $zielPfad = $ordnerPfad . '/' . $dateiName;
+            if ($userFolder->nodeExists($zielPfad)) {
+                return new DataResponse(['fehler' => 'Datei existiert bereits'], Http::STATUS_CONFLICT);
+            }
+            $inhalt = '';
+            if ($vorlage !== '' && $userFolder->nodeExists($vorlage)) {
+                $vorlageNode = $userFolder->get($vorlage);
+                if ($vorlageNode instanceof \OCP\Files\File) {
+                    $inhalt = $vorlageNode->getContent();
+                }
+            }
+            $datei = $userFolder->newFile($zielPfad, $inhalt);
+            return new DataResponse([
+                'name' => $datei->getName(),
+                'pfad' => $zielPfad,
+                'fileId' => $datei->getId(),
+                'mime' => $datei->getMimeType(),
+                'groesse' => $datei->getSize(),
+                'mtime' => $datei->getMTime(),
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->warning('parlwin: dokumentErstellen() Fehler: {msg}', ['msg' => $e->getMessage()]);
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_INTERNAL_SERVER_ERROR);
+        }
     }
 }

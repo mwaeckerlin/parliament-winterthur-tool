@@ -88,24 +88,11 @@
         </div>
 
         <div class="pw-form-zeile">
-          <label>Votum im Rat</label>
-          <div v-if="!geschaeft.istNutzerZustaendig" class="pw-hinweis pw-votum-hinweis">
-            Nur die zuständige Person darf das Votum bearbeiten.
-          </div>
-          <PwWysiwyg
-            v-model="votumHtml"
-            :editable="!!geschaeft.istNutzerZustaendig"
-            :status="votumStatus"
-            :pdf-href="votumPdfUrl"
-            pdf-title="Votum als PDF herunterladen"
-            placeholder="Votum, Sprecher, Kernpunkte"
-            @update:model-value="votumGeaendert"
-            @blur="votumSofortSpeichern"
+          <label>Dokumente zum Geschäft</label>
+          <GeschaeftDokumente
+            :geschaeft-id="geschaeftId"
+            :geschaeft-nummer="geschaeft.nummer || ''"
           />
-          <div v-if="geschaeft.istNutzerZustaendig && votumHatInhalt" class="pw-votum-aktionen">
-            <button type="button" class="button pw-btn-klein" @click="votumArchivieren">Votum archivieren</button>
-            <small class="pw-hinweis">Verschiebt das aktuelle Votum in die History und leert das Feld für ein neues.</small>
-          </div>
         </div>
       </div>
 
@@ -139,11 +126,12 @@ import axios from '@nextcloud/axios'
 import NcSelect from '@nextcloud/vue/components/NcSelect'
 import PwMultiSelect from './PwMultiSelect.vue'
 import PwWysiwyg from './PwWysiwyg.vue'
+import GeschaeftDokumente from './GeschaeftDokumente.vue'
 import { subscribeRealtime } from '../realtime'
 
 export default {
   name: 'GeschaeftDetail',
-  components: { NcSelect, PwMultiSelect, PwWysiwyg },
+  components: { NcSelect, PwMultiSelect, PwWysiwyg, GeschaeftDokumente },
   props: {
     geschaeftId: { type: Number, required: true },
     mitglieder: { type: Array, default: () => [] },

@@ -18,6 +18,8 @@ return [
         ['name' => 'geschaeft#updateVotum', 'url' => '/geschaefte/{id}/votum', 'verb' => 'PUT'],
         ['name' => 'geschaeft#archiviereVotum', 'url' => '/geschaefte/{id}/votum/archivieren', 'verb' => 'POST'],
         ['name' => 'geschaeft#votumPdf', 'url' => '/geschaefte/{id}/votum/pdf', 'verb' => 'GET'],
+        ['name' => 'geschaeft#dokumente', 'url' => '/geschaefte/{id}/dokumente', 'verb' => 'GET'],
+        ['name' => 'geschaeft#dokumentErstellen', 'url' => '/geschaefte/{id}/dokumente', 'verb' => 'POST'],
 
         // Sitzungen
         ['name' => 'sitzung#index', 'url' => '/sitzungen', 'verb' => 'GET'],
@@ -31,6 +33,8 @@ return [
         ['name' => 'sitzungstyp#update', 'url' => '/sitzungstypen/{id}', 'verb' => 'PUT'],
         ['name' => 'sitzungstyp#destroy', 'url' => '/sitzungstypen/{id}', 'verb' => 'DELETE'],
         ['name' => 'sitzungstyp#neueSitzung', 'url' => '/sitzungstypen/{id}/sitzung', 'verb' => 'POST'],
+        ['name' => 'sitzungstyp#ncGroups', 'url' => '/sitzungstypen/nc/groups', 'verb' => 'GET'],
+        ['name' => 'sitzungstyp#ncUsers', 'url' => '/sitzungstypen/nc/users', 'verb' => 'GET'],
 
         // Traktanden
         ['name' => 'traktandum#index', 'url' => '/sitzungen/{sitzungId}/traktanden', 'verb' => 'GET'],

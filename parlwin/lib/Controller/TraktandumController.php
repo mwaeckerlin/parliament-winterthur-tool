@@ -13,6 +13,7 @@ use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\DataResponse;
 use OCP\AppFramework\Http;
 use OCP\IRequest;
+use OCP\IUserSession;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -25,6 +26,7 @@ class TraktandumController extends Controller
         private readonly SitzungService $service,
         private readonly FraktionsarbeitService $fraktionsarbeitService,
         private readonly RealtimePublisherService $realtimePublisher,
+        private readonly IUserSession $userSession,
         private readonly LoggerInterface $logger,
     ) {
         parent::__construct(Application::APP_ID, $request);
@@ -77,7 +79,8 @@ class TraktandumController extends Controller
     {
         $felder = [];
         if ($this->request->offsetExists('notizen')) {
-            $felder['notizen'] = $this->request->getParam('notizen', '[]');
+            $rohwert = $this->request->getParam('notizen', '[]');
+            $felder['notizen'] = $this->normalisiereNotizen($rohwert);
         }
 
         try {
@@ -90,5 +93,54 @@ class TraktandumController extends Controller
         } catch (\OCP\AppFramework\Db\DoesNotExistException) {
             return new DataResponse(['fehler' => 'Nicht gefunden'], Http::STATUS_NOT_FOUND);
         }
+    }
+
+    /**
+     * Stellt sicher, dass jede Notiz ein vollständiges Audit-Trail trägt:
+     * `datum`, `uid` und `displayName` werden aus der Session ergänzt, falls
+     * sie fehlen. Eingaben können ein JSON-String oder ein Array sein.
+     *
+     * @param mixed $rohwert
+     */
+    private function normalisiereNotizen(mixed $rohwert): string
+    {
+        if (is_string($rohwert)) {
+            $arr = json_decode($rohwert, true);
+        } elseif (is_array($rohwert)) {
+            $arr = $rohwert;
+        } else {
+            $arr = [];
+        }
+        if (!is_array($arr)) {
+            $arr = [];
+        }
+        $user = $this->userSession->getUser();
+        $aktUid = $user?->getUID() ?? '';
+        $aktName = $user?->getDisplayName() ?? $aktUid;
+        $jetzt = (new \DateTime())->format('d.m.Y H:i');
+        $ergebnis = [];
+        foreach ($arr as $eintrag) {
+            if (!is_array($eintrag)) {
+                continue;
+            }
+            $text = (string) ($eintrag['text'] ?? '');
+            if ($text === '') {
+                continue;
+            }
+            $datum = (string) ($eintrag['datum'] ?? '');
+            $uid = (string) ($eintrag['uid'] ?? '');
+            $name = (string) ($eintrag['displayName'] ?? '');
+            // Fehlende Audit-Felder mit aktueller Session befüllen.
+            if ($datum === '') $datum = $jetzt;
+            if ($uid === '') $uid = $aktUid;
+            if ($name === '') $name = $aktName !== '' ? $aktName : $uid;
+            $ergebnis[] = [
+                'datum' => $datum,
+                'uid' => $uid,
+                'displayName' => $name,
+                'text' => $text,
+            ];
+        }
+        return json_encode($ergebnis, JSON_UNESCAPED_UNICODE);
     }
 }
