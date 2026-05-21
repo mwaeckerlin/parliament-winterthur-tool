@@ -335,6 +335,10 @@ class SitzungService
 
     /**
      * Aktualisiert die fraktionsinternen Felder eines Traktandums.
+     *
+     * Nur `notizen` ist relevant; `bemerkungen` wird nicht mehr von der UI
+     * gesetzt, bleibt aber in der DB (Altbestand) und wird hier defensiv
+     * gehandhabt, falls Tests/Altcode das Feld noch übergeben.
      */
     public function aktualisiereInternesTraktandum(int $id, array $felder): Traktandum
     {
