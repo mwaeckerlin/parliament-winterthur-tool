@@ -7,6 +7,7 @@ namespace OCA\ParliamentWinterthur\Service;
 use OCA\ParliamentWinterthur\AppInfo\Application;
 use OCA\ParliamentWinterthur\Db\Sitzung;
 use OCP\IConfig;
+use OCP\IUserManager;
 use Psr\Log\LoggerInterface;
 use Sabre\DAV\PropPatch;
 
@@ -34,6 +35,7 @@ class KalenderService
     public function __construct(
         private readonly IConfig $config,
         private readonly LoggerInterface $logger,
+        private readonly ?IUserManager $userManager = null,
     ) {
     }
 
@@ -182,6 +184,8 @@ class KalenderService
             $beschreibung = 'Weitere Informationen: ' . $url;
         }
 
+        $teilnehmerZeilen = $this->teilnehmerZeilen($sitzung);
+
         return "BEGIN:VCALENDAR\r\n" .
             "VERSION:2.0\r\n" .
             "PRODID:-//Parlament Winterthur Tool//Nextcloud//DE\r\n" .
@@ -195,8 +199,54 @@ class KalenderService
             ($ort ? "LOCATION:{$ort}\r\n" : '') .
             ($beschreibung ? "DESCRIPTION:{$beschreibung}\r\n" : '') .
             ($url ? "URL:{$url}\r\n" : '') .
+            $teilnehmerZeilen .
             "END:VEVENT\r\n" .
             "END:VCALENDAR\r\n";
+    }
+
+    /**
+     * Gibt ORGANIZER und ATTENDEE-Zeilen für eine Sitzung zurück, sofern
+     * die Sitzung aus einer Vorlage erstellt wurde und Teilnehmer
+     * materialisiert sind.
+     */
+    private function teilnehmerZeilen(Sitzung $sitzung): string
+    {
+        $teilnehmer = $sitzung->getTeilnehmerArray();
+        if ($teilnehmer === []) {
+            return '';
+        }
+
+        $zeilen = '';
+        $organizerEmail = $this->organizerEmail();
+        if ($organizerEmail !== '') {
+            $zeilen .= 'ORGANIZER:mailto:' . $organizerEmail . "\r\n";
+        }
+
+        foreach ($teilnehmer as $eintrag) {
+            $email = trim((string) ($eintrag['email'] ?? ''));
+            if ($email === '') {
+                continue;
+            }
+            $name = (string) ($eintrag['name'] ?? '');
+            $cn = $name !== '' ? ';CN=' . str_replace([',', ';', ':'], ' ', $name) : '';
+            $zeilen .= 'ATTENDEE' . $cn
+                . ';ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:'
+                . $email . "\r\n";
+        }
+        return $zeilen;
+    }
+
+    private function organizerEmail(): string
+    {
+        $uid = (string) $this->config->getAppValue(Application::APP_ID, 'kalender_nutzer', '');
+        if ($uid === '' || $this->userManager === null) {
+            return '';
+        }
+        $user = $this->userManager->get($uid);
+        if ($user === null) {
+            return '';
+        }
+        return (string) ($user->getEMailAddress() ?? '');
     }
 
     /**

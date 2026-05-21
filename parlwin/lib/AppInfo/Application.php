@@ -16,6 +16,9 @@ use OCA\ParliamentWinterthur\Db\GeschaeftZustaendigkeitMapper;
 use OCA\ParliamentWinterthur\Db\KommissionMapper;
 use OCA\ParliamentWinterthur\Db\MitgliedMapper;
 use OCA\ParliamentWinterthur\Db\SitzungMapper;
+use OCA\ParliamentWinterthur\Db\SitzungstypMapper;
+use OCA\ParliamentWinterthur\Db\SitzungstypTeilnehmerMapper;
+use OCA\ParliamentWinterthur\Db\SitzungstypTraktandumMapper;
 use OCA\ParliamentWinterthur\Db\TraktandumMapper;
 use OCA\ParliamentWinterthur\Db\VorstossEntwurfMapper;
 use OCA\ParliamentWinterthur\Service\FraktionsarbeitService;
@@ -25,6 +28,7 @@ use OCA\ParliamentWinterthur\Service\MitgliedService;
 use OCA\ParliamentWinterthur\Service\RealtimePublisherService;
 use OCA\ParliamentWinterthur\Service\ScraperService;
 use OCA\ParliamentWinterthur\Service\SitzungService;
+use OCA\ParliamentWinterthur\Service\SitzungstypService;
 use OCA\ParliamentWinterthur\Service\SyncLockService;
 use OCA\ParliamentWinterthur\Service\SyncProcessService;
 use OCP\AppFramework\App;
@@ -52,6 +56,15 @@ class Application extends App implements IBootstrap
         });
         $context->registerService(TraktandumMapper::class, function ($c) {
             return new TraktandumMapper($c->get(\OCP\IDBConnection::class));
+        });
+        $context->registerService(SitzungstypMapper::class, function ($c) {
+            return new SitzungstypMapper($c->get(\OCP\IDBConnection::class));
+        });
+        $context->registerService(SitzungstypTraktandumMapper::class, function ($c) {
+            return new SitzungstypTraktandumMapper($c->get(\OCP\IDBConnection::class));
+        });
+        $context->registerService(SitzungstypTeilnehmerMapper::class, function ($c) {
+            return new SitzungstypTeilnehmerMapper($c->get(\OCP\IDBConnection::class));
         });
         $context->registerService(MitgliedMapper::class, function ($c) {
             return new MitgliedMapper($c->get(\OCP\IDBConnection::class));
@@ -117,8 +130,20 @@ class Application extends App implements IBootstrap
                 $c->get(\Psr\Log\LoggerInterface::class)
             );
         });
-        $context->registerService(MitgliedService::class, function ($c) {
-            return new MitgliedService(
+        $context->registerService(SitzungstypService::class, function ($c) {
+            return new SitzungstypService(
+                $c->get(SitzungstypMapper::class),
+                $c->get(SitzungstypTraktandumMapper::class),
+                $c->get(SitzungstypTeilnehmerMapper::class),
+                $c->get(SitzungMapper::class),
+                $c->get(TraktandumMapper::class),
+                $c->get(MitgliedMapper::class),
+                $c->get(KommissionMapper::class),
+                $c->get(FraktionsrolleMapper::class),
+                $c->get(\Psr\Log\LoggerInterface::class)
+            );
+        });
+        $context->registerService(MitgliedService::class, function ($c) {            return new MitgliedService(
                 $c->get(MitgliedMapper::class),
                 $c->get(FraktionMapper::class),
                 $c->get(KommissionMapper::class),
@@ -133,7 +158,8 @@ class Application extends App implements IBootstrap
         $context->registerService(KalenderService::class, function ($c) {
             return new KalenderService(
                 $c->get(\OCP\IConfig::class),
-                $c->get(\Psr\Log\LoggerInterface::class)
+                $c->get(\Psr\Log\LoggerInterface::class),
+                $c->get(\OCP\IUserManager::class),
             );
         });
         $context->registerService(RealtimePublisherService::class, function ($c) {

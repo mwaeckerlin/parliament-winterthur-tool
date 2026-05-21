@@ -24,6 +24,14 @@ return [
         ['name' => 'sitzung#show',     'url' => '/sitzungen/{id}',       'verb' => 'GET'],
         ['name' => 'sitzung#update',   'url' => '/sitzungen/{id}',       'verb' => 'PUT'],
 
+        // Sitzungs-Vorlagen / Sitzungstypen
+        ['name' => 'sitzungstyp#index',       'url' => '/sitzungstypen',                 'verb' => 'GET'],
+        ['name' => 'sitzungstyp#show',        'url' => '/sitzungstypen/{id}',            'verb' => 'GET'],
+        ['name' => 'sitzungstyp#create',      'url' => '/sitzungstypen',                 'verb' => 'POST'],
+        ['name' => 'sitzungstyp#update',      'url' => '/sitzungstypen/{id}',            'verb' => 'PUT'],
+        ['name' => 'sitzungstyp#destroy',     'url' => '/sitzungstypen/{id}',            'verb' => 'DELETE'],
+        ['name' => 'sitzungstyp#neueSitzung', 'url' => '/sitzungstypen/{id}/sitzung',    'verb' => 'POST'],
+
         // Traktanden
         ['name' => 'traktandum#index',  'url' => '/sitzungen/{sitzungId}/traktanden',      'verb' => 'GET'],
         ['name' => 'traktandum#update', 'url' => '/sitzungen/{sitzungId}/traktanden/{id}', 'verb' => 'PUT'],
