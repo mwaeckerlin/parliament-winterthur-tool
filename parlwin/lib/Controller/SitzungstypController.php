@@ -16,6 +16,7 @@ use OCP\AppFramework\Http\DataResponse;
 use OCP\IGroupManager;
 use OCP\IRequest;
 use OCP\IUserManager;
+use Psr\Log\LoggerInterface;
 
 /**
  * REST-Controller für Sitzungs-Vorlagen / Sitzungstypen.
@@ -29,6 +30,7 @@ class SitzungstypController extends Controller
     private readonly RealtimePublisherService $realtimePublisher,
     private readonly IGroupManager $groupManager,
     private readonly IUserManager $userManager,
+    private readonly LoggerInterface $logger,
   ) {
     parent::__construct(Application::APP_ID, $request);
   }
@@ -52,10 +54,15 @@ class SitzungstypController extends Controller
   #[NoAdminRequired]
   public function create(): DataResponse
   {
-    $daten = $this->sammleDaten(false);
-    $ergebnis = $this->service->speichern($daten);
-    $this->realtimePublisher->publish('sitzungstypen.updated', ['id' => (int) ($ergebnis['id'] ?? 0)]);
-    return new DataResponse($ergebnis, Http::STATUS_CREATED);
+    try {
+      $daten = $this->sammleDaten(false);
+      $ergebnis = $this->service->speichern($daten);
+      $this->realtimePublisher->publish('sitzungstypen.updated', ['id' => (int) ($ergebnis['id'] ?? 0)]);
+      return new DataResponse($ergebnis, Http::STATUS_CREATED);
+    } catch (\Throwable $e) {
+      $this->logger->error('parlwin: Sitzungstyp create fehlgeschlagen: ' . $e->getMessage(), ['exception' => $e]);
+      return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_INTERNAL_SERVER_ERROR);
+    }
   }
 
   #[NoAdminRequired]
@@ -66,11 +73,16 @@ class SitzungstypController extends Controller
     } catch (DoesNotExistException) {
       return new DataResponse(['fehler' => 'Nicht gefunden'], Http::STATUS_NOT_FOUND);
     }
-    $daten = $this->sammleDaten(true);
-    $daten['id'] = $id;
-    $ergebnis = $this->service->speichern($daten);
-    $this->realtimePublisher->publish('sitzungstypen.updated', ['id' => $id]);
-    return new DataResponse($ergebnis);
+    try {
+      $daten = $this->sammleDaten(true);
+      $daten['id'] = $id;
+      $ergebnis = $this->service->speichern($daten);
+      $this->realtimePublisher->publish('sitzungstypen.updated', ['id' => $id]);
+      return new DataResponse($ergebnis);
+    } catch (\Throwable $e) {
+      $this->logger->error('parlwin: Sitzungstyp update fehlgeschlagen: ' . $e->getMessage(), ['exception' => $e]);
+      return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_INTERNAL_SERVER_ERROR);
+    }
   }
 
   #[NoAdminRequired]
@@ -119,12 +131,17 @@ class SitzungstypController extends Controller
   public function ncGroups(string $search = '', int $limit = 25): DataResponse
   {
     $limit = max(1, min(100, $limit));
-    $groups = $this->groupManager->search($search, $limit);
-    $result = [];
-    foreach ($groups as $g) {
-      $result[] = ['gid' => $g->getGID(), 'displayName' => $g->getDisplayName()];
+    try {
+      $groups = $this->groupManager->search($search, $limit);
+      $result = [];
+      foreach ($groups as $g) {
+        $result[] = ['gid' => $g->getGID(), 'displayName' => $g->getDisplayName()];
+      }
+      return new DataResponse($result);
+    } catch (\Throwable $e) {
+      $this->logger->error('parlwin: ncGroups fehlgeschlagen: ' . $e->getMessage(), ['exception' => $e]);
+      return new DataResponse(['fehler' => 'Gruppen konnten nicht geladen werden: ' . $e->getMessage()], Http::STATUS_INTERNAL_SERVER_ERROR);
     }
-    return new DataResponse($result);
   }
 
   /**
@@ -134,16 +151,21 @@ class SitzungstypController extends Controller
   public function ncUsers(string $search = '', int $limit = 25): DataResponse
   {
     $limit = max(1, min(100, $limit));
-    $users = $this->userManager->search($search, $limit);
-    $result = [];
-    foreach ($users as $u) {
-      $result[] = [
-        'uid' => $u->getUID(),
-        'displayName' => $u->getDisplayName(),
-        'email' => method_exists($u, 'getEMailAddress') ? ((string) $u->getEMailAddress()) : '',
-      ];
+    try {
+      $users = $this->userManager->search($search, $limit);
+      $result = [];
+      foreach ($users as $u) {
+        $result[] = [
+          'uid' => $u->getUID(),
+          'displayName' => $u->getDisplayName(),
+          'email' => method_exists($u, 'getEMailAddress') ? ((string) $u->getEMailAddress()) : '',
+        ];
+      }
+      return new DataResponse($result);
+    } catch (\Throwable $e) {
+      $this->logger->error('parlwin: ncUsers fehlgeschlagen: ' . $e->getMessage(), ['exception' => $e]);
+      return new DataResponse(['fehler' => 'Benutzer konnten nicht geladen werden: ' . $e->getMessage()], Http::STATUS_INTERNAL_SERVER_ERROR);
     }
-    return new DataResponse($result);
   }
 
   /**

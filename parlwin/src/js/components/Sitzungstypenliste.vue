@@ -113,18 +113,22 @@
               </select>
               <span v-else-if="p.art === 'eigeneFraktion'" class="pw-hinweis">→ wird beim Anlegen der Sitzung anhand des angemeldeten Users aufgelöst.</span>
               <select v-else-if="p.art === 'kommission'" v-model.number="p.referenzId" class="pw-input">
-                <option :value="0">— Kommission wählen —</option>
-                <option v-for="k in kommissionen" :key="k.id" :value="k.id">{{ k.name }}</option>
+                <option :value="0">{{ aktiveKommissionen.length ? '— Kommission wählen —' : '— Keine Kommissionen vorhanden —' }}</option>
+                <option v-for="k in aktiveKommissionen" :key="k.id" :value="k.id">{{ k.name }}</option>
               </select>
               <select v-else-if="p.art === 'ncGruppe'" v-model="p.referenzName" class="pw-input">
-                <option value="">— Nextcloud-Gruppe wählen —</option>
+                <option value="">{{ ncGruppenLaden ? '— Lade Gruppen … —' : (ncGruppen.length ? '— Nextcloud-Gruppe wählen —' : '— Keine Gruppen verfügbar —') }}</option>
                 <option v-for="g in ncGruppen" :key="g.gid" :value="g.gid">{{ g.displayName || g.gid }}</option>
               </select>
               <select v-else-if="p.art === 'ncUser'" v-model="p.referenzName" class="pw-input">
-                <option value="">— Nextcloud-Benutzer wählen —</option>
+                <option value="">{{ ncUserLaden ? '— Lade Benutzer … —' : (ncUser.length ? '— Nextcloud-Benutzer wählen —' : '— Keine Benutzer verfügbar —') }}</option>
                 <option v-for="u in ncUser" :key="u.uid" :value="u.uid">{{ u.displayName || u.uid }} ({{ u.uid }})</option>
               </select>
-              <input v-else v-model="p.referenzName" placeholder="Rollen-Bezeichnung" class="pw-input" />
+              <select v-else-if="p.art === 'rolle'" v-model="p.referenzName" class="pw-input">
+                <option value="">— Fraktions-Rolle wählen —</option>
+                <option v-for="r in verfuegbareRollen" :key="r.code" :value="r.code">{{ r.bezeichnung }}</option>
+              </select>
+              <input v-else v-model="p.referenzName" placeholder="Bezeichnung" class="pw-input" />
               <button type="button" class="pw-btn-klein" @click="bearbeitung.teilnehmer.splice(i, 1)">✕</button>
             </div>
             <NcButton type="secondary" @click="bearbeitung.teilnehmer.push({ art: 'mitglied', referenzId: 0, referenzName: '' })">+ Regel</NcButton>
@@ -165,6 +169,15 @@ export default {
       speichernLaeuft: false,
       ncGruppen: [],
       ncUser: [],
+      ncGruppenLaden: false,
+      ncUserLaden: false,
+      verfuegbareRollen: [
+        { code: 'kommissionsmitglied', bezeichnung: 'Kommissionsmitglied' },
+        { code: 'fraktionspraesident', bezeichnung: 'Fraktionspräsident*in' },
+        { code: 'fraktionspraesident_stellvertretung', bezeichnung: 'Fraktionspräsident*in Stellvertretung' },
+        { code: 'protokollfuehrer', bezeichnung: 'Protokollführer*in' },
+        { code: 'protokollfuehrer_stellvertretung', bezeichnung: 'Protokollführer*in Stellvertretung' },
+      ],
     }
   },
   computed: {
@@ -181,6 +194,9 @@ export default {
     },
     aktiveFraktionen() {
       return (this.fraktionen || []).filter(f => f.aktiv !== false)
+    },
+    aktiveKommissionen() {
+      return (this.kommissionen || []).filter(k => k.aktiv !== false && !k.geloescht)
     },
   },
   mounted() {
@@ -214,19 +230,27 @@ export default {
       p.referenzName = ''
     },
     async ladeNcGruppen(search = '') {
+      this.ncGruppenLaden = true
       try {
         const { data } = await axios.get(generateUrl('/apps/parlwin/sitzungstypen/nc/groups'), { params: { search, limit: 100 } })
         this.ncGruppen = Array.isArray(data) ? data : []
       } catch (e) {
-        console.error('Fehler beim Laden der Nextcloud-Gruppen:', e)
+        console.error('Fehler beim Laden der Nextcloud-Gruppen:', e?.response?.status, e?.response?.data || e.message)
+        this.ncGruppen = []
+      } finally {
+        this.ncGruppenLaden = false
       }
     },
     async ladeNcUser(search = '') {
+      this.ncUserLaden = true
       try {
         const { data } = await axios.get(generateUrl('/apps/parlwin/sitzungstypen/nc/users'), { params: { search, limit: 100 } })
         this.ncUser = Array.isArray(data) ? data : []
       } catch (e) {
-        console.error('Fehler beim Laden der Nextcloud-Benutzer:', e)
+        console.error('Fehler beim Laden der Nextcloud-Benutzer:', e?.response?.status, e?.response?.data || e.message)
+        this.ncUser = []
+      } finally {
+        this.ncUserLaden = false
       }
     },
     neuerTyp() {
@@ -269,6 +293,18 @@ export default {
     },
     async speichern() {
       if (!this.bearbeitung || !this.bearbeitung.name) return
+      // Validierung: leere Teilnehmer-Regeln (z.B. „— wählen —“ stehen geblieben)
+      // herausfiltern, damit das Backend keine ungueltigen Einträge speichert.
+      const unvollstaendig = (this.bearbeitung.teilnehmer || []).filter(p => {
+        if (p.art === 'eigeneFraktion') return false
+        if (['mitglied', 'kommission'].includes(p.art)) return !p.referenzId
+        if (['fraktion', 'ncGruppe', 'ncUser', 'rolle'].includes(p.art)) return !p.referenzName
+        return !p.referenzName
+      })
+      if (unvollstaendig.length) {
+        alert('Bitte alle Teilnehmer-Regeln vollständig ausfüllen oder leere Zeilen mit ✕ entfernen.')
+        return
+      }
       this.speichernLaeuft = true
       try {
         const payload = { ...this.bearbeitung }
@@ -280,8 +316,10 @@ export default {
         this.bearbeitung = null
         await this.lade()
       } catch (e) {
-        console.error('Fehler beim Speichern des Sitzungstyps:', e)
-        alert('Fehler beim Speichern: ' + (e?.response?.data?.fehler || e.message))
+        const status = e?.response?.status
+        const serverMsg = e?.response?.data?.fehler || e?.response?.data?.message || ''
+        console.error('Fehler beim Speichern des Sitzungstyps:', status, e?.response?.data || e.message)
+        alert(`Fehler beim Speichern (HTTP ${status || '?'}): ${serverMsg || e.message}`)
       } finally {
         this.speichernLaeuft = false
       }
@@ -324,12 +362,10 @@ export default {
   font-size: 0.9em;
   color: var(--color-text-maxcontrast, #666);
 }
-.pw-modal-overlay {
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,0.5);
-  display: flex; align-items: center; justify-content: center;
-  z-index: 10000;
-}
+/* .pw-modal-overlay wird aus dem globalen style.scss übernommen (z-index 100000,
+   damit das Modal über der Nextcloud-App-Navigation liegt). Hier NICHT scoped
+   überschreiben – das lokale Style mit z-index 10000 hatte zur Folge, dass das
+   Modal in eingeklapptem Layout teilweise unter der Sidebar lag. */
 .pw-modal {
   background: var(--color-main-background, #fff);
   border-radius: 8px;
