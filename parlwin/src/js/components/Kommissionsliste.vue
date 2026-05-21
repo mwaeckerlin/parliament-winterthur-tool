@@ -1,6 +1,6 @@
 <template>
   <Teleport v-if="filterReady" to="#pw-search-slot">
-    <NcTextField :value="suche" label="Suche" placeholder="Name oder Beschreibung" trailing-button-icon="close" :show-trailing-button="!!suche" @update:value="suche = $event" @trailing-button-click="suche = ''" />
+    <NcTextField v-model="suche" label="Suche" placeholder="Name oder Beschreibung" trailing-button-icon="close" :show-trailing-button="!!suche" @trailing-button-click="suche = ''" />
   </Teleport>
   <Teleport v-if="filterReady" to="#pw-filter-slot">
     <div class="pw-filter-body">

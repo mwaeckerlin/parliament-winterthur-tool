@@ -1,12 +1,11 @@
 <template>
   <Teleport v-if="filterReady" to="#pw-search-slot">
     <NcTextField
-      :value="suche"
+      v-model="suche"
       label="Suche"
       placeholder="Name oder Zweck"
       trailing-button-icon="close"
       :show-trailing-button="!!suche"
-      @update:value="suche = $event"
       @trailing-button-click="suche = ''"
     />
   </Teleport>

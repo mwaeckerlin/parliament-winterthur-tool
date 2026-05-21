@@ -23,7 +23,8 @@ use Psr\Log\LoggerInterface;
 /**
  * REST-Controller für politische Geschäfte.
  */
-class GeschaeftController extends Controller {
+class GeschaeftController extends Controller
+{
     public function __construct(
         IRequest $request,
         private readonly GeschaeftService $service,
@@ -40,7 +41,8 @@ class GeschaeftController extends Controller {
      * Gibt alle Geschäfte zurück.
      */
     #[NoAdminRequired]
-    public function index(int $limit = 100, int $offset = 0): DataResponse {
+    public function index(int $limit = 100, int $offset = 0): DataResponse
+    {
         $filterLetzterBeschluss = (string) $this->request->getParam('letzter_beschluss', '');
         $filterEntscheidungsbedarfRaw = strtolower((string) $this->request->getParam('entscheidungsbedarf', ''));
         $showErledigtRaw = strtolower((string) $this->request->getParam('show_erledigt', '0'));
@@ -64,7 +66,8 @@ class GeschaeftController extends Controller {
      * Gibt ein einzelnes Geschäft zurück.
      */
     #[NoAdminRequired]
-    public function show(int $id): DataResponse {
+    public function show(int $id): DataResponse
+    {
         try {
             $daten = $this->fraktionsarbeitService->angereichertesGeschaeft($id);
             return new DataResponse($daten);
@@ -77,7 +80,8 @@ class GeschaeftController extends Controller {
      * Aktualisiert die fraktionsinternen Felder eines Geschäfts.
      */
     #[NoAdminRequired]
-    public function update(int $id): DataResponse {
+    public function update(int $id): DataResponse
+    {
         try {
             $zustaendigkeiten = $this->request->getParam('zustaendigkeiten', null);
             $hauptPersonKey = (string) $this->request->getParam('haupt_person_key', '');
@@ -104,7 +108,8 @@ class GeschaeftController extends Controller {
     }
 
     #[NoAdminRequired]
-    public function addNotiz(int $id): DataResponse {
+    public function addNotiz(int $id): DataResponse
+    {
         $text = (string) $this->request->getParam('text', '');
 
         try {
@@ -122,7 +127,8 @@ class GeschaeftController extends Controller {
     }
 
     #[NoAdminRequired]
-    public function addBeschluss(int $id): DataResponse {
+    public function addBeschluss(int $id): DataResponse
+    {
         $code = (string) $this->request->getParam('code', '');
         $text = (string) $this->request->getParam('text', '');
 
@@ -142,7 +148,8 @@ class GeschaeftController extends Controller {
     }
 
     #[NoAdminRequired]
-    public function removeBeschluss(int $id): DataResponse {
+    public function removeBeschluss(int $id): DataResponse
+    {
         try {
             $aktion = $this->fraktionsarbeitService->beschlussZuruecknehmen($id);
             $this->realtimePublisher->publish('geschaefte.action', [
@@ -159,7 +166,8 @@ class GeschaeftController extends Controller {
     }
 
     #[NoAdminRequired]
-    public function addVotum(int $id): DataResponse {
+    public function addVotum(int $id): DataResponse
+    {
         $text = (string) $this->request->getParam('text', '');
 
         try {
@@ -182,7 +190,8 @@ class GeschaeftController extends Controller {
      * darf das Votum bearbeiten.
      */
     #[NoAdminRequired]
-    public function updateVotum(int $id): DataResponse {
+    public function updateVotum(int $id): DataResponse
+    {
         $text = (string) $this->request->getParam('text', '');
 
         try {
@@ -206,7 +215,8 @@ class GeschaeftController extends Controller {
      * neues Votum kann erfasst werden.
      */
     #[NoAdminRequired]
-    public function archiviereVotum(int $id): DataResponse {
+    public function archiviereVotum(int $id): DataResponse
+    {
         try {
             $aktion = $this->fraktionsarbeitService->votumArchivieren($id);
             $this->realtimePublisher->publish('geschaefte.action', [
@@ -230,7 +240,8 @@ class GeschaeftController extends Controller {
      */
     #[NoAdminRequired]
     #[NoCSRFRequired]
-    public function votumPdf(int $id): TemplateResponse {
+    public function votumPdf(int $id): TemplateResponse
+    {
         try {
             $daten = $this->fraktionsarbeitService->angereichertesGeschaeft($id);
         } catch (\OCP\AppFramework\Db\DoesNotExistException) {
@@ -253,7 +264,8 @@ class GeschaeftController extends Controller {
      * @return DataResponse Liste mit Eintrag pro Datei: {name, pfad, mime, groesse, mtime, downloadUrl, openUrl}
      */
     #[NoAdminRequired]
-    public function dokumente(int $id): DataResponse {
+    public function dokumente(int $id): DataResponse
+    {
         try {
             $geschaeft = $this->fraktionsarbeitService->angereichertesGeschaeft($id);
         } catch (\OCP\AppFramework\Db\DoesNotExistException) {
@@ -310,7 +322,8 @@ class GeschaeftController extends Controller {
      * Erwartete Body-Felder: `name` (Suffix nach `YYYY.XXXX-`), `extension` (z.B. "docx"), `vorlage` (optional, Pfad zu Vorlage).
      */
     #[NoAdminRequired]
-    public function dokumentErstellen(int $id): DataResponse {
+    public function dokumentErstellen(int $id): DataResponse
+    {
         $name = trim((string) $this->request->getParam('name', ''));
         $extension = trim((string) $this->request->getParam('extension', ''));
         $vorlage = trim((string) $this->request->getParam('vorlage', ''));
