@@ -31,6 +31,7 @@ use OCA\ParliamentWinterthur\Service\SitzungService;
 use OCA\ParliamentWinterthur\Service\SitzungstypService;
 use OCA\ParliamentWinterthur\Service\SyncLockService;
 use OCA\ParliamentWinterthur\Service\SyncProcessService;
+use OCA\ParliamentWinterthur\Search\GeschaeftSearchProvider;
 use OCP\AppFramework\App;
 use OCP\AppFramework\Bootstrap\IBootContext;
 use OCP\AppFramework\Bootstrap\IBootstrap;
@@ -196,6 +197,9 @@ class Application extends App implements IBootstrap
                 $c->get(SyncProcessService::class),
             );
         });
+
+        // Unified Search Provider für Geschäfte
+        $context->registerSearchProvider(GeschaeftSearchProvider::class);
     }
 
     public function boot(IBootContext $context): void
