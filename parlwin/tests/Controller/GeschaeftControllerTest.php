@@ -8,8 +8,11 @@ use OCA\ParliamentWinterthur\Controller\GeschaeftController;
 use OCA\ParliamentWinterthur\Service\FraktionsarbeitService;
 use OCA\ParliamentWinterthur\Service\GeschaeftService;
 use OCA\ParliamentWinterthur\Service\RealtimePublisherService;
+use OCP\Files\IRootFolder;
 use OCP\IRequest;
+use OCP\IUserSession;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 
 class GeschaeftControllerTest extends TestCase {
     public function testIndexBlendetErledigteStandardmaessigAus(): void {
@@ -36,6 +39,9 @@ class GeschaeftControllerTest extends TestCase {
             $service,
             $fraktionsarbeit,
             $this->createStub(RealtimePublisherService::class),
+            $this->createStub(IRootFolder::class),
+            $this->createStub(IUserSession::class),
+            $this->createStub(LoggerInterface::class),
         );
 
         $response = $controller->index(50, 5);
@@ -70,6 +76,9 @@ class GeschaeftControllerTest extends TestCase {
             $service,
             $fraktionsarbeit,
             $this->createStub(RealtimePublisherService::class),
+            $this->createStub(IRootFolder::class),
+            $this->createStub(IUserSession::class),
+            $this->createStub(LoggerInterface::class),
         );
 
         $response = $controller->index();

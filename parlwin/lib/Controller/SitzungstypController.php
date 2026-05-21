@@ -13,7 +13,9 @@ use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\DataResponse;
+use OCP\IGroupManager;
 use OCP\IRequest;
+use OCP\IUserManager;
 
 /**
  * REST-Controller für Sitzungs-Vorlagen / Sitzungstypen.
@@ -25,6 +27,8 @@ class SitzungstypController extends Controller
     private readonly SitzungstypService $service,
     private readonly KalenderService $kalenderService,
     private readonly RealtimePublisherService $realtimePublisher,
+    private readonly IGroupManager $groupManager,
+    private readonly IUserManager $userManager,
   ) {
     parent::__construct(Application::APP_ID, $request);
   }
@@ -106,6 +110,40 @@ class SitzungstypController extends Controller
 
     $this->realtimePublisher->publish('sitzungen.updated', ['id' => (int) $sitzung->getId()]);
     return new DataResponse($sitzung->jsonSerialize(), Http::STATUS_CREATED);
+  }
+
+  /**
+   * Sucht Nextcloud-Gruppen für die Teilnehmer-Regeln.
+   */
+  #[NoAdminRequired]
+  public function ncGroups(string $search = '', int $limit = 25): DataResponse
+  {
+    $limit = max(1, min(100, $limit));
+    $groups = $this->groupManager->search($search, $limit);
+    $result = [];
+    foreach ($groups as $g) {
+      $result[] = ['gid' => $g->getGID(), 'displayName' => $g->getDisplayName()];
+    }
+    return new DataResponse($result);
+  }
+
+  /**
+   * Sucht Nextcloud-Benutzer für die Teilnehmer-Regeln.
+   */
+  #[NoAdminRequired]
+  public function ncUsers(string $search = '', int $limit = 25): DataResponse
+  {
+    $limit = max(1, min(100, $limit));
+    $users = $this->userManager->search($search, $limit);
+    $result = [];
+    foreach ($users as $u) {
+      $result[] = [
+        'uid' => $u->getUID(),
+        'displayName' => $u->getDisplayName(),
+        'email' => method_exists($u, 'getEMailAddress') ? ((string) $u->getEMailAddress()) : '',
+      ];
+    }
+    return new DataResponse($result);
   }
 
   /**

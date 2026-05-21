@@ -18,6 +18,9 @@ use OCA\ParliamentWinterthur\Db\SitzungstypTraktandumMapper;
 use OCA\ParliamentWinterthur\Db\Traktandum;
 use OCA\ParliamentWinterthur\Db\TraktandumMapper;
 use OCP\AppFramework\Db\DoesNotExistException;
+use OCP\IGroupManager;
+use OCP\IUserManager;
+use OCP\IUserSession;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -34,6 +37,9 @@ class SitzungstypService
     private readonly MitgliedMapper $mitgliedMapper,
     private readonly KommissionMapper $kommissionMapper,
     private readonly FraktionsrolleMapper $fraktionsrolleMapper,
+    private readonly IGroupManager $groupManager,
+    private readonly IUserManager $userManager,
+    private readonly IUserSession $userSession,
     private readonly LoggerInterface $logger,
   ) {
   }
@@ -123,7 +129,7 @@ class SitzungstypService
     $teilnehmer = is_array($daten['teilnehmer'] ?? null) ? $daten['teilnehmer'] : [];
     foreach ($teilnehmer as $eintrag) {
       $art = (string) ($eintrag['art'] ?? 'mitglied');
-      if (!in_array($art, ['mitglied', 'fraktion', 'kommission', 'rolle'], true)) {
+      if (!in_array($art, ['mitglied', 'fraktion', 'kommission', 'rolle', 'eigeneFraktion', 'ncGruppe', 'ncUser'], true)) {
         continue;
       }
       $tt = new SitzungstypTeilnehmer();
@@ -295,6 +301,69 @@ class SitzungstypService
             }
           }
           return $mitglieder;
+
+        case 'eigeneFraktion':
+          $aktUser = $this->userSession->getUser();
+          if ($aktUser === null) {
+            return [];
+          }
+          $eigen = $this->mitgliedMapper->findByNextcloudUid($aktUser->getUID());
+          $fraktionsName = $eigen?->getFraktion() ?? '';
+          if ($fraktionsName === '') {
+            return [];
+          }
+          return array_map(
+            fn($m) => $this->mitgliedZuEintrag($m),
+            $this->mitgliedMapper->findByFraktion($fraktionsName)
+          );
+
+        case 'ncGruppe':
+          $gid = $regel->getReferenzName();
+          if ($gid === '') {
+            return [];
+          }
+          $group = $this->groupManager->get($gid);
+          if ($group === null) {
+            return [];
+          }
+          $mitglieder = [];
+          foreach ($group->getUsers() as $user) {
+            $uid = $user->getUID();
+            $m = $this->mitgliedMapper->findByNextcloudUid($uid);
+            if ($m !== null) {
+              $mitglieder[] = $this->mitgliedZuEintrag($m);
+            } else {
+              $mitglieder[] = [
+                'mitgliedId' => 0,
+                'name' => $user->getDisplayName(),
+                'email' => method_exists($user, 'getEMailAddress') ? ((string) $user->getEMailAddress()) : '',
+                'rolle' => '',
+                'uid' => $uid,
+              ];
+            }
+          }
+          return $mitglieder;
+
+        case 'ncUser':
+          $uid = $regel->getReferenzName();
+          if ($uid === '') {
+            return [];
+          }
+          $m = $this->mitgliedMapper->findByNextcloudUid($uid);
+          if ($m !== null) {
+            return [$this->mitgliedZuEintrag($m)];
+          }
+          $user = $this->userManager->get($uid);
+          if ($user === null) {
+            return [];
+          }
+          return [[
+            'mitgliedId' => 0,
+            'name' => $user->getDisplayName(),
+            'email' => method_exists($user, 'getEMailAddress') ? ((string) $user->getEMailAddress()) : '',
+            'rolle' => '',
+            'uid' => $uid,
+          ]];
       }
     } catch (\Throwable $e) {
       $this->logger->warning(

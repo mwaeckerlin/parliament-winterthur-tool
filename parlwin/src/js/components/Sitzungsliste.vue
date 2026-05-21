@@ -22,7 +22,18 @@
     <header class="pw-view-header">
       <h2 class="pw-view-title">Sitzungen</h2>
       <span class="pw-view-count">{{ gefilterteSitzungen.length }}</span>
-      <NcButton type="primary" @click="oeffneNeuDialog">+ Neue Sitzung</NcButton>
+      <NcActions :menu-name="verfuegbareTypen.length ? '+ Neue Sitzung' : '+ Neue Sitzung'" type="primary">
+        <NcActionButton v-if="!verfuegbareTypen.length" :disabled="true">
+          Keine Sitzungstypen vorhanden
+        </NcActionButton>
+        <NcActionButton
+          v-for="typ in verfuegbareTypen"
+          :key="typ.id"
+          @click="oeffneNeuDialogMitTyp(typ)"
+        >
+          {{ typ.name }}
+        </NcActionButton>
+      </NcActions>
     </header>
     <div v-if="laden" class="pw-laden"><NcLoadingIcon :size="32" /></div>
 
@@ -141,6 +152,7 @@
                           <div class="pw-traktandum-notizen">
                             <div v-for="(n, idx) in parseTraktandumNotizen(t.id)" :key="idx" class="pw-notiz-klein">
                               <span class="pw-notiz-datum">{{ n.datum }}</span>
+                              <span v-if="n.displayName || n.uid" class="pw-notiz-autor">{{ n.displayName || n.uid }}:</span>
                               {{ n.text }}
                               <button type="button" class="button pw-btn-mini" @click="loescheTraktandumNotiz(t, idx)">✕</button>
                             </div>
@@ -176,41 +188,27 @@
     <div v-if="neuDialogOffen" class="pw-modal-overlay" @click.self="schliesseNeuDialog">
       <div class="pw-modal pw-modal-neu">
         <div class="pw-modal-kopf">
-          <h3>Neue Sitzung anlegen</h3>
+          <h3>Neue Sitzung: {{ gewaehlterTypName }}</h3>
           <button type="button" class="button pw-btn-schliessen" aria-label="Dialog schliessen" @click="schliesseNeuDialog">✕</button>
         </div>
         <div class="pw-modal-body">
-          <div v-if="typenLaden" class="pw-laden">Sitzungstypen laden...</div>
-          <template v-else>
-            <p v-if="!verfuegbareTypen.length" class="pw-hinweis">
-              Keine Sitzungstypen vorhanden. Bitte zuerst unter „Sitzungstypen" einen Typ anlegen.
-            </p>
-            <template v-else>
-              <label>Sitzungstyp *
-                <select :value="neueSitzung.typId" class="pw-input" @change="typAusgewaehlt($event.target.value)">
-                  <option :value="0">— Sitzungstyp wählen —</option>
-                  <option v-for="t in verfuegbareTypen" :key="t.id" :value="t.id">{{ t.name }}</option>
-                </select>
-              </label>
-              <label>Datum *
-                <input v-model="neueSitzung.datum" type="date" class="pw-input" />
-              </label>
-              <div class="pw-grid-2">
-                <label>Zeit von
-                  <input v-model="neueSitzung.zeitVon" type="time" class="pw-input" />
-                </label>
-                <label>Zeit bis
-                  <input v-model="neueSitzung.zeitBis" type="time" class="pw-input" />
-                </label>
-              </div>
-              <label>Ort
-                <input v-model="neueSitzung.ort" type="text" class="pw-input" />
-              </label>
-              <label>Titel
-                <input v-model="neueSitzung.titel" type="text" class="pw-input" />
-              </label>
-            </template>
-          </template>
+          <label>Datum *
+            <input v-model="neueSitzung.datum" type="date" class="pw-input" />
+          </label>
+          <div class="pw-grid-2">
+            <label>Zeit von
+              <input v-model="neueSitzung.zeitVon" type="time" class="pw-input" />
+            </label>
+            <label>Zeit bis
+              <input v-model="neueSitzung.zeitBis" type="time" class="pw-input" />
+            </label>
+          </div>
+          <label>Ort
+            <input v-model="neueSitzung.ort" type="text" class="pw-input" />
+          </label>
+          <label>Titel
+            <input v-model="neueSitzung.titel" type="text" class="pw-input" />
+          </label>
         </div>
         <div class="pw-modal-footer">
           <button type="button" class="button" @click="schliesseNeuDialog">Abbrechen</button>
@@ -244,6 +242,7 @@
 <script>
 import { generateUrl } from '@nextcloud/router'
 import axios from '@nextcloud/axios'
+import { getCurrentUser } from '@nextcloud/auth'
 import { subscribeRealtime } from '../realtime'
 import GeschaeftDetail from './GeschaeftDetail.vue'
 import NcCheckboxRadioSwitch from '@nextcloud/vue/components/NcCheckboxRadioSwitch'
@@ -251,11 +250,13 @@ import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 import NcSelect from '@nextcloud/vue/components/NcSelect'
 import NcTextField from '@nextcloud/vue/components/NcTextField'
 import NcButton from '@nextcloud/vue/components/NcButton'
+import NcActions from '@nextcloud/vue/components/NcActions'
+import NcActionButton from '@nextcloud/vue/components/NcActionButton'
 import PwMultiSelect from './PwMultiSelect.vue'
 
 export default {
   name: 'Sitzungsliste',
-  components: { GeschaeftDetail, NcCheckboxRadioSwitch, NcLoadingIcon, NcSelect, NcTextField, NcButton, PwMultiSelect },
+  components: { GeschaeftDetail, NcCheckboxRadioSwitch, NcLoadingIcon, NcSelect, NcTextField, NcButton, NcActions, NcActionButton, PwMultiSelect },
   props: {
     mitglieder: { type: Array, default: () => [] },
   },
@@ -288,9 +289,24 @@ export default {
         const heute = new Date().toISOString().slice(0, 10)
         liste = liste.filter(s => (s.datum || '') >= heute)
       }
-      // Suchfilter: zeige nur Sitzungen, die Treffer enthalten – aber lade die Treffer erst,
-      // wenn die Sitzung aufgeklappt ist. Bei aktivem Suchstring klappen wir geladene
-      // Sitzungen mit Treffern automatisch auf.
+      const s = (this.suche || '').trim().toLowerCase()
+      if (s) {
+        liste = liste.filter((sit) => {
+          // Sitzung selbst (Titel/Ort) auch durchsuchen.
+          const titel = (sit.titel || '').toLowerCase()
+          const ort = (sit.ort || '').toLowerCase()
+          if (titel.includes(s) || ort.includes(s)) return true
+          // Wenn Traktanden noch nicht geladen sind: optimistisch anzeigen –
+          // der Watcher unten lädt sie nach und reduziert die Liste dann weiter.
+          const traks = this.traktanden[sit.id]
+          if (!traks) return true
+          return traks.some((t) => {
+            const tt = (t.geschaeft?.titel || t.titel || '').toLowerCase()
+            const tn = (t.geschaeft?.nummer || '').toLowerCase()
+            return tt.includes(s) || tn.includes(s)
+          })
+        })
+      }
       return liste
     },
     zustaendigeOptionenFuerSelect() {
@@ -304,10 +320,32 @@ export default {
         .filter((o) => !!o.label)
         .sort((a, b) => a.label.localeCompare(b.label))
     },
+    gewaehlterTypName() {
+      const t = this.verfuegbareTypen.find(x => x.id === Number(this.neueSitzung.typId))
+      return t ? t.name : ''
+    },
+  },
+  watch: {
+    suche(neu) {
+      const term = (neu || '').trim()
+      if (!term) return
+      // Beim Tippen: Traktanden aller (gefilterten) Sitzungen nachladen, damit
+      // die Suche tatsächlich greift. Trefferliste klappt sich automatisch auf.
+      this.sitzungen.forEach((sit) => {
+        if (this.nurKuenftige) {
+          const heute = new Date().toISOString().slice(0, 10)
+          if ((sit.datum || '') < heute) return
+        }
+        if (!this.traktanden[sit.id] && !this.ladenTraktanden[sit.id]) {
+          this.ladeTraktandenFuerSitzung(sit.id)
+        }
+      })
+    },
   },
   mounted() {
     this.$nextTick(() => { this.filterReady = true })
     this.ladeSitzungen()
+    this.ladeSitzungstypen()
     this.unsubRealtime = subscribeRealtime(this.handleRealtimeEvent)
   },
   beforeUnmount() {
@@ -362,6 +400,16 @@ export default {
           notizen[t.id] = this.parseNotizen(t.notizen)
         })
         this.traktandumNotizen = notizen
+        // Wenn aktive Suche Treffer ergibt, Sitzung automatisch aufklappen.
+        const term = (this.suche || '').trim().toLowerCase()
+        if (term && !this.offeneSitzungen.includes(sitzungId)) {
+          const hit = data.some((t) => {
+            const tt = (t.geschaeft?.titel || t.titel || '').toLowerCase()
+            const tn = (t.geschaeft?.nummer || '').toLowerCase()
+            return tt.includes(term) || tn.includes(term)
+          })
+          if (hit) this.offeneSitzungen.push(sitzungId)
+        }
       } catch (e) {
         console.error('Fehler beim Laden der Traktanden:', e)
       } finally {
@@ -411,9 +459,12 @@ export default {
       const text = (this.neueNotizen[tId] || '').trim()
       if (!text) return
       const aktuell = Array.isArray(this.traktandumNotizen[tId]) ? [...this.traktandumNotizen[tId]] : []
+      const user = getCurrentUser()
       aktuell.push({
         text,
         datum: new Date().toLocaleString('de-CH'),
+        uid: user?.uid || '',
+        displayName: user?.displayName || user?.uid || '',
       })
       // Optimistisches Update + sofortige Persistenz – sonst gehen die Notizen
       // verloren, falls der Benutzer nicht separat speichert.
@@ -528,6 +579,26 @@ export default {
     },
     schliesseNeuDialog() {
       this.neuDialogOffen = false
+    },
+    async ladeSitzungstypen() {
+      try {
+        const { data } = await axios.get(generateUrl('/apps/parlwin/sitzungstypen'))
+        this.verfuegbareTypen = Array.isArray(data) ? data : []
+      } catch (e) {
+        console.error('Fehler beim Laden der Sitzungstypen:', e)
+        this.verfuegbareTypen = []
+      }
+    },
+    oeffneNeuDialogMitTyp(typ) {
+      this.neueSitzung = {
+        typId: typ.id,
+        datum: '',
+        zeitVon: typ.standardZeitVon || '',
+        zeitBis: typ.standardZeitBis || '',
+        ort: typ.standardOrt || '',
+        titel: typ.name || '',
+      }
+      this.neuDialogOffen = true
     },
     typAusgewaehlt(typId) {
       const typ = this.verfuegbareTypen.find(t => t.id === Number(typId))

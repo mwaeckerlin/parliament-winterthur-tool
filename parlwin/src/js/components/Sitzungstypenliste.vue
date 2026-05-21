@@ -95,23 +95,35 @@
           <fieldset class="pw-fieldset">
             <legend>Teilnehmer-Regeln</legend>
             <div v-for="(p, i) in bearbeitung.teilnehmer" :key="i" class="pw-zeile">
-              <select v-model="p.art" class="pw-input">
+              <select v-model="p.art" class="pw-input" @change="onArtChange(p)">
                 <option value="mitglied">Einzelnes Mitglied</option>
                 <option value="fraktion">Ganze Fraktion</option>
+                <option value="eigeneFraktion">Eigene Fraktion</option>
                 <option value="kommission">Ganze Kommission</option>
                 <option value="rolle">Fraktions-Rolle</option>
+                <option value="ncGruppe">Nextcloud-Gruppe</option>
+                <option value="ncUser">Nextcloud-Benutzer</option>
               </select>
               <select v-if="p.art === 'mitglied'" v-model.number="p.referenzId" class="pw-input">
                 <option :value="0">— Mitglied wählen —</option>
-                <option v-for="m in mitglieder" :key="m.id" :value="m.id">{{ mitgliedLabel(m) }}</option>
+                <option v-for="m in aktiveMitglieder" :key="m.id" :value="m.id">{{ mitgliedLabel(m) }}</option>
               </select>
               <select v-else-if="p.art === 'fraktion'" v-model="p.referenzName" class="pw-input">
                 <option value="">— Fraktion wählen —</option>
-                <option v-for="f in fraktionen" :key="f.kuerzel || f.name" :value="f.name">{{ f.name }}</option>
+                <option v-for="f in aktiveFraktionen" :key="f.kuerzel || f.name" :value="f.name">{{ f.name }}</option>
               </select>
+              <span v-else-if="p.art === 'eigeneFraktion'" class="pw-hinweis">→ wird beim Anlegen der Sitzung anhand des angemeldeten Users aufgelöst.</span>
               <select v-else-if="p.art === 'kommission'" v-model.number="p.referenzId" class="pw-input">
                 <option :value="0">— Kommission wählen —</option>
                 <option v-for="k in kommissionen" :key="k.id" :value="k.id">{{ k.name }}</option>
+              </select>
+              <select v-else-if="p.art === 'ncGruppe'" v-model="p.referenzName" class="pw-input">
+                <option value="">— Nextcloud-Gruppe wählen —</option>
+                <option v-for="g in ncGruppen" :key="g.gid" :value="g.gid">{{ g.displayName || g.gid }}</option>
+              </select>
+              <select v-else-if="p.art === 'ncUser'" v-model="p.referenzName" class="pw-input">
+                <option value="">— Nextcloud-Benutzer wählen —</option>
+                <option v-for="u in ncUser" :key="u.uid" :value="u.uid">{{ u.displayName || u.uid }} ({{ u.uid }})</option>
               </select>
               <input v-else v-model="p.referenzName" placeholder="Rollen-Bezeichnung" class="pw-input" />
               <button type="button" class="pw-btn-klein" @click="bearbeitung.teilnehmer.splice(i, 1)">✕</button>
@@ -152,6 +164,8 @@ export default {
       suche: '',
       bearbeitung: null,
       speichernLaeuft: false,
+      ncGruppen: [],
+      ncUser: [],
     }
   },
   computed: {
@@ -163,11 +177,19 @@ export default {
         (t.zweck || '').toLowerCase().includes(q)
       )
     },
+    aktiveMitglieder() {
+      return (this.mitglieder || []).filter(m => m.aktiv !== false)
+    },
+    aktiveFraktionen() {
+      return (this.fraktionen || []).filter(f => f.aktiv !== false)
+    },
   },
   mounted() {
     this.$nextTick(() => { this.filterReady = true })
     this.laden = true
     this.lade()
+    this.ladeNcGruppen()
+    this.ladeNcUser()
   },
   methods: {
     async lade() {
@@ -185,6 +207,28 @@ export default {
       const v = m.vorname || ''
       const n = m.name || ''
       return `${v} ${n}`.trim() + (m.fraktion ? ` (${m.fraktion})` : '')
+    },
+    onArtChange(p) {
+      // Bei Wechsel der Art: Referenzen zurücksetzen, damit nicht versehentlich
+      // ein Wert aus einem anderen Auswahlfeld übernommen wird.
+      p.referenzId = 0
+      p.referenzName = ''
+    },
+    async ladeNcGruppen(search = '') {
+      try {
+        const { data } = await axios.get(generateUrl('/apps/parlwin/sitzungstypen/nc/groups'), { params: { search, limit: 100 } })
+        this.ncGruppen = Array.isArray(data) ? data : []
+      } catch (e) {
+        console.error('Fehler beim Laden der Nextcloud-Gruppen:', e)
+      }
+    },
+    async ladeNcUser(search = '') {
+      try {
+        const { data } = await axios.get(generateUrl('/apps/parlwin/sitzungstypen/nc/users'), { params: { search, limit: 100 } })
+        this.ncUser = Array.isArray(data) ? data : []
+      } catch (e) {
+        console.error('Fehler beim Laden der Nextcloud-Benutzer:', e)
+      }
     },
     neuerTyp() {
       this.bearbeitung = {

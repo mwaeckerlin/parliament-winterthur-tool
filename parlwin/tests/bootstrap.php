@@ -213,6 +213,50 @@ if (!interface_exists('OCP\Mail\IMessage')) {
     }');
 }
 
+if (!interface_exists('OCP\IUserSession')) {
+    // phpcs:ignore
+    eval('namespace OCP; interface IUserSession {
+        public function getUser(): ?\\OCP\\IUser;
+    }');
+}
+
+if (!interface_exists('OCP\Files\Node')) {
+    // phpcs:ignore
+    eval('namespace OCP\Files; interface Node {
+        public function getName(): string;
+        public function getId(): int;
+        public function getMTime(): int;
+        public function getSize(): int|float;
+        public function getMimeType(): string;
+    }');
+}
+if (!interface_exists('OCP\Files\Folder')) {
+    // phpcs:ignore
+    eval('namespace OCP\Files; interface Folder extends Node {
+        public function getDirectoryListing(): array;
+        public function nodeExists(string $path): bool;
+        public function get(string $path);
+        public function newFolder(string $path);
+        public function newFile(string $path, $content = null);
+    }');
+}
+if (!interface_exists('OCP\Files\File')) {
+    // phpcs:ignore
+    eval('namespace OCP\Files; interface File extends Node {
+        public function getContent(): string;
+    }');
+}
+if (!class_exists('OCP\Files\NotFoundException')) {
+    // phpcs:ignore
+    eval('namespace OCP\Files; class NotFoundException extends \\RuntimeException {}');
+}
+if (!interface_exists('OCP\Files\IRootFolder')) {
+    // phpcs:ignore
+    eval('namespace OCP\Files; interface IRootFolder {
+        public function getUserFolder(string $userId): Folder;
+    }');
+}
+
 if (!interface_exists('OCP\Mail\IMailer')) {
     // phpcs:ignore
     eval('namespace OCP\Mail; interface IMailer {
