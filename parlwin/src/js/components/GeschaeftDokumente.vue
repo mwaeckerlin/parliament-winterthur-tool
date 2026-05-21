@@ -157,16 +157,35 @@ export default {
       const name = (this.neuerName || '').trim()
       if (!name || !this.aktiveVorlage) return
       this.laeuft = true
+      // Tab synchron im Click-Kontext öffnen, damit Browser-Popup-Blocker
+      // den window.open() spaeter nicht abfaengt. URL setzen wir, sobald
+      // die fileId vom Server zurückkommt; bis dahin läuft der neue Tab im
+      // „about:blank“-Zustand und die Collabora-/Office-Lade­zeit beginnt
+      // direkt nach dem Server-Roundtrip (vermeidet die zusätzlichen
+      // dutzend Sekunden, die ein nachgeschalteter manueller Klick kostet).
+      let neuerTab = null
+      try { neuerTab = window.open('about:blank', '_blank') } catch (e) { neuerTab = null }
       try {
-        await axios.post(
+        const { data } = await axios.post(
           generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}/dokumente`),
           { name, extension: this.aktiveVorlage.extension }
         )
+        const fileId = data && data.fileId
+        if (fileId && neuerTab) {
+          // Direkt zur Files-Route mit fileid-Hash navigieren – öffnet den
+          // Default-Viewer (Collabora für Office-Dateien, Text-Editor sonst).
+          neuerTab.location.href = generateUrl(`/f/${fileId}`)
+        } else if (neuerTab) {
+          neuerTab.close()
+        }
         this.dialogSchliessen()
         this.meldung = 'Dokument erstellt'
         setTimeout(() => { this.meldung = '' }, 2500)
         await this.laden_()
       } catch (e) {
+        if (neuerTab) {
+          try { neuerTab.close() } catch (_e) { /* ignore */ }
+        }
         console.error('parlwin: Dokument erstellen fehlgeschlagen', e)
         this.meldung = 'Fehler: ' + (e?.response?.data?.fehler || e.message)
       } finally {

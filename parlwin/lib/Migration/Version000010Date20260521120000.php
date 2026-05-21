@@ -20,21 +20,21 @@ use OCP\Migration\SimpleMigrationStep;
  */
 class Version000010Date20260521120000 extends SimpleMigrationStep
 {
-    public function changeSchema(IOutput $output, Closure $schemaClosure, array $options): ?ISchemaWrapper
-    {
-        /** @var ISchemaWrapper $schema */
-        $schema = $schemaClosure();
+  public function changeSchema(IOutput $output, Closure $schemaClosure, array $options): ?ISchemaWrapper
+  {
+    /** @var ISchemaWrapper $schema */
+    $schema = $schemaClosure();
 
-        if ($schema->hasTable('pw_sitzungen')) {
-            $tabelle = $schema->getTable('pw_sitzungen');
-            if (!$tabelle->hasColumn('notizen')) {
-                $tabelle->addColumn('notizen', Types::TEXT, [
-                    'notnull' => true,
-                    'default' => '[]',
-                ]);
-            }
-        }
-
-        return $schema;
+    if ($schema->hasTable('pw_sitzungen')) {
+      $tabelle = $schema->getTable('pw_sitzungen');
+      if (!$tabelle->hasColumn('notizen')) {
+        $tabelle->addColumn('notizen', Types::TEXT, [
+          'notnull' => true,
+          'default' => '[]',
+        ]);
+      }
     }
+
+    return $schema;
+  }
 }

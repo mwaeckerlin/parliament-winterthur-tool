@@ -21,10 +21,21 @@
     <header class="pw-view-header">
       <h2 class="pw-view-title">Sitzungen</h2>
       <span class="pw-view-count">{{ gefilterteSitzungen.length }}</span>
-      <NcActions :menu-name="verfuegbareTypen.length ? '+ Neue Sitzung' : '+ Neue Sitzung'" type="primary">
-        <NcActionButton v-if="!verfuegbareTypen.length" :disabled="true">
-          Keine Sitzungstypen vorhanden
-        </NcActionButton>
+      <NcButton
+        v-if="!verfuegbareTypen.length"
+        type="primary"
+        :disabled="true"
+        class="pw-neue-sitzung"
+        title="Keine Sitzungstypen vorhanden – zuerst unter „Sitzungstypen“ einen Typ anlegen."
+      >+ Neue Sitzung</NcButton>
+      <NcActions
+        v-else
+        menu-name="+ Neue Sitzung"
+        :force-name="true"
+        :primary="true"
+        type="primary"
+        class="pw-neue-sitzung"
+      >
         <NcActionButton
           v-for="typ in verfuegbareTypen"
           :key="typ.id"
@@ -106,6 +117,14 @@
                             @click.stop
                             class="pw-inline-link"
                             title="Extern öffnen"
+                          >↗</a>
+                          <a
+                            v-else-if="sitzung.url"
+                            :href="sitzung.url"
+                            target="_blank"
+                            @click.stop
+                            class="pw-inline-link"
+                            title="Originaltraktandum extern öffnen (kein verknüpftes Geschäft)"
                           >↗</a>
                           {{ t.geschaeft?.titel || t.titel }}
                         </td>

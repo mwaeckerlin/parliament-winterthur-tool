@@ -17,7 +17,8 @@ use OCP\IUserSession;
 /**
  * REST-Controller für Parlamentssitzungen und Traktanden.
  */
-class SitzungController extends Controller {
+class SitzungController extends Controller
+{
     public function __construct(
         IRequest $request,
         private readonly SitzungService $service,
@@ -31,7 +32,8 @@ class SitzungController extends Controller {
      * Gibt alle Sitzungen zurück.
      */
     #[NoAdminRequired]
-    public function index(int $limit = 50, int $offset = 0): DataResponse {
+    public function index(int $limit = 50, int $offset = 0): DataResponse
+    {
         $sitzungen = $this->service->alle($limit, $offset);
         return new DataResponse(array_map(
             fn($s) => $s->jsonSerialize(),
@@ -43,7 +45,8 @@ class SitzungController extends Controller {
      * Gibt eine einzelne Sitzung zurück.
      */
     #[NoAdminRequired]
-    public function show(int $id): DataResponse {
+    public function show(int $id): DataResponse
+    {
         try {
             $sitzung = $this->service->eins($id);
             $traktanden = $this->service->traktanden($id);
@@ -59,7 +62,8 @@ class SitzungController extends Controller {
      * Aktualisiert die fraktionsinternen Felder einer Sitzung.
      */
     #[NoAdminRequired]
-    public function update(int $id): DataResponse {
+    public function update(int $id): DataResponse
+    {
         $felder = [];
         if ($this->request->offsetExists('bemerkungen')) {
             $felder['bemerkungen'] = $this->request->getParam('bemerkungen', '');
@@ -113,9 +117,12 @@ class SitzungController extends Controller {
             $datum = (string) ($eintrag['datum'] ?? '');
             $uid = (string) ($eintrag['uid'] ?? '');
             $name = (string) ($eintrag['displayName'] ?? '');
-            if ($datum === '') $datum = $jetzt;
-            if ($uid === '') $uid = $aktUid;
-            if ($name === '') $name = $aktName !== '' ? $aktName : $uid;
+            if ($datum === '')
+                $datum = $jetzt;
+            if ($uid === '')
+                $uid = $aktUid;
+            if ($name === '')
+                $name = $aktName !== '' ? $aktName : $uid;
             $ergebnis[] = [
                 'datum' => $datum,
                 'uid' => $uid,
