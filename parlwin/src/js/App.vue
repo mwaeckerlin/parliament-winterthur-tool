@@ -45,6 +45,12 @@
       v-else-if="aktiveAnsicht === 'kommissionen'"
       :mitglieder="mitglieder"
     />
+    <Sitzungstypenliste
+      v-else-if="aktiveAnsicht === 'sitzungstypen'"
+      :mitglieder="mitglieder"
+      :fraktionen="fraktionen"
+      :kommissionen="kommissionen"
+    />
   </NcAppContent>
 </template>
 
@@ -59,6 +65,7 @@ import Geschaeftsliste from './components/Geschaeftsliste.vue'
 import Sitzungsliste from './components/Sitzungsliste.vue'
 import Mitgliederliste from './components/Mitgliederliste.vue'
 import Kommissionsliste from './components/Kommissionsliste.vue'
+import Sitzungstypenliste from './components/Sitzungstypenliste.vue'
 
 export default {
   name: 'ParliamentWinterthurApp',
@@ -70,6 +77,7 @@ export default {
     Sitzungsliste,
     Mitgliederliste,
     Kommissionsliste,
+    Sitzungstypenliste,
   },
   provide() {
     // NcAppNavigation / NcAppContent in @nextcloud/vue v9 erwarten diesen Inject
@@ -92,6 +100,7 @@ export default {
         { key: 'sitzungen', bezeichnung: 'Sitzungen', icon: '📅' },
         { key: 'mitglieder', bezeichnung: 'Mitglieder', icon: '👥' },
         { key: 'kommissionen', bezeichnung: 'Kommissionen', icon: '🏛' },
+        { key: 'sitzungstypen', bezeichnung: 'Sitzungstypen', icon: '📝' },
       ],
       unsubRealtime: null,
     }
