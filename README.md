@@ -5,6 +5,9 @@ Nextcloud-Plugin für die Fraktionsarbeit im Winterthurer Parlament.
 ## Zu Erledigen:
 
   - Neuer Sitzungstyp: ![alt text](image-11.png)
+  - Nextcloud-Gruppe kann nicht gewählzt werden: ![](image-12.png), Benutzer ebensowenig! Fraktionsrolle hat keine Auswahl. Kommission wählen ist immer noch alte Schreisse drin!
+  - FEHLER BEIM SPEICHERN KOMMT IMMER NOCH
+
 
   - (offen) Falls beim Öffnen eines bereits existierenden Dokuments aus der
     Geschäfts-Ansicht weiterhin lange Wartezeiten auftreten: das ist die
