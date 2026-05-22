@@ -12,6 +12,31 @@ Nextcloud-Plugin für die Fraktionsarbeit im Winterthurer Parlament.
 
 ## Erledigt:
 
+  - ✅ **Echte Ursache des Speichern-Fehlers gefunden und behoben (v1.1.3):**
+    `Application.php` registrierte `SitzungstypService` per Closure mit nur
+    9 statt 12 Constructor-Argumenten. Der `LoggerInterface` landete auf
+    Position 9, wo der Constructor `IGroupManager` erwartet → PHP-`TypeError`
+    bei *jedem* Aufruf an `SitzungstypController` (`index`, `create`,
+    `update`, `ncGroups`, `ncUsers`, …) → HTTP 500. Das erklärt
+    rückwirkend alle vier in v1.1.1 als "behoben" deklarierten Symptome,
+    die in v1.1.2 weiter auftraten: Nextcloud-Gruppen/-Benutzer-Dropdowns
+    leer, Fraktionsrolle/Kommission ohne Auswahl, Fehler beim Speichern.
+    Fix: `IGroupManager`, `IUserManager`, `IUserSession` als
+    `$c->get(...)` vor `LoggerInterface` in der Service-Factory ergänzt.
+    Mit `docker exec … php -r '$svc = …->get(SitzungstypService::class);
+    $svc->speichern([...])'` reproduziert und nach dem Patch verifiziert
+    (saved id=1).
+  - ✅ Gendering app-weit entfernt (v1.1.3): `Sitzungstypenliste.vue`,
+    `Mitgliederliste.vue`, `Kommissionsliste.vue`, `NotizenListe.vue` und
+    README – keine `*in`/`:in`-Varianten mehr. Rollen-Dropdown enthält jetzt
+    `Fraktionspräsident`, `Fraktionspräsident Stellvertretung`,
+    `Protokollführer`, `Protokollführer Stellvertretung`.
+  - ✅ "Eigene Fraktion" als Default-Teilnehmer-Regel (v1.1.3): „+ Regel"
+    legt einen Eintrag `{ art: 'eigeneFraktion' }` an. Der Service löst
+    `eigeneFraktion` über die `Fraktion` des aktuell eingeloggten Users
+    auf (kein Auswahlfeld nötig). Validierung in `speichern()` filtert
+    unvollständige Regeln still heraus, statt mit Alert zu blockieren.
+
   - ✅ Sitzungstyp-Modal Stacking-Context **wirklich** behoben (v1.1.2): Das
     in v1.1.0 / v1.1.1 verwendete „z-index immer höher drehen“ war der
     falsche Ansatz. Die echte Ursache: `NcAppContent` ist
@@ -84,7 +109,7 @@ Nextcloud-Plugin für die Fraktionsarbeit im Winterthurer Parlament.
     Datum und Name werden nach Inhalt gesized, Notiztext nimmt den Rest (1fr)
     und ist linksbündig. Kein `:` mehr nach dem Namen, Name nicht mehr fett.
   - ✅ Notiz-Berechtigungen (v1.0.9): Statt einem globalen Lösch-Knopf kann
-    nur noch der/die Urheber:in (uid-Vergleich) eigene Notizen löschen oder
+    nur noch der Urheber (uid-Vergleich) eigene Notizen löschen oder
     durch Klick auf den Text inline bearbeiten (Enter speichert, Escape bricht
     ab, leerer Text löscht).
   - ✅ Notizen auch auf Sitzungsebene (v1.0.9): „Bemerkungen zur Sitzung"

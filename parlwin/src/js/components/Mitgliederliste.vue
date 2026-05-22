@@ -156,8 +156,8 @@ export default {
       }
       // Sortierung: Präsident zuerst, dann Vize, dann alphabetisch
       const rang = (eintrag) => {
-        if (eintrag.rolle === 'Präsident:in') return 0
-        if (eintrag.rolle === 'Vizepräsident:in') return 1
+        if (eintrag.rolle === 'Präsident') return 0
+        if (eintrag.rolle === 'Vizepräsident') return 1
         return 2
       }
       for (const [k, v] of map) {
@@ -202,7 +202,7 @@ export default {
       const istPraesident = v.includes('präsiden') || v.includes('praesiden')
       if (!istPraesident) return ''
       const istVize = v.includes('vize') || v.includes('stellvert')
-      return istVize ? 'Vizepräsident:in' : 'Präsident:in'
+      return istVize ? 'Vizepräsident' : 'Präsident'
     },
     fraktionsRolle(m) {
       const id = String(m?.externId || m?.extern_id || '')

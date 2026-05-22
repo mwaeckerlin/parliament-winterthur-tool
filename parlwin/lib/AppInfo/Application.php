@@ -141,6 +141,9 @@ class Application extends App implements IBootstrap
                 $c->get(MitgliedMapper::class),
                 $c->get(KommissionMapper::class),
                 $c->get(FraktionsrolleMapper::class),
+                $c->get(\OCP\IGroupManager::class),
+                $c->get(\OCP\IUserManager::class),
+                $c->get(\OCP\IUserSession::class),
                 $c->get(\Psr\Log\LoggerInterface::class)
             );
         });

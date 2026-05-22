@@ -74,8 +74,8 @@ import { getCurrentUser } from '@nextcloud/auth'
 /**
  * Anzeige + Bearbeitung einer Notizen-Liste.
  *
- * Notizen sind Objekte `{ datum, uid, displayName, text }`. Nur der/die
- * Urheber:in kann eigene Notizen löschen oder durch Klick auf den Text
+ * Notizen sind Objekte `{ datum, uid, displayName, text }`. Nur der
+ * Urheber kann eigene Notizen löschen oder durch Klick auf den Text
  * bearbeiten. Andere Notizen sind reine Anzeige.
  */
 export default {
