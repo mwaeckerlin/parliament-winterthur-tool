@@ -132,7 +132,7 @@
               <input v-else v-model="p.referenzName" placeholder="Bezeichnung" class="pw-input" />
               <button type="button" class="pw-btn-klein" @click="bearbeitung.teilnehmer.splice(i, 1)">✕</button>
             </div>
-            <NcButton type="secondary" @click="bearbeitung.teilnehmer.push({ art: 'mitglied', referenzId: 0, referenzName: '' })">+ Regel</NcButton>
+            <NcButton type="secondary" @click="bearbeitung.teilnehmer.push({ art: 'eigeneFraktion', referenzId: 0, referenzName: '' })">+ Regel</NcButton>
           </fieldset>
         </div>
         <footer class="pw-modal-footer">
@@ -175,10 +175,10 @@ export default {
       ncUserLaden: false,
       verfuegbareRollen: [
         { code: 'kommissionsmitglied', bezeichnung: 'Kommissionsmitglied' },
-        { code: 'fraktionspraesident', bezeichnung: 'Fraktionspräsident*in' },
-        { code: 'fraktionspraesident_stellvertretung', bezeichnung: 'Fraktionspräsident*in Stellvertretung' },
-        { code: 'protokollfuehrer', bezeichnung: 'Protokollführer*in' },
-        { code: 'protokollfuehrer_stellvertretung', bezeichnung: 'Protokollführer*in Stellvertretung' },
+        { code: 'fraktionspraesident', bezeichnung: 'Fraktionspräsident' },
+        { code: 'fraktionspraesident_stellvertretung', bezeichnung: 'Fraktionspräsident Stellvertretung' },
+        { code: 'protokollfuehrer', bezeichnung: 'Protokollführer' },
+        { code: 'protokollfuehrer_stellvertretung', bezeichnung: 'Protokollführer Stellvertretung' },
       ],
     }
   },
@@ -295,21 +295,19 @@ export default {
     },
     async speichern() {
       if (!this.bearbeitung || !this.bearbeitung.name) return
-      // Validierung: leere Teilnehmer-Regeln (z.B. „— wählen —“ stehen geblieben)
-      // herausfiltern, damit das Backend keine ungueltigen Einträge speichert.
-      const unvollstaendig = (this.bearbeitung.teilnehmer || []).filter(p => {
-        if (p.art === 'eigeneFraktion') return false
-        if (['mitglied', 'kommission'].includes(p.art)) return !p.referenzId
-        if (['fraktion', 'ncGruppe', 'ncUser', 'rolle'].includes(p.art)) return !p.referenzName
-        return !p.referenzName
-      })
-      if (unvollstaendig.length) {
-        alert('Bitte alle Teilnehmer-Regeln vollständig ausfüllen oder leere Zeilen mit ✕ entfernen.')
-        return
+      // Unvollstaendige Teilnehmer-Regeln (z.B. "— wählen —" stehen geblieben)
+      // werden stillschweigend verworfen, damit der Benutzer nicht durch eine
+      // Validierungs-Meldung blockiert wird.
+      const istVollstaendig = (p) => {
+        if (p.art === 'eigeneFraktion') return true
+        if (['mitglied', 'kommission'].includes(p.art)) return !!p.referenzId
+        if (['fraktion', 'ncGruppe', 'ncUser', 'rolle'].includes(p.art)) return !!p.referenzName
+        return !!p.referenzName
       }
+      const teilnehmerSauber = (this.bearbeitung.teilnehmer || []).filter(istVollstaendig)
       this.speichernLaeuft = true
       try {
-        const payload = { ...this.bearbeitung }
+        const payload = { ...this.bearbeitung, teilnehmer: teilnehmerSauber }
         if (payload.id) {
           await axios.put(generateUrl(`/apps/parlwin/sitzungstypen/${payload.id}`), payload)
         } else {

@@ -296,11 +296,11 @@ export default {
       const arr = kommission?.mitgliederArray || []
       const liste = this.nurAktiveMitglieder ? arr.filter(m => m.aktiv !== false) : arr
       // Sortierung:
-      //   0. Präsident:in
-      //   1. Vizepräsident:in
+      //   0. Präsident
+      //   1. Vizepräsident
       //   2. Mitglied der eigenen Fraktion
       //   3. Alle anderen Mitglieder
-      //   4. Protokollführer:in und andere Rollen
+      //   4. Protokollführer und andere Rollen
       const funktionsRang = (m) => {
         const v = (m.funktion || '').toLowerCase().trim()
         const istPraesident = v.includes('präsident') || v.includes('praesident')
