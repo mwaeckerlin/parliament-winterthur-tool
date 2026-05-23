@@ -41,7 +41,6 @@
         <div class="pw-sitzungstyp-meta">
           <span v-if="typ.standardOrt">📍 {{ typ.standardOrt }}</span>
           <span v-if="typ.standardZeitVon">🕒 {{ typ.standardZeitVon }}<template v-if="typ.standardZeitBis"> – {{ typ.standardZeitBis }}</template></span>
-          <span>{{ typ.kalenderAnlegen ? '📅 Kalendereintrag' : '— kein Kalender' }}</span>
           <span>{{ typ.einladungVersenden ? '✉️ Einladung' : '— keine Einladung' }}</span>
           <span>{{ (typ.traktanden || []).length }} Vorlage-Traktanden</span>
           <span>{{ (typ.teilnehmer || []).length }} Teilnehmer-Regeln</span>
@@ -75,9 +74,6 @@
               <input v-model="bearbeitung.standardZeitBis" type="time" class="pw-input" />
             </label>
           </div>
-          <NcCheckboxRadioSwitch v-model="bearbeitung.kalenderAnlegen" type="switch">
-            Kalendereintrag automatisch erstellen
-          </NcCheckboxRadioSwitch>
           <NcCheckboxRadioSwitch v-model="bearbeitung.einladungVersenden" type="switch">
             Einladung an Teilnehmer versenden
           </NcCheckboxRadioSwitch>
@@ -112,7 +108,7 @@
                 <option value="">— Fraktion wählen —</option>
                 <option v-for="f in aktiveFraktionen" :key="f.kuerzel || f.name" :value="f.name">{{ f.name }}</option>
               </select>
-              <span v-else-if="p.art === 'eigeneFraktion'" class="pw-hinweis">→ wird beim Anlegen der Sitzung anhand des angemeldeten Users aufgelöst.</span>
+              <span v-else-if="p.art === 'eigeneFraktion'" class="pw-hinweis">→ {{ konfigurierteGruppe || '(in den Plugin-Einstellungen keine Nextcloud-Gruppe konfiguriert)' }}</span>
               <select v-else-if="p.art === 'kommission'" v-model.number="p.referenzId" class="pw-input">
                 <option :value="0">{{ aktiveKommissionen.length ? '— Kommission wählen —' : '— Keine Kommissionen vorhanden —' }}</option>
                 <option v-for="k in aktiveKommissionen" :key="k.id" :value="k.id">{{ k.name }}</option>
@@ -200,6 +196,9 @@ export default {
     aktiveKommissionen() {
       return (this.kommissionen || []).filter(k => k.aktiv !== false && !k.geloescht)
     },
+    konfigurierteGruppe() {
+      return (typeof window !== 'undefined' && window.PARLWIN_CONFIG && window.PARLWIN_CONFIG.nextcloudGruppe) || ''
+    },
   },
   mounted() {
     this.$nextTick(() => { this.filterReady = true })
@@ -261,7 +260,7 @@ export default {
         name: '',
         zweck: '',
         kalenderAnlegen: true,
-        einladungVersenden: false,
+        einladungVersenden: true,
         standardOrt: '',
         standardZeitVon: '',
         standardZeitBis: '',
@@ -275,7 +274,7 @@ export default {
         name: typ.name || '',
         zweck: typ.zweck || '',
         kalenderAnlegen: typ.kalenderAnlegen !== false,
-        einladungVersenden: !!typ.einladungVersenden,
+        einladungVersenden: typ.einladungVersenden !== false,
         standardOrt: typ.standardOrt || '',
         standardZeitVon: typ.standardZeitVon || '',
         standardZeitBis: typ.standardZeitBis || '',

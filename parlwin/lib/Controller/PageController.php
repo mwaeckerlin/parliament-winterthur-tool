@@ -16,7 +16,8 @@ use OCP\Util;
 /**
  * Seitencontroller: Liefert die Hauptseite der App.
  */
-class PageController extends Controller {
+class PageController extends Controller
+{
     public function __construct(
         IRequest $request,
         private readonly IConfig $config,
@@ -29,22 +30,26 @@ class PageController extends Controller {
      */
     #[NoAdminRequired]
     #[NoCSRFRequired]
-    public function index(): TemplateResponse {
+    public function index(): TemplateResponse
+    {
         Util::addScript(Application::APP_ID, 'parlwin-main');
         Util::addStyle(Application::APP_ID, 'parlwin-style');
 
         $letzteSync = $this->config->getAppValue(Application::APP_ID, 'letzte_synchronisation', '');
         $fraktion = $this->config->getAppValue(Application::APP_ID, 'fraktion', '');
+        $nextcloudGruppe = $this->config->getAppValue(Application::APP_ID, 'nextcloud_gruppe', '');
         $realtimeWsUrl = $this->realtimeWsUrl();
 
         return new TemplateResponse(Application::APP_ID, 'main', [
             'letzte_synchronisation' => $letzteSync,
             'fraktion' => $fraktion,
+            'nextcloud_gruppe' => $nextcloudGruppe,
             'realtime_ws_url' => $realtimeWsUrl,
         ]);
     }
 
-    private function realtimeWsUrl(): string {
+    private function realtimeWsUrl(): string
+    {
         $env = trim((string) getenv('PARLWIN_REALTIME_WS_URL'));
         if ($env !== '') {
             return $env;
@@ -67,7 +72,8 @@ class PageController extends Controller {
         return sprintf('%s://%s%s/ws/%s/', $scheme, $host, $webroot, Application::APP_ID);
     }
 
-    private function isHttpsRequest(): bool {
+    private function isHttpsRequest(): bool
+    {
         $forwardedProto = strtolower(trim((string) $this->request->getHeader('x-forwarded-proto')));
         if (str_contains($forwardedProto, 'https')) {
             return true;

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace OCA\ParliamentWinterthur\Controller;
 
 use OCA\ParliamentWinterthur\AppInfo\Application;
-use OCA\ParliamentWinterthur\Service\KalenderService;
 use OCA\ParliamentWinterthur\Service\RealtimePublisherService;
 use OCA\ParliamentWinterthur\Service\SitzungstypService;
 use OCP\AppFramework\Controller;
@@ -26,7 +25,6 @@ class SitzungstypController extends Controller
   public function __construct(
     IRequest $request,
     private readonly SitzungstypService $service,
-    private readonly KalenderService $kalenderService,
     private readonly RealtimePublisherService $realtimePublisher,
     private readonly IGroupManager $groupManager,
     private readonly IUserManager $userManager,
@@ -94,37 +92,6 @@ class SitzungstypController extends Controller
   }
 
   /**
-   * Erstellt aus dem Sitzungstyp eine konkrete Sitzung.
-   */
-  #[NoAdminRequired]
-  public function neueSitzung(int $id): DataResponse
-  {
-    $overrides = [
-      'titel' => (string) $this->request->getParam('titel', ''),
-      'datum' => (string) $this->request->getParam('datum', ''),
-      'zeitVon' => (string) $this->request->getParam('zeitVon', ''),
-      'zeitBis' => (string) $this->request->getParam('zeitBis', ''),
-      'ort' => (string) $this->request->getParam('ort', ''),
-      'bemerkungen' => (string) $this->request->getParam('bemerkungen', ''),
-    ];
-    try {
-      $sitzung = $this->service->sitzungAusTyp($id, $overrides);
-    } catch (DoesNotExistException) {
-      return new DataResponse(['fehler' => 'Sitzungstyp nicht gefunden'], Http::STATUS_NOT_FOUND);
-    }
-
-    // Kalendereintrag (best-effort) anlegen.
-    try {
-      $this->kalenderService->sitzungenAktualisieren([$sitzung]);
-    } catch (\Throwable) {
-      // Fehler werden bereits intern geloggt.
-    }
-
-    $this->realtimePublisher->publish('sitzungen.updated', ['id' => (int) $sitzung->getId()]);
-    return new DataResponse($sitzung->jsonSerialize(), Http::STATUS_CREATED);
-  }
-
-  /**
    * Sucht Nextcloud-Gruppen für die Teilnehmer-Regeln.
    */
   #[NoAdminRequired]
@@ -179,7 +146,7 @@ class SitzungstypController extends Controller
       'name' => (string) $this->request->getParam('name', ''),
       'zweck' => (string) $this->request->getParam('zweck', ''),
       'kalenderAnlegen' => (bool) $this->request->getParam('kalenderAnlegen', true),
-      'einladungVersenden' => (bool) $this->request->getParam('einladungVersenden', false),
+      'einladungVersenden' => (bool) $this->request->getParam('einladungVersenden', true),
       'standardOrt' => (string) $this->request->getParam('standardOrt', ''),
       'standardZeitVon' => (string) $this->request->getParam('standardZeitVon', ''),
       'standardZeitBis' => (string) $this->request->getParam('standardZeitBis', ''),

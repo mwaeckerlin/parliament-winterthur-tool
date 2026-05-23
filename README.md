@@ -4,13 +4,42 @@ Nextcloud-Plugin für die Fraktionsarbeit im Winterthurer Parlament.
 
 ## Zu Erledigen:
 
-  - (offen) Falls beim Öffnen eines bereits existierenden Dokuments aus der
-    Geschäfts-Ansicht weiterhin lange Wartezeiten auftreten: das ist die
-    Collabora-/Office-Startzeit (Server-Cold-Start). Workaround in v1.1.0:
-    Beim *Erstellen* wird die Datei direkt in einem neuen Tab geöffnet, so
-    dass die Ladezeit parallel zur Modal-Schliessung läuft.
-
 ## Erledigt:
+
+  - ✅ **„Eigene Fraktion" = die konfigurierte Nextcloud-Gruppe als
+    Gruppen-Attendee (v1.1.8):** Die Teilnehmer-Regel `eigeneFraktion`
+    erzeugt **genau einen Teilnehmer-Eintrag = die in den App-Einstellungen
+    konfigurierte Nextcloud-Gruppe** (`parlwin/nextcloud_gruppe`). KEIN
+    `getUsers`, KEIN Expandieren, KEIN Mapping. Im generierten iCal wird
+    daraus eine `ATTENDEE;CUTYPE=GROUP`-Zeile mit dem
+    `principal:principals/groups/<gid>`-URI; die Einladung an die einzelnen
+    Mitglieder verteilt Nextcloud selbst. Frühere Versionen v1.1.6/v1.1.7
+    haben die Gruppe noch zu Einzel-Usern expandiert — das war falsch.
+
+  - ✅ **Neue Sitzung ohne eigenen Dialog (v1.1.5):** Der „+ Neue Sitzung"-
+    Knopf öffnet jetzt direkt ein NcActions-Menu mit den vorhandenen
+    Sitzungstypen. Klick auf einen Typ legt die Sitzung sofort serverseitig
+    aus dem Template an (Titel, Standardzeit, Standardort, Teilnehmer aus
+    den Regeln werden materialisiert; Datum = heute als Vorbelegung), legt
+    parallel den Kalendereintrag an und navigiert direkt in die
+    Nextcloud-Kalender-Tagesansicht. Dort kann der Eintrag mit dem nativen
+    Kalender-Bearbeiten-Popup (Titel, Von/Bis, Ganztägig, Ort, Beschreibung,
+    Teilnehmer) verfeinert werden – KEIN parlwin-eigener Modal-Dialog mehr.
+    Server-Endpoint `/sitzungstypen/{id}/sitzung` liefert dazu zusätzlich
+    `kalender_url` (`/apps/calendar/timeGridDay/{YYYY-MM-DD}`).
+
+  - ✅ **„Eigene Fraktion" = App-Setting (v1.1.4):** `SitzungstypService`
+    bekam `IConfig` injiziert; die Teilnehmer-Regel `eigeneFraktion` löst
+    sich jetzt über `parlwin/fraktion` aus den Plugin-Einstellungen auf
+    und nicht mehr über den aktuellen Login. Die Sitzungstypen-UI-
+    Hinweistexte wurden entsprechend angepasst.
+  - ✅ **Einheitliches Modal-Styling (v1.1.4):** `style.scss` definiert
+    konsequent CSS-Variablen `--pw-space-*`, `--pw-gap-*`, `--pw-radius`,
+    `--pw-shadow`, `--pw-font-*`, `--pw-click-sm`, `--pw-surface`,
+    `--pw-muted`. Alle Modale (`.pw-modal-header`, `.pw-modal-body`,
+    `.pw-modal-footer`, `.pw-modal-close`, `.pw-grid-2`, `.pw-modal-neu`,
+    `.pw-modal-hinweis`) verwenden ausschliesslich diese Tokens für
+    Spacings, Radien, Schriften und Farben.
 
   - ✅ **Echte Ursache des Speichern-Fehlers gefunden und behoben (v1.1.3):**
     `Application.php` registrierte `SitzungstypService` per Closure mit nur
