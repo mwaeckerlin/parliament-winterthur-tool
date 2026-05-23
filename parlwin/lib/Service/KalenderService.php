@@ -223,6 +223,14 @@ class KalenderService
         }
 
         foreach ($teilnehmer as $eintrag) {
+            $gruppe = trim((string) ($eintrag['gruppe'] ?? ''));
+            if ($gruppe !== '') {
+                $cn = ';CN=' . str_replace([',', ';', ':'], ' ', $gruppe);
+                $zeilen .= 'ATTENDEE;CUTYPE=GROUP' . $cn
+                    . ';ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:'
+                    . 'principal:principals/groups/' . rawurlencode($gruppe) . "\r\n";
+                continue;
+            }
             $email = trim((string) ($eintrag['email'] ?? ''));
             if ($email === '') {
                 continue;

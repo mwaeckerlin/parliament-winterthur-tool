@@ -30,7 +30,7 @@ class Sitzungstyp extends Entity
   protected string $name = '';
   protected string $zweck = '';
   protected bool $kalenderAnlegen = true;
-  protected bool $einladungVersenden = false;
+  protected bool $einladungVersenden = true;
   protected string $standardOrt = '';
   protected string $standardZeitVon = '';
   protected string $standardZeitBis = '';

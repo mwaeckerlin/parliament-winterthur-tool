@@ -912,6 +912,103 @@ ul.app-navigation__list {
   background: transparent;
 }
 
+/* ----------------------------------------------------------------------
+   Einheitliches Modal-Layout (Header / Body / Footer / Grid / Felder)
+   – ALLE Spacings über --pw-space-* / --pw-gap-* Variablen,
+     KEINE Magic-Numbers in den Komponenten.
+   ---------------------------------------------------------------------- */
+.pw-modal-header {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pw-gap-1);
+  padding: var(--pw-gap-2);
+  background: var(--pw-surface);
+  border-block-end: var(--pw-border-thin) solid var(--pw-border);
+}
+
+.pw-modal-header h3 {
+  margin: 0;
+  font-size: var(--pw-font-xl);
+  line-height: var(--pw-lh-heading);
+  letter-spacing: var(--pw-track-tight);
+}
+
+.pw-modal-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--pw-click-sm);
+  block-size: var(--pw-click-sm);
+  padding: 0;
+  background: transparent;
+  border: var(--pw-border-thin) solid transparent;
+  border-radius: var(--pw-radius-small);
+  font-size: var(--pw-font-lg);
+  color: var(--pw-muted);
+  cursor: pointer;
+}
+
+.pw-modal-close:hover,
+.pw-modal-close:focus {
+  background: var(--pw-surface-strong);
+  color: var(--color-main-text);
+}
+
+.pw-modal-body {
+  display: grid;
+  gap: var(--pw-gap-2);
+  padding: var(--pw-gap-2);
+}
+
+.pw-modal-body>label {
+  display: grid;
+  gap: var(--pw-space-xs);
+  font-size: var(--pw-font-md);
+  color: var(--pw-muted);
+}
+
+.pw-modal-footer {
+  display: flex;
+  gap: var(--pw-gap-1);
+  justify-content: flex-end;
+  align-items: center;
+  padding: var(--pw-gap-2);
+  border-block-start: var(--pw-border-thin) solid var(--pw-border);
+  background: var(--pw-surface);
+  position: sticky;
+  inset-block-end: 0;
+}
+
+.pw-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--pw-gap-1);
+}
+
+@media (max-width: 32rem) {
+  .pw-grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pw-modal-neu {
+  inline-size: min(36rem, 100%);
+}
+
+.pw-modal-hinweis {
+  margin: 0;
+  padding: var(--pw-space-sm) var(--pw-space-md);
+  border-radius: var(--pw-radius-small);
+  background: color-mix(in srgb, var(--color-primary-element) 8%, var(--pw-surface));
+  color: var(--pw-muted);
+  font-size: var(--pw-font-sm);
+  line-height: var(--pw-lh-snug);
+}
+
 .pw-geschaeft-detail {
   display: grid;
   gap: var(--pw-gap-2);

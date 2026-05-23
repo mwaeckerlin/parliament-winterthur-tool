@@ -39,7 +39,6 @@ return [
         ['name' => 'sitzungstyp#show', 'url' => '/sitzungstypen/{id}', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
         ['name' => 'sitzungstyp#update', 'url' => '/sitzungstypen/{id}', 'verb' => 'PUT', 'requirements' => ['id' => '\d+']],
         ['name' => 'sitzungstyp#destroy', 'url' => '/sitzungstypen/{id}', 'verb' => 'DELETE', 'requirements' => ['id' => '\d+']],
-        ['name' => 'sitzungstyp#neueSitzung', 'url' => '/sitzungstypen/{id}/sitzung', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
 
         // Traktanden
         ['name' => 'traktandum#index', 'url' => '/sitzungen/{sitzungId}/traktanden', 'verb' => 'GET'],

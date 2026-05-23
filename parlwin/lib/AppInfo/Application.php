@@ -144,6 +144,7 @@ class Application extends App implements IBootstrap
                 $c->get(\OCP\IGroupManager::class),
                 $c->get(\OCP\IUserManager::class),
                 $c->get(\OCP\IUserSession::class),
+                $c->get(\OCP\IConfig::class),
                 $c->get(\Psr\Log\LoggerInterface::class)
             );
         });
