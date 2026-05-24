@@ -123,6 +123,31 @@ Nextcloud-Plugin für die Fraktionsarbeit im Winterthurer Parlament.
     jetzt das ↗-Symbol mit Link auf `sitzung.url` (Originaltraktandum auf
     der Parlamentsseite), so dass die zugehörigen PDFs/Originale direkt
     erreichbar sind.
+  - ✅ Protokoll-Dokument-URL (v1.1.1): Für Traktanden ohne Geschäft
+    (Protokoll-Abnahmen etc.) wird der direkte Dokument-Link (PDF-URL) aus dem
+    HTML-Titel der Parlamentsseite extrahiert. Das `<br>`-getrennte Metadaten-
+    Suffix (Dokumentdatum, Kategorie, Download-Link) wird bereinigt; der saubere
+    Titel und die Dokument-URL werden separat gespeichert (`pw_traktanden.url`,
+    Migration v000012). Im Tabellenansicht und Karten-Layout (responsive) zeigt
+    ↗ direkt auf das Dokument.
+  - ✅ Auto-Save auf allen Eingabefeldern (v1.1.1): Kein expliziter
+    „Speichern"-Knopf mehr bei Notizen und Beschlüssen. Alle Felder speichern
+    automatisch bei Fokusverlust (blur) und nach 5 Sekunden ohne Eingabe
+    (Debounce). Beschlüsse aus der Auswahlliste werden sofort beim Anklicken
+    gespeichert; Freitexteingaben beim Verlassen des Felds.
+  - ✅ Zuständigkeits-Audit „Von → Nach" (v1.1.1): Die Zeitleiste zeigt bei
+    Zuständigkeitsänderungen neu den vollständigen Vorher/Nachher-Zustand in der
+    Form „Von: X → Nach: Y". Alle zugewiesenen Personen (vorher und nachher)
+    sind sichtbar, nicht nur die geänderte.
+  - ✅ Responsive Traktanden-Karten (v1.1.1): Unterhalb von 52 em
+    Container-Breite wechselt die Traktandentabelle vollständig in ein
+    Karten-Layout (statt Spalten auszublenden). Container-Query
+    `@container pw-sitzungen (max-inline-size: 52em)`.
+  - ✅ Realtime-Synchronisation (v1.1.0): Alle relevanten Schreibvorgänge
+    (Geschäfte, Sitzungen, Traktanden, Fraktionssitzung) publizieren Realtime-
+    Events via WebSocket (parlwin-realtime Service, Port 3001). Alle offenen
+    Frontends derselben Nextcloud-Instanz aktualisieren sich automatisch ohne
+    Seiten-Reload.
   - ✅ Dokument-Erstellen ohne Doppelklick-Verzögerung (v1.1.0):
     `dokumentErstellen()` öffnet die neu angelegte Datei sofort in einem
     parallel geöffneten Tab (`window.open` synchron im Click-Handler, dann
@@ -546,11 +571,17 @@ Sitzungstypen aufnehmen.
 #### Traktanden
 
 Jedem Traktandum einer Sitzung können folgende Zusatzfelder bearbeitet werden:
-- `bemerkungen` – Bemerkungen zum Traktandum
+- `bemerkungen` – Bemerkungen zum Traktandum (Altbestand, UI nicht mehr genutzt)
 - `notizen` – beliebig viele Notizen (als JSON-Array gespeichert)
 
+Importierte Felder (read-only):
+- `url` – Direktlink auf das verknüpfte Dokument (PDF, Protokoll etc.) für
+  Traktanden ohne eigenes Geschäft; aus dem HTML-Titel der Parlamentsseite
+  extrahiert (Migration v000012).
+
 Traktanden sind in der Regel Geschäfte aus der Geschäftsliste und werden
-entsprechend verknüpft (`geschaeft_id`).
+entsprechend verknüpft (`geschaeft_id`). Traktanden ohne Geschäft (z.B.
+Protokoll-Abnahmen) erhalten eine direkte Dokument-URL (`url`).
 
 #### Mitglieder
 

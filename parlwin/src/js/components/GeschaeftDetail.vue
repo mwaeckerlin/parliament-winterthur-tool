@@ -52,36 +52,46 @@
 
         <div class="pw-form-zeile">
           <label>Notiz hinzufügen</label>
-          <textarea v-model="neueNotiz" class="pw-textarea" rows="2" placeholder="Kommentar, Beobachtung, Hinweis" />
-          <button type="button" class="button pw-btn-klein" @click="notizSpeichern">Notiz speichern</button>
+          <textarea
+            v-model="neueNotiz"
+            class="pw-textarea"
+            rows="2"
+            placeholder="Kommentar, Beobachtung, Hinweis"
+            @input="notizDebounce"
+            @blur="notizSpeichernBeiBlur"
+          />
         </div>
 
         <div class="pw-form-zeile">
           <label>Beschluss erfassen</label>
+          <template v-if="beschlussWert && beschlussWert.freitext">
+            <textarea
+              v-model="beschlussWert.label"
+              class="pw-textarea"
+              rows="2"
+              placeholder="Freitext Beschluss"
+              :disabled="!geschaeft.fraktionssitzung?.beschlussSchreibbar"
+              @input="beschlussFreitextInput"
+              @blur="beschlussAutoSpeichern"
+            />
+            <button
+              type="button"
+              class="button pw-btn-klein"
+              @click="beschlussWert = null"
+            >Aus Liste wählen</button>
+          </template>
           <NcSelect
-            :model-value="beschlussOption"
+            v-else
+            :model-value="beschlussWert"
             :options="beschlussOptionen"
+            :taggable="true"
+            :create-option="(text) => ({ label: text, value: '', freitext: true })"
             :clearable="true"
             :disabled="!geschaeft.fraktionssitzung?.beschlussSchreibbar"
-            placeholder="—"
+            placeholder="Beschluss eingeben oder aus Liste wählen…"
             label="label"
-            @update:model-value="aenderungBeschluss($event)"
+            @update:model-value="beschlussNachWahl"
           />
-          <textarea
-            v-model="beschlussText"
-            class="pw-textarea"
-            rows="2"
-            placeholder="Optionale Begründung"
-            :disabled="!geschaeft.fraktionssitzung?.beschlussSchreibbar"
-          />
-          <button
-            type="button"
-            class="button pw-btn-klein"
-            :disabled="!geschaeft.fraktionssitzung?.beschlussSchreibbar"
-            @click="beschlussSpeichern"
-          >
-            Beschluss speichern
-          </button>
           <small v-if="!geschaeft.fraktionssitzung?.beschlussSchreibbar" class="pw-hinweis">
             Im Fraktionssitzungsmodus darf nur der Protokollführer Beschlüsse erfassen.
           </small>
@@ -98,18 +108,78 @@
 
       <div class="pw-detail-abschnitt">
         <h4>Aktionszeitleiste</h4>
-        <div v-if="zeitleisteAktionen.length === 0" class="pw-hinweis">Noch keine Aktionen vorhanden.</div>
-        <div v-for="a in zeitleisteAktionen" :key="a.id" class="pw-timeline-eintrag">
-          <div class="pw-timeline-kopf">
-            <strong>{{ a.titel || a.aktionTyp }}</strong>
-            <span class="pw-timeline-zeit">{{ formatiereZeitpunkt(a.erstelltAm) }}</span>
+        <div v-if="zeitleisteEintraege.length === 0" class="pw-hinweis">Noch keine Aktionen vorhanden.</div>
+        <div
+          v-for="(e, idx) in zeitleisteEintraege"
+          :key="e._key"
+          class="pw-timeline-eintrag"
+          :class="{ 'pw-timeline-drag-over': dragZeitleisteUeberIdx === idx }"
+          draggable="true"
+          @dragstart="tlDragStart($event, idx)"
+          @dragover.prevent="tlDragOver($event, idx)"
+          @dragleave="tlDragLeave"
+          @drop.prevent="tlDrop($event, idx)"
+          @dragend="tlDragEnd"
+        >
+          <span class="pw-notiz-griff" title="Verschieben" aria-hidden="true">⠿</span>
+          <div class="pw-timeline-datum">
+            <span class="pw-timeline-zeit">{{ formatiereZeitpunkt(e.erstelltAm) }}</span>
+            <small v-if="e._sitzungInfo" class="pw-traktandum-kontext-meta">{{ e._sitzungInfo }}</small>
           </div>
-          <div class="pw-timeline-meta">
-            <span class="pw-timeline-autor">{{ a.autorName || a.autorUid || 'unbekannt' }}</span>
-            <span v-if="a.aktionCode"> · {{ a.aktionCode }}</span>
+          <span class="pw-timeline-autor">{{ e.autorName || e.autorUid || 'unbekannt' }}</span>
+          <div class="pw-timeline-inhalt">
+            <template v-if="e._type === 'traktandumNotiz'">
+              <span
+                v-if="e._sitzungId"
+                class="pw-timeline-text pw-notiz-text-klickbar"
+                role="button"
+                tabindex="0"
+                title="Zur Sitzung springen"
+                @click="$emit('oeffneTraktandum', e._sitzungId)"
+                @keydown.enter.prevent="$emit('oeffneTraktandum', e._sitzungId)"
+              >{{ e.text }}</span>
+              <span v-else class="pw-timeline-text">{{ e.text }}</span>
+            </template>
+            <template v-else-if="e.aktionTyp === 'notiz' && istEigeneAktion(e)">
+              <div v-if="bearbeitenNotizId === e.id" class="pw-notiz-bearbeiten-zeile">
+                <textarea
+                  ref="notizBearbeitenInput"
+                  v-model="bearbeitenNotizText"
+                  class="pw-textarea"
+                  rows="2"
+                  @keydown.escape="notizBearbeitenAbbrechen"
+                />
+                <div class="pw-notiz-bearbeiten-aktionen">
+                  <button type="button" class="button pw-btn-mini" @click="notizBearbeitenSpeichern(e)">✓</button>
+                  <button type="button" class="button pw-btn-mini" @click="notizBearbeitenAbbrechen">✕</button>
+                </div>
+              </div>
+              <span
+                v-else-if="e.text"
+                class="pw-timeline-text pw-notiz-text-klickbar"
+                role="button"
+                tabindex="0"
+                title="Klicken zum Bearbeiten"
+                @click="notizBearbeitenStarten(e, $event)"
+                @keydown.enter.prevent="notizBearbeitenStarten(e)"
+              >{{ e.text }}</span>
+            </template>
+            <div v-else-if="e.text && e.aktionTyp === 'votum'" class="pw-timeline-text pw-timeline-html" v-html="e.text" />
+            <template v-else-if="e.titel && e.aktionTyp !== 'notiz'">
+              <span class="pw-timeline-text">{{ e.titel }}</span>
+              <span v-if="e.text" class="pw-timeline-detail">{{ e.text }}</span>
+            </template>
+            <span v-else-if="e.text" class="pw-timeline-text">{{ e.text }}</span>
           </div>
-          <div v-if="a.text && a.aktionTyp === 'votum'" class="pw-timeline-text pw-timeline-html" v-html="a.text" />
-          <div v-else-if="a.text" class="pw-timeline-text">{{ a.text }}</div>
+          <div class="pw-timeline-aktionen">
+            <button
+              v-if="e._type === 'aktion' && e.aktionTyp === 'notiz' && istEigeneAktion(e) && bearbeitenNotizId !== e.id"
+              type="button"
+              class="button pw-btn-mini"
+              title="Notiz löschen"
+              @click="notizLoeschen(e)"
+            >✕</button>
+          </div>
         </div>
       </div>
 
@@ -122,6 +192,7 @@
 
 <script>
 import { generateUrl } from '@nextcloud/router'
+import { getCurrentUser } from '@nextcloud/auth'
 import axios from '@nextcloud/axios'
 import NcSelect from '@nextcloud/vue/components/NcSelect'
 import PwMultiSelect from './PwMultiSelect.vue'
@@ -135,20 +206,28 @@ export default {
   props: {
     geschaeftId: { type: Number, required: true },
     mitglieder: { type: Array, default: () => [] },
+    traktandumKontext: { type: Object, default: null },
   },
-  emits: ['gespeichert'],
+  emits: ['gespeichert', 'oeffneTraktandum'],
   data() {
     return {
       laden: false,
       geschaeft: null,
       neueNotiz: '',
-      beschlussCode: '',
-      beschlussText: '',
+      beschlussWert: null,
+      bearbeitenNotizId: null,
+      bearbeitenNotizText: '',
+      zeitleisteReihenfolge: [],
+      dragZeitleisteVonIdx: -1,
+      dragZeitleisteUeberIdx: -1,
       votumHtml: '',
       votumAktionId: null,
       votumSpeicherTimer: null,
       votumStatus: '',
       votumDirty: false,
+      notizTimer: null,
+      beschlussTimer: null,
+      notizAktionId: null,
       ausgewaehltePersonKeys: [],
       hauptPersonKey: '',
       meldung: '',
@@ -163,6 +242,16 @@ export default {
     if (this.unsubRealtime) {
       this.unsubRealtime()
       this.unsubRealtime = null
+    }
+    if (this.notizTimer) {
+      clearTimeout(this.notizTimer)
+      this.notizTimer = null
+      this.notizSpeichern()
+    }
+    if (this.beschlussTimer) {
+      clearTimeout(this.beschlussTimer)
+      this.beschlussTimer = null
+      this.beschlussSpeichern()
     }
     if (this.votumSpeicherTimer) {
       clearTimeout(this.votumSpeicherTimer)
@@ -207,19 +296,51 @@ export default {
       const erlaubt = Array.isArray(this.geschaeft?.erlaubteBeschluesse) ? this.geschaeft.erlaubteBeschluesse : []
       return erlaubt.map((b) => ({ label: b.label || b.code, value: b.code }))
     },
-    beschlussOption() {
-      if (!this.beschlussCode) return null
-      const treffer = this.beschlussOptionen.find((o) => o.value === this.beschlussCode)
-      if (treffer) return treffer
-      const lb = this.geschaeft?.letzterBeschluss
-      return { label: lb?.titel || this.beschlussCode, value: this.beschlussCode }
-    },
     zeitleisteAktionen() {
-      // Das aktuell aktive Votum (entscheidGueltig=true) wird im Editor
-      // angezeigt und soll nicht zusätzlich als Timeline-Eintrag
-      // erscheinen – erst nach dem Archivieren.
       const alle = this.geschaeft?.aktionen || []
       return alle.filter(a => !(a.aktionTyp === 'votum' && a.entscheidGueltig))
+    },
+    zeitleisteEintraege() {
+      const aktionen = this.zeitleisteAktionen.map(a => ({
+        ...a,
+        _key: String(a.id),
+        _type: 'aktion',
+        _sitzungInfo: null,
+        _sitzungId: null,
+      }))
+      const tk = this.traktandumKontext
+      const traktandumNotizen = (tk?.notizen || []).map((n, i) => {
+        const parts = []
+        if (tk.traktandumNummer) parts.push(`Trakt. ${tk.traktandumNummer}`)
+        if (tk.sitzungDatum) parts.push(this.formatieredatum(tk.sitzungDatum))
+        if (tk.sitzungTitel) parts.push(tk.sitzungTitel)
+        return {
+          id: null,
+          _key: `tk_${i}`,
+          _type: 'traktandumNotiz',
+          _sitzungId: tk.sitzungId || null,
+          aktionTyp: 'notiz',
+          titel: '',
+          text: n.text,
+          autorName: n.displayName || n.uid,
+          autorUid: n.uid,
+          erstelltAm: n.datum,
+          aktionCode: '',
+          entscheidGueltig: false,
+          _sitzungInfo: parts.join(', '),
+        }
+      })
+      const kombiniert = [...traktandumNotizen, ...aktionen]
+      if (this.zeitleisteReihenfolge.length > 0) {
+        const indexMap = {}
+        this.zeitleisteReihenfolge.forEach((key, i) => { indexMap[key] = i })
+        return [...kombiniert].sort((a, b) => {
+          const ia = indexMap[a._key] ?? Number.MAX_SAFE_INTEGER
+          const ib = indexMap[b._key] ?? Number.MAX_SAFE_INTEGER
+          return ia - ib
+        })
+      }
+      return kombiniert
     },
     votumHatInhalt() {
       const t = (this.votumHtml || '').replace(/<[^>]*>/g, '').trim()
@@ -279,8 +400,13 @@ export default {
         this.hauptPersonKey = haupt?.personKey || ''
         this.synchronisiereHauptPersonKey()
         const lb = data.letzterBeschluss || null
-        this.beschlussCode = lb?.aktionCode || ''
-        this.beschlussText = lb?.text || ''
+        if (!lb) {
+          this.beschlussWert = null
+        } else if (lb.aktionCode) {
+          this.beschlussWert = { label: lb.titel || lb.aktionCode, value: lb.aktionCode }
+        } else {
+          this.beschlussWert = { label: lb.text || '', value: '', freitext: true }
+        }
         const av = data.aktuellesVotum || null
         this.votumHtml = av?.text || ''
         this.votumAktionId = av?.id || null
@@ -295,13 +421,75 @@ export default {
     handleRealtimeEvent(event) {
       const type = event?.type || ''
       const changedId = Number(event?.payload?.id || 0)
-      if (type === 'sync.completed' || type === 'fraktionssitzung.updated' || type === 'fraktion.roles.updated') {
+      if (type === 'fraktionssitzung.updated' || type === 'fraktion.roles.updated') {
+        // Seltene globale Konfigurationsänderung – Full-Reload nötig
         this.ladeDetail()
         return
       }
-      if (type.startsWith('geschaefte.') && (changedId === 0 || changedId === this.geschaeftId)) {
-        this.ladeDetail()
+      if (type === 'sync.completed') {
+        // Sync: nur Aktionen und öffentliche Felder aktualisieren
+        this._ladeAktionenNur()
+        return
       }
+      if (type === 'geschaefte.action' && (changedId === 0 || changedId === this.geschaeftId)) {
+        // Notiz/Beschluss/Votum: nur Aktionen-Liste aktualisieren
+        this._ladeAktionenNur()
+        return
+      }
+      if (type === 'geschaefte.updated' && (changedId === 0 || changedId === this.geschaeftId)) {
+        // Zuständigkeiten, Status: Aktionen + Zuständigkeiten aktualisieren
+        this._ladeZustaendigkeitenUndAktionen()
+        return
+      }
+    },
+    // Lädt nur aktionen nach – ohne beschlussWert oder andere UI-State zu berühren
+    async _ladeAktionenNur() {
+      try {
+        const { data } = await axios.get(generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}`))
+        if (this.geschaeft && Array.isArray(data?.aktionen)) {
+          this.geschaeft.aktionen = data.aktionen
+        }
+      } catch (e) {
+        console.error('Aktionen-Reload fehlgeschlagen:', e)
+      }
+    },
+    // Lädt Zuständigkeiten + Aktionen nach – ohne beschlussWert zu ändern
+    async _ladeZustaendigkeitenUndAktionen() {
+      try {
+        const { data } = await axios.get(generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}`))
+        if (!this.geschaeft) return
+        if (Array.isArray(data?.aktionen)) {
+          this.geschaeft.aktionen = data.aktionen
+        }
+        if (Array.isArray(data?.zustaendigkeiten)) {
+          this.geschaeft.zustaendigkeiten = data.zustaendigkeiten
+          this.ausgewaehltePersonKeys = data.zustaendigkeiten.map(z => z.personKey)
+          const haupt = data.zustaendigkeiten.find(z => z.istHaupt)
+          this.hauptPersonKey = haupt?.personKey || ''
+        }
+      } catch (e) {
+        console.error('Reload fehlgeschlagen:', e)
+      }
+    },
+    // Fügt eine Aktion zur lokalen Liste hinzu
+    _aktionHinzufuegen(aktion) {
+      if (!this.geschaeft || !aktion) return
+      if (!Array.isArray(this.geschaeft.aktionen)) this.geschaeft.aktionen = []
+      this.geschaeft.aktionen.push(aktion)
+    },
+    // Aktualisiert eine bestehende Aktion in der lokalen Liste (in-place)
+    _aktionAktualisieren(aktion) {
+      if (!this.geschaeft || !aktion?.id) return
+      const aktionen = this.geschaeft.aktionen || []
+      const idx = aktionen.findIndex(a => a.id === aktion.id)
+      if (idx >= 0) aktionen[idx] = aktion
+    },
+    // Entfernt eine Aktion aus der lokalen Liste (in-place)
+    _aktionEntfernen(aktionId) {
+      if (!this.geschaeft) return
+      const aktionen = this.geschaeft.aktionen || []
+      const idx = aktionen.findIndex(a => a.id === aktionId)
+      if (idx >= 0) aktionen.splice(idx, 1)
     },
     async speichereZustaendigkeiten() {
       try {
@@ -313,14 +501,17 @@ export default {
             personName: member ? this.vollerName(member) : this.personLabelByKey(key),
           }
         })
-
-        await axios.put(generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}`), {
+        const { data } = await axios.put(generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}`), {
           zustaendigkeiten,
           haupt_person_key: this.hauptPersonKey,
         })
+        if (this.geschaeft && Array.isArray(data?.zustaendigkeiten)) {
+          this.geschaeft.zustaendigkeiten = data.zustaendigkeiten
+        }
+        // Nur Aktionen neu laden (Audit-Trail-Eintrag) – kein Full-Reload
+        await this._ladeAktionenNur()
         this.meldung = 'Zuständigkeiten gespeichert'
         this.fehler = false
-        await this.ladeDetail()
         this.$emit('gespeichert')
       } catch (e) {
         this.meldung = 'Fehler beim Speichern der Zuständigkeiten'
@@ -328,39 +519,143 @@ export default {
         console.error(e)
       }
     },
-    async notizSpeichern() {
-      if (!this.neueNotiz.trim()) return
+    istEigeneAktion(a) {
+      const uid = (getCurrentUser()?.uid || '').toLowerCase()
+      return !!uid && (a.autorUid || '').toLowerCase() === uid
+    },
+    notizDebounce() {
+      if (this.notizTimer) clearTimeout(this.notizTimer)
+      this.notizTimer = setTimeout(() => { this.notizSpeichern(); this.notizTimer = null }, 5000)
+    },
+    async notizSpeichernBeiBlur() {
+      if (this.notizTimer) { clearTimeout(this.notizTimer); this.notizTimer = null }
+      await this.notizSpeichern()
+      // Feld erst nach blur leeren und Session zurücksetzen
+      this.neueNotiz = ''
+      this.notizAktionId = null
+    },
+    async beschlussNachWahl(val) {
+      const hatteWert = !!this.beschlussWert
+      this.beschlussWert = val
+      if (!val) {
+        if (hatteWert) await this.beschlussZuruecknehmen()
+      } else if (!val.freitext) {
+        await this.beschlussSpeichern()
+      }
+    },
+    async beschlussAutoSpeichern() {
+      if (this.beschlussTimer) { clearTimeout(this.beschlussTimer); this.beschlussTimer = null }
+      if (this.beschlussWert?.freitext && (this.beschlussWert.label || '').trim()) {
+        await this.beschlussSpeichern()
+      }
+    },
+    beschlussFreitextInput() {
+      if (!this.beschlussWert?.label) {
+        this.beschlussWert = null
+        if (this.beschlussTimer) { clearTimeout(this.beschlussTimer); this.beschlussTimer = null }
+        return
+      }
+      if (this.beschlussTimer) clearTimeout(this.beschlussTimer)
+      this.beschlussTimer = setTimeout(() => { this.beschlussSpeichern(); this.beschlussTimer = null }, 5000)
+    },
+    notizBearbeitenStarten(a, clickEvent) {
+      this.bearbeitenNotizId = a.id
+      this.bearbeitenNotizText = a.text || ''
+      let caretOffset = (a.text || '').length
+      if (clickEvent) {
+        const pos = document.caretPositionFromPoint?.(clickEvent.clientX, clickEvent.clientY)
+        if (pos) {
+          caretOffset = pos.offset
+        } else {
+          const range = document.caretRangeFromPoint?.(clickEvent.clientX, clickEvent.clientY)
+          if (range) caretOffset = range.startOffset
+        }
+      }
+      this.$nextTick(() => {
+        const el = Array.isArray(this.$refs.notizBearbeitenInput)
+          ? this.$refs.notizBearbeitenInput[0]
+          : this.$refs.notizBearbeitenInput
+        if (el) {
+          el.focus()
+          el.setSelectionRange(caretOffset, caretOffset)
+        }
+      })
+    },
+    notizBearbeitenAbbrechen() {
+      this.bearbeitenNotizId = null
+      this.bearbeitenNotizText = ''
+    },
+    async notizBearbeitenSpeichern(a) {
+      const text = (this.bearbeitenNotizText || '').trim()
+      if (!text) return
       try {
-        await axios.post(generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}/notizen`), {
-          text: this.neueNotiz,
-        })
-        this.neueNotiz = ''
+        const { data } = await axios.put(generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}/notizen/${a.id}`), { text })
+        this.notizBearbeitenAbbrechen()
+        this._aktionAktualisieren(data)
+      } catch (e) {
+        this.meldung = 'Fehler beim Bearbeiten der Notiz'
+        this.fehler = true
+        console.error(e)
+      }
+    },
+    async notizLoeschen(a) {
+      try {
+        await axios.delete(generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}/notizen/${a.id}`))
+        this._aktionEntfernen(a.id)
+      } catch (e) {
+        this.meldung = 'Fehler beim Löschen der Notiz'
+        this.fehler = true
+        console.error(e)
+      }
+    },
+    async notizSpeichern() {
+      const text = (this.neueNotiz || '').trim()
+      if (!text) return
+      try {
+        if (this.notizAktionId) {
+          // Gleiche Notiz in derselben Eingabe-Session aktualisieren
+          const { data } = await axios.put(
+            generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}/notizen/${this.notizAktionId}`),
+            { text }
+          )
+          this._aktionAktualisieren(data)
+        } else {
+          // Erste Speicherung → neue Aktion anlegen
+          const { data } = await axios.post(
+            generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}/notizen`),
+            { text }
+          )
+          this.notizAktionId = data.id
+          this._aktionHinzufuegen(data)
+        }
         this.meldung = 'Notiz gespeichert'
         this.fehler = false
-        await this.ladeDetail()
         this.$emit('gespeichert')
+        // Kein ladeDetail() / Feld bleibt – erst blur löscht es
       } catch (e) {
         this.meldung = 'Fehler beim Speichern der Notiz'
         this.fehler = true
         console.error(e)
       }
     },
-    async aenderungBeschluss(option) {
-      const code = option?.value || ''
+    async beschlussSpeichern() {
+      if (!this.beschlussWert) return
+      const code = this.beschlussWert.freitext ? '' : (this.beschlussWert.value || '')
+      const text = this.beschlussWert.freitext ? (this.beschlussWert.label || '') : ''
       try {
-        if (code) {
-          await axios.post(generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}/beschluesse`), {
-            code,
-            text: this.beschlussText,
-          })
-          this.meldung = 'Beschluss gespeichert'
-        } else {
-          await axios.delete(generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}/beschluesse`))
-          this.beschlussText = ''
-          this.meldung = 'Beschluss zurückgenommen'
+        const { data } = await axios.post(
+          generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}/beschluesse`),
+          { code, text }
+        )
+        this._aktionHinzufuegen(data)
+        if (this.geschaeft) {
+          this.geschaeft.letzterBeschluss = data
+            ? { aktionCode: code, titel: data.titel || this.beschlussWert.label || code, text }
+            : null
+          this.geschaeft.fraktionsstatus = 'entschieden'
         }
+        this.meldung = 'Beschluss gespeichert'
         this.fehler = false
-        await this.ladeDetail()
         this.$emit('gespeichert')
       } catch (e) {
         this.meldung = 'Fehler beim Speichern des Beschlusses'
@@ -368,19 +663,22 @@ export default {
         console.error(e)
       }
     },
-    async beschlussSpeichern() {
-      if (!this.beschlussCode) return
+    async beschlussZuruecknehmen() {
       try {
-        await axios.post(generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}/beschluesse`), {
-          code: this.beschlussCode,
-          text: this.beschlussText,
-        })
-        this.meldung = 'Beschluss gespeichert'
+        const { data } = await axios.delete(
+          generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}/beschluesse`)
+        )
+        this.beschlussWert = null
+        if (data) this._aktionHinzufuegen(data)
+        if (this.geschaeft) {
+          this.geschaeft.letzterBeschluss = null
+          this.geschaeft.fraktionsstatus = null
+        }
+        this.meldung = 'Beschluss zurückgenommen'
         this.fehler = false
-        await this.ladeDetail()
         this.$emit('gespeichert')
       } catch (e) {
-        this.meldung = 'Fehler beim Speichern des Beschlusses'
+        this.meldung = 'Fehler beim Zurücknehmen des Beschlusses'
         this.fehler = true
         console.error(e)
       }
@@ -446,6 +744,48 @@ export default {
         this.fehler = true
         console.error(e)
       }
+    },
+    _scrollContainer() {
+      let el = this.$el?.parentElement
+      while (el && el !== document.documentElement) {
+        const { overflowY } = window.getComputedStyle(el)
+        if (overflowY === 'auto' || overflowY === 'scroll') return el
+        el = el.parentElement
+      }
+      return null
+    },
+    async _mitScrollSchutz(fn) {
+      const c = this._scrollContainer()
+      const top = c ? c.scrollTop : window.scrollY
+      await fn()
+      await this.$nextTick()
+      if (c) c.scrollTop = top
+      else window.scrollTo({ top, behavior: 'instant' })
+    },
+    tlDragStart(event, idx) {
+      this.dragZeitleisteVonIdx = idx
+      event.dataTransfer.effectAllowed = 'move'
+    },
+    tlDragOver(event, idx) {
+      event.dataTransfer.dropEffect = 'move'
+      this.dragZeitleisteUeberIdx = idx
+    },
+    tlDragLeave() {
+      this.dragZeitleisteUeberIdx = -1
+    },
+    tlDrop(event, zuIdx) {
+      const vonIdx = this.dragZeitleisteVonIdx
+      this.dragZeitleisteUeberIdx = -1
+      this.dragZeitleisteVonIdx = -1
+      if (vonIdx < 0 || vonIdx === zuIdx) return
+      const eintraege = [...this.zeitleisteEintraege]
+      const [verschoben] = eintraege.splice(vonIdx, 1)
+      eintraege.splice(zuIdx, 0, verschoben)
+      this.zeitleisteReihenfolge = eintraege.map(e => e._key)
+    },
+    tlDragEnd() {
+      this.dragZeitleisteVonIdx = -1
+      this.dragZeitleisteUeberIdx = -1
     },
     formatieredatum(datum) {
       if (!datum) return ''

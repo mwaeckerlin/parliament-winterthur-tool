@@ -727,6 +727,26 @@ ul.app-navigation__list {
   }
 }
 
+/* Sitzungen-Ansicht: Container für responsive Traktanden-Tabelle */
+.pw-sitzungen {
+  container-type: inline-size;
+  container-name: pw-sitzungen;
+}
+
+/* Traktanden-Tabelle: Bei Breite < Summe aller Spalten-Mindestbreiten
+   (4+4+15+10+6+5+4+4 = 52em) wird die Tabelle auf Karten-Darstellung
+   umgeschaltet. Keine Spalten werden ausgeblendet – alle Daten bleiben
+   sichtbar, nur das Layout ändert sich. */
+@container pw-sitzungen (max-inline-size: 52em) {
+  .pw-sitzungen .pw-table-desktop {
+    display: none !important;
+  }
+
+  .pw-sitzungen .pw-card-mobile {
+    display: grid !important;
+  }
+}
+
 .pw-tabelle,
 .pw-members-table,
 .pw-info-tabelle {
@@ -811,6 +831,15 @@ ul.app-navigation__list {
 .pw-tabelle tbody tr:hover,
 .pw-members-table tbody tr:hover {
   background: var(--color-background-hover);
+}
+
+.pw-row-orphan {
+  opacity: 0.75;
+}
+
+.pw-orphan-durchgestrichen {
+  text-decoration: line-through;
+  color: var(--pw-muted);
 }
 
 .pw-titel,
@@ -1012,6 +1041,8 @@ ul.app-navigation__list {
 .pw-geschaeft-detail {
   display: grid;
   gap: var(--pw-gap-2);
+  container-type: inline-size;
+  container-name: pw-geschaeft-detail;
 }
 
 .pw-detail-header {
@@ -1034,6 +1065,22 @@ ul.app-navigation__list {
 .pw-traktanden h4 {
   margin: 0;
   font-size: var(--pw-font-base);
+}
+
+.pw-traktandum-kontext-meta {
+  font-weight: normal;
+  color: var(--pw-muted);
+  font-size: 0.9em;
+}
+
+.pw-traktandum-notiz {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.2rem 0;
+  border-block-end: 1px solid var(--pw-border);
+  &:last-child { border-block-end: none; }
 }
 
 .pw-info-tabelle th {
@@ -1084,6 +1131,39 @@ ul.app-navigation__list {
   white-space: pre-wrap;
 }
 
+.pw-timeline-detail {
+  display: block;
+  font-size: 0.85em;
+  color: var(--pw-muted);
+  margin-block-start: 0.2em;
+  white-space: pre-wrap;
+}
+
+.pw-timeline-eintrag {
+  display: grid;
+  grid-template-columns: auto auto auto 1fr auto;
+  gap: var(--pw-space-sm) var(--pw-space-md);
+  align-items: baseline;
+  padding: var(--pw-space-md) var(--pw-space-md-plus);
+}
+
+.pw-timeline-datum {
+  display: grid;
+  gap: var(--pw-space-2xs);
+  white-space: nowrap;
+}
+
+.pw-timeline-inhalt {
+  min-inline-size: 0;
+  word-break: break-word;
+}
+
+.pw-timeline-aktionen {
+  display: flex;
+  gap: var(--pw-space-xs);
+  align-items: flex-start;
+}
+
 .pw-timeline-html {
   white-space: normal;
 
@@ -1091,6 +1171,30 @@ ul.app-navigation__list {
   ol {
     padding-inline-start: var(--pw-space-lg, 1.5rem);
     margin: var(--pw-space-xs, 0.25rem) 0;
+  }
+}
+
+/* Aktionszeitleiste: bei schmalen Containern (Mobile/schmales Modal)
+   3-Spalten-Layout: Griff | Datum | Aktionen / Inhalt (2. Zeile, volle Breite).
+   Autor wird ausgeblendet. */
+@container pw-geschaeft-detail (max-inline-size: 28em) {
+  .pw-timeline-eintrag {
+    grid-template-columns: auto 1fr auto;
+    align-items: start;
+  }
+
+  .pw-timeline-autor {
+    display: none;
+  }
+
+  .pw-timeline-aktionen {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .pw-timeline-inhalt {
+    grid-column: 1 / -1;
+    grid-row: 2;
   }
 }
 
@@ -1368,6 +1472,67 @@ ul.app-navigation__list {
   font-weight: 700;
 }
 
+/* ---- Traktanden Karten-Darstellung (mobile / schmaler Container) ---- */
+.pw-traktandum-karte {
+  display: grid;
+  gap: var(--pw-gap-1);
+  padding: var(--pw-gap-1) var(--pw-gap-2);
+  border-block-start: var(--pw-border-thin) solid var(--pw-border);
+
+  &:first-child {
+    border-block-start: none;
+  }
+}
+
+.pw-traktandum-karte-kopf {
+  cursor: pointer;
+  display: grid;
+  gap: var(--pw-space-xs);
+
+  &:hover,
+  &:focus-visible {
+    outline: 2px solid var(--color-primary-element);
+    outline-offset: 2px;
+    border-radius: var(--pw-radius-small);
+  }
+}
+
+.pw-traktandum-karte-kennung {
+  display: flex;
+  gap: var(--pw-space-sm);
+  align-items: baseline;
+  color: var(--pw-muted);
+  font-size: var(--pw-font-sm, 0.875rem);
+}
+
+.pw-traktandum-karte-titel {
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.pw-traktandum-karte-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--pw-space-2xs) var(--pw-space-md);
+  color: var(--pw-muted);
+  font-size: var(--pw-font-sm, 0.875rem);
+}
+
+.pw-traktandum-karte-selektoren {
+  display: grid;
+  grid-template-columns: 6em 1fr;
+  gap: var(--pw-space-xs) var(--pw-space-sm);
+  align-items: center;
+  font-size: var(--pw-font-sm, 0.875rem);
+
+  label {
+    color: var(--pw-muted);
+    text-transform: uppercase;
+    font-size: 0.75em;
+    letter-spacing: var(--pw-track-wide);
+  }
+}
+
 .pw-traktandum-aktion {
   display: flex;
   justify-content: flex-start;
@@ -1411,9 +1576,27 @@ ul.app-navigation__list {
 .pw-notiz-zeile,
 .pw-neue-notiz {
   display: grid;
-  grid-template-columns: auto auto 1fr auto auto;
+  grid-template-columns: auto auto auto 1fr auto auto;
   gap: 0.5rem;
   align-items: center;
+}
+
+.pw-notiz-griff {
+  cursor: grab;
+  color: var(--pw-muted);
+  user-select: none;
+  font-size: 0.9em;
+  &:active { cursor: grabbing; }
+}
+
+.pw-notiz-drag-over {
+  outline: 2px solid var(--color-primary);
+  border-radius: var(--pw-radius-small);
+}
+
+.pw-timeline-drag-over {
+  outline: 2px solid var(--color-primary-element);
+  outline-offset: 2px;
 }
 
 .pw-neue-notiz {

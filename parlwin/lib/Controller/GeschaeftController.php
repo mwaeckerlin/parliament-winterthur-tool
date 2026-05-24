@@ -127,6 +127,35 @@ class GeschaeftController extends Controller
     }
 
     #[NoAdminRequired]
+    public function updateNotiz(int $id, int $aktionId): DataResponse
+    {
+        $text = (string) $this->request->getParam('text', '');
+        try {
+            $aktion = $this->fraktionsarbeitService->notizAktualisieren($id, $aktionId, $text);
+            $this->realtimePublisher->publish('geschaefte.action', ['id' => $id, 'aktionTyp' => 'notiz']);
+            return new DataResponse($aktion);
+        } catch (\InvalidArgumentException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+        } catch (\RuntimeException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_FORBIDDEN);
+        }
+    }
+
+    #[NoAdminRequired]
+    public function deleteNotiz(int $id, int $aktionId): DataResponse
+    {
+        try {
+            $this->fraktionsarbeitService->notizLoeschen($id, $aktionId);
+            $this->realtimePublisher->publish('geschaefte.action', ['id' => $id, 'aktionTyp' => 'notiz']);
+            return new DataResponse([]);
+        } catch (\InvalidArgumentException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+        } catch (\RuntimeException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_FORBIDDEN);
+        }
+    }
+
+    #[NoAdminRequired]
     public function addBeschluss(int $id): DataResponse
     {
         $code = (string) $this->request->getParam('code', '');

@@ -255,10 +255,13 @@ class SitzungService
                 $neu = true;
             }
 
+            $traktandumUrl = (string) ScraperService::wert($tDaten, ['traktandumUrl'], '');
+
             $traktandum->setGeschaeftId($geschaeftId);
             $traktandum->setNummer($tNummer);
             $traktandum->setTitel($titel);
             $traktandum->setBeschreibung($beschreibung);
+            $traktandum->setUrl($traktandumUrl);
             $traktandum->setGeloescht(false);
             $traktandum->setAktualisiertAm($jetzt);
 

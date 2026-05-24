@@ -19,6 +19,8 @@ use OCP\AppFramework\Db\Entity;
  * @method string getAutorUid()
  * @method string getAutorName()
  * @method string getErstelltAm()
+ * @method void   setText(string $text)
+ * @method void   setEntscheidGueltig(bool $v)
  */
 class GeschaeftAktion extends Entity {
     protected int $geschaeftId = 0;

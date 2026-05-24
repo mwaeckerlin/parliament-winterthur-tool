@@ -64,7 +64,7 @@ class SyncCancelCommandTest extends TestCase {
                     self::equalTo('sync.cancel.requested'),
                     self::equalTo('sync.cancelled')
                 ),
-                self::isType('array')
+                self::isArray()
             );
 
         $syncProcessService = $this->createMock(SyncProcessService::class);
@@ -72,7 +72,7 @@ class SyncCancelCommandTest extends TestCase {
             ->method('ensureStopped')
             ->with(
                 self::equalTo(4242),
-                self::isType('callable'),
+                self::isCallable(),
                 self::equalTo(900),
                 self::equalTo(250),
                 self::equalTo(450),
@@ -94,7 +94,7 @@ class SyncCancelCommandTest extends TestCase {
             ->with(self::stringContains('wurde beendet'));
 
         $ref = new \ReflectionMethod($command, 'execute');
-        $ref->setAccessible(true);
+
         $result = $ref->invoke($command, $input, $output);
 
         self::assertSame(Command::SUCCESS, $result);
@@ -148,7 +148,7 @@ class SyncCancelCommandTest extends TestCase {
             ->with(self::stringContains('Keine laufende Synchronisation'));
 
         $ref = new \ReflectionMethod($command, 'execute');
-        $ref->setAccessible(true);
+
         $result = $ref->invoke($command, $input, $output);
 
         self::assertSame(Command::SUCCESS, $result);

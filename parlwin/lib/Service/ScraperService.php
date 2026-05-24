@@ -947,7 +947,17 @@ class ScraperService
             }
 
             $nummerText = self::bereinigeHtmlText($dom->saveHTML($zellen->item(0)) ?: '');
-            $titel = self::bereinigeHtmlText($dom->saveHTML($zellen->item(1)) ?: '');
+            $titelHtml = $dom->saveHTML($zellen->item(1)) ?: '';
+            // Metadaten-Suffix (Dokumentdatum, Kategorie, Download-Link) ab erstem <br> abschneiden
+            $titelVorBr = preg_split('/<br\s*\/?>/ui', $titelHtml)[0] ?? $titelHtml;
+            $titel = self::bereinigeHtmlText($titelVorBr);
+            if ($titel === '') {
+                $titel = self::bereinigeHtmlText($titelHtml);
+            }
+            // Dokument-URL aus Titel-Zelle extrahieren (für Protokolle, Beschlüsse etc. ohne Geschäft-Link)
+            $titelLink = self::extrahiereLinkAusHtml($titelHtml);
+            // Nur externe Dokument-Links speichern – Geschäft-Links (/_rte/information/ID) werden via businessId abgedeckt
+            $traktandumUrl = ($titelLink['externId'] === '' && $titelLink['url'] !== '') ? $titelLink['url'] : '';
             $typ = self::bereinigeHtmlText($dom->saveHTML($zellen->item(2)) ?: '');
             $geschaeftLinkNode = $xpath->query(".//a[contains(@href, '/_rte/information/')]", $zellen->item(3))->item(0);
             $geschaeftUrl = '';
@@ -968,6 +978,7 @@ class ScraperService
                 'businessId' => $geschaeftExternId,
                 'businessNumber' => $geschaeftNummer,
                 'url' => $geschaeftUrl,
+                'traktandumUrl' => $traktandumUrl,
             ];
         }
 
