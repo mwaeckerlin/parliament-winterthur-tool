@@ -484,7 +484,7 @@ class MitgliedService
      *
      * - Neue Mitglieder werden per E-Mail eingeladen.
      * - Bestehende Mitglieder bleiben in der Gruppe.
-     * - Mitglieder, die nicht mehr zur Fraktion gehören, werden aus der Gruppe entfernt.
+     * - Entfernen aus der Gruppe erfolgt ausschliesslich über «Ausgewählte abgleichen» im Admin-UI.
      */
     public function aktualisiereNextcloudGruppe(): void
     {
@@ -540,15 +540,6 @@ class MitgliedService
             }
         }
 
-        // Nicht mehr zur Fraktion gehörende Mitglieder aus der Gruppe entfernen
-        foreach ($gruppe->getUsers() as $user) {
-            if (!in_array($user->getEMailAddress(), $sollMitglieder)) {
-                $gruppe->removeUser($user);
-                $this->logger->info(
-                    "Parlament Winterthur: Benutzer '{$user->getUID()}' aus Gruppe '{$konfigGruppe}' entfernt"
-                );
-            }
-        }
     }
 
     /**

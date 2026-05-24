@@ -613,15 +613,14 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
                 const tdUser = document.createElement('td');
                 tdUser.dataset.label = t('parlwin', 'Username');
                 const uidSpan = document.createElement('span');
-                uidSpan.className = 'pw-orphan-uid pw-orphan-durchgestrichen';
+                uidSpan.className = 'pw-orphan-uid';
                 uidSpan.textContent = String(verwaist.uid || '');
                 tdUser.appendChild(uidSpan);
 
                 const tdLocal = document.createElement('td');
+                tdLocal.classList.add('pw-member-groups');
                 tdLocal.dataset.label = t('parlwin', 'Gruppen');
-                tdLocal.textContent = verwaist.aktiv === false
-                    ? t('parlwin', 'deaktiviert')
-                    : t('parlwin', 'aktiv');
+                aktualisiereGruppenZelle(tdLocal, { lokaleGruppen: verwaist.lokaleGruppen || [], lokalerUserExistiert: true });
 
                 tr.appendChild(tdSelect);
                 tr.appendChild(tdName);
