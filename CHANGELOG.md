@@ -1,5 +1,40 @@
 # Changelog
 
+## Unreleased
+
+### Bugfix: `bemerkungen`-Feld in `TraktandumController::update()` wiederhergestellt
+
+Das `bemerkungen`-Feld wurde in einer früheren Session versehentlich aus `update()` entfernt.
+Es wird wieder korrekt aus dem Request gelesen und gespeichert (neben `notizen`).
+
+### Tests: TraktandumController
+
+Neue Testklasse `parlwin/tests/Controller/TraktandumControllerTest.php` mit 3 Tests:
+- `testUpdateSpeichertBemerkungen`
+- `testUpdateSpeichertNotizenOhneBemerkungen`
+- `testUpdateSpeichertBeidesGleichzeitig`
+
+### Tests: Orphan-User-Verhalten in SettingsControllerTest
+
+2 neue Tests für die «Fraktionsmitglieder ↔ Nextcloud-User»-Logik:
+- `testFraktionMitgliederZeigtVerwaisteNCGruppenUserOhneParlamentseintrag`:
+  Verwaiste NC-Gruppe-User (in Gruppe, aber kein Parlamentseintrag) erscheinen
+  in `verwaiste` und werden im Frontend durchgestrichen dargestellt.
+- `testProvisionVerarbeitetNurSelektierteOrphans`:
+  Nur selektierte verwaiste User werden bei «Ausgewählte abgleichen» verarbeitet;
+  nicht selektierte bleiben unberührt.
+
+### Cleanup: createMock → createStub in SettingsControllerTest
+
+Mock-Objekte ohne `expects()`-Aufrufe auf `createStub` umgestellt.
+Eliminiert 8 PHPUnit-Notices («No expectations configured»).
+
+### Cleanup: README bereinigt
+
+Abschnitte «Zu Erledigen», «Erledigt» und «Bugs» aus dem README entfernt
+(alles umgesetzt). Alle nicht mehr referenzierten `image*.png`-Dateien gelöscht.
+Abschnitt «Fraktionsmitglieder ↔ Nextcloud-User» (verwaiste User) im README dokumentiert.
+
 ## Unreleased (seit Commit 28c7034)
 
 ### Auto-Save – keine Speichern-Knöpfe mehr
@@ -40,7 +75,7 @@ Realtime-Events von anderen Benutzenden ebenfalls gezielt:
 - Tabellenansicht und Karten-Layout: ↗-Link zeigt direkt auf Dokument
 
 ### Beschluss-Migration (v000011)
-
+i
 - Bestehende Beschluss-Aktionen mit `titel` + `text` werden zu einem einzigen `text`-Feld zusammengeführt
 
 ### Popup schliesst sich nicht mehr bei Speichern (Kommissionsliste)

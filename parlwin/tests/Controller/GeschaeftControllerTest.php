@@ -18,7 +18,7 @@ class GeschaeftControllerTest extends TestCase
 {
     public function testIndexBlendetErledigteStandardmaessigAus(): void
     {
-        $request = $this->createMock(IRequest::class);
+        $request = $this->createStub(IRequest::class);
         $request->method('getParam')
             ->willReturnCallback(static function (string $key, mixed $default = null): mixed {
                 return $default;
@@ -52,7 +52,7 @@ class GeschaeftControllerTest extends TestCase
 
     public function testIndexZeigtErledigteBeiShowErledigtFlag(): void
     {
-        $request = $this->createMock(IRequest::class);
+        $request = $this->createStub(IRequest::class);
         $request->method('getParam')
             ->willReturnCallback(static function (string $key, mixed $default = null): mixed {
                 return match ($key) {
