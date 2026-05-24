@@ -6,6 +6,7 @@ module.exports = {
   ...webpackConfig,
   entry: {
     'parlwin-main': path.join(__dirname, 'src', 'js', 'main.js'),
+    'calendar-prefill': path.join(__dirname, 'src', 'js', 'calendar-prefill.js'),
   },
   output: {
     path: path.join(__dirname, 'js'),

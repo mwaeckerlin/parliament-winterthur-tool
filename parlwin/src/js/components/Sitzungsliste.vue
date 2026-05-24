@@ -21,7 +21,50 @@
     <header class="pw-view-header">
       <h2 class="pw-view-title">Sitzungen</h2>
       <span class="pw-view-count">{{ gefilterteSitzungen.length }}</span>
+      <NcActions :aria-label="'Neue Sitzung aus Vorlage erstellen'" type="primary" class="pw-neue-sitzung-btn">
+        <template #icon>
+          <span style="font-size:1.2em;line-height:1">+</span>
+        </template>
+        <NcActionCaption v-if="sitzungstypen.length === 0" :name="'Keine Vorlagen vorhanden'" />
+        <NcActionButton
+          v-for="typ in sitzungstypen"
+          :key="typ.id"
+          @click="waehleTypFuerNeueSitzung(typ)"
+        >
+          {{ typ.name }}
+        </NcActionButton>
+      </NcActions>
     </header>
+
+  <!-- Neue Sitzung: Datum-Auswahl -->
+  <Teleport to="body">
+    <div v-if="gewaehlterTyp" class="pw-neue-sitzung-overlay" @click.self="gewaehlterTyp = null">
+      <div class="pw-neue-sitzung-form">
+        <h3>Neue Sitzung: {{ gewaehlterTyp.name }}</h3>
+        <div class="pw-neue-sitzung-feld">
+          <label for="pw-datum-input">Datum</label>
+          <input
+            id="pw-datum-input"
+            v-model="neueSitzungDatum"
+            type="date"
+            :min="heuteDatum"
+            class="pw-datum-input"
+          />
+        </div>
+        <div v-if="neuerSitzungFehler" class="pw-neue-sitzung-fehler">{{ neuerSitzungFehler }}</div>
+        <div class="pw-neue-sitzung-aktionen">
+          <NcButton
+            type="primary"
+            :disabled="!neueSitzungDatum || neuerSitzungLaden"
+            @click="erstelleNeueSession"
+          >
+            {{ neuerSitzungLaden ? 'Lädt …' : 'Im Kalender öffnen' }}
+          </NcButton>
+          <NcButton @click="gewaehlterTyp = null">Abbrechen</NcButton>
+        </div>
+      </div>
+    </div>
+  </Teleport>
     <div v-if="laden" class="pw-laden"><NcLoadingIcon :size="32" /></div>
 
     <div v-else>
@@ -183,9 +226,15 @@
 <script>
 import { generateUrl } from '@nextcloud/router'
 import axios from '@nextcloud/axios'
+import { showError } from '@nextcloud/dialogs'
+import '@nextcloud/dialogs/style.css'
 import { subscribeRealtime } from '../realtime'
 import GeschaeftDetail from './GeschaeftDetail.vue'
 import NotizenListe from './NotizenListe.vue'
+import NcActions from '@nextcloud/vue/components/NcActions'
+import NcActionButton from '@nextcloud/vue/components/NcActionButton'
+import NcActionCaption from '@nextcloud/vue/components/NcActionCaption'
+import NcButton from '@nextcloud/vue/components/NcButton'
 import NcCheckboxRadioSwitch from '@nextcloud/vue/components/NcCheckboxRadioSwitch'
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 import NcSelect from '@nextcloud/vue/components/NcSelect'
@@ -194,7 +243,7 @@ import PwMultiSelect from './PwMultiSelect.vue'
 
 export default {
   name: 'Sitzungsliste',
-  components: { GeschaeftDetail, NotizenListe, NcCheckboxRadioSwitch, NcLoadingIcon, NcSelect, NcTextField, PwMultiSelect },
+  components: { GeschaeftDetail, NotizenListe, NcActions, NcActionButton, NcActionCaption, NcButton, NcCheckboxRadioSwitch, NcLoadingIcon, NcSelect, NcTextField, PwMultiSelect },
   props: {
     mitglieder: { type: Array, default: () => [] },
   },
@@ -212,9 +261,18 @@ export default {
       traktandumNotizen: {},
       ausgewaehlteGeschaeftId: null,
       unsubRealtime: null,
+      // Neue Sitzung aus Vorlage
+      sitzungstypen: [],
+      gewaehlterTyp: null,
+      neueSitzungDatum: '',
+      neuerSitzungLaden: false,
+      neuerSitzungFehler: '',
     }
   },
   computed: {
+    heuteDatum() {
+      return new Date().toISOString().slice(0, 10)
+    },
     gefilterteSitzungen() {
       let liste = this.sitzungen
       if (this.nurKuenftige) {
@@ -273,6 +331,7 @@ export default {
   mounted() {
     this.$nextTick(() => { this.filterReady = true })
     this.ladeSitzungen()
+    this.ladeSitzungstypen()
     this.unsubRealtime = subscribeRealtime(this.handleRealtimeEvent)
   },
   beforeUnmount() {
@@ -282,6 +341,57 @@ export default {
     }
   },
   methods: {
+    async ladeSitzungstypen() {
+      try {
+        const { data } = await axios.get(generateUrl('/apps/parlwin/sitzungstypen'))
+        this.sitzungstypen = (data || []).filter(t => !t.geloescht)
+      } catch (e) {
+        console.error('Fehler beim Laden der Sitzungstypen:', e)
+      }
+    },
+    waehleTypFuerNeueSitzung(typ) {
+      this.gewaehlterTyp = typ
+      this.neueSitzungDatum = this.heuteDatum
+      this.neuerSitzungFehler = ''
+    },
+    async erstelleNeueSession() {
+      if (!this.gewaehlterTyp || !this.neueSitzungDatum) return
+      this.neuerSitzungLaden = true
+      this.neuerSitzungFehler = ''
+      try {
+        const { data } = await axios.get(
+          generateUrl(`/apps/parlwin/sitzungstypen/${this.gewaehlterTyp.id}/vorschau`)
+        )
+
+        // dtStart / dtEnd als Unix-Timestamp in Sekunden (was NC Calendar erwartet)
+        const datum = this.neueSitzungDatum  // YYYY-MM-DD
+        const normalizeZeit = (z, def) => {
+          const s = (z || def).replace(/^(\d):/, '0$1:').slice(0, 5)  // HH:MM
+          return s
+        }
+        const zeitVon = normalizeZeit(data.zeitVon, '08:00')
+        const zeitBis = normalizeZeit(data.zeitBis, '09:00')
+
+        const dtStart = Math.floor(new Date(`${datum}T${zeitVon}:00`).getTime() / 1000)
+        const dtEnd   = Math.floor(new Date(`${datum}T${zeitBis}:00`).getTime() / 1000)
+
+        sessionStorage.setItem('parlwin_event_prefill', JSON.stringify(data))
+
+        const calUrl = generateUrl(
+          `/apps/calendar/dayGridMonth/${datum}/new/popover/0/${dtStart}/${dtEnd}`
+        )
+        console.debug('[parlwin] NC Calendar URL:', calUrl, { datum, zeitVon, zeitBis, dtStart, dtEnd })
+        window.location.href = calUrl
+
+      } catch (e) {
+        const meldung = e?.response?.data?.fehler || e?.message || 'Unbekannter Fehler'
+        this.neuerSitzungFehler = 'Fehler: ' + meldung
+        showError('Vorlage konnte nicht geladen werden: ' + meldung)
+        console.error('Fehler beim Laden der Sitzungstyp-Vorschau:', e)
+      } finally {
+        this.neuerSitzungLaden = false
+      }
+    },
     vollerName(m) {
       return `${m.vorname || ''} ${m.name || ''}`.trim()
     },
@@ -494,3 +604,68 @@ export default {
   },
 }
 </script>
+
+<style scoped>
+.pw-neue-sitzung-btn {
+  margin-left: auto;
+}
+
+.pw-neue-sitzung-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pw-neue-sitzung-form {
+  background: var(--color-main-background);
+  border-radius: var(--border-radius-large);
+  padding: 2rem;
+  min-width: 320px;
+  max-width: 480px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.pw-neue-sitzung-form h3 {
+  margin: 0;
+  font-size: 1.1em;
+}
+
+.pw-neue-sitzung-feld {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.pw-neue-sitzung-feld label {
+  font-weight: bold;
+  font-size: 0.9em;
+}
+
+.pw-datum-input {
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  padding: 0.4em 0.6em;
+  background: var(--color-main-background);
+  color: var(--color-main-text);
+  font-size: 1em;
+  width: 100%;
+}
+
+.pw-neue-sitzung-fehler {
+  color: var(--color-error);
+  font-size: 0.9em;
+}
+
+.pw-neue-sitzung-aktionen {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+</style>

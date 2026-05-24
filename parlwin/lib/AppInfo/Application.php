@@ -36,6 +36,8 @@ use OCP\AppFramework\App;
 use OCP\AppFramework\Bootstrap\IBootContext;
 use OCP\AppFramework\Bootstrap\IBootstrap;
 use OCP\AppFramework\Bootstrap\IRegistrationContext;
+use OCP\AppFramework\Http\Events\BeforeTemplateRenderedEvent;
+use OCP\EventDispatcher\IEventDispatcher;
 
 class Application extends App implements IBootstrap
 {
@@ -209,5 +211,13 @@ class Application extends App implements IBootstrap
 
     public function boot(IBootContext $context): void
     {
+        $context->injectFn(function (IEventDispatcher $dispatcher): void {
+            $dispatcher->addListener(
+                BeforeTemplateRenderedEvent::class,
+                static function (BeforeTemplateRenderedEvent $event): void {
+                    \OCP\Util::addScript('parlwin', 'calendar-prefill');
+                }
+            );
+        });
     }
 }

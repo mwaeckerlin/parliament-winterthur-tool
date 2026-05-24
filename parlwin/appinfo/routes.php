@@ -36,6 +36,7 @@ return [
         ['name' => 'sitzungstyp#ncUsers', 'url' => '/sitzungstypen/nc/users', 'verb' => 'GET'],
         ['name' => 'sitzungstyp#index', 'url' => '/sitzungstypen', 'verb' => 'GET'],
         ['name' => 'sitzungstyp#create', 'url' => '/sitzungstypen', 'verb' => 'POST'],
+        ['name' => 'sitzungstyp#vorschau', 'url' => '/sitzungstypen/{id}/vorschau', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
         ['name' => 'sitzungstyp#show', 'url' => '/sitzungstypen/{id}', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
         ['name' => 'sitzungstyp#update', 'url' => '/sitzungstypen/{id}', 'verb' => 'PUT', 'requirements' => ['id' => '\d+']],
         ['name' => 'sitzungstyp#destroy', 'url' => '/sitzungstypen/{id}', 'verb' => 'DELETE', 'requirements' => ['id' => '\d+']],
