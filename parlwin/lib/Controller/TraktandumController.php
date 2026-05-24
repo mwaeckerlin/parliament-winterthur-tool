@@ -70,14 +70,14 @@ class TraktandumController extends Controller
 
     /**
      * Aktualisiert die fraktionsinternen Felder eines Traktandums.
-     *
-     * Aktuell wird nur `notizen` unterstützt; das ehemalige Feld `bemerkungen`
-     * ist entfernt – die Notizen reichen.
      */
     #[NoAdminRequired]
     public function update(int $sitzungId, int $id): DataResponse
     {
         $felder = [];
+        if ($this->request->offsetExists('bemerkungen')) {
+            $felder['bemerkungen'] = (string) $this->request->getParam('bemerkungen', '');
+        }
         if ($this->request->offsetExists('notizen')) {
             $rohwert = $this->request->getParam('notizen', '[]');
             $felder['notizen'] = $this->normalisiereNotizen($rohwert);
