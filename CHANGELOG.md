@@ -31,10 +31,16 @@ Neue Testklasse `parlwin/tests/Controller/TraktandumControllerTest.php` mit 3 Te
   Nur selektierte verwaiste User werden bei «Ausgewählte abgleichen» verarbeitet;
   nicht selektierte bleiben unberührt.
 
-### Cleanup: createMock → createStub in SettingsControllerTest
+### Cleanup: createMock → createStub in allen betroffenen Testdateien
 
-Mock-Objekte ohne `expects()`-Aufrufe auf `createStub` umgestellt.
-Eliminiert 8 PHPUnit-Notices («No expectations configured»).
+Mock-Objekte ohne `expects()`-Aufrufe konsequent auf `createStub` umgestellt
+in: BackgroundJob/SyncJobTest, Command/SyncCancelCommandTest,
+Command/SyncCommandTest, Service/FraktionsarbeitServiceTest,
+Service/GeschaeftServiceTest, Service/MitgliedServiceTest,
+Service/RealtimePublisherServiceTest, Service/ScraperHtmlSyncTest,
+Service/ScraperServiceTest.
+Eliminiert alle verbleibenden 49 PHPUnit-Notices («No expectations configured»);
+Testergebnis jetzt: 104 Tests, 0 Notices.
 
 ### Cleanup: README bereinigt
 

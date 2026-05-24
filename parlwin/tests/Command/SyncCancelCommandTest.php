@@ -87,7 +87,7 @@ class SyncCancelCommandTest extends TestCase {
             $syncProcessService,
         );
 
-        $input = $this->createMock(InputInterface::class);
+        $input = $this->createStub(InputInterface::class);
         $output = $this->createMock(OutputInterface::class);
         $output->expects(self::once())
             ->method('writeln')
@@ -141,7 +141,7 @@ class SyncCancelCommandTest extends TestCase {
             $syncProcessService,
         );
 
-        $input = $this->createMock(InputInterface::class);
+        $input = $this->createStub(InputInterface::class);
         $output = $this->createMock(OutputInterface::class);
         $output->expects(self::once())
             ->method('writeln')

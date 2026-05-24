@@ -21,8 +21,8 @@ class ScraperServiceTest extends TestCase {
 
     protected function setUp(): void {
         $this->service = new ScraperService(
-            $this->createMock(IClientService::class),
-            $this->createMock(LoggerInterface::class),
+            $this->createStub(IClientService::class),
+            $this->createStub(LoggerInterface::class),
         );
     }
 
@@ -179,7 +179,7 @@ class ScraperServiceTest extends TestCase {
     public function testLadeGeschaefteAusDataWrapperUndDetailseite(): void {
         $clientService = $this->createMock(IClientService::class);
         $client = $this->createMock(IClient::class);
-        $logger = $this->createMock(LoggerInterface::class);
+        $logger = $this->createStub(LoggerInterface::class);
         $service = new ScraperService($clientService, $logger);
 
         $listenRohdaten = [
@@ -204,9 +204,9 @@ class ScraperServiceTest extends TestCase {
         </div>
         HTML;
 
-        $responseListe = $this->createMock(IResponse::class);
+        $responseListe = $this->createStub(IResponse::class);
         $responseListe->method('getBody')->willReturn($listenHtml);
-        $responseDetail = $this->createMock(IResponse::class);
+        $responseDetail = $this->createStub(IResponse::class);
         $responseDetail->method('getBody')->willReturn($detailHtml);
 
         $clientService->expects($this->exactly(2))
@@ -242,7 +242,7 @@ class ScraperServiceTest extends TestCase {
     public function testLadeSitzungenNormalisiertNameLinkUndDatum(): void {
         $clientService = $this->createMock(IClientService::class);
         $client = $this->createMock(IClient::class);
-        $logger = $this->createMock(LoggerInterface::class);
+        $logger = $this->createStub(LoggerInterface::class);
         $service = new ScraperService($clientService, $logger);
 
         $listenRohdaten = [
@@ -257,7 +257,7 @@ class ScraperServiceTest extends TestCase {
         $listenJson = htmlspecialchars((string) json_encode($listenRohdaten), ENT_QUOTES);
         $listenHtml = "<div data-entities=\"{$listenJson}\"></div>";
 
-        $responseListe = $this->createMock(IResponse::class);
+        $responseListe = $this->createStub(IResponse::class);
         $responseListe->method('getBody')->willReturn($listenHtml);
 
         $clientService->expects($this->once())
@@ -280,9 +280,9 @@ class ScraperServiceTest extends TestCase {
     }
 
     public function testLadeFraktionenLeitetAktivAusDatumBisAb(): void {
-        $clientService = $this->createMock(IClientService::class);
-        $client = $this->createMock(IClient::class);
-        $logger = $this->createMock(LoggerInterface::class);
+        $clientService = $this->createStub(IClientService::class);
+        $client = $this->createStub(IClient::class);
+        $logger = $this->createStub(LoggerInterface::class);
         $service = new ScraperService($clientService, $logger);
 
         $listenRohdaten = [
@@ -302,10 +302,10 @@ class ScraperServiceTest extends TestCase {
         $listenJson = htmlspecialchars((string) json_encode($listenRohdaten), ENT_QUOTES);
         $listenHtml = "<div data-entities=\"{$listenJson}\"></div>";
 
-        $responseListe = $this->createMock(IResponse::class);
+        $responseListe = $this->createStub(IResponse::class);
         $responseListe->method('getBody')->willReturn($listenHtml);
 
-        $responseLeer = $this->createMock(IResponse::class);
+        $responseLeer = $this->createStub(IResponse::class);
         $responseLeer->method('getBody')->willReturn('<html></html>');
 
         $clientService->method('newClient')->willReturn($client);
@@ -330,7 +330,7 @@ class ScraperServiceTest extends TestCase {
     {
         $clientService = $this->createMock(IClientService::class);
         $client = $this->createMock(IClient::class);
-        $logger = $this->createMock(LoggerInterface::class);
+        $logger = $this->createStub(LoggerInterface::class);
         $service = new ScraperService($clientService, $logger);
 
         $listenRohdaten = [
@@ -344,7 +344,7 @@ class ScraperServiceTest extends TestCase {
         $listenJson = htmlspecialchars((string) json_encode($listenRohdaten), ENT_QUOTES);
         $listenHtml = "<div data-entities=\"{$listenJson}\"></div>";
 
-        $responseListe = $this->createMock(IResponse::class);
+        $responseListe = $this->createStub(IResponse::class);
         $responseListe->method('getBody')->willReturn($listenHtml);
 
         $clientService->expects($this->once())
@@ -367,7 +367,7 @@ class ScraperServiceTest extends TestCase {
     {
         $clientService = $this->createMock(IClientService::class);
         $client = $this->createMock(IClient::class);
-        $logger = $this->createMock(LoggerInterface::class);
+        $logger = $this->createStub(LoggerInterface::class);
         $service = new ScraperService($clientService, $logger);
 
         $listenRohdaten = [
@@ -383,7 +383,7 @@ class ScraperServiceTest extends TestCase {
         $listenJson = htmlspecialchars((string) json_encode($listenRohdaten), ENT_QUOTES);
         $listenHtml = "<div data-entities=\"{$listenJson}\"></div>";
 
-        $responseListe = $this->createMock(IResponse::class);
+        $responseListe = $this->createStub(IResponse::class);
         $responseListe->method('getBody')->willReturn($listenHtml);
 
         $clientService->expects($this->once())
@@ -404,7 +404,7 @@ class ScraperServiceTest extends TestCase {
     public function testLadeGeschaefteMeldetFortschrittImSequenziellenDetailFallbackProElement(): void {
         $clientService = $this->createMock(IClientService::class);
         $client = $this->createMock(IClient::class);
-        $logger = $this->createMock(LoggerInterface::class);
+        $logger = $this->createStub(LoggerInterface::class);
         $service = new ScraperService($clientService, $logger);
 
         $listenRohdaten = [
@@ -426,11 +426,11 @@ class ScraperServiceTest extends TestCase {
         $listenJson = htmlspecialchars((string) json_encode($listenRohdaten), ENT_QUOTES);
         $listenHtml = "<div data-entities=\"{$listenJson}\"></div>";
 
-        $responseListe = $this->createMock(IResponse::class);
+        $responseListe = $this->createStub(IResponse::class);
         $responseListe->method('getBody')->willReturn($listenHtml);
-        $responseDetailA = $this->createMock(IResponse::class);
+        $responseDetailA = $this->createStub(IResponse::class);
         $responseDetailA->method('getBody')->willReturn('<dt>Status</dt><dd>Offen</dd>');
-        $responseDetailB = $this->createMock(IResponse::class);
+        $responseDetailB = $this->createStub(IResponse::class);
         $responseDetailB->method('getBody')->willReturn('<dt>Status</dt><dd>Erledigt</dd>');
 
         $clientService->expects($this->exactly(3))
@@ -469,7 +469,7 @@ class ScraperServiceTest extends TestCase {
     public function testLadeMitgliederFiltertNichtPersonenUndExtrahiertBasisfelder(): void {
         $clientService = $this->createMock(IClientService::class);
         $client = $this->createMock(IClient::class);
-        $logger = $this->createMock(LoggerInterface::class);
+        $logger = $this->createStub(LoggerInterface::class);
         $service = new ScraperService($clientService, $logger);
 
         $mitgliederBlock = htmlspecialchars((string) json_encode([
@@ -507,7 +507,7 @@ class ScraperServiceTest extends TestCase {
 
         $html = "<div data-entities=\"{$mitgliederBlock}\"></div><div data-entities=\"{$sitzungenBlock}\"></div>";
 
-        $response = $this->createMock(IResponse::class);
+        $response = $this->createStub(IResponse::class);
         $response->method('getBody')->willReturn($html);
 
         $clientService->expects($this->once())
@@ -537,7 +537,7 @@ class ScraperServiceTest extends TestCase {
     public function testLadeTraktandenAusSitzungsHtmlTabelle(): void {
         $clientService = $this->createMock(IClientService::class);
         $client = $this->createMock(IClient::class);
-        $logger = $this->createMock(LoggerInterface::class);
+        $logger = $this->createStub(LoggerInterface::class);
         $service = new ScraperService($clientService, $logger);
 
         $html = <<<HTML
@@ -553,7 +553,7 @@ class ScraperServiceTest extends TestCase {
         </table>
         HTML;
 
-        $response = $this->createMock(IResponse::class);
+        $response = $this->createStub(IResponse::class);
         $response->method('getBody')->willReturn($html);
 
         $clientService->expects($this->once())

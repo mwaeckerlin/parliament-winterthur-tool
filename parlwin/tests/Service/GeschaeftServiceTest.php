@@ -18,10 +18,10 @@ use Psr\Log\LoggerInterface;
 class GeschaeftServiceTest extends TestCase {
     public function testSynchronisierenMeldetFortschrittBereitsBeimLadenDerDetailseiten(): void {
         $mapper = $this->createMock(GeschaeftMapper::class);
-        $entwurfMapper = $this->createMock(VorstossEntwurfMapper::class);
-        $ereignisMapper = $this->createMock(GeschaeftEreignisMapper::class);
+        $entwurfMapper = $this->createStub(VorstossEntwurfMapper::class);
+        $ereignisMapper = $this->createStub(GeschaeftEreignisMapper::class);
         $scraper = $this->createMock(ScraperService::class);
-        $logger = $this->createMock(LoggerInterface::class);
+        $logger = $this->createStub(LoggerInterface::class);
 
         $service = new GeschaeftService($mapper, $entwurfMapper, $ereignisMapper, $scraper, $logger);
 
@@ -80,9 +80,9 @@ class GeschaeftServiceTest extends TestCase {
     public function testSynchronisierenSpeichertUnnummeriertenVorstossAlsEntwurf(): void {
         $mapper = $this->createMock(GeschaeftMapper::class);
         $entwurfMapper = $this->createMock(VorstossEntwurfMapper::class);
-        $ereignisMapper = $this->createMock(GeschaeftEreignisMapper::class);
+        $ereignisMapper = $this->createStub(GeschaeftEreignisMapper::class);
         $scraper = $this->createMock(ScraperService::class);
-        $logger = $this->createMock(LoggerInterface::class);
+        $logger = $this->createStub(LoggerInterface::class);
 
         $service = new GeschaeftService($mapper, $entwurfMapper, $ereignisMapper, $scraper, $logger);
 
@@ -122,10 +122,10 @@ class GeschaeftServiceTest extends TestCase {
 
     public function testSynchronisierenSetztDbIdAusExternIdBeiNeuemGeschaeft(): void {
         $mapper = $this->createMock(GeschaeftMapper::class);
-        $entwurfMapper = $this->createMock(VorstossEntwurfMapper::class);
-        $ereignisMapper = $this->createMock(GeschaeftEreignisMapper::class);
+        $entwurfMapper = $this->createStub(VorstossEntwurfMapper::class);
+        $ereignisMapper = $this->createStub(GeschaeftEreignisMapper::class);
         $scraper = $this->createMock(ScraperService::class);
-        $logger = $this->createMock(LoggerInterface::class);
+        $logger = $this->createStub(LoggerInterface::class);
 
         $service = new GeschaeftService($mapper, $entwurfMapper, $ereignisMapper, $scraper, $logger);
 
@@ -169,10 +169,10 @@ class GeschaeftServiceTest extends TestCase {
 
     public function testSynchronisierenHarmonisiertBestehendeIdMitExternId(): void {
         $mapper = $this->createMock(GeschaeftMapper::class);
-        $entwurfMapper = $this->createMock(VorstossEntwurfMapper::class);
-        $ereignisMapper = $this->createMock(GeschaeftEreignisMapper::class);
+        $entwurfMapper = $this->createStub(VorstossEntwurfMapper::class);
+        $ereignisMapper = $this->createStub(GeschaeftEreignisMapper::class);
         $scraper = $this->createMock(ScraperService::class);
-        $logger = $this->createMock(LoggerInterface::class);
+        $logger = $this->createStub(LoggerInterface::class);
 
         $service = new GeschaeftService($mapper, $entwurfMapper, $ereignisMapper, $scraper, $logger);
 
@@ -220,10 +220,10 @@ class GeschaeftServiceTest extends TestCase {
 
     public function testSynchronisierenUeberspringtBereitsErledigteGeschaefteBeiUpdate(): void {
         $mapper = $this->createMock(GeschaeftMapper::class);
-        $entwurfMapper = $this->createMock(VorstossEntwurfMapper::class);
+        $entwurfMapper = $this->createStub(VorstossEntwurfMapper::class);
         $ereignisMapper = $this->createMock(GeschaeftEreignisMapper::class);
         $scraper = $this->createMock(ScraperService::class);
-        $logger = $this->createMock(LoggerInterface::class);
+        $logger = $this->createStub(LoggerInterface::class);
 
         $service = new GeschaeftService($mapper, $entwurfMapper, $ereignisMapper, $scraper, $logger);
 
@@ -268,10 +268,10 @@ class GeschaeftServiceTest extends TestCase {
 
     public function testAlleLeitetInklusiveErledigtFlagAnMapperWeiter(): void {
         $mapper = $this->createMock(GeschaeftMapper::class);
-        $entwurfMapper = $this->createMock(VorstossEntwurfMapper::class);
-        $ereignisMapper = $this->createMock(GeschaeftEreignisMapper::class);
-        $scraper = $this->createMock(ScraperService::class);
-        $logger = $this->createMock(LoggerInterface::class);
+        $entwurfMapper = $this->createStub(VorstossEntwurfMapper::class);
+        $ereignisMapper = $this->createStub(GeschaeftEreignisMapper::class);
+        $scraper = $this->createStub(ScraperService::class);
+        $logger = $this->createStub(LoggerInterface::class);
 
         $service = new GeschaeftService($mapper, $entwurfMapper, $ereignisMapper, $scraper, $logger);
 

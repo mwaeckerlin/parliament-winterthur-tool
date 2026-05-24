@@ -24,8 +24,8 @@ class RealtimePublisherServiceTest extends TestCase {
 
         $clientService = $this->createMock(IClientService::class);
         $client = $this->createMock(IClient::class);
-        $config = $this->createMock(IConfig::class);
-        $logger = $this->createMock(LoggerInterface::class);
+        $config = $this->createStub(IConfig::class);
+        $logger = $this->createStub(LoggerInterface::class);
 
         $config->method('getAppValue')->willReturnMap([
             ['parlwin', 'realtime_publish_url', '', 'http://realtime.local/publish'],
@@ -61,8 +61,8 @@ class RealtimePublisherServiceTest extends TestCase {
 
         $clientService = $this->createMock(IClientService::class);
         $client = $this->createMock(IClient::class);
-        $config = $this->createMock(IConfig::class);
-        $logger = $this->createMock(LoggerInterface::class);
+        $config = $this->createStub(IConfig::class);
+        $logger = $this->createStub(LoggerInterface::class);
 
         $clientService->expects($this->once())
             ->method('newClient')
@@ -85,8 +85,8 @@ class RealtimePublisherServiceTest extends TestCase {
 
         $clientService = $this->createMock(IClientService::class);
         $client = $this->createMock(IClient::class);
-        $config = $this->createMock(IConfig::class);
-        $logger = $this->createMock(LoggerInterface::class);
+        $config = $this->createStub(IConfig::class);
+        $logger = $this->createStub(LoggerInterface::class);
 
         $config->method('getAppValue')->willReturnMap([
             ['parlwin', 'realtime_publish_url', '', ''],

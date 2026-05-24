@@ -14,7 +14,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 class SyncJobTest extends TestCase {
     public function testBackgroundJobNutztSyncCommandMitSourceUndProgress(): void {
-        $timeFactory = $this->createMock(ITimeFactory::class);
+        $timeFactory = $this->createStub(ITimeFactory::class);
         $logger = $this->createMock(LoggerInterface::class);
         $logger->expects(self::exactly(2))->method('info');
 

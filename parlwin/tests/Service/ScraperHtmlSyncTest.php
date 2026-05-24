@@ -26,9 +26,9 @@ class ScraperHtmlSyncTest extends TestCase {
     private ScraperService $service;
 
     protected function setUp(): void {
-        $this->clientService = $this->createMock(IClientService::class);
-        $this->client = $this->createMock(IClient::class);
-        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->clientService = $this->createStub(IClientService::class);
+        $this->client = $this->createStub(IClient::class);
+        $this->logger = $this->createStub(LoggerInterface::class);
 
         $this->service = new ScraperService(
             $this->clientService,
@@ -231,18 +231,23 @@ class ScraperHtmlSyncTest extends TestCase {
     }
 
     public function testLadeMitgliederBeiHttpFehlerGibtLeeresArrayZurueck(): void {
-        $this->clientService->expects($this->once())
-            ->method('newClient')
-            ->willReturn($this->client);
+        $clientService = $this->createMock(IClientService::class);
+        $client = $this->createMock(IClient::class);
+        $logger = $this->createMock(LoggerInterface::class);
+        $service = new ScraperService($clientService, $logger);
 
-        $this->client->expects($this->once())
+        $clientService->expects($this->once())
+            ->method('newClient')
+            ->willReturn($client);
+
+        $client->expects($this->once())
             ->method('get')
             ->willThrowException(new \RuntimeException('HTTP timeout'));
 
-        $this->logger->expects($this->once())
+        $logger->expects($this->once())
             ->method('error');
 
-        $entitaeten = $this->service->ladeMitglieder();
+        $entitaeten = $service->ladeMitglieder();
         $this->assertSame([], $entitaeten);
     }
 
@@ -334,7 +339,7 @@ class ScraperHtmlSyncTest extends TestCase {
 
             $html = $resolver($url);
 
-            $response = $this->createMock(IResponse::class);
+            $response = $this->createStub(IResponse::class);
             $response->method('getBody')->willReturn($html);
             return $response;
         });
