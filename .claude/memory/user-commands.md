@@ -116,3 +116,30 @@ metadata:
 > "SVP-Fraktion nicht namentlich erwähnen"
 
 > "Regelmässig alles gelernte in Memory updaten."
+
+> "WAS HAST DU BEZUEGLICH ORPAHN VERHALéTEN WIUE ANGEPASST!?!?"
+
+> "ES FUCKINMG FUNKTIONIERT NICHT!!! ARSHLOCH!!!"
+
+> "Zuerst deinieren wir eine sinnvolle Struktur für alle READMEs. → Prüfe die README in allen Projekten hier und versuche Gemeinsamkeiten und Pattern zu finden!
+
+Was ich mir vorstelle:
+
+Jedes README hat diese Struktur:
+1. Kurz worum geht es, wenige Sätze erklären den grundlegenden Zweck
+2. Werbetext: Warum ist diese Projekt besser als andere, warum braucht es genau das
+3. Details worum es geht aus Sicht des Endanwender
+4. Alle notwendigen Informationen für den Endanwender, inkl. Bedienungsanleitung
+5. Alle notwendigen Informationen für den Administrator, der das Projekt betreibt, Konfiguration, Parameter, Installation, Betrieb0
+6. Alle notwendigen Informationen für Entwickler
+7. Allenfalls weitere Details, Internas, Entscheidungen und ihre Begründungen, Probleme, und wie sie gelöst wurden, etc.
+
+→ Was meinst du zu meinem Vorschlag? Suche in den aktuellen READMEs und verbessere meine Struktur!
+
+Deployment auf einer Ubuntu-VM → nach unten
+Das heisst, das Kapitel 'Deployment auf einer Ubuntu-VM' kommt in Punkt 5."
+
+> "→ Vergiss aber nicht zuerst den vorherigen Task abzuschliessen und das Problem des Users ohne Fraktion zu lösen!"
+
+> "Zwischendurch: Lies deine .claude neu ein.
+> Es gibt z.B. ein neues Command."
