@@ -969,6 +969,7 @@ class SettingsController extends Controller
                 'displayName' => (string) $user->getDisplayName(),
                 'email' => (string) $user->getEMailAddress(),
                 'aktiv' => $user->isEnabled(),
+                'lokaleGruppen' => $this->gruppenIdsFuerUser($user),
             ];
         }
         return $verwaiste;

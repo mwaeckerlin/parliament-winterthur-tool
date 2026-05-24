@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+### Bugfix: Auto-Sync entfernte NC-Gruppe-Mitglieder ohne Admin-Einwilligung
+
+`MitgliedService::aktualisiereNextcloudGruppe()` entfernte automatisch alle
+NC-Gruppe-Mitglieder, die nicht mehr aktive Parlamentsmitglieder waren — ohne
+Admin-Einwilligung. Dieser Block wurde entfernt. Entfernen aus der Gruppe
+erfolgt jetzt ausschliesslich über «Ausgewählte abgleichen» im Admin-UI
+(Requirement: nur selektierte Orphans werden deaktiviert/entfernt).
+
+### Bugfix: Orphan-Zeile zeigte «aktiv» statt Gruppen in Spalte 4
+
+In «Fraktionsmitglieder ↔ Nextcloud-User» zeigte die Gruppen-Spalte bei
+verwaisten Usern «aktiv» statt der tatsächlichen NC-Gruppen. Ausserdem war
+der Username (Spalte 3) fälschlicherweise durchgestrichen.
+
+Fix: `findeVerwaisteGruppenmitglieder()` liefert jetzt `lokaleGruppen` pro
+Orphan-Eintrag. Im Frontend: Username-Spalte ohne Strikethrough, Gruppen-Spalte
+via `aktualisiereGruppenZelle()` wie bei normalen Mitgliedern.
+
 ### Dokumentation: README komplett nach Template A umstrukturiert
 
 Neue Abschnitt-Reihenfolge: Purpose → Warum dieses Tool? → Funktionen →

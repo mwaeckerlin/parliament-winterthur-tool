@@ -337,11 +337,15 @@ Docker-Images automatisch nach.
 In der Admin-Einstellungsseite unter **«Fraktionsmitglieder ↔ Nextcloud-User»**
 werden alle User der konfigurierten Nextcloud-Gruppe angezeigt. User die in der
 Gruppe sind, aber keinen aktuellen Parlamentseintrag haben, erscheinen
-**durchgestrichen**. Mit «Ausgewählte abgleichen» werden nur die angewählten
-verwaisten User aus der Gruppe entfernt und deaktiviert — die Anderen bleiben
-unberührt. Damit ein User als verwaist erscheint, muss er in der NC-Gruppe sein
-(Beispiel: einen ehemaligen Fraktionsmitarbeiter zur Gruppe hinzufügen — er erscheint
-als verwaister Eintrag, sofern er kein aktives Parlamentsmandat hat).
+**durchgestrichen** (Name und E-Mail). Username und Gruppen werden normal angezeigt.
+Mit «Ausgewählte abgleichen» werden nur die angewählten verwaisten User aus der
+Gruppe entfernt und deaktiviert — die Anderen bleiben unberührt.
+
+**Wichtig:** Der automatische Sync entfernt niemanden aus der Gruppe. Nur über
+«Ausgewählte abgleichen» mit expliziter Admin-Auswahl werden User entfernt/deaktiviert.
+Damit ein User als verwaist erscheint, muss er manuell in die NC-Gruppe aufgenommen worden
+sein (Beispiel: ein ehemaliger Fraktionsmitarbeiter in der Gruppe — er erscheint als
+verwaister Eintrag, solange er kein aktives Parlamentsmandat hat).
 
 
 ### Voraussetzungen
