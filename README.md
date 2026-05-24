@@ -2,213 +2,89 @@
 
 Nextcloud-Plugin für die Fraktionsarbeit im Winterthurer Parlament.
 
-## Zu Erledigen:
 
-## Erledigt:
+## Deployment auf einer Ubuntu-VM (Beispiel)
 
-  - ✅ **„Eigene Fraktion" = die konfigurierte Nextcloud-Gruppe als
-    Gruppen-Attendee (v1.1.8):** Die Teilnehmer-Regel `eigeneFraktion`
-    erzeugt **genau einen Teilnehmer-Eintrag = die in den App-Einstellungen
-    konfigurierte Nextcloud-Gruppe** (`parlwin/nextcloud_gruppe`). KEIN
-    `getUsers`, KEIN Expandieren, KEIN Mapping. Im generierten iCal wird
-    daraus eine `ATTENDEE;CUTYPE=GROUP`-Zeile mit dem
-    `principal:principals/groups/<gid>`-URI; die Einladung an die einzelnen
-    Mitglieder verteilt Nextcloud selbst. Frühere Versionen v1.1.6/v1.1.7
-    haben die Gruppe noch zu Einzel-Usern expandiert — das war falsch.
+Diese Anleitung zeigt, wie das Tool auf einer Ubuntu-VM mit automatischem HTTPS
+(Let's Encrypt via Traefik) produktiv betrieben wird.
 
-  - ✅ **Neue Sitzung ohne eigenen Dialog (v1.1.5):** Der „+ Neue Sitzung"-
-    Knopf öffnet jetzt direkt ein NcActions-Menu mit den vorhandenen
-    Sitzungstypen. Klick auf einen Typ legt die Sitzung sofort serverseitig
-    aus dem Template an (Titel, Standardzeit, Standardort, Teilnehmer aus
-    den Regeln werden materialisiert; Datum = heute als Vorbelegung), legt
-    parallel den Kalendereintrag an und navigiert direkt in die
-    Nextcloud-Kalender-Tagesansicht. Dort kann der Eintrag mit dem nativen
-    Kalender-Bearbeiten-Popup (Titel, Von/Bis, Ganztägig, Ort, Beschreibung,
-    Teilnehmer) verfeinert werden – KEIN parlwin-eigener Modal-Dialog mehr.
-    Server-Endpoint `/sitzungstypen/{id}/sitzung` liefert dazu zusätzlich
-    `kalender_url` (`/apps/calendar/timeGridDay/{YYYY-MM-DD}`).
+### Einmalige Einrichtung
 
-  - ✅ **„Eigene Fraktion" = App-Setting (v1.1.4):** `SitzungstypService`
-    bekam `IConfig` injiziert; die Teilnehmer-Regel `eigeneFraktion` löst
-    sich jetzt über `parlwin/fraktion` aus den Plugin-Einstellungen auf
-    und nicht mehr über den aktuellen Login. Die Sitzungstypen-UI-
-    Hinweistexte wurden entsprechend angepasst.
-  - ✅ **Einheitliches Modal-Styling (v1.1.4):** `style.scss` definiert
-    konsequent CSS-Variablen `--pw-space-*`, `--pw-gap-*`, `--pw-radius`,
-    `--pw-shadow`, `--pw-font-*`, `--pw-click-sm`, `--pw-surface`,
-    `--pw-muted`. Alle Modale (`.pw-modal-header`, `.pw-modal-body`,
-    `.pw-modal-footer`, `.pw-modal-close`, `.pw-grid-2`, `.pw-modal-neu`,
-    `.pw-modal-hinweis`) verwenden ausschliesslich diese Tokens für
-    Spacings, Radien, Schriften und Farben.
+**1. Ubuntu-VM bereitstellen, Docker Engine + Compose installieren:**
 
-  - ✅ **Echte Ursache des Speichern-Fehlers gefunden und behoben (v1.1.3):**
-    `Application.php` registrierte `SitzungstypService` per Closure mit nur
-    9 statt 12 Constructor-Argumenten. Der `LoggerInterface` landete auf
-    Position 9, wo der Constructor `IGroupManager` erwartet → PHP-`TypeError`
-    bei *jedem* Aufruf an `SitzungstypController` (`index`, `create`,
-    `update`, `ncGroups`, `ncUsers`, …) → HTTP 500. Das erklärt
-    rückwirkend alle vier in v1.1.1 als "behoben" deklarierten Symptome,
-    die in v1.1.2 weiter auftraten: Nextcloud-Gruppen/-Benutzer-Dropdowns
-    leer, Fraktionsrolle/Kommission ohne Auswahl, Fehler beim Speichern.
-    Fix: `IGroupManager`, `IUserManager`, `IUserSession` als
-    `$c->get(...)` vor `LoggerInterface` in der Service-Factory ergänzt.
-    Mit `docker exec … php -r '$svc = …->get(SitzungstypService::class);
-    $svc->speichern([...])'` reproduziert und nach dem Patch verifiziert
-    (saved id=1).
-  - ✅ Gendering app-weit entfernt (v1.1.3): `Sitzungstypenliste.vue`,
-    `Mitgliederliste.vue`, `Kommissionsliste.vue`, `NotizenListe.vue` und
-    README – keine `*in`/`:in`-Varianten mehr. Rollen-Dropdown enthält jetzt
-    `Fraktionspräsident`, `Fraktionspräsident Stellvertretung`,
-    `Protokollführer`, `Protokollführer Stellvertretung`.
-  - ✅ "Eigene Fraktion" als Default-Teilnehmer-Regel (v1.1.3): „+ Regel"
-    legt einen Eintrag `{ art: 'eigeneFraktion' }` an. Der Service löst
-    `eigeneFraktion` über die `Fraktion` des aktuell eingeloggten Users
-    auf (kein Auswahlfeld nötig). Validierung in `speichern()` filtert
-    unvollständige Regeln still heraus, statt mit Alert zu blockieren.
+```bash
+# Offizielle Docker-Quelle einrichten (Ubuntu 22.04/24.04)
+sudo apt-get update
+sudo apt-get install -y ca-certificates curl pwgen git
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+     -o /etc/apt/keyrings/docker.asc
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
+     https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+  | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+```
 
-  - ✅ Sitzungstyp-Modal Stacking-Context **wirklich** behoben (v1.1.2): Das
-    in v1.1.0 / v1.1.1 verwendete „z-index immer höher drehen“ war der
-    falsche Ansatz. Die echte Ursache: `NcAppContent` ist
-    `position: relative; z-index: 1000` und erzeugt damit einen eigenen
-    *Stacking-Context*. Unser Modal-Overlay (`position: fixed`, Kind von
-    NcAppContent) bleibt an diesen Context gebunden — `position: fixed`
-    entkommt einem Vorfahren-Stacking-Context **nicht**. NcAppNavigation
-    ist Geschwister von NcAppContent und hat `z-index: 1800`, lag deshalb
-    immer über dem Modal, egal welcher z-index gesetzt war.
+**2. Docker für den Nicht-Root-User erlauben (danach neu einloggen):**
 
-    Korrekte Lösung: Modal in `Sitzungstypenliste.vue` per
-    `<Teleport to="body">` aus dem NcAppContent-Stacking-Context
-    herausziehen (die anderen 5 Modal-Stellen hatten den Teleport schon).
-    Der z-index in `style.scss` wurde von 100000 auf einen vernünftigen
-    Wert 2000 reduziert (über NcAppNavigation 1800 und NcAppSidebar 1500),
-    Dropdown-Z-Index entsprechend auf 2010.
+```bash
+sudo usermod -aG docker $USER
+newgrp docker
+```
 
-  - ✅ Sitzungstyp-Modal Z-Index (v1.1.1, superseded by v1.1.2): das in
-    `Sitzungstypenliste.vue` lokal `scoped` definierte `.pw-modal-overlay`
-    (z-index 10000) hat das globale 100000 überschrieben — daher lag das
-    Modal in eingeklapptem Layout teilweise hinter der Nextcloud-Navigation
-    (image-11). Lokale Override entfernt — half aber nicht, siehe v1.1.2.
-  - ✅ Nextcloud-Gruppen & -Benutzer im Sitzungstyp-Dialog (v1.1.1):
-    Routen-Reihenfolge in `appinfo/routes.php` korrigiert
-    (`/sitzungstypen/nc/groups`, `/sitzungstypen/nc/users` stehen jetzt
-    VOR der generischen `/sitzungstypen/{id}`-Route, `{id}` ist auf `\d+`
-    eingeschränkt). Vorher matchte `nc` als `{id}` (Type-Cast) und der
-    Endpunkt blieb leer. Lade-/Leer-/Fehlerzustände werden im Dropdown
-    angezeigt.
-  - ✅ Fraktions-Rolle als Auswahl (v1.1.1): statt freiem Text gibt es jetzt
-    ein Dropdown der fünf definierten Rollen-Codes (Kommissionsmitglied,
-    Fraktionspräsident\*in (+ Stv.), Protokollführer\*in (+ Stv.)).
-  - ✅ Kommissions-Auswahl gefiltert (v1.1.1): es werden nur noch aktive,
-    nicht gelöschte Kommissionen angeboten; bei leerer Liste erscheint ein
-    Hinweistext statt eines leeren Dropdowns.
-  - ✅ Speichern-Fehler-Diagnose (v1.1.1): Controller `create()`/`update()`
-    fangen Throwables, loggen via `LoggerInterface` und liefern eine
-    sprechende `fehler`-Nachricht. Frontend zeigt HTTP-Status + Server-
-    Meldung im Alert. Leere Teilnehmer-Regeln werden vor dem Senden
-    validiert.
+**3. Projekt klonen:**
 
-  - ✅ Z-Index-Fix Modal-Overlay (v1.1.0): `.pw-modal-overlay` z-index von
-    10000 auf 100000 angehoben, damit Sitzungstyp-/Sitzung-/Dokument-Modale
-    sicher über der Nextcloud-App-Navigation liegen (insbesondere im
-    eingeklappten/Mobile-Layout, wo die Sidebar einen eigenen Stacking-Context
-    aufmachte).
-  - ✅ „+ Neue Sitzung"-Knopf sichtbar (v1.1.0): NcActions mit
-    `:force-name="true"` (zeigt den Text dauerhaft) und `margin-inline-start:
-    auto` rechtsbündig. Wenn keine Sitzungstypen vorhanden sind, wird
-    stattdessen ein deaktivierter `NcButton` mit Tooltip „Zuerst unter
-    Sitzungstypen einen Typ anlegen" gerendert – statt eines unsichtbaren
-    Icons mit Tooltip.
-  - ✅ Protokoll-Abnahme & Nicht-Geschäfts-Traktanden (v1.1.0): Traktanden
-    ohne verknüpftes Geschäft (z.B. „Abnahme Parlaments-Protokolle") zeigen
-    jetzt das ↗-Symbol mit Link auf `sitzung.url` (Originaltraktandum auf
-    der Parlamentsseite), so dass die zugehörigen PDFs/Originale direkt
-    erreichbar sind.
-  - ✅ Protokoll-Dokument-URL (v1.1.1): Für Traktanden ohne Geschäft
-    (Protokoll-Abnahmen etc.) wird der direkte Dokument-Link (PDF-URL) aus dem
-    HTML-Titel der Parlamentsseite extrahiert. Das `<br>`-getrennte Metadaten-
-    Suffix (Dokumentdatum, Kategorie, Download-Link) wird bereinigt; der saubere
-    Titel und die Dokument-URL werden separat gespeichert (`pw_traktanden.url`,
-    Migration v000012). Im Tabellenansicht und Karten-Layout (responsive) zeigt
-    ↗ direkt auf das Dokument.
-  - ✅ Auto-Save auf allen Eingabefeldern (v1.1.1): Kein expliziter
-    „Speichern"-Knopf mehr bei Notizen und Beschlüssen. Alle Felder speichern
-    automatisch bei Fokusverlust (blur) und nach 5 Sekunden ohne Eingabe
-    (Debounce). Beschlüsse aus der Auswahlliste werden sofort beim Anklicken
-    gespeichert; Freitexteingaben beim Verlassen des Felds.
-  - ✅ Zuständigkeits-Audit „Von → Nach" (v1.1.1): Die Zeitleiste zeigt bei
-    Zuständigkeitsänderungen neu den vollständigen Vorher/Nachher-Zustand in der
-    Form „Von: X → Nach: Y". Alle zugewiesenen Personen (vorher und nachher)
-    sind sichtbar, nicht nur die geänderte.
-  - ✅ Responsive Traktanden-Karten (v1.1.1): Unterhalb von 52 em
-    Container-Breite wechselt die Traktandentabelle vollständig in ein
-    Karten-Layout (statt Spalten auszublenden). Container-Query
-    `@container pw-sitzungen (max-inline-size: 52em)`.
-  - ✅ Realtime-Synchronisation (v1.1.0): Alle relevanten Schreibvorgänge
-    (Geschäfte, Sitzungen, Traktanden, Fraktionssitzung) publizieren Realtime-
-    Events via WebSocket (parlwin-realtime Service, Port 3001). Alle offenen
-    Frontends derselben Nextcloud-Instanz aktualisieren sich automatisch ohne
-    Seiten-Reload.
-  - ✅ Dokument-Erstellen ohne Doppelklick-Verzögerung (v1.1.0):
-    `dokumentErstellen()` öffnet die neu angelegte Datei sofort in einem
-    parallel geöffneten Tab (`window.open` synchron im Click-Handler, dann
-    Navigation zur `/f/{fileId}`-Route, sobald die Server-Antwort da ist).
-    Damit beginnt die Collabora-Ladezeit unmittelbar, statt erst nach einem
-    weiteren manuellen Klick.
+```bash
+git clone git@github.com:mwaeckerlin/parliament-winterthur-tool.git
+```
 
-  - ✅ Kommissionen-Suche (v1.0.9): Suche prüft jetzt zusätzlich Mitglieder
-    (Name, Partei, Fraktion, Funktion, E-Mail) sowie zugehörige Geschäfte
-    (GGR-Nr + Titel). Treffer werden automatisch aufgeklappt, so dass die
-    Fundstelle sichtbar ist – auch bei eingeklappten Kommissionen.
-  - ✅ Notizen-Darstellung (v1.0.9): Eigene `NotizenListe.vue`-Komponente.
-    Datum und Name werden nach Inhalt gesized, Notiztext nimmt den Rest (1fr)
-    und ist linksbündig. Kein `:` mehr nach dem Namen, Name nicht mehr fett.
-  - ✅ Notiz-Berechtigungen (v1.0.9): Statt einem globalen Lösch-Knopf kann
-    nur noch der Urheber (uid-Vergleich) eigene Notizen löschen oder
-    durch Klick auf den Text inline bearbeiten (Enter speichert, Escape bricht
-    ab, leerer Text löscht).
-  - ✅ Notizen auch auf Sitzungsebene (v1.0.9): „Bemerkungen zur Sitzung"
-    (freier Textarea-Block) wurde durch eine vollwertige Notizenliste mit
-    Audit-Trail (`{datum, uid, displayName, text}`) ersetzt – analog zu den
-    Traktanden-Notizen. Neues Feld `pw_sitzungen.notizen` (Migration
-    `Version000010`).
-  - ✅ Dokument-Menu schliesst (v1.0.9): Das „+ Neues Dokument"-Popup in
-    `GeschaeftDokumente.vue` wird nach der Auswahl einer Vorlage explizit
-    geschlossen (`v-model:open`), bevor der Namensdialog erscheint.
+**4. Konfigurationsdatei `.env` anlegen:**
 
-  4. ✅ Neuer Sitzungstyp, Teilnehmer-Regeln, Fraktion wählen → Die Fraktionsauswahl auch Mitgliederauswahl sollte nur aktive zur Auswahl stellen; Ausserdem fehlt eine einfache Auswahl: "Eigene Fraktion" und Nextcloud-Gruppe oder Nextcloud-User; → ergänzen / anpassen
-  4. ✅ Neuer Sitzungstyp → Fehler beim Speichern: ![alt text](image-2.png)
-  5. ✅ +Neu-Knopf in der Sitzungs-Ansicht öffnet Dialog: Sitzungstyp wählen,
-     Datum/Zeit/Ort/Titel-Override eingeben → POST `/sitzungstypen/{id}/sitzung`. → Immer an Nextcloud-Standards halten! Kopiere Ansätze von anderen Plugins! Das Popup mit der Auswahl soll gleich erfolgen wie bei anderen, z.B. Files, es soll genau so ein Menu mit den vordefinierten Templates aufpoppen: ![alt text](image-3.png)
-  3. ✅ Bemerkungen pro Traktandum entfernt – nur Notizen pro Traktandum bleiben.
-  4. ✅ Sitzungstypen / Sitzungs-Vorlagen: neue Tabellen `pw_sitzungstypen`,
-     `pw_sitzungstyp_traktanden`, `pw_sitzungstyp_teilnehmer`, neues Feld
-     `pw_sitzungen.typ_id` und `pw_sitzungen.teilnehmer` (JSON-materialisierte
-     Liste). `SitzungstypService::sitzungAusTyp()` löst Gruppen
-     (Fraktion/Kommission/Rolle) zu Einzelpersonen auf, kopiert Vorlage-Traktanden
-     und legt eine neue Sitzung an. CRUD-Endpunkte unter `/sitzungstypen`,
-     Verwaltungs-UI (`Sitzungstypenliste.vue`). `KalenderService::erstelleIcal()`
-     emittiert `ORGANIZER:mailto:` und `ATTENDEE;…:mailto:` für jeden Teilnehmer
-     mit E-Mail.
-  5. ✅ +Neu-Knopf in der Sitzungs-Ansicht öffnet Dialog: Sitzungstyp wählen,
-     Datum/Zeit/Ort/Titel-Override eingeben → POST `/sitzungstypen/{id}/sitzung`.
-  6. ✅ Notizen pro Traktandum werden persistiert (Autosave auf Enter, Server-PUT
-     auf `notizen`-Feld; nur dieses Feld wird vom Controller akzeptiert).
-  7. ✅ Audit-Trail für Notizen (Fail 6): jede Notiz trägt `datum`, `uid`,
-     `displayName` und `text`. `TraktandumController::normalisiereNotizen()`
-     ergänzt fehlende Felder serverseitig aus `IUserSession`; `Sitzungsliste.vue`
-     setzt sie via `getCurrentUser()` und rendert `datum displayName: text`.
-  8. ✅ Templates-Style Menu für „+ Neue Sitzung" (Fail 5): `NcActions` mit
-     `NcActionButton` pro Sitzungstyp (analog Files-Neu-Menü); Klick öffnet
-     vorbefüllten Dialog (Datum/Zeit/Ort/Titel) ohne Typ-Auswahl.
-  9. ✅ Geschäft-Dokumente statt WYSIWYG „Votum im Rat" (Zu Erledigen 1):
-     neue Komponente `GeschaeftDokumente.vue` spiegelt
-     `Fraktion/20_Geschäfte/{YYYY}/{YYYY.XXXX}-*` über neue Endpunkte
-     `GET/POST /geschaefte/{id}/dokumente`. „+ Neues Dokument" bietet ein
-     Templates-Menu (docx/xlsx/pptx/odt/ods/odp/md/txt); Spaces im Namen werden
-     zu Underscores.
+```bash
+cd parliament-winterthur-tool/example
+cat > .env << EOF
+HOST=your-site.com
+LETSENCRYPT_EMAIL=info@your-site.com
+NEXTCLOUD_DB_PASSWORD=$(pwgen -s 40 1)
+NEXTCLOUD_ADMIN_PASSWORD=$(pwgen -s 40 1)
+EOF
+```
 
-## Bugs
+`HOST` ist der öffentliche Domainname (z. B. `fraktion.example.com`).
+`LETSENCRYPT_EMAIL` erhält die Let's-Encrypt-Zertifikatsbenachrichtigungen.
+Die beiden Passwörter werden von `pwgen` als sichere Zufallsstrings erzeugt.
 
+### Starten – und bei jedem Update
+
+```bash
+cd parliament-winterthur-tool/example
+git pull
+docker compose up -d --remove-orphans --force-recreate --pull always
+```
+
+Das genügt für den ersten Start und für alle zukünftigen Updates:
+`git pull` holt die aktuellste Version, und `--pull always` lädt die neuen
+Docker-Images automatisch nach.
+
+### Nach dem ersten Start: Konfiguration in Nextcloud
+
+1. Nextcloud unter `https://your-site.com` aufrufen und mit dem Admin-Account
+   einloggen (Passwort = `NEXTCLOUD_ADMIN_PASSWORD`).
+2. Unter **Administration → Parlament Winterthur** die Fraktion, die Nextcloud-Gruppe
+   und die E-Mail-Einstellungen konfigurieren.
+3. **Jetzt synchronisieren** klicken, um die Parlamentsdaten erstmals zu laden.
+
+### Hinweis: «Fraktionsmitglieder ↔ Nextcloud-User» — verwaiste User
+
+In der Admin-Einstellungsseite unter **«Fraktionsmitglieder ↔ Nextcloud-User»**
+werden alle User der konfigurierten Nextcloud-Gruppe angezeigt. User die in der
+Gruppe sind, aber keinen aktuellen Parlamentseintrag haben, erscheinen
+**durchgestrichen**. Mit «Ausgewählte abgleichen» werden nur die angewählten
+verwaisten User aus der Gruppe entfernt und deaktiviert — die Anderen bleiben
+unberührt. Damit ein User als verwaist erscheint, muss er in der NC-Gruppe sein
+(Beispiel: einen ehemaligen Fraktionsmitarbeiter zur Gruppe hinzufügen — er erscheint
+als verwaister Eintrag, sofern er kein aktives Parlamentsmandat hat).
 
 
 ## Für Parlamentarier: Worum geht es hier?
@@ -294,10 +170,10 @@ als Symbole oben in der Menüleiste, sobald sie aktiviert sind.
 | **Kalender**                     | Calendar                    | Persönliche und gemeinsame Termine. Sitzungen aus dem Plugin erscheinen automatisch.                |
 | **Kontakte**                     | Contacts                    | Gemeinsames Adressbuch der Fraktion.                                                                |
 | **Talk**                         | Talk                        | Chat und Videokonferenz innerhalb der Fraktion (Ersatz für WhatsApp-Gruppe + Zoom).                 |
-| **Deck**                         | Deck                        | Kanban-Board (To-Do-Spalten): „Zu erledigen“ – „In Arbeit“ – „Erledigt“. Ideal pro Geschäft oder Kampagne. |
+| **Deck**                         | Deck                        | Kanban-Board (To-Do-Spalten): „Zu erledigen" – „In Arbeit" – „Erledigt". Ideal pro Geschäft oder Kampagne. |
 | **Aufgaben**                     | Tasks                       | Einfache To-Do-Listen, synchronisiert mit Handy.                                                    |
 | **Notizen**                      | Notes                       | Schnelle Notizen, ähnlich wie ein Notizbuch. Markdown-fähig.                                        |
-| **Forms**                        | Forms                       | Umfragen innerhalb der Fraktion (z. B. „Wer kommt am 15. Mai?“).                                    |
+| **Forms**                        | Forms                       | Umfragen innerhalb der Fraktion (z. B. „Wer kommt am 15. Mai?").                                    |
 | **Polls**                        | Polls                       | Terminfindung (Doodle-Ersatz).                                                                      |
 | **Mail**                         | Mail                        | E-Mail-Konto in Nextcloud einbinden (optional).                                                     |
 | **Lesezeichen**                  | Bookmarks                   | Gemeinsame Linksammlung (z. B. wichtige Artikel, Gesetzestexte).                                    |
@@ -381,8 +257,8 @@ Empfohlene Kalender:
 
 So fügst du den Fraktionskalender hinzu:
 
-1. Symbol „Kalender“ oben anklicken.
-2. Links unten „+ Neuer Kalender“ oder „Kalender abonnieren“ wählen
+1. Symbol „Kalender" oben anklicken.
+2. Links unten „+ Neuer Kalender" oder „Kalender abonnieren" wählen
    (Präsidium gibt den Link weiter).
 3. Auf dem Handy: in der Nextcloud-Smartphone-App den Kalender auswählen –
    er erscheint dann in der Standard-Kalender-App.
@@ -607,6 +483,11 @@ In den Plugin-Einstellungen kann folgendes konfiguriert werden:
 - **Stellvertretungen**: befristete Delegation mit `gueltig_von` und `gueltig_bis`
 - **Realtime WebSocket**: immer aktiv, ohne manuelle URL-Konfiguration
   (Authentisierung über die aktuelle Nextcloud-Anmeldung)
+- **Fraktionsmitglieder ↔ Nextcloud-User**: Abgleich der Parlamentsmitglieder mit
+  lokalen Nextcloud-Usern. Alle Mitglieder der konfigurierten Nextcloud-Gruppe
+  werden angezeigt – auch User die in der Gruppe sind, aber keinen Parlamentseintrag
+  haben (verwaiste User, durchgestrichen dargestellt). Selektiv abgleichen:
+  nur markierte User werden deaktiviert/entfernt.
 
 Die Admin-Einstellungsseite verwendet bewusst das standardisierte Nextcloud-Settings-Layout
 (`section` + Standard-Formfelder) ohne app-spezifische Input-Styling-Klassen.
@@ -636,7 +517,9 @@ Aktuell umgesetzt:
    ist bewusst als allgemeiner Fraktions-Container ausgelegt und nimmt künftig auch
    weitere Sitzungstypen auf.
 6. **Mitgliederverwaltung**: Automatische Synchronisation der Fraktionsmitglieder
-   als Nextcloud-Gruppe mit E-Mail-Einladung.
+   als Nextcloud-Gruppe mit E-Mail-Einladung. Verwaiste Nextcloud-User (in der Gruppe,
+   aber nicht mehr im Parlament) werden in der Admin-UI durchgestrichen angezeigt
+   und können selektiv deaktiviert werden.
 7. **Fraktionssitzungsmodus**: Beschlüsse sind im Sitzungsmodus auf
    Protokollführung (inkl. aktiver Stellvertretung) beschränkt; Notizen bleiben offen.
 8. **Rollenmodell**: Fraktionspräsidium, Protokollführung und Kommissionsmitgliedschaften
@@ -741,6 +624,9 @@ Wichtige UI-Regeln der Admin-Seite:
   - Username ist editierbar und wird in `pw_mitglieder.nextcloud_uid` gespeichert
   - Lokale Existenzprüfung zeigt vorhandene Gruppen des Users
   - Sammelaktion **Ausgewählte anlegen**: erstellt fehlende User und ergänzt sie in die gewählte Fraktionsgruppe
+  - **Verwaiste User**: Nextcloud-User die in der Gruppe sind, aber keinen aktuellen
+    Parlamentseintrag haben, werden durchgestrichen angezeigt. Mit «Ausgewählte abgleichen»
+    werden nur die markierten verwaisten User aus der Gruppe entfernt und deaktiviert.
 - Die Konfigurationsseite ist responsiv (Desktop/Mobil) im Nextcloud-Settings-Layout.
 
 ### Lokales Docker-Setup (mwaeckerlin/nextcloud + Plugin)
@@ -762,7 +648,7 @@ Alle Netze sind wie im Referenz-Setup mit `driver_opts.encrypted=1` definiert.
 ### WebSocket-Backend (`parlwin-realtime`)
 
 Die App folgt der **WebSocket-App-Convention** von `mwaeckerlin/nextcloud:nginx`
-(siehe README dort, Abschnitt „WebSocket Apps“):
+(siehe README dort, Abschnitt „WebSocket Apps"):
 
 - Compose-Service heisst **`parlwin-realtime`** und hört intern auf Port **`3001`**.
 - Kein externer Port-Mapping nötig — der Browser erreicht den WS-Server
@@ -900,15 +786,15 @@ Fortschritt bereit:
 - API-Abbruch: `POST /apps/parlwin/sync/cancel`
 - robust gegen lange Läufe: kein hartes Script-Limit (`set_time_limit(0)`) im Worker
 - Heartbeat-/Stale-Erkennung: wenn der Sync-Prozess nicht mehr aktiv ist, wird der Lauf
-  sofort als `abgebrochen` markiert (kein langes „Hängenbleiben“ im alten Prozentstand)
+  sofort als `abgebrochen` markiert (kein langes „Hängenbleiben" im alten Prozentstand)
 - Fortsetzen über mehrere Läufe: bei `abgebrochen`/`fehler` wird mit Cursor pro Bereich (`mitglieder`, `fraktionen`, `kommissionen`, `geschaefte`, `sitzungen`) automatisch weitergemacht
-- bereits verarbeitete Datensätze bleiben persistiert (inkrementelle Updates pro Element, kein „alles-oder-nichts“-Commit)
+- bereits verarbeitete Datensätze bleiben persistiert (inkrementelle Updates pro Element, kein „alles-oder-nichts"-Commit)
 - Bereits lokal als `erledigt`/`abgeschlossen` markierte Geschäfte werden beim
   Sync nicht erneut überschrieben; abgeschlossene Geschäfte gelten als final.
 - Singleton-Lock: systemweit läuft immer nur **ein** Sync gleichzeitig
   (egal ob manuell oder via Cron).
 - Startet ein zweiter Benutzer während eines laufenden Syncs, wird der Aufruf
-  an den bestehenden Lauf „angehängt“ statt einen Parallel-Run zu starten.
+  an den bestehenden Lauf „angehängt" statt einen Parallel-Run zu starten.
 - Auch nach Seitenwechsel wird ein bereits laufender Singleton-Sync sofort
   wieder angezeigt.
   Primär erfolgt das Update eventbasiert über WebSocket (`sync.progress`);
