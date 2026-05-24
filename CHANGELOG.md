@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Dokumentation: README komplett nach Template A umstrukturiert
+
+Neue Abschnitt-Reihenfolge: Purpose → Warum dieses Tool? → Funktionen →
+Bedienung → Administration → Entwicklung → Internas → Lizenz.
+Deployment-Anleitung verschoben von Abschnitt 2 nach Administration (Abschnitt 5).
+Doppelter «Beschreibung»-Abschnitt entfernt (Inhalt in Purpose eingearbeitet).
+
 ### Bugfix: `bemerkungen`-Feld in `TraktandumController::update()` wiederhergestellt
 
 Das `bemerkungen`-Feld wurde in einer früheren Session versehentlich aus `update()` entfernt.
