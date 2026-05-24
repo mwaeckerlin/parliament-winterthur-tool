@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OCA\ParliamentWinterthur\Db;
 
+use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Db\QBMapper;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
@@ -16,6 +17,35 @@ class GeschaeftAktionMapper extends QBMapper
     public function __construct(IDBConnection $db)
     {
         parent::__construct($db, 'pw_geschaeft_aktionen', GeschaeftAktion::class);
+    }
+
+    /**
+     * @throws DoesNotExistException
+     */
+    public function findById(int $id): GeschaeftAktion
+    {
+        $qb = $this->db->getQueryBuilder();
+        $qb->select('*')
+            ->from($this->getTableName())
+            ->where($qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT)));
+
+        $result = $qb->executeQuery();
+        $row = $result->fetch();
+        $result->closeCursor();
+
+        if (!is_array($row)) {
+            throw new DoesNotExistException("GeschaeftAktion $id nicht gefunden");
+        }
+
+        return $this->mapRowToEntity($row);
+    }
+
+    public function loeschen(GeschaeftAktion $aktion): void
+    {
+        $qb = $this->db->getQueryBuilder();
+        $qb->delete($this->getTableName())
+            ->where($qb->expr()->eq('id', $qb->createNamedParameter($aktion->getId(), IQueryBuilder::PARAM_INT)));
+        $qb->executeStatement();
     }
 
     /**

@@ -592,25 +592,28 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
                 checkbox.className = 'pw-orphan-select';
-                checkbox.checked = true;
+                checkbox.checked = false;
                 tdSelect.appendChild(checkbox);
 
                 const tdName = document.createElement('td');
                 tdName.dataset.label = t('parlwin', 'Mitglied');
-                tdName.textContent = String(verwaist.displayName || verwaist.uid || '').trim();
-                const hinweis = document.createElement('div');
-                hinweis.className = 'settings-hint';
-                hinweis.textContent = t('parlwin', 'Zum Löschen markiert (nicht mehr in Fraktion)');
-                tdName.appendChild(hinweis);
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'pw-orphan-durchgestrichen';
+                nameSpan.textContent = String(verwaist.displayName || verwaist.uid || '').trim();
+                nameSpan.title = t('parlwin', 'In Nextcloud-Gruppe, aber laut Webseite nicht mehr in der Fraktion. Anwählen zum Deaktivieren.');
+                tdName.appendChild(nameSpan);
 
                 const tdEmail = document.createElement('td');
                 tdEmail.dataset.label = t('parlwin', 'E-Mail');
-                tdEmail.textContent = String(verwaist.email || '').trim();
+                const emailSpan = document.createElement('span');
+                emailSpan.className = 'pw-orphan-durchgestrichen';
+                emailSpan.textContent = String(verwaist.email || '').trim();
+                tdEmail.appendChild(emailSpan);
 
                 const tdUser = document.createElement('td');
                 tdUser.dataset.label = t('parlwin', 'Username');
                 const uidSpan = document.createElement('span');
-                uidSpan.className = 'pw-orphan-uid';
+                uidSpan.className = 'pw-orphan-uid pw-orphan-durchgestrichen';
                 uidSpan.textContent = String(verwaist.uid || '');
                 tdUser.appendChild(uidSpan);
 

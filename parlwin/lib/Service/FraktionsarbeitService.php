@@ -47,7 +47,7 @@ class FraktionsarbeitService
      * @var array<string, string>
      */
     private const BESCHLUSS_LABELS = [
-        'unterstuetzen' => 'Unterstützen',
+        'unterstuetzen' => 'Zustimmen',
         'ablehnen' => 'Ablehnen',
         'stimmfreigabe' => 'Stimmfreigabe',
         'miteinreichen_fraktion' => 'Miteinreichen als Fraktion',
@@ -158,6 +158,56 @@ class FraktionsarbeitService
 
         $aktion = $this->erstelleAktion($geschaeftId, 'notiz', '', 'Notiz', $text, false);
         return $this->mapAktion($aktion);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function notizAktualisieren(int $geschaeftId, int $aktionId, string $text): array
+    {
+        $text = trim($text);
+        if ($text === '') {
+            throw new \InvalidArgumentException('Notiztext darf nicht leer sein');
+        }
+
+        try {
+            $aktion = $this->aktionMapper->findById($aktionId);
+        } catch (DoesNotExistException) {
+            throw new \InvalidArgumentException('Notiz nicht gefunden');
+        }
+
+        if ($aktion->getGeschaeftId() !== $geschaeftId || $aktion->getAktionTyp() !== 'notiz') {
+            throw new \InvalidArgumentException('Notiz gehört nicht zu diesem Geschäft');
+        }
+
+        $uid = $this->userSession->getUser()?->getUID() ?? '';
+        if ($aktion->getAutorUid() !== $uid) {
+            throw new \RuntimeException('Nur der Autor darf eigene Notizen bearbeiten');
+        }
+
+        $aktion->setText($text);
+        $this->aktionMapper->update($aktion);
+        return $this->mapAktion($aktion);
+    }
+
+    public function notizLoeschen(int $geschaeftId, int $aktionId): void
+    {
+        try {
+            $aktion = $this->aktionMapper->findById($aktionId);
+        } catch (DoesNotExistException) {
+            throw new \InvalidArgumentException('Notiz nicht gefunden');
+        }
+
+        if ($aktion->getGeschaeftId() !== $geschaeftId || $aktion->getAktionTyp() !== 'notiz') {
+            throw new \InvalidArgumentException('Notiz gehört nicht zu diesem Geschäft');
+        }
+
+        $uid = $this->userSession->getUser()?->getUID() ?? '';
+        if ($aktion->getAutorUid() !== $uid) {
+            throw new \RuntimeException('Nur der Autor darf eigene Notizen löschen');
+        }
+
+        $this->aktionMapper->loeschen($aktion);
     }
 
     /**
@@ -281,25 +331,33 @@ class FraktionsarbeitService
     /**
      * @return array<string, mixed>
      */
-    public function beschlussHinzufuegen(int $geschaeftId, string $beschlussCode, string $begruendung = ''): array
+    public function beschlussHinzufuegen(int $geschaeftId, string $beschlussCode, string $text = ''): array
     {
         $this->pruefeBeschlussSchreibrecht();
 
+        $text = trim($text);
+
+        // Freitext-Modus: kein Code, aber Text vorhanden → erlaubt ohne Workflow-Prüfung.
+        if ($beschlussCode === '') {
+            if ($text === '') {
+                throw new \InvalidArgumentException('Beschluss ohne Code erfordert einen Freitext');
+            }
+            $kurzTitel = mb_substr($text, 0, 60, 'UTF-8');
+            if (mb_strlen($text, 'UTF-8') > 60) {
+                $kurzTitel .= '…';
+            }
+            $aktion = $this->erstelleAktion($geschaeftId, 'beschluss', '', $kurzTitel, $text, true);
+            return $this->mapAktion($aktion);
+        }
+
         $geschaeft = $this->geschaeftMapper->find($geschaeftId);
         $erlaubt = array_column($this->ermittleErlaubteBeschluesse($geschaeft), 'code');
-        if (!in_array($beschlussCode, $erlaubt, true)) {
+        if (!\in_array($beschlussCode, $erlaubt, true)) {
             throw new \InvalidArgumentException('Beschluss ist im aktuellen Status nicht zulässig');
         }
 
         $label = self::BESCHLUSS_LABELS[$beschlussCode] ?? $beschlussCode;
-        $aktion = $this->erstelleAktion(
-            $geschaeftId,
-            'beschluss',
-            $beschlussCode,
-            $label,
-            trim($begruendung),
-            true,
-        );
+        $aktion = $this->erstelleAktion($geschaeftId, 'beschluss', $beschlussCode, $label, $text, true);
 
         return $this->mapAktion($aktion);
     }
@@ -405,26 +463,18 @@ class FraktionsarbeitService
         $hinzugefuegt = array_values(array_diff_key($nachherMap, $vorherMap));
         $entfernt = array_values(array_diff_key($vorherMap, $nachherMap));
 
-        $teile = [];
-        foreach ($hinzugefuegt as $name) {
-            $teile[] = sprintf('Zuständigkeit "%s" gesetzt', $name);
-        }
-        foreach ($entfernt as $name) {
-            $teile[] = sprintf('Zuständigkeit "%s" entfernt', $name);
-        }
-        if ($vorherHauptKey !== $nachherHauptKey && $nachherHauptKey !== '' && !in_array($nachherHauptKey, array_keys(array_diff_key($nachherMap, $vorherMap)), true)) {
-            // Hauptzuständigkeit hat innerhalb bestehender Personen gewechselt
-            $teile[] = sprintf('Hauptzuständigkeit auf "%s" geändert', $nachherHauptName);
-        }
+        $vonNamen = array_values($vorherMap);
+        $nachNamen = array_values($nachherMap);
 
-        if ($teile === []) {
-            // Kein effektiver Diff – Aktion trotzdem festhalten (Audit)
-            $teile[] = $nachherMap === []
-                ? 'Alle Zuständigkeiten entfernt'
-                : 'Zuständigkeiten unverändert bestätigt';
+        if ($hinzugefuegt !== [] || $entfernt !== []) {
+            $vonStr = $vonNamen !== [] ? implode(', ', $vonNamen) : '(niemand)';
+            $nachStr = $nachNamen !== [] ? implode(', ', $nachNamen) : '(niemand)';
+            $zuweisungsText = 'Von: ' . $vonStr . ' → Nach: ' . $nachStr;
+        } elseif ($vorherHauptKey !== $nachherHauptKey && $nachherHauptKey !== '') {
+            $zuweisungsText = sprintf('Hauptzuständigkeit auf "%s" geändert', $nachherHauptName);
+        } else {
+            $zuweisungsText = $nachherMap !== [] ? 'Zuständigkeiten unverändert bestätigt' : 'Alle Zuständigkeiten entfernt';
         }
-
-        $zuweisungsText = implode('; ', $teile);
         $this->erstelleAktion($geschaeftId, 'zuweisung', 'zustaendigkeit_geaendert', 'Zuständigkeiten geändert', $zuweisungsText, false);
 
         $neu = $this->zustaendigkeitMapper->findAktiveByGeschaeft($geschaeftId);

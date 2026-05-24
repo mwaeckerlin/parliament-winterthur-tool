@@ -4,8 +4,15 @@
       v-for="(n, idx) in notizen"
       :key="idx"
       class="pw-notiz-zeile"
-      :class="{ 'pw-notiz-eigen': istEigene(n), 'pw-notiz-bearbeiten': bearbeiteIdx === idx }"
+      :class="{ 'pw-notiz-eigen': istEigene(n), 'pw-notiz-bearbeiten': bearbeiteIdx === idx, 'pw-notiz-drag-over': dragUeberIdx === idx }"
+      draggable="true"
+      @dragstart="dragStart($event, idx)"
+      @dragover.prevent="dragOver($event, idx)"
+      @dragleave="dragLeave"
+      @drop.prevent="drop($event, idx)"
+      @dragend="dragEnd"
     >
+      <span class="pw-notiz-griff" title="Verschieben" aria-hidden="true">⠿</span>
       <span class="pw-notiz-datum">{{ n.datum }}</span>
       <span class="pw-notiz-autor">{{ n.displayName || n.uid }}</span>
       <template v-if="bearbeiteIdx === idx">
@@ -92,6 +99,8 @@ export default {
       neuerText: '',
       bearbeiteIdx: -1,
       bearbeiteText: '',
+      dragVonIdx: -1,
+      dragUeberIdx: -1,
     }
   },
   computed: {
@@ -161,6 +170,31 @@ export default {
       next[idx] = { ...aktuell, text }
       this.$emit('update:modelValue', next)
       this.bearbeitenAbbrechen()
+    },
+    dragStart(event, idx) {
+      this.dragVonIdx = idx
+      event.dataTransfer.effectAllowed = 'move'
+    },
+    dragOver(event, idx) {
+      event.dataTransfer.dropEffect = 'move'
+      this.dragUeberIdx = idx
+    },
+    dragLeave() {
+      this.dragUeberIdx = -1
+    },
+    drop(event, zuIdx) {
+      const vonIdx = this.dragVonIdx
+      this.dragUeberIdx = -1
+      this.dragVonIdx = -1
+      if (vonIdx < 0 || vonIdx === zuIdx) return
+      const next = [...this.notizen]
+      const [verschoben] = next.splice(vonIdx, 1)
+      next.splice(zuIdx, 0, verschoben)
+      this.$emit('update:modelValue', next)
+    },
+    dragEnd() {
+      this.dragVonIdx = -1
+      this.dragUeberIdx = -1
     },
   },
 }

@@ -32,7 +32,6 @@ class SyncJobTest extends TestCase {
 
         $job = new SyncJob($timeFactory, $syncCommand, $logger);
         $ref = new \ReflectionMethod($job, 'run');
-        $ref->setAccessible(true);
         $ref->invoke($job, null);
     }
 }

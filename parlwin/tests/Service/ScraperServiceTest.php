@@ -353,7 +353,7 @@ class ScraperServiceTest extends TestCase {
 
         $client->expects($this->once())
             ->method('get')
-            ->with('https://parlament.winterthur.ch/sitzung', $this->isType('array'))
+            ->with('https://parlament.winterthur.ch/sitzung', $this->isArray())
             ->willReturn($responseListe);
 
         $service->prefetchTopLevelListen(['sitzungen']);
@@ -392,7 +392,7 @@ class ScraperServiceTest extends TestCase {
 
         $client->expects($this->once())
             ->method('get')
-            ->with('https://parlament.winterthur.ch/politbusiness', $this->isType('array'))
+            ->with('https://parlament.winterthur.ch/politbusiness', $this->isArray())
             ->willReturn($responseListe);
 
         $service->prefetchTopLevelListen(['geschaefte']);

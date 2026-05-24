@@ -94,7 +94,7 @@ class SyncCommandTest extends TestCase {
             ->with(self::stringContains('läuft bereits'));
 
         $ref = new \ReflectionMethod($command, 'execute');
-        $ref->setAccessible(true);
+
         $result = $ref->invoke($command, $input, $output);
 
         self::assertSame(Command::SUCCESS, $result);
@@ -161,7 +161,7 @@ class SyncCommandTest extends TestCase {
                     self::equalTo('sync.progress'),
                     self::equalTo('sync.completed')
                 ),
-                self::isType('array')
+                self::isArray()
             );
 
         $fraktionsarbeitService = $this->createMock(FraktionsarbeitService::class);
@@ -200,7 +200,7 @@ class SyncCommandTest extends TestCase {
         $output->method('writeln');
 
         $ref = new \ReflectionMethod($command, 'execute');
-        $ref->setAccessible(true);
+
         $result = $ref->invoke($command, $input, $output);
 
         self::assertSame(Command::SUCCESS, $result);
@@ -319,7 +319,7 @@ class SyncCommandTest extends TestCase {
         };
 
         $ref = new \ReflectionMethod($command, 'execute');
-        $ref->setAccessible(true);
+
         $result = $ref->invoke($command, $input, $output);
 
         self::assertSame(Command::SUCCESS, $result, implode("\n", $output->messages));
@@ -395,7 +395,7 @@ class SyncCommandTest extends TestCase {
         $realtimePublisher = $this->createMock(RealtimePublisherService::class);
         $realtimePublisher->expects(self::once())
             ->method('publish')
-            ->with(self::equalTo('sync.completed'), self::isType('array'));
+            ->with(self::equalTo('sync.completed'), self::isArray());
 
         $fraktionsarbeitService = $this->createMock(FraktionsarbeitService::class);
         $fraktionsarbeitService->method('autoZuweisenKommissionsmitglieder')->willReturn([
@@ -433,7 +433,7 @@ class SyncCommandTest extends TestCase {
         $output->method('writeln');
 
         $ref = new \ReflectionMethod($command, 'execute');
-        $ref->setAccessible(true);
+
         $result = $ref->invoke($command, $input, $output);
 
         self::assertSame(Command::SUCCESS, $result);

@@ -345,7 +345,7 @@ class SettingsControllerTest extends TestCase {
             ->willReturnOnConsecutiveCalls(null, $localUser);
         $userManager->expects(self::once())
             ->method('createUser')
-            ->with('max-muster', self::isType('string'))
+            ->with('max-muster', self::isString())
             ->willReturn($localUser);
 
         $group = $this->createMock(IGroup::class);
@@ -361,7 +361,7 @@ class SettingsControllerTest extends TestCase {
         $publisher = $this->createMock(RealtimePublisherService::class);
         $publisher->expects(self::once())->method('publish')->with(
             'settings.members.provisioned',
-            self::isType('array')
+            self::isArray()
         );
 
         $controller = new SettingsController(

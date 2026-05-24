@@ -410,7 +410,6 @@ export default {
     },
     async nachSpeichern() {
       await this.ladeGeschaefte()
-      this.schliesseDetail()
       this.$emit('aktualisiert')
     },
   },

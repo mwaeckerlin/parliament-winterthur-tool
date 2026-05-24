@@ -18,11 +18,13 @@ use OCP\AppFramework\Db\Entity;
  * @method int    getNummer()
  * @method string getTitel()
  * @method string getBeschreibung()
+ * @method string getUrl()
  * @method bool   getGeloescht()
  * @method string getBemerkungen()
  * @method string getNotizen()
  * @method string getErstelltAm()
  * @method string getAktualisiertAm()
+ * @method void   setUrl(string $url)
  */
 class Traktandum extends Entity {
     /** @var int Fremdschlüssel zur zugehörigen Sitzung */
@@ -39,6 +41,9 @@ class Traktandum extends Entity {
 
     /** @var string Kurzbeschreibung */
     protected string $beschreibung = '';
+
+    /** @var string URL eines verknüpften Dokuments (Protokoll-PDF etc.) ohne eigenes Geschäft */
+    protected string $url = '';
 
     /** @var bool Wurde das Traktandum entfernt? */
     protected bool $geloescht = false;
@@ -73,6 +78,7 @@ class Traktandum extends Entity {
             'nummer' => $this->getNummer(),
             'titel' => $this->getTitel(),
             'beschreibung' => $this->getBeschreibung(),
+            'url' => $this->getUrl(),
             'geloescht' => $this->getGeloescht(),
             'bemerkungen' => $this->getBemerkungen(),
             'notizen' => $this->getNotizen(),
@@ -91,7 +97,7 @@ class Traktandum extends Entity {
         $notizen = $this->getNotizenArray();
         $notizen[] = [
             'text' => $notiz,
-            'datum' => (new \DateTime())->format('Y-m-d H:i:s'),
+            'datum' => new \DateTime()->format('Y-m-d H:i:s'),
         ];
         $this->notizen = json_encode($notizen);
     }

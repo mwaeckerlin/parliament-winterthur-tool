@@ -71,6 +71,7 @@
       <div
         v-for="sitzung in gefilterteSitzungen"
         :key="sitzung.id"
+        :id="'pw-sitzung-' + sitzung.id"
         class="pw-sitzung-karte"
         :class="{ 'pw-vergangen': istVergangen(sitzung.datum) }"
       >
@@ -123,9 +124,9 @@
                         tabindex="0"
                         role="button"
                         :aria-label="`Traktandum ${t.nummer} öffnen`"
-                        @click="oeffneGeschaeft(t)"
-                        @keydown.enter.prevent="oeffneGeschaeft(t)"
-                        @keydown.space.prevent="oeffneGeschaeft(t)"
+                        @click="oeffneGeschaeft(t, sitzung)"
+                        @keydown.enter.prevent="oeffneGeschaeft(t, sitzung)"
+                        @keydown.space.prevent="oeffneGeschaeft(t, sitzung)"
                       >
                         <td data-label="Tr." class="pw-col-nr"><strong>{{ t.nummer }}</strong></td>
                         <td data-label="Nr." class="pw-col-nr">{{ t.geschaeft?.nummer || '' }}</td>
@@ -137,6 +138,14 @@
                             @click.stop
                             class="pw-inline-link"
                             title="Extern öffnen"
+                          >↗</a>
+                          <a
+                            v-else-if="t.url"
+                            :href="t.url"
+                            target="_blank"
+                            @click.stop
+                            class="pw-inline-link"
+                            title="Dokument öffnen"
                           >↗</a>
                           <a
                             v-else-if="sitzung.url"
@@ -196,6 +205,94 @@
                   </tbody>
                 </table>
               </div>
+              <!-- Karten-Darstellung (bei schmaler Ansicht, via Container-Query) -->
+              <div class="pw-card-mobile">
+                <div
+                  v-for="t in gefilterteTraktanden(sitzung.id)"
+                  :key="`karte-${t.id}`"
+                  class="pw-traktandum-karte"
+                  :class="{ 'pw-geloescht': t.geschaeft?.geloescht }"
+                >
+                  <div
+                    class="pw-traktandum-karte-kopf"
+                    role="button"
+                    tabindex="0"
+                    :aria-label="`Traktandum ${t.nummer} öffnen`"
+                    @click="oeffneGeschaeft(t, sitzung)"
+                    @keydown.enter.prevent="oeffneGeschaeft(t, sitzung)"
+                    @keydown.space.prevent="oeffneGeschaeft(t, sitzung)"
+                  >
+                    <div class="pw-traktandum-karte-kennung">
+                      <strong>Tr.&nbsp;{{ t.nummer }}</strong>
+                      <span v-if="t.geschaeft?.nummer">Nr.&nbsp;{{ t.geschaeft.nummer }}</span>
+                    </div>
+                    <span class="pw-traktandum-karte-titel">
+                      <a
+                        v-if="t.geschaeft?.url"
+                        :href="t.geschaeft.url"
+                        target="_blank"
+                        @click.stop
+                        class="pw-inline-link"
+                        title="Extern öffnen"
+                      >↗</a>
+                      <a
+                        v-else-if="t.url"
+                        :href="t.url"
+                        target="_blank"
+                        @click.stop
+                        class="pw-inline-link"
+                        title="Dokument öffnen"
+                      >↗</a>
+                      <a
+                        v-else-if="sitzung.url"
+                        :href="sitzung.url"
+                        target="_blank"
+                        @click.stop
+                        class="pw-inline-link"
+                        title="Originaltraktandum extern öffnen"
+                      >↗</a>
+                      {{ t.geschaeft?.titel || t.titel }}
+                    </span>
+                    <div class="pw-traktandum-karte-meta">
+                      <span
+                        v-if="t.geschaeft?.status"
+                        :class="['pw-status-' + statusKlasse(t.geschaeft.status), 'pw-status-text']"
+                      >{{ t.geschaeft.status }}</span>
+                      <span v-if="t.geschaeft?.typ">{{ t.geschaeft.typ }}</span>
+                      <span v-if="t.geschaeft?.datum">{{ formatieredatum(t.geschaeft.datum) }}</span>
+                    </div>
+                  </div>
+                  <div v-if="t.geschaeft" class="pw-traktandum-karte-selektoren" @click.stop>
+                    <label>Zuständig</label>
+                    <PwMultiSelect
+                      class="pw-inline-select"
+                      :model-value="zustaendigOptionenFuer(t.geschaeft)"
+                      :options="zustaendigeOptionenFuerSelect"
+                      :clearable="true"
+                      placeholder="—"
+                      label="label"
+                      @update:model-value="aenderungZustaendig(t.geschaeft, sitzung.id, $event || [])"
+                    />
+                    <label>Beschluss</label>
+                    <NcSelect
+                      class="pw-inline-select"
+                      :model-value="beschlussOptionFuer(t.geschaeft)"
+                      :options="beschlussOptionenFuer(t.geschaeft)"
+                      :clearable="true"
+                      placeholder="—"
+                      label="label"
+                      @update:model-value="aenderungBeschluss(t.geschaeft, sitzung.id, $event)"
+                    />
+                  </div>
+                  <div @click.stop>
+                    <NotizenListe
+                      :model-value="parseTraktandumNotizen(t.id)"
+                      placeholder="Notiz zum Traktandum hinzufügen…"
+                      @update:model-value="speichereTraktandumNotizen(t, $event)"
+                    />
+                  </div>
+                </div>
+              </div>
               <p v-if="gefilterteTraktanden(sitzung.id).length === 0">
                 Keine Traktanden gefunden.
               </p>
@@ -216,7 +313,8 @@
         <GeschaeftDetail
           :geschaeft-id="ausgewaehlteGeschaeftId"
           :mitglieder="mitglieder"
-          @gespeichert="schliesseGeschaeft"
+          :traktandum-kontext="ausgewaehltesGeschaeftTraktandumKontext"
+          @oeffne-traktandum="sprungZuSitzung"
         />
       </div>
     </div>
@@ -260,6 +358,7 @@ export default {
       sitzungNotizen: {},
       traktandumNotizen: {},
       ausgewaehlteGeschaeftId: null,
+      ausgewaehltesGeschaeftTraktandumKontext: null,
       unsubRealtime: null,
       // Neue Sitzung aus Vorlage
       sitzungstypen: [],
@@ -424,9 +523,9 @@ export default {
         await this.ladeTraktandenFuerSitzung(id)
       }
     },
-    async ladeTraktandenFuerSitzung(sitzungId, force = false) {
+    async ladeTraktandenFuerSitzung(sitzungId, force = false, silent = false) {
       if (this.traktanden[sitzungId] && !force) return
-      this.ladenTraktanden = { ...this.ladenTraktanden, [sitzungId]: true }
+      if (!silent) this.ladenTraktanden = { ...this.ladenTraktanden, [sitzungId]: true }
       try {
         const { data } = await axios.get(
           generateUrl(`/apps/parlwin/sitzungen/${sitzungId}/traktanden`)
@@ -552,7 +651,7 @@ export default {
           zustaendigkeiten: payload,
           haupt_person_key: haupt,
         })
-        await this.ladeTraktandenFuerSitzung(sitzungId, true)
+        await this.ladeTraktandenFuerSitzung(sitzungId, true, true)
       } catch (fehler) {
         console.error('Fehler beim Speichern der Zuständigkeit:', fehler)
       }
@@ -565,19 +664,37 @@ export default {
         } else {
           await axios.delete(generateUrl(`/apps/parlwin/geschaefte/${geschaeft.id}/beschluesse`))
         }
-        await this.ladeTraktandenFuerSitzung(sitzungId, true)
+        await this.ladeTraktandenFuerSitzung(sitzungId, true, true)
       } catch (fehler) {
         console.error('Fehler beim Speichern des Beschlusses:', fehler)
       }
     },
-    oeffneGeschaeft(traktandum) {
+    oeffneGeschaeft(traktandum, sitzung) {
       const id = Number(traktandum?.geschaeftId || traktandum?.geschaeft?.id || 0)
       if (id > 0) {
         this.ausgewaehlteGeschaeftId = id
+        this.ausgewaehltesGeschaeftTraktandumKontext = sitzung ? {
+          sitzungId: sitzung.id,
+          sitzungDatum: sitzung.datum,
+          sitzungTitel: sitzung.titel,
+          traktandumNummer: traktandum.nummer,
+          notizen: this.traktandumNotizen[traktandum.id] || [],
+        } : null
       }
     },
     schliesseGeschaeft() {
       this.ausgewaehlteGeschaeftId = null
+      this.ausgewaehltesGeschaeftTraktandumKontext = null
+    },
+    async sprungZuSitzung(sitzungId) {
+      this.schliesseGeschaeft()
+      if (!sitzungId) return
+      if (!this.offeneSitzungen.includes(sitzungId)) {
+        this.offeneSitzungen.push(sitzungId)
+        await this.ladeTraktandenFuerSitzung(sitzungId)
+      }
+      await this.$nextTick()
+      document.getElementById('pw-sitzung-' + sitzungId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     },
     istVergangen(datum) {
       if (!datum) return false
