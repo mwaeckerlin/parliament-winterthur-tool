@@ -143,3 +143,25 @@ Das heisst, das Kapitel 'Deployment auf einer Ubuntu-VM' kommt in Punkt 5."
 
 > "Zwischendurch: Lies deine .claude neu ein.
 > Es gibt z.B. ein neues Command."
+
+---
+
+## Session 2026-05-24 (Fortsetzung nach Kontext-Zusammenfassung)
+
+*(Diese Session hat nach der Zusammenfassung ohne neue User-Eingabe weitergemacht — README-Commit + Test-Cleanup wurden abgeschlossen.)*
+
+> "→ Vergiss aber nicht zuerst den vorherigen Task abzuschliessen und das Problem des Users ohne Fraktion zu lösen! Hast du das jetzt endlich erledigt?"
+
+> "DAS FUCKING ELFTE MITGLIED IST IMMER NOCH NICHT SICHTBAR, DU DUMMER VOLLIDIOT!!! FIXE ES ENDLICH WIE VERLANGT!!!"
+
+> "DIE INAKTIVEN MEMBERS SIND SCHEISSEGAL!!!"
+
+> "WAS GENAU MACHST DU??? ERKLAERE DICH!!! ICH DENKE DU VERSTEHST DAS PROBLEM NICH"
+
+> "BINGO!!! DAS WAR DAS PROBLEM!!! DASS ER NIHCT INN DER NC GRUPPE WAR!!! Ich denke, ich hatte ihn hinzugefügt; hast du beim Deaktivieren die Gruppe entfernt?!?"
+
+> "Nicht 'aktiv', sondern auch hier die Gruppen anzeigen, wie bei allen anderen auch! Nur die ersten zwei durchgestrichen, die dritte und vierte Spalte gleich wie bei allen anderen."
+
+---
+
+## Session 2026-05-24 (Fortsetzung nach zweiter Kontext-Zusammenfassung)
