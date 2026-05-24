@@ -40,6 +40,19 @@ class SitzungstypController extends Controller
   }
 
   #[NoAdminRequired]
+  public function vorschau(int $id): DataResponse
+  {
+    try {
+      return new DataResponse($this->service->vorschau($id));
+    } catch (\OCP\AppFramework\Db\DoesNotExistException) {
+      return new DataResponse(['fehler' => 'Nicht gefunden'], Http::STATUS_NOT_FOUND);
+    } catch (\Throwable $e) {
+      $this->logger->error('parlwin: vorschau fehlgeschlagen: ' . $e->getMessage(), ['exception' => $e]);
+      return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  #[NoAdminRequired]
   public function show(int $id): DataResponse
   {
     try {

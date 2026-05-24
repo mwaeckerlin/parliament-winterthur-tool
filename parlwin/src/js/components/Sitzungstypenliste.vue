@@ -41,7 +41,6 @@
         <div class="pw-sitzungstyp-meta">
           <span v-if="typ.standardOrt">📍 {{ typ.standardOrt }}</span>
           <span v-if="typ.standardZeitVon">🕒 {{ typ.standardZeitVon }}<template v-if="typ.standardZeitBis"> – {{ typ.standardZeitBis }}</template></span>
-          <span>{{ typ.einladungVersenden ? '✉️ Einladung' : '— keine Einladung' }}</span>
           <span>{{ (typ.traktanden || []).length }} Vorlage-Traktanden</span>
           <span>{{ (typ.teilnehmer || []).length }} Teilnehmer-Regeln</span>
         </div>
@@ -74,10 +73,6 @@
               <input v-model="bearbeitung.standardZeitBis" type="time" class="pw-input" />
             </label>
           </div>
-          <NcCheckboxRadioSwitch v-model="bearbeitung.einladungVersenden" type="switch">
-            Einladung an Teilnehmer versenden
-          </NcCheckboxRadioSwitch>
-
           <fieldset class="pw-fieldset">
             <legend>Vorlage-Traktanden</legend>
             <div v-for="(t, i) in bearbeitung.traktanden" :key="i" class="pw-zeile">
