@@ -21,14 +21,14 @@ use Psr\Log\LoggerInterface;
 class MitgliedServiceTest extends TestCase {
     public function testSynchronisiereMitgliederUebernimmtAktivstatusAusImportdaten(): void {
         $mitgliedMapper = $this->createMock(MitgliedMapper::class);
-        $fraktionMapper = $this->createMock(FraktionMapper::class);
-        $kommissionMapper = $this->createMock(KommissionMapper::class);
+        $fraktionMapper = $this->createStub(FraktionMapper::class);
+        $kommissionMapper = $this->createStub(KommissionMapper::class);
         $scraper = $this->createMock(ScraperService::class);
-        $groupManager = $this->createMock(IGroupManager::class);
-        $userManager = $this->createMock(IUserManager::class);
-        $mailer = $this->createMock(IMailer::class);
-        $config = $this->createMock(IConfig::class);
-        $logger = $this->createMock(LoggerInterface::class);
+        $groupManager = $this->createStub(IGroupManager::class);
+        $userManager = $this->createStub(IUserManager::class);
+        $mailer = $this->createStub(IMailer::class);
+        $config = $this->createStub(IConfig::class);
+        $logger = $this->createStub(LoggerInterface::class);
 
         $service = new MitgliedService(
             $mitgliedMapper,

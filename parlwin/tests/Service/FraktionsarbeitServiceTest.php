@@ -27,14 +27,14 @@ class FraktionsarbeitServiceTest extends TestCase
         GeschaeftAktionMapper $aktionMapper,
         GeschaeftZustaendigkeitMapper $zustaendigkeitMapper,
     ): FraktionsarbeitService {
-        $rollenMapper = $this->createMock(FraktionsrolleMapper::class);
-        $mitgliedMapper = $this->createMock(MitgliedMapper::class);
-        $kommissionMapper = $this->createMock(KommissionMapper::class);
-        $ereignisMapper = $this->createMock(GeschaeftEreignisMapper::class);
-        $config = $this->createMock(IConfig::class);
-        $userSession = $this->createMock(IUserSession::class);
+        $rollenMapper = $this->createStub(FraktionsrolleMapper::class);
+        $mitgliedMapper = $this->createStub(MitgliedMapper::class);
+        $kommissionMapper = $this->createStub(KommissionMapper::class);
+        $ereignisMapper = $this->createStub(GeschaeftEreignisMapper::class);
+        $config = $this->createStub(IConfig::class);
+        $userSession = $this->createStub(IUserSession::class);
         $userSession->method('getUser')->willReturn(null);
-        $groupManager = $this->createMock(IGroupManager::class);
+        $groupManager = $this->createStub(IGroupManager::class);
 
         return new FraktionsarbeitService(
             $geschaeftMapper,
@@ -61,17 +61,17 @@ class FraktionsarbeitServiceTest extends TestCase
 
     public function testZustaendigkeitenTextVonNach(): void
     {
-        $geschaeftMapper = $this->createMock(GeschaeftMapper::class);
+        $geschaeftMapper = $this->createStub(GeschaeftMapper::class);
         $geschaeftMapper->method('find')->willReturn(new Geschaeft());
 
-        $aktionMapper = $this->createMock(GeschaeftAktionMapper::class);
+        $aktionMapper = $this->createStub(GeschaeftAktionMapper::class);
         $erfassteAktion = null;
         $aktionMapper->method('insert')->willReturnCallback(function (GeschaeftAktion $a) use (&$erfassteAktion): GeschaeftAktion {
             $erfassteAktion = $a;
             return $a;
         });
 
-        $zustaendigkeitMapper = $this->createMock(GeschaeftZustaendigkeitMapper::class);
+        $zustaendigkeitMapper = $this->createStub(GeschaeftZustaendigkeitMapper::class);
         // Vorher: Marc war zuständig
         $zustaendigkeitMapper->method('findAktiveByGeschaeft')->willReturnOnConsecutiveCalls(
             [$this->makeZustaendigkeit('mitglied:marc', 'Marc Muster', true)],
@@ -97,17 +97,17 @@ class FraktionsarbeitServiceTest extends TestCase
 
     public function testZustaendigkeitenTextWennNiemandVorher(): void
     {
-        $geschaeftMapper = $this->createMock(GeschaeftMapper::class);
+        $geschaeftMapper = $this->createStub(GeschaeftMapper::class);
         $geschaeftMapper->method('find')->willReturn(new Geschaeft());
 
-        $aktionMapper = $this->createMock(GeschaeftAktionMapper::class);
+        $aktionMapper = $this->createStub(GeschaeftAktionMapper::class);
         $erfassteAktion = null;
         $aktionMapper->method('insert')->willReturnCallback(function (GeschaeftAktion $a) use (&$erfassteAktion): GeschaeftAktion {
             $erfassteAktion = $a;
             return $a;
         });
 
-        $zustaendigkeitMapper = $this->createMock(GeschaeftZustaendigkeitMapper::class);
+        $zustaendigkeitMapper = $this->createStub(GeschaeftZustaendigkeitMapper::class);
         $zustaendigkeitMapper->method('findAktiveByGeschaeft')->willReturnOnConsecutiveCalls(
             [],
             [$this->makeZustaendigkeit('mitglied:jana', 'Jana Beispiel', true)],
@@ -129,17 +129,17 @@ class FraktionsarbeitServiceTest extends TestCase
 
     public function testZustaendigkeitenUnveraendertBestaetigt(): void
     {
-        $geschaeftMapper = $this->createMock(GeschaeftMapper::class);
+        $geschaeftMapper = $this->createStub(GeschaeftMapper::class);
         $geschaeftMapper->method('find')->willReturn(new Geschaeft());
 
-        $aktionMapper = $this->createMock(GeschaeftAktionMapper::class);
+        $aktionMapper = $this->createStub(GeschaeftAktionMapper::class);
         $erfassteAktion = null;
         $aktionMapper->method('insert')->willReturnCallback(function (GeschaeftAktion $a) use (&$erfassteAktion): GeschaeftAktion {
             $erfassteAktion = $a;
             return $a;
         });
 
-        $zustaendigkeitMapper = $this->createMock(GeschaeftZustaendigkeitMapper::class);
+        $zustaendigkeitMapper = $this->createStub(GeschaeftZustaendigkeitMapper::class);
         $zustaendig = $this->makeZustaendigkeit('mitglied:marc', 'Marc Muster', true);
         $zustaendigkeitMapper->method('findAktiveByGeschaeft')->willReturn([$zustaendig]);
         $zustaendigkeitMapper->method('ersetzeAktive');

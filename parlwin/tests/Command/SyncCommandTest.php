@@ -57,7 +57,7 @@ class SyncCommandTest extends TestCase {
         $config = $this->createMock(IConfig::class);
         $config->expects(self::never())->method('setAppValue');
 
-        $fraktionsarbeitService = $this->createMock(FraktionsarbeitService::class);
+        $fraktionsarbeitService = $this->createStub(FraktionsarbeitService::class);
         $fraktionsarbeitService->method('autoZuweisenKommissionsmitglieder')->willReturn([
             'gepruet' => 0,
             'zugewiesen' => 0,
@@ -78,7 +78,7 @@ class SyncCommandTest extends TestCase {
             $config,
         );
 
-        $input = $this->createMock(InputInterface::class);
+        $input = $this->createStub(InputInterface::class);
         $input->method('getOption')->willReturnCallback(static function (string $name): mixed {
             return match ($name) {
                 'nur-geschaefte', 'nur-sitzungen', 'nur-mitglieder' => false,
@@ -164,7 +164,7 @@ class SyncCommandTest extends TestCase {
                 self::isArray()
             );
 
-        $fraktionsarbeitService = $this->createMock(FraktionsarbeitService::class);
+        $fraktionsarbeitService = $this->createStub(FraktionsarbeitService::class);
         $fraktionsarbeitService->method('autoZuweisenKommissionsmitglieder')->willReturn([
             'gepruet' => 0,
             'zugewiesen' => 0,
@@ -185,7 +185,7 @@ class SyncCommandTest extends TestCase {
             $config,
         );
 
-        $input = $this->createMock(InputInterface::class);
+        $input = $this->createStub(InputInterface::class);
         $input->method('getOption')->willReturnCallback(static function (string $name): mixed {
             return match ($name) {
                 'nur-geschaefte', 'nur-sitzungen' => false,
@@ -196,7 +196,7 @@ class SyncCommandTest extends TestCase {
             };
         });
 
-        $output = $this->createMock(OutputInterface::class);
+        $output = $this->createStub(OutputInterface::class);
         $output->method('writeln');
 
         $ref = new \ReflectionMethod($command, 'execute');
@@ -275,7 +275,7 @@ class SyncCommandTest extends TestCase {
                 $realtimeEvents[] = $event;
             });
 
-        $fraktionsarbeitService = $this->createMock(FraktionsarbeitService::class);
+        $fraktionsarbeitService = $this->createStub(FraktionsarbeitService::class);
         $fraktionsarbeitService->method('autoZuweisenKommissionsmitglieder')->willReturn([
             'gepruet' => 0,
             'zugewiesen' => 0,
@@ -296,7 +296,7 @@ class SyncCommandTest extends TestCase {
             $config,
         );
 
-        $input = $this->createMock(InputInterface::class);
+        $input = $this->createStub(InputInterface::class);
         $input->method('getOption')->willReturnCallback(static function (string $name): mixed {
             return match ($name) {
                 'nur-geschaefte', 'nur-sitzungen' => false,
@@ -397,7 +397,7 @@ class SyncCommandTest extends TestCase {
             ->method('publish')
             ->with(self::equalTo('sync.completed'), self::isArray());
 
-        $fraktionsarbeitService = $this->createMock(FraktionsarbeitService::class);
+        $fraktionsarbeitService = $this->createStub(FraktionsarbeitService::class);
         $fraktionsarbeitService->method('autoZuweisenKommissionsmitglieder')->willReturn([
             'gepruet' => 0,
             'zugewiesen' => 0,
@@ -418,7 +418,7 @@ class SyncCommandTest extends TestCase {
             $config,
         );
 
-        $input = $this->createMock(InputInterface::class);
+        $input = $this->createStub(InputInterface::class);
         $input->method('getOption')->willReturnCallback(static function (string $name): mixed {
             return match ($name) {
                 'nur-geschaefte', 'nur-sitzungen' => false,
@@ -429,7 +429,7 @@ class SyncCommandTest extends TestCase {
             };
         });
 
-        $output = $this->createMock(OutputInterface::class);
+        $output = $this->createStub(OutputInterface::class);
         $output->method('writeln');
 
         $ref = new \ReflectionMethod($command, 'execute');
