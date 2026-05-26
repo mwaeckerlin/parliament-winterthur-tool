@@ -19,9 +19,10 @@ function pwLog(string $message): void
 function pwOcc(array $args): array
 {
   $cmd = array_merge(['/usr/bin/php', '/app/occ'], $args);
+  // stderr → stdout: avoids pipe deadlock when occ produces large output
   $proc = proc_open(
     $cmd,
-    [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+    [1 => ['pipe', 'w'], 2 => ['redirect', 1]],
     $pipes
   );
   if (!is_resource($proc)) {
@@ -29,11 +30,8 @@ function pwOcc(array $args): array
   }
   $out = stream_get_contents($pipes[1]);
   fclose($pipes[1]);
-  $err = stream_get_contents($pipes[2]);
-  fclose($pipes[2]);
   $code = proc_close($proc);
-  $combined = trim(((string) $out) . "\n" . ((string) $err));
-  return [is_int($code) ? $code : 1, $combined];
+  return [is_int($code) ? $code : 1, trim((string) $out)];
 }
 
 /**
@@ -81,6 +79,13 @@ for ($i = 0; $i < $maxAttempts; $i++) {
       pwLog('parlwin already enabled');
     } else {
       pwAbortContainer("app:enable parlwin failed (exit={$code}):\n{$output}");
+    }
+
+    // Wartungsmodus aufheben falls er von einem abgebrochenen Upgrade übrig ist.
+    [, $status] = pwOcc(['status', '--no-ansi']);
+    if (strpos($status, 'maintenance: true') !== false) {
+      pwLog('Maintenance mode active (leftover from aborted upgrade) — disabling before upgrade...');
+      pwOcc(['maintenance:mode', '--off', '--no-ansi']);
     }
 
     // Migrationen ausführen. Schlägt eine Migration fehl, bricht occ upgrade mit
