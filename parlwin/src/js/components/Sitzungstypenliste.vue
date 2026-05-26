@@ -42,7 +42,7 @@
           <span v-if="typ.standardOrt">📍 {{ typ.standardOrt }}</span>
           <span v-if="typ.standardZeitVon">🕒 {{ typ.standardZeitVon }}<template v-if="typ.standardZeitBis"> – {{ typ.standardZeitBis }}</template></span>
           <span>{{ (typ.traktanden || []).length }} Vorlage-Traktanden</span>
-          <span>{{ (typ.teilnehmer || []).length }} Teilnehmer-Regeln</span>
+          <span>{{ (typ.teilnehmer || []).length }} Teilnehmer</span>
         </div>
       </div>
     </div>
@@ -56,26 +56,41 @@
           <button type="button" class="pw-modal-close" @click="abbrechen">×</button>
         </header>
         <div class="pw-modal-body">
-          <label>Name *
+          <PwField label="Name *">
             <input v-model="bearbeitung.name" type="text" class="pw-input" />
-          </label>
-          <label>Zweck
-            <textarea v-model="bearbeitung.zweck" class="pw-textarea" rows="2"></textarea>
-          </label>
-          <div class="pw-grid-2">
-            <label>Standard-Ort
-              <input v-model="bearbeitung.standardOrt" type="text" class="pw-input" />
-            </label>
-            <label>Standard-Zeit von
+          </PwField>
+          <PwField label="Zweck">
+            <textarea v-model="bearbeitung.zweck" class="pw-textarea" rows="2" />
+          </PwField>
+          <PwField label="Standard-Ort">
+            <input v-model="bearbeitung.standardOrt" type="text" class="pw-input" />
+          </PwField>
+          <div class="pw-von-bis">
+            <PwField label="Von">
               <input v-model="bearbeitung.standardZeitVon" type="time" class="pw-input" />
-            </label>
-            <label>Standard-Zeit bis
+            </PwField>
+            <PwField label="Bis">
               <input v-model="bearbeitung.standardZeitBis" type="time" class="pw-input" />
-            </label>
+            </PwField>
           </div>
           <fieldset class="pw-fieldset">
             <legend>Vorlage-Traktanden</legend>
-            <div v-for="(t, i) in bearbeitung.traktanden" :key="i" class="pw-zeile">
+            <div
+              v-for="(t, i) in bearbeitung.traktanden"
+              :key="i"
+              class="pw-zeile"
+              :class="{ 'pw-drag-over': typDragOverIdx === i }"
+              @dragover.prevent="typDragOverIdx = i"
+              @dragleave="typDragOverIdx = null"
+              @drop.prevent="typDragDrop(i)"
+              @dragend="typDragOverIdx = null"
+            >
+              <span
+                class="pw-drag-handle"
+                aria-hidden="true"
+                draggable="true"
+                @dragstart="typDragSrc = i"
+              >⠿</span>
               <input v-model="t.titel" placeholder="Titel" class="pw-input" />
               <input v-model="t.beschreibung" placeholder="Beschreibung" class="pw-input" />
               <button type="button" class="pw-btn-klein" @click="bearbeitung.traktanden.splice(i, 1)">✕</button>
@@ -84,46 +99,20 @@
           </fieldset>
 
           <fieldset class="pw-fieldset">
-            <legend>Teilnehmer-Regeln</legend>
-            <div v-for="(p, i) in bearbeitung.teilnehmer" :key="i" class="pw-zeile">
-              <select v-model="p.art" class="pw-input" @change="onArtChange(p)">
-                <option value="mitglied">Einzelnes Mitglied</option>
-                <option value="fraktion">Ganze Fraktion</option>
-                <option value="eigeneFraktion">Eigene Fraktion</option>
-                <option value="kommission">Ganze Kommission</option>
-                <option value="rolle">Fraktions-Rolle</option>
-                <option value="ncGruppe">Nextcloud-Gruppe</option>
-                <option value="ncUser">Nextcloud-Benutzer</option>
-              </select>
-              <select v-if="p.art === 'mitglied'" v-model.number="p.referenzId" class="pw-input">
-                <option :value="0">— Mitglied wählen —</option>
-                <option v-for="m in aktiveMitglieder" :key="m.id" :value="m.id">{{ mitgliedLabel(m) }}</option>
-              </select>
-              <select v-else-if="p.art === 'fraktion'" v-model="p.referenzName" class="pw-input">
-                <option value="">— Fraktion wählen —</option>
-                <option v-for="f in aktiveFraktionen" :key="f.kuerzel || f.name" :value="f.name">{{ f.name }}</option>
-              </select>
-              <span v-else-if="p.art === 'eigeneFraktion'" class="pw-hinweis">→ {{ konfigurierteGruppe || '(in den Plugin-Einstellungen keine Nextcloud-Gruppe konfiguriert)' }}</span>
-              <select v-else-if="p.art === 'kommission'" v-model.number="p.referenzId" class="pw-input">
-                <option :value="0">{{ aktiveKommissionen.length ? '— Kommission wählen —' : '— Keine Kommissionen vorhanden —' }}</option>
-                <option v-for="k in aktiveKommissionen" :key="k.id" :value="k.id">{{ k.name }}</option>
-              </select>
-              <select v-else-if="p.art === 'ncGruppe'" v-model="p.referenzName" class="pw-input">
-                <option value="">{{ ncGruppenLaden ? '— Lade Gruppen … —' : (ncGruppen.length ? '— Nextcloud-Gruppe wählen —' : '— Keine Gruppen verfügbar —') }}</option>
-                <option v-for="g in ncGruppen" :key="g.gid" :value="g.gid">{{ g.displayName || g.gid }}</option>
-              </select>
-              <select v-else-if="p.art === 'ncUser'" v-model="p.referenzName" class="pw-input">
-                <option value="">{{ ncUserLaden ? '— Lade Benutzer … —' : (ncUser.length ? '— Nextcloud-Benutzer wählen —' : '— Keine Benutzer verfügbar —') }}</option>
-                <option v-for="u in ncUser" :key="u.uid" :value="u.uid">{{ u.displayName || u.uid }} ({{ u.uid }})</option>
-              </select>
-              <select v-else-if="p.art === 'rolle'" v-model="p.referenzName" class="pw-input">
-                <option value="">— Fraktions-Rolle wählen —</option>
-                <option v-for="r in verfuegbareRollen" :key="r.code" :value="r.code">{{ r.bezeichnung }}</option>
-              </select>
-              <input v-else v-model="p.referenzName" placeholder="Bezeichnung" class="pw-input" />
-              <button type="button" class="pw-btn-klein" @click="bearbeitung.teilnehmer.splice(i, 1)">✕</button>
-            </div>
-            <NcButton type="secondary" @click="bearbeitung.teilnehmer.push({ art: 'eigeneFraktion', referenzId: 0, referenzName: '' })">+ Regel</NcButton>
+            <legend>Teilnehmer</legend>
+            <NcCheckboxRadioSwitch
+              :checked="hatEigeneFraktion"
+              @update:checked="toggleEigeneFraktion"
+            >Eigene Fraktion<span v-if="konfigurierteGruppe" class="pw-hinweis pw-hinweis-inline"> → {{ konfigurierteGruppe }}</span></NcCheckboxRadioSwitch>
+            <PwField label="Einzelne Mitglieder">
+              <PwMultiSelect
+                :model-value="ausgewaehlteMitglieder"
+                :options="mitgliederOptionen"
+                placeholder="Mitglieder hinzufügen…"
+                label="label"
+                @update:model-value="updateMitglieder"
+              />
+            </PwField>
           </fieldset>
         </div>
         <footer class="pw-modal-footer">
@@ -143,10 +132,12 @@ import NcTextField from '@nextcloud/vue/components/NcTextField'
 import NcButton from '@nextcloud/vue/components/NcButton'
 import NcCheckboxRadioSwitch from '@nextcloud/vue/components/NcCheckboxRadioSwitch'
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
+import PwMultiSelect from './PwMultiSelect.vue'
+import PwField from './PwField.vue'
 
 export default {
   name: 'Sitzungstypenliste',
-  components: { NcTextField, NcButton, NcCheckboxRadioSwitch, NcLoadingIcon },
+  components: { NcTextField, NcButton, NcCheckboxRadioSwitch, NcLoadingIcon, PwMultiSelect, PwField },
   props: {
     mitglieder: { type: Array, default: () => [] },
     fraktionen: { type: Array, default: () => [] },
@@ -164,6 +155,8 @@ export default {
       ncUser: [],
       ncGruppenLaden: false,
       ncUserLaden: false,
+      typDragSrc: null,
+      typDragOverIdx: null,
       verfuegbareRollen: [
         { code: 'kommissionsmitglied', bezeichnung: 'Kommissionsmitglied' },
         { code: 'fraktionspraesident', bezeichnung: 'Fraktionspräsident' },
@@ -194,6 +187,17 @@ export default {
     konfigurierteGruppe() {
       return (typeof window !== 'undefined' && window.PARLWIN_CONFIG && window.PARLWIN_CONFIG.nextcloudGruppe) || ''
     },
+    hatEigeneFraktion() {
+      return !!(this.bearbeitung?.teilnehmer || []).some(p => p.art === 'eigeneFraktion')
+    },
+    mitgliederOptionen() {
+      return this.aktiveMitglieder.map(m => ({ value: m.id, label: this.mitgliedLabel(m) }))
+    },
+    ausgewaehlteMitglieder() {
+      return (this.bearbeitung?.teilnehmer || [])
+        .filter(p => p.art === 'mitglied')
+        .map(p => ({ value: p.referenzId, label: p.referenzName || this.mitgliedLabel(this.aktiveMitglieder.find(m => m.id === p.referenzId) || {}) }))
+    },
   },
   mounted() {
     this.$nextTick(() => { this.filterReady = true })
@@ -219,11 +223,24 @@ export default {
       const n = m.name || ''
       return `${v} ${n}`.trim() + (m.fraktion ? ` (${m.fraktion})` : '')
     },
-    onArtChange(p) {
-      // Bei Wechsel der Art: Referenzen zurücksetzen, damit nicht versehentlich
-      // ein Wert aus einem anderen Auswahlfeld übernommen wird.
-      p.referenzId = 0
-      p.referenzName = ''
+    toggleEigeneFraktion(checked) {
+      if (!this.bearbeitung) return
+      if (checked) {
+        if (!this.bearbeitung.teilnehmer.some(p => p.art === 'eigeneFraktion')) {
+          this.bearbeitung.teilnehmer.push({ art: 'eigeneFraktion', referenzId: 0, referenzName: '' })
+        }
+      } else {
+        this.bearbeitung.teilnehmer = this.bearbeitung.teilnehmer.filter(p => p.art !== 'eigeneFraktion')
+      }
+    },
+    updateMitglieder(optionen) {
+      if (!this.bearbeitung) return
+      const andere = this.bearbeitung.teilnehmer.filter(p => p.art !== 'mitglied')
+      const mitglieder = (optionen || []).map(o => {
+        const m = this.aktiveMitglieder.find(x => x.id === o.value)
+        return { art: 'mitglied', referenzId: o.value, referenzName: m ? this.mitgliedLabel(m) : (o.label || '') }
+      })
+      this.bearbeitung.teilnehmer = [...andere, ...mitglieder]
     },
     async ladeNcGruppen(search = '') {
       this.ncGruppenLaden = true
@@ -248,6 +265,14 @@ export default {
       } finally {
         this.ncUserLaden = false
       }
+    },
+    typDragDrop(targetIdx) {
+      if (this.typDragSrc === null || this.typDragSrc === targetIdx) return
+      const arr = this.bearbeitung.traktanden
+      const moved = arr.splice(this.typDragSrc, 1)[0]
+      arr.splice(targetIdx, 0, moved)
+      this.typDragSrc = null
+      this.typDragOverIdx = null
     },
     neuerTyp() {
       this.bearbeitung = {
@@ -380,7 +405,7 @@ export default {
   padding: 16px; overflow-y: auto; flex: 1;
   display: flex; flex-direction: column; gap: 12px;
 }
-.pw-modal-body label { display: flex; flex-direction: column; gap: 4px; font-weight: 500; }
+.pw-hinweis-inline { font-weight: 400; margin-left: 4px; }
 .pw-modal-footer {
   display: flex; justify-content: flex-end; gap: 8px;
   padding: 12px 16px; border-top: 1px solid var(--color-border, #ddd);
@@ -392,7 +417,8 @@ export default {
   background: var(--color-main-background, #fff);
   color: var(--color-main-text, #000);
 }
-.pw-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.pw-von-bis { display: flex; gap: 12px; }
+.pw-von-bis label { flex: 1; }
 .pw-fieldset {
   border: 1px solid var(--color-border, #ddd);
   border-radius: 4px; padding: 8px 12px;
@@ -400,6 +426,16 @@ export default {
 .pw-fieldset legend { font-weight: 600; padding: 0 6px; }
 .pw-zeile {
   display: flex; gap: 6px; margin-bottom: 6px; align-items: center;
+}
+.pw-zeile.pw-drag-over {
+  outline: 2px solid var(--color-primary);
+  border-radius: var(--border-radius);
+}
+.pw-drag-handle {
+  cursor: grab;
+  color: var(--color-text-lighter);
+  user-select: none;
+  flex-shrink: 0;
 }
 .pw-zeile .pw-input { flex: 1; }
 .pw-btn-klein {

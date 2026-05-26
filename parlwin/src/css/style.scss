@@ -1000,6 +1000,20 @@ ul.app-navigation__list {
   color: var(--pw-muted);
 }
 
+.pw-fieldset {
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.pw-fieldset>legend {
+  font-size: var(--pw-font-md);
+  font-weight: 500;
+  color: var(--pw-muted);
+  padding: 0;
+  margin-block-end: var(--pw-gap-1);
+}
+
 .pw-modal-footer {
   display: flex;
   gap: var(--pw-gap-1);

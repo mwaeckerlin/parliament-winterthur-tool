@@ -46,8 +46,7 @@
               role="button"
               :aria-label="`Geschäft ${g.nummer || ''} öffnen`"
               @click="oeffneDetail(g.id)"
-              @keydown.enter.prevent="oeffneDetail(g.id)"
-              @keydown.space.prevent="oeffneDetail(g.id)"
+              @keydown="zeilenKeydown($event, g.id)"
             >
               <td data-label="Nr." class="pw-col-nr">{{ g.nummer }}</td>
               <td class="pw-titel pw-col-titel" data-label="Titel">
@@ -71,13 +70,11 @@
                 />
               </td>
               <td data-label="Beschluss" class="pw-col-inline-edit pw-col-beschluss" @click.stop>
-                <NcSelect
-                  class="pw-inline-select"
+                <BeschlussWidget
+                  class="pw-inline-beschluss"
                   :model-value="beschlussOptionFuer(g)"
                   :options="beschlussOptionenFuer(g)"
-                  :clearable="true"
                   placeholder="—"
-                  label="label"
                   @update:model-value="aenderungBeschluss(g, $event)"
                 />
               </td>
@@ -95,8 +92,7 @@
             tabindex="0"
             role="button"
             @click="oeffneDetail(g.id)"
-            @keydown.enter.prevent="oeffneDetail(g.id)"
-            @keydown.space.prevent="oeffneDetail(g.id)"
+            @keydown="zeilenKeydown($event, g.id)"
           >
             <div class="pw-data-card-header">
               <div>
@@ -156,6 +152,7 @@ import GeschaeftDetail from './GeschaeftDetail.vue'
 import NcTextField from '@nextcloud/vue/components/NcTextField'
 import NcSelect from '@nextcloud/vue/components/NcSelect'
 import PwMultiSelect from './PwMultiSelect.vue'
+import BeschlussWidget from './BeschlussWidget.vue'
 import NcCheckboxRadioSwitch from '@nextcloud/vue/components/NcCheckboxRadioSwitch'
 import NcButton from '@nextcloud/vue/components/NcButton'
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
@@ -163,7 +160,7 @@ import NcEmptyContent from '@nextcloud/vue/components/NcEmptyContent'
 
 export default {
   name: 'Geschaeftsliste',
-  components: { GeschaeftDetail, NcTextField, NcSelect, PwMultiSelect, NcCheckboxRadioSwitch, NcButton, NcLoadingIcon, NcEmptyContent },
+  components: { GeschaeftDetail, NcTextField, NcSelect, PwMultiSelect, NcCheckboxRadioSwitch, NcButton, NcLoadingIcon, NcEmptyContent, BeschlussWidget },
   props: {
     mitglieder: { type: Array, default: () => [] },
   },
@@ -368,15 +365,23 @@ export default {
         return treffer || { label: z.personName || z.personKey, value: z.personKey, mitglied: null }
       })
     },
+    zeilenKeydown(event, id) {
+      if (event.target.closest('input, select, textarea, [contenteditable], [role="combobox"], [role="listbox"], [role="option"]')) return
+      if (event.key === ' ') { event.preventDefault(); this.oeffneDetail(id) }
+      else if (event.key === 'Enter') { event.preventDefault(); this.oeffneDetail(id) }
+    },
     beschlussOptionenFuer(geschaeft) {
       const erlaubt = Array.isArray(geschaeft.erlaubteBeschluesse) ? geschaeft.erlaubteBeschluesse : []
       return erlaubt.map((b) => ({ label: b.label || b.code, value: b.code }))
     },
     beschlussOptionFuer(geschaeft) {
-      const code = geschaeft.letzterBeschluss?.aktionCode || ''
+      const lb = geschaeft.letzterBeschluss
+      if (!lb) return null
+      const code = lb.aktionCode || ''
+      if (!code && lb.text) return { label: lb.text, value: '', freitext: true }
       if (!code) return null
       const optionen = this.beschlussOptionenFuer(geschaeft)
-      return optionen.find((o) => o.value === code) || { label: geschaeft.letzterBeschluss?.titel || code, value: code }
+      return optionen.find((o) => o.value === code) || { label: lb.titel || code, value: code }
     },
     async aenderungZustaendig(geschaeft, optionen) {
       const optList = Array.isArray(optionen) ? optionen : (optionen ? [optionen] : [])
@@ -404,9 +409,10 @@ export default {
     },
     async aenderungBeschluss(geschaeft, option) {
       const code = option?.value || ''
+      const text = option?.freitext ? (option.label || '') : ''
       try {
-        if (code) {
-          await axios.post(generateUrl(`/apps/parlwin/geschaefte/${geschaeft.id}/beschluesse`), { code, text: '' })
+        if (code || text) {
+          await axios.post(generateUrl(`/apps/parlwin/geschaefte/${geschaeft.id}/beschluesse`), { code, text })
         } else {
           await axios.delete(generateUrl(`/apps/parlwin/geschaefte/${geschaeft.id}/beschluesse`))
         }

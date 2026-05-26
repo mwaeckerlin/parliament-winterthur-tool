@@ -1,136 +1,76 @@
 # Changelog
 
-## Unreleased
+2026-05-26  Marc Wäckerlin
 
-### Bugfix: Auto-Sync entfernte NC-Gruppe-Mitglieder ohne Admin-Einwilligung
+	Notizen und Beschlüsse können wieder mit der Maus verschoben werden — nur
+	noch über das ⠿-Symbol, nicht mehr über die ganze Zeile. Text in der Zeile
+	kann wieder normal markiert werden.
 
-`MitgliedService::aktualisiereNextcloudGruppe()` entfernte automatisch alle
-NC-Gruppe-Mitglieder, die nicht mehr aktive Parlamentsmitglieder waren — ohne
-Admin-Einwilligung. Dieser Block wurde entfernt. Entfernen aus der Gruppe
-erfolgt jetzt ausschliesslich über «Ausgewählte abgleichen» im Admin-UI
-(Requirement: nur selektierte Orphans werden deaktiviert/entfernt).
+	Beschluss-Widget ist jetzt überall gleich: in der Übersicht und in der
+	Detailansicht dasselbe Eingabefeld. Der Knopf «Aus Liste wählen» ist
+	verschwunden — nur wenn der Freitext manuell geleert wird, erscheint die
+	Listenauswahl wieder. Freier Text wird automatisch gespeichert.
 
-### Bugfix: Orphan-Zeile zeigte «aktiv» statt Gruppen in Spalte 4
+	Alle Beschriftungen im Formular sind jetzt einheitlich: gleiche Schrift,
+	gleiche Farbe — egal ob Label über Eingabefeld oder Abschnittstitel.
 
-In «Fraktionsmitglieder ↔ Nextcloud-User» zeigte die Gruppen-Spalte bei
-verwaisten Usern «aktiv» statt der tatsächlichen NC-Gruppen. Ausserdem war
-der Username (Spalte 3) fälschlicherweise durchgestrichen.
+	Sitzungstypen: Teilnehmerliste direkt wählen statt Regelwerk definieren.
+	Eigene Fraktion per Checkbox, einzelne Mitglieder per Mehrfachauswahl.
 
-Fix: `findeVerwaisteGruppenmitglieder()` liefert jetzt `lokaleGruppen` pro
-Orphan-Eintrag. Im Frontend: Username-Spalte ohne Strikethrough, Gruppen-Spalte
-via `aktualisiereGruppenZelle()` wie bei normalen Mitgliedern.
+	Zweite (und weitere) interne Sitzungen konnten nicht gespeichert werden.
+	Fehler behoben.
 
-### Dokumentation: README komplett nach Template A umstrukturiert
+2026-05-24  Marc Wäckerlin
 
-Neue Abschnitt-Reihenfolge: Purpose → Warum dieses Tool? → Funktionen →
-Bedienung → Administration → Entwicklung → Internas → Lizenz.
-Deployment-Anleitung verschoben von Abschnitt 2 nach Administration (Abschnitt 5).
-Doppelter «Beschreibung»-Abschnitt entfernt (Inhalt in Purpose eingearbeitet).
+	Interne Fraktionssitzungen erscheinen jetzt neben den Parlamentssitzungen in
+	der Sitzungsliste — mit Titel, Zweck, aufklappbaren Traktanden und Notizen für
+	das Protokoll.
 
-### Bugfix: `bemerkungen`-Feld in `TraktandumController::update()` wiederhergestellt
+	Neues Erstellungsformular im Stil des Nextcloud-Kalenders: Sitzungstyp wählen,
+	alle Felder werden aus der Vorlage vorausgefüllt (Titel, Ort, Von/Bis, Zweck,
+	Traktanden) und können vor dem Speichern angepasst werden. Optional wird
+	gleichzeitig ein Kalender-Eintrag erstellt.
 
-Das `bemerkungen`-Feld wurde in einer früheren Session versehentlich aus `update()` entfernt.
-Es wird wieder korrekt aus dem Request gelesen und gespeichert (neben `notizen`).
+	Interne Sitzungen sind in der Liste mit «intern» gekennzeichnet. Der Zwecktext
+	ist direkt sichtbar ohne Aufklappen.
 
-### Tests: TraktandumController
+	Der Parlamentssync löscht interne Sitzungen nicht mehr.
 
-Neue Testklasse `parlwin/tests/Controller/TraktandumControllerTest.php` mit 3 Tests:
-- `testUpdateSpeichertBemerkungen`
-- `testUpdateSpeichertNotizenOhneBemerkungen`
-- `testUpdateSpeichertBeidesGleichzeitig`
+	In «Fraktionsmitglieder ↔ Nextcloud-User» erscheinen jetzt auch Personen, die
+	in der NC-Gruppe sind, aber keinen aktiven Parlamentseintrag haben — mit
+	durchgestrichenem Namen. Nur wenn diese Person explizit ausgewählt wird, wird
+	sie beim «Ausgewählte abgleichen» deaktiviert.
 
-### Tests: Orphan-User-Verhalten in SettingsControllerTest
+	Traktandum-Bemerkungen werden wieder korrekt gespeichert.
 
-2 neue Tests für die «Fraktionsmitglieder ↔ Nextcloud-User»-Logik:
-- `testFraktionMitgliederZeigtVerwaisteNCGruppenUserOhneParlamentseintrag`:
-  Verwaiste NC-Gruppe-User (in Gruppe, aber kein Parlamentseintrag) erscheinen
-  in `verwaiste` und werden im Frontend durchgestrichen dargestellt.
-- `testProvisionVerarbeitetNurSelektierteOrphans`:
-  Nur selektierte verwaiste User werden bei «Ausgewählte abgleichen» verarbeitet;
-  nicht selektierte bleiben unberührt.
+2026-05-24  Marc Wäckerlin
 
-### Cleanup: createMock → createStub in allen betroffenen Testdateien
+	Notizen und Beschlüsse speichern automatisch — kein «Speichern»-Knopf mehr.
+	Notizen speichern bei Fokusverlust oder nach 5 Sekunden ohne Eingabe.
+	Beschlüsse speichern sofort nach Auswahl aus der Liste.
 
-Mock-Objekte ohne `expects()`-Aufrufe konsequent auf `createStub` umgestellt
-in: BackgroundJob/SyncJobTest, Command/SyncCancelCommandTest,
-Command/SyncCommandTest, Service/FraktionsarbeitServiceTest,
-Service/GeschaeftServiceTest, Service/MitgliedServiceTest,
-Service/RealtimePublisherServiceTest, Service/ScraperHtmlSyncTest,
-Service/ScraperServiceTest.
-Eliminiert alle verbleibenden 49 PHPUnit-Notices («No expectations configured»);
-Testergebnis jetzt: 104 Tests, 0 Notices.
+	Beim Speichern flimmert nichts mehr und offene Popups bleiben offen —
+	auch wenn mehrere Personen gleichzeitig arbeiten.
 
-### Cleanup: README bereinigt
+	In der Zeitleiste wird bei Zuständigkeitsänderungen «Von: X → Nach: Y»
+	angezeigt.
 
-Abschnitte «Zu Erledigen», «Erledigt» und «Bugs» aus dem README entfernt
-(alles umgesetzt). Alle nicht mehr referenzierten `image*.png`-Dateien gelöscht.
-Abschnitt «Fraktionsmitglieder ↔ Nextcloud-User» (verwaiste User) im README dokumentiert.
+	Die Traktanden-Tabelle wechselt auf schmalen Bildschirmen in ein Karten-Layout.
 
-## Unreleased (seit Commit 28c7034)
+	Dokument-Links (PDF) werden direkt beim Traktandum angezeigt (↗).
 
-### Auto-Save – keine Speichern-Knöpfe mehr
+2026-05-22  Marc Wäckerlin
 
-- **Notiz**: Kein «Notiz speichern»-Knopf. Speichert automatisch bei Fokusverlust (blur) und nach 5 Sekunden ohne Eingabe (Debounce). Während einer Eingabe-Session wird dieselbe Zeitleisten-Aktion aktualisiert (PUT statt POST), nicht eine neue angelegt. Feld wird erst nach blur geleert.
-- **Beschluss**: Kein «Beschluss speichern»-Knopf und kein «Beschluss zurücknehmen»-Knopf. Speichert sofort nach Auswahl aus der Liste. Freitext-Textarea speichert auf blur + Debounce. Löschen der Auswahl = Beschluss zurücknehmen.
+	Fehler beim Erstellen einer Sitzung aus einer Vorlage behoben.
+	Standard-Teilnehmerkreis ist nun die eigene Fraktion.
 
-### Kein Flimmern / keine Popup-Probleme beim Speichern
+2026-05-21  Marc Wäckerlin
 
-Alle Speichermethoden rufen kein `ladeDetail()` mehr auf. Stattdessen chirurgische lokale State-Updates:
+	Sitzungstyp-Formular vollständig funktionsfähig — Vorlagen können angelegt,
+	bearbeitet und für neue Sitzungen verwendet werden.
 
-- `_aktionHinzufuegen` / `_aktionAktualisieren` / `_aktionEntfernen` – mutieren `geschaeft.aktionen` in-place
-- `geschaeft.letzterBeschluss`, `geschaeft.zustaendigkeiten` werden gezielt aktualisiert
-- Offene Dropdowns / Popups bleiben offen, andere Widgets bleiben unberührt
+	Notizen können pro Sitzung erfasst werden (Protokollführung).
 
-Realtime-Events von anderen Benutzenden ebenfalls gezielt:
-- `geschaefte.action` → nur `_ladeAktionenNur()` (Timeline, kein beschlussWert-Touch)
-- `geschaefte.updated` → `_ladeZustaendigkeitenUndAktionen()` (kein beschlussWert-Touch)
-- `fraktionssitzung.updated` / `fraktion.roles.updated` → Full-Reload (seltene Konfigurationsänderungen)
+	Kommissionen können per Suchfeld gefunden werden.
 
-### Zeitleiste: «Von → Nach» bei Zuständigkeitsänderungen
-
-- PHP `FraktionsarbeitService::zustaendigkeitenSetzen()`: Audit-Text neu als `Von: X → Nach: Y`
-- Vue: `e.text` wird zusätzlich zum `e.titel` in der Zeitleiste angezeigt (`.pw-timeline-detail`, kleiner, gedimmt)
-
-### Responsive Traktanden-Karten in Sitzungsliste
-
-- Unterhalb von 52 em Container-Breite wechselt die Traktandentabelle vollständig in ein Karten-Layout
-- Container-Query `@container pw-sitzungen (max-inline-size: 52em)` – kein Spalten-Verstecken, sondern vollständiges Umformatieren
-- Dokument-URL (`t.url`) auch im Karten-Layout als ↗-Link sichtbar
-
-### Protokoll-Dokument-URL
-
-- `ScraperService::extrahiereTraktandenAusHtml()`: HTML-Titel ab erstem `<br>` abschneiden; Dokument-Link (PDF) aus `<a href>` extrahieren, wenn kein Geschäft-Link vorhanden
-- Neues Feld `pw_traktanden.url` (Migration `Version000012Date20260524190000`)
-- `Traktandum.php`: Property `$url`, Getter/Setter, `jsonSerialize()`
-- `SitzungService`: liest `traktandumUrl` aus Scraper-Daten, ruft `setUrl()` auf
-- Tabellenansicht und Karten-Layout: ↗-Link zeigt direkt auf Dokument
-
-### Beschluss-Migration (v000011)
-i
-- Bestehende Beschluss-Aktionen mit `titel` + `text` werden zu einem einzigen `text`-Feld zusammengeführt
-
-### Popup schliesst sich nicht mehr bei Speichern (Kommissionsliste)
-
-- `nachSpeichern()` in `Kommissionsliste.vue` ruft kein `schliesseDetail()` mehr auf
-
-### Cursor-Position beim Notiz-Bearbeiten
-
-- Klick auf Notiztext öffnet Textarea mit Cursor genau an der geklickten Textstelle (`caretPositionFromPoint` / `caretRangeFromPoint`)
-
-### Beschluss-Freitext Auto-Reset
-
-- Leerer Freitext-Textarea → automatisch zurück zur NcSelect-Liste
-
-### Tests
-
-- **Vitest-Infrastruktur** neu aufgesetzt (`vitest.config.js`, `src/js/tests/`, Mocks für `@nextcloud/*`)
-- **31 JS-Tests** in `GeschaeftDetail.test.js` und `Kommissionsliste.test.js`
-- **3 neue PHP-Tests** in `FraktionsarbeitServiceTest.php` (Von→Nach-Format für Zuständigkeiten)
-- **PHPUnit 13 / PHP 8.5-Fixes**: `isType()` → `isArray()`/`isString()`/`isCallable()`; `setAccessible()` entfernt
-- **Alle 99 PHP-Tests und 31 JS-Tests grün**
-
-### Sonstiges
-
-- `NotizenListe.vue`: Überarbeitungen
-- `templates/admin.php`: Anpassungen
-- `README.md`: Dokumentation aller neuen Features (v1.1.1-Einträge)
+	Dokumente können direkt aus dem Tool erstellt werden.

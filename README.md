@@ -839,20 +839,19 @@ Zusätzliche Rollenverwaltung:
 
 #### Sitzungen
 
-Felder aus der Parlamentswebseite:
-- `extern_id`, `titel`, `datum`, `zeit_von`, `zeit_bis`, `ort`, `url`
+Zwei Typen von Sitzungen werden in `pw_sitzungen` gespeichert:
 
-Für jede Sitzung werden automatisch **Kalendereinträge** im Fraktions-Kalender
-(`Fraktion <Name>`) in Nextcloud Calendar erstellt. Dieser Kalender ist als allgemeiner Fraktions-Container angelegt und wird künftig auch weitere
-Sitzungstypen aufnehmen.
+**Parlamentssitzungen** (scraper-synchronisiert):
+- `extern_id` ist gesetzt (ID der Parlamentswebseite)
+- Felder: `extern_id`, `titel`, `datum`, `zeit_von`, `zeit_bis`, `ort`, `url`
+- Für jede Sitzung wird automatisch ein **Kalendereintrag** im Fraktions-Kalender (`Fraktion <Name>`) erstellt
 
-Felder:
-- `extern_id`: identisch mit `id` in der Datenbank (kanonisch)
-- `titel`, `beschreibung`: leer bei Kommissionssitzungen
-- `datum`, `zeit_von`, `zeit_bis`, `ort`: Aus den Quellseiten
-- `url`: direkter Link auf der Webseite
-- `typ`: `parlament` / `kommission` (automatisch aus der Quellseite)
-- `kommission_id` (nur für Kommissionssitzungen)
+**Interne Fraktionssitzungen** (manuell angelegt):
+- `extern_id` ist NULL, `typ_id` verweist auf einen `pw_sitzungstypen`-Eintrag
+- Felder: `titel`, `datum`, `zeit_von`, `zeit_bis`, `ort`, `bemerkungen` (Zweck)
+- Traktanden in `pw_traktanden` (ohne Parlamentsgeschäfts-Verknüpfung)
+- Optionaler Kalender-Eintrag: DESCRIPTION = Zweck + Traktanden-Liste
+- Parliament-Sync löscht interne Sitzungen nie (nur Zeilen mit `extern_id IS NOT NULL` werden berücksichtigt)
 
 #### Traktanden
 
@@ -944,23 +943,24 @@ aktualisiert_am
 pw_sitzungstypen                     pw_sitzungstyp_teilnehmer
 ────────────────────────────         ─────────────────────────
 id                                   id
-name                                 sitzungstyp_id
-beschreibung                         uid
-kalender_uid                         erstellt_am
+name                                 typ_id -> pw_sitzungstypen
+zweck                                art (eigeneFraktion|mitglied|ncUser|…)
+kalender_anlegen                     referenz_id
+einladung_versenden                  referenz_name
+standard_ort                         erstellt_am
+standard_zeit_von
+standard_zeit_bis
+geloescht
 erstellt_am
 aktualisiert_am
 
 pw_sitzungstyp_traktanden
 ─────────────────────────
 id
-sitzungstyp_id
+typ_id -> pw_sitzungstypen
 position
 titel
-notiz
-mit_notiz_feld
-mit_beschluss_feld
-Notiz-/Bemerkungsfeldern für die
-Sitzungsarbeit
+beschreibung
 ```
 
 ### Realtime-Collaboration (WebSocket)

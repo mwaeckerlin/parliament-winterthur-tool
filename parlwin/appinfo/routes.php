@@ -25,6 +25,7 @@ return [
 
         // Sitzungen
         ['name' => 'sitzung#index', 'url' => '/sitzungen', 'verb' => 'GET'],
+        ['name' => 'sitzung#create', 'url' => '/sitzungen', 'verb' => 'POST'],
         ['name' => 'sitzung#show', 'url' => '/sitzungen/{id}', 'verb' => 'GET'],
         ['name' => 'sitzung#update', 'url' => '/sitzungen/{id}', 'verb' => 'PUT'],
 

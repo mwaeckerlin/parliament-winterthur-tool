@@ -84,7 +84,8 @@ class SitzungMapper extends QBMapper
     }
 
     /**
-     * Gibt alle externen IDs der bekannten Sitzungen zurück.
+     * Gibt alle externen IDs der bekannten Parlamentssitzungen zurück.
+     * Interne Sitzungen (extern_id IS NULL) werden ausgeschlossen.
      *
      * @return string[]
      */
@@ -92,18 +93,21 @@ class SitzungMapper extends QBMapper
     {
         $qb = $this->db->getQueryBuilder();
         $qb->select('extern_id')
-            ->from($this->getTableName());
+            ->from($this->getTableName())
+            ->where($qb->expr()->isNotNull('extern_id'))
+            ->andWhere($qb->expr()->neq('extern_id', $qb->createNamedParameter('')));
         $result = $qb->executeQuery();
         $ids = [];
         while ($row = $result->fetch()) {
-            $ids[] = $row['extern_id'];
+            $ids[] = (string) $row['extern_id'];
         }
         $result->closeCursor();
         return $ids;
     }
 
     /**
-     * Markiert alle Sitzungen, deren externe IDs nicht in $bekannteIds sind, als gelöscht.
+     * Markiert alle Parlamentssitzungen, deren externe IDs nicht in $bekannteIds sind, als gelöscht.
+     * Interne Sitzungen (extern_id IS NULL) werden nie angefasst.
      *
      * Chunkweise IN-Abfrage statt NOT IN, um Nextclouds Oracle-kompatibles
      * 1000-Element-Limit nicht zu überschreiten.
@@ -115,7 +119,9 @@ class SitzungMapper extends QBMapper
         $qb = $this->db->getQueryBuilder();
         $qb->select('extern_id')
             ->from($this->getTableName())
-            ->where($qb->expr()->eq('geloescht', $qb->createNamedParameter(false, IQueryBuilder::PARAM_BOOL)));
+            ->where($qb->expr()->eq('geloescht', $qb->createNamedParameter(false, IQueryBuilder::PARAM_BOOL)))
+            ->andWhere($qb->expr()->isNotNull('extern_id'))
+            ->andWhere($qb->expr()->neq('extern_id', $qb->createNamedParameter('')));
         $result = $qb->executeQuery();
         $aktive = [];
         while ($row = $result->fetch()) {
