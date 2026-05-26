@@ -64,32 +64,10 @@
 
         <div class="pw-form-zeile">
           <label>Beschluss erfassen</label>
-          <template v-if="beschlussWert && beschlussWert.freitext">
-            <textarea
-              v-model="beschlussWert.label"
-              class="pw-textarea"
-              rows="2"
-              placeholder="Freitext Beschluss"
-              :disabled="!geschaeft.fraktionssitzung?.beschlussSchreibbar"
-              @input="beschlussFreitextInput"
-              @blur="beschlussAutoSpeichern"
-            />
-            <button
-              type="button"
-              class="button pw-btn-klein"
-              @click="beschlussWert = null"
-            >Aus Liste wählen</button>
-          </template>
-          <NcSelect
-            v-else
+          <BeschlussWidget
             :model-value="beschlussWert"
             :options="beschlussOptionen"
-            :taggable="true"
-            :create-option="(text) => ({ label: text, value: '', freitext: true })"
-            :clearable="true"
             :disabled="!geschaeft.fraktionssitzung?.beschlussSchreibbar"
-            placeholder="Beschluss eingeben oder aus Liste wählen…"
-            label="label"
             @update:model-value="beschlussNachWahl"
           />
           <small v-if="!geschaeft.fraktionssitzung?.beschlussSchreibbar" class="pw-hinweis">
@@ -114,14 +92,13 @@
           :key="e._key"
           class="pw-timeline-eintrag"
           :class="{ 'pw-timeline-drag-over': dragZeitleisteUeberIdx === idx }"
-          draggable="true"
           @dragstart="tlDragStart($event, idx)"
           @dragover.prevent="tlDragOver($event, idx)"
           @dragleave="tlDragLeave"
           @drop.prevent="tlDrop($event, idx)"
           @dragend="tlDragEnd"
         >
-          <span class="pw-notiz-griff" title="Verschieben" aria-hidden="true">⠿</span>
+          <span class="pw-notiz-griff" draggable="true" title="Verschieben" aria-hidden="true">⠿</span>
           <div class="pw-timeline-datum">
             <span class="pw-timeline-zeit">{{ formatiereZeitpunkt(e.erstelltAm) }}</span>
             <small v-if="e._sitzungInfo" class="pw-traktandum-kontext-meta">{{ e._sitzungInfo }}</small>
@@ -198,11 +175,12 @@ import NcSelect from '@nextcloud/vue/components/NcSelect'
 import PwMultiSelect from './PwMultiSelect.vue'
 import PwWysiwyg from './PwWysiwyg.vue'
 import GeschaeftDokumente from './GeschaeftDokumente.vue'
+import BeschlussWidget from './BeschlussWidget.vue'
 import { subscribeRealtime } from '../realtime'
 
 export default {
   name: 'GeschaeftDetail',
-  components: { NcSelect, PwMultiSelect, PwWysiwyg, GeschaeftDokumente },
+  components: { NcSelect, PwMultiSelect, PwWysiwyg, GeschaeftDokumente, BeschlussWidget },
   props: {
     geschaeftId: { type: Number, required: true },
     mitglieder: { type: Array, default: () => [] },
@@ -226,7 +204,6 @@ export default {
       votumStatus: '',
       votumDirty: false,
       notizTimer: null,
-      beschlussTimer: null,
       notizAktionId: null,
       ausgewaehltePersonKeys: [],
       hauptPersonKey: '',
@@ -247,11 +224,6 @@ export default {
       clearTimeout(this.notizTimer)
       this.notizTimer = null
       this.notizSpeichern()
-    }
-    if (this.beschlussTimer) {
-      clearTimeout(this.beschlussTimer)
-      this.beschlussTimer = null
-      this.beschlussSpeichern()
     }
     if (this.votumSpeicherTimer) {
       clearTimeout(this.votumSpeicherTimer)
@@ -539,24 +511,9 @@ export default {
       this.beschlussWert = val
       if (!val) {
         if (hatteWert) await this.beschlussZuruecknehmen()
-      } else if (!val.freitext) {
+      } else {
         await this.beschlussSpeichern()
       }
-    },
-    async beschlussAutoSpeichern() {
-      if (this.beschlussTimer) { clearTimeout(this.beschlussTimer); this.beschlussTimer = null }
-      if (this.beschlussWert?.freitext && (this.beschlussWert.label || '').trim()) {
-        await this.beschlussSpeichern()
-      }
-    },
-    beschlussFreitextInput() {
-      if (!this.beschlussWert?.label) {
-        this.beschlussWert = null
-        if (this.beschlussTimer) { clearTimeout(this.beschlussTimer); this.beschlussTimer = null }
-        return
-      }
-      if (this.beschlussTimer) clearTimeout(this.beschlussTimer)
-      this.beschlussTimer = setTimeout(() => { this.beschlussSpeichern(); this.beschlussTimer = null }, 5000)
     },
     notizBearbeitenStarten(a, clickEvent) {
       this.bearbeitenNotizId = a.id

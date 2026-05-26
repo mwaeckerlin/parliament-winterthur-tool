@@ -82,8 +82,10 @@ services:
       PARLWIN_NEXTCLOUD_AUTH_URL: ${PARLWIN_NEXTCLOUD_AUTH_URL:-}
       PARLWIN_REALTIME_SECRET: ${PARLWIN_REALTIME_SECRET:-}
     networks:
-      - php-realtime
-      - nginx-realtime
+      php-realtime:
+      nginx-realtime:
+        aliases:
+          - parlwin-ws
 
   smtp-relay:
     image: mwaeckerlin/fake-smtp

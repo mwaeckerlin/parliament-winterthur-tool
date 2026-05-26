@@ -303,6 +303,7 @@ if (!class_exists('OCP\AppFramework\Http')) {
     // phpcs:ignore
     eval ('namespace OCP\AppFramework; class Http {
         public const STATUS_OK = 200;
+        public const STATUS_CREATED = 201;
         public const STATUS_ACCEPTED = 202;
         public const STATUS_BAD_REQUEST = 400;
         public const STATUS_FORBIDDEN = 403;
@@ -342,6 +343,7 @@ if (!class_exists('OCP\AppFramework\Db\Entity')) {
         protected function addType(string $field, string $type): void {
             $this->types[$field] = $type;
         }
+        public function markFieldUpdated(string $fieldName): void {}
         public function __call(string $name, array $arguments) {
             if (str_starts_with($name, "set")) {
                 $property = lcfirst(substr($name, 3));

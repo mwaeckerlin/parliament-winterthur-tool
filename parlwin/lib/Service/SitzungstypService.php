@@ -46,6 +46,7 @@ class SitzungstypService
     private readonly IUserSession $userSession,
     private readonly IConfig $config,
     private readonly LoggerInterface $logger,
+    private readonly KalenderService $kalenderService,
   ) {
   }
 
@@ -149,6 +150,97 @@ class SitzungstypService
   }
 
   /**
+   * Erstellt eine interne Sitzung aus einer Vorlage.
+   *
+   * Felder in $daten:
+   *  - typId (int, required)
+   *  - datum (string YYYY-MM-DD, required)
+   *  - titel, ort, zeitVon, zeitBis, bemerkungen (strings, optional – Fallback auf Vorlage)
+   *  - traktanden (array of {titel, beschreibung}, optional)
+   *
+   * @throws \OCP\AppFramework\Db\DoesNotExistException wenn der Typ nicht gefunden wird
+   */
+  public function erstelleAusTyp(array $daten): Sitzung
+  {
+    $typId = (int) ($daten['typId'] ?? 0);
+    $typ = $this->typMapper->find($typId);
+    $jetzt = (new \DateTime())->format('Y-m-d H:i:s');
+
+    $traktandenDaten = is_array($daten['traktanden'] ?? null) ? $daten['traktanden'] : [];
+    $zweck = (string) ($daten['bemerkungen'] ?? $typ->getZweck());
+
+    // Kalender-Beschreibung: Zweck + Traktanden-Liste (wie vorschau() aufbaut)
+    $beschreibungTeile = [];
+    if ($zweck !== '') {
+      $beschreibungTeile[] = $zweck;
+    }
+    if (!empty($traktandenDaten)) {
+      if (!empty($beschreibungTeile)) {
+        $beschreibungTeile[] = '';
+      }
+      $beschreibungTeile[] = 'Traktanden:';
+      foreach ($traktandenDaten as $i => $td) {
+        $zeile = ($i + 1) . '. ' . trim((string) ($td['titel'] ?? ''));
+        if (!empty($td['beschreibung'])) {
+          $zeile .= ': ' . $td['beschreibung'];
+        }
+        $beschreibungTeile[] = $zeile;
+      }
+    }
+    $kalenderBeschreibung = implode("\n", $beschreibungTeile);
+
+    $sitzung = new Sitzung();
+    $sitzung->setTitel((string) (($daten['titel'] ?? '') !== '' ? $daten['titel'] : $typ->getName()));
+    $sitzung->setDatum((string) ($daten['datum'] ?? ''));
+    $sitzung->setZeitVon((string) ($daten['zeitVon'] ?? $typ->getStandardZeitVon()));
+    $sitzung->setZeitBis((string) ($daten['zeitBis'] ?? $typ->getStandardZeitBis()));
+    $sitzung->setOrt((string) ($daten['ort'] ?? $typ->getStandardOrt()));
+    $sitzung->setBemerkungen($zweck);
+    $sitzung->setTypId($typId);
+    $sitzung->setExternId(null);
+    $sitzung->setUrl('');
+    $sitzung->setGeloescht(false);
+    $sitzung->setNotizen('[]');
+    $sitzung->setTeilnehmer('[]');
+    $sitzung->setErstelltAm($jetzt);
+    $sitzung->setAktualisiertAm($jetzt);
+
+    // Wenn der Client Teilnehmer-Regeln mitschickt, diese materialisieren; sonst aus Vorlage
+    $teilnehmerRegeln = is_array($daten['teilnehmer'] ?? null) ? $daten['teilnehmer'] : null;
+    if ($teilnehmerRegeln !== null) {
+      $teilnehmer = $this->materialisiereRegeln($teilnehmerRegeln);
+    } else {
+      $teilnehmer = $this->materialisiereTeilnehmer($typ);
+    }
+    $sitzung->setTeilnehmer(json_encode($teilnehmer, JSON_UNESCAPED_UNICODE));
+
+    $sitzung = $this->sitzungMapper->insert($sitzung);
+
+    $nummer = 1;
+    foreach ($traktandenDaten as $td) {
+      $t = new Traktandum();
+      $t->setSitzungId((int) $sitzung->getId());
+      $t->setNummer($nummer++);
+      $t->setTitel(trim((string) ($td['titel'] ?? '')));
+      $t->setBeschreibung(trim((string) ($td['beschreibung'] ?? '')));
+      $t->setGeschaeftId(0);
+      $t->setUrl('');
+      $t->setGeloescht(false);
+      $t->setBemerkungen('');
+      $t->setNotizen('[]');
+      $t->setErstelltAm($jetzt);
+      $t->setAktualisiertAm($jetzt);
+      $this->traktandumMapper->insert($t);
+    }
+
+    if ($typ->getKalenderAnlegen()) {
+      $this->kalenderService->erstelleInterneSitzung($sitzung, $kalenderBeschreibung);
+    }
+
+    return $sitzung;
+  }
+
+  /**
    * Markiert einen Sitzungstyp als gelöscht (Soft-Delete – konkrete Sitzungen
    * bleiben erhalten).
    */
@@ -199,6 +291,60 @@ class SitzungstypService
         $this->logger->warning('parlwin: Teilnehmer-Regel fehlgeschlagen', [
           'art' => $art, 'refId' => $refId, 'refName' => $refName,
           'exception' => $e,
+        ]);
+      }
+
+      foreach ($personen as $person) {
+        if (!empty($person['gruppe'])) {
+          $gid = $person['groupId'] ?? '';
+          if (!$gid || isset($seenGroupIds[$gid])) continue;
+          $seenGroupIds[$gid] = true;
+          $result[] = $person;
+        } else {
+          $email = $person['email'] ?? '';
+          if (!$email) continue;
+          if (isset($seenEmails[$email])) continue;
+          $seenEmails[$email] = true;
+          $result[] = $person;
+        }
+      }
+    }
+
+    return $result;
+  }
+
+  /**
+   * Löst Teilnehmer-Regeln als Array (statt DB-Objekte) zu konkreten Personen auf.
+   *
+   * @param array<int, array{art: string, referenzId?: int, referenzName?: string}> $regeln
+   * @return array<int, array{email: string, displayName: string, ncUid: string, gruppe: bool}>
+   */
+  private function materialisiereRegeln(array $regeln): array
+  {
+    $result = [];
+    $seenEmails = [];
+    $seenGroupIds = [];
+
+    foreach ($regeln as $regel) {
+      $art    = (string) ($regel['art'] ?? '');
+      $refId  = (int) ($regel['referenzId'] ?? 0);
+      $refName = (string) ($regel['referenzName'] ?? '');
+
+      $personen = [];
+      try {
+        $personen = match ($art) {
+          'mitglied'       => $this->mitgliedAlsPersonen($refId),
+          'fraktion'       => $this->fraktionAlsPersonen($refName),
+          'kommission'     => $this->kommissionAlsPersonen($refId),
+          'rolle'          => $this->rolleAlsPersonen($refName),
+          'eigeneFraktion' => $this->eigeneFraktionAlsPersonen(),
+          'ncGruppe'       => $this->ncGruppeAlsPersonen($refName),
+          'ncUser'         => $this->ncUserAlsPersonen($refName),
+          default          => [],
+        };
+      } catch (\Throwable $e) {
+        $this->logger->warning('parlwin: Teilnehmer-Regel fehlgeschlagen', [
+          'art' => $art, 'refId' => $refId, 'refName' => $refName, 'exception' => $e,
         ]);
       }
 

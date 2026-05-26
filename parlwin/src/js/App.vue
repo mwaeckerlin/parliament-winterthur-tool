@@ -34,6 +34,8 @@
     <Sitzungsliste
       v-else-if="aktiveAnsicht === 'sitzungen'"
       :mitglieder="mitglieder"
+      :fraktionen="fraktionen"
+      :kommissionen="kommissionen"
     />
     <Mitgliederliste
       v-else-if="aktiveAnsicht === 'mitglieder'"

@@ -5,14 +5,18 @@
       :key="idx"
       class="pw-notiz-zeile"
       :class="{ 'pw-notiz-eigen': istEigene(n), 'pw-notiz-bearbeiten': bearbeiteIdx === idx, 'pw-notiz-drag-over': dragUeberIdx === idx }"
-      draggable="true"
       @dragstart="dragStart($event, idx)"
       @dragover.prevent="dragOver($event, idx)"
       @dragleave="dragLeave"
       @drop.prevent="drop($event, idx)"
       @dragend="dragEnd"
     >
-      <span class="pw-notiz-griff" title="Verschieben" aria-hidden="true">⠿</span>
+      <span
+        class="pw-notiz-griff"
+        draggable="true"
+        title="Verschieben"
+        aria-hidden="true"
+      >⠿</span>
       <span class="pw-notiz-datum">{{ n.datum }}</span>
       <span class="pw-notiz-autor">{{ n.displayName || n.uid }}</span>
       <template v-if="bearbeiteIdx === idx">

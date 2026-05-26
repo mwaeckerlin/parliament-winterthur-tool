@@ -62,7 +62,7 @@ class KalenderService
             $kalender = $this->sicherstelleKalender($dav, $kalenderNutzer);
 
             foreach ($sitzungen as $sitzung) {
-                $this->erstelleOderAktualisiere($dav, $kalender, $sitzung);
+                $this->erstelleOderAktualisiere($dav, $kalender, $sitzung, null);
             }
         } catch (\Throwable $e) {
             $this->logger->error(
@@ -141,16 +141,42 @@ class KalenderService
     }
 
     /**
+     * Erstellt oder aktualisiert einen Kalendereintrag für eine einzelne
+     * interne Sitzung. Die Beschreibung wird explizit übergeben (Zweck +
+     * Traktanden-Liste, zusammengestellt durch den aufrufenden Service).
+     */
+    public function erstelleInterneSitzung(Sitzung $sitzung, string $beschreibung): void
+    {
+        $kalenderNutzer = $this->config->getAppValue(Application::APP_ID, 'kalender_nutzer', '');
+        if (empty($kalenderNutzer)) {
+            return;
+        }
+        try {
+            $dav = \OC::$server->get(\OCA\DAV\CalDAV\CalDavBackend::class);
+            $kalender = $this->sicherstelleKalender($dav, $kalenderNutzer);
+            $this->erstelleOderAktualisiere($dav, $kalender, $sitzung, $beschreibung);
+        } catch (\Throwable $e) {
+            $this->logger->error(
+                'Parlament Winterthur: Fehler beim Anlegen des internen Kalendereintrags: ' . $e->getMessage(),
+                ['exception' => $e]
+            );
+        }
+    }
+
+    /**
      * Erstellt oder aktualisiert einen Kalendereintrag für eine Sitzung.
      */
     private function erstelleOderAktualisiere(
         \OCA\DAV\CalDAV\CalDavBackend $dav,
         array $kalender,
-        Sitzung $sitzung
+        Sitzung $sitzung,
+        ?string $beschreibungOverride = null
     ): void {
-        $uid = 'parliament-winterthur-sitzung-' . $sitzung->getExternId();
+        $uid = $sitzung->getTypId() > 0
+            ? 'parliament-winterthur-sitzung-intern-' . $sitzung->getId()
+            : 'parliament-winterthur-sitzung-' . $sitzung->getExternId();
         $dateiname = $uid . '.ics';
-        $ical = $this->erstelleIcal($sitzung, $uid);
+        $ical = $this->erstelleIcal($sitzung, $uid, $beschreibungOverride);
 
         $vorhandeneObjekte = $dav->getCalendarObjects($kalender['id']);
         $vorhandeneUris = array_column($vorhandeneObjekte, 'uri');
@@ -163,30 +189,32 @@ class KalenderService
     }
 
     /**
-     * Erstellt einen iCalendar-String für eine Parlamentssitzung.
+     * Erstellt einen iCalendar-String für eine Sitzung.
+     * $beschreibungOverride wird bei internen Sitzungen übergeben (Zweck + Traktanden).
      */
-    private function erstelleIcal(Sitzung $sitzung, string $uid): string
+    private function erstelleIcal(Sitzung $sitzung, string $uid, ?string $beschreibungOverride = null): string
     {
         $datum = $sitzung->getDatum();
         $zeitVon = $sitzung->getZeitVon() ?: '09:00';
         $zeitBis = $sitzung->getZeitBis() ?: '12:00';
 
-        // Datum-/Zeitformate für iCal
         $startDt = $this->formatiereDatumZeit($datum, $zeitVon);
         $endDt = $this->formatiereDatumZeit($datum, $zeitBis);
         $jetzt = gmdate('Ymd\THis\Z');
 
-        $titel = addslashes($sitzung->getTitel() ?: 'Sitzung Stadtparlament Winterthur');
-        $ort = addslashes($sitzung->getOrt() ?: '');
+        $titel = $this->icalEscape($sitzung->getTitel() ?: 'Sitzung Stadtparlament Winterthur');
+        $ort = $this->icalEscape($sitzung->getOrt() ?: '');
         $url = $sitzung->getUrl() ?: '';
         $beschreibung = '';
-        if (!empty($url)) {
+        if ($beschreibungOverride !== null) {
+            $beschreibung = $this->icalEscape($beschreibungOverride);
+        } elseif (!empty($url)) {
             $beschreibung = 'Weitere Informationen: ' . $url;
         }
 
         $teilnehmerZeilen = $this->teilnehmerZeilen($sitzung);
 
-        return "BEGIN:VCALENDAR\r\n" .
+        $ical = "BEGIN:VCALENDAR\r\n" .
             "VERSION:2.0\r\n" .
             "PRODID:-//Parlament Winterthur Tool//Nextcloud//DE\r\n" .
             "CALSCALE:GREGORIAN\r\n" .
@@ -202,6 +230,33 @@ class KalenderService
             $teilnehmerZeilen .
             "END:VEVENT\r\n" .
             "END:VCALENDAR\r\n";
+
+        return $this->foldIcal($ical);
+    }
+
+    /** RFC 5545 text escaping: backslash, newlines, commas, semicolons. */
+    private function icalEscape(string $value): string
+    {
+        $value = str_replace('\\', '\\\\', $value);
+        $value = str_replace(["\r\n", "\r", "\n"], '\n', $value);
+        $value = str_replace(',', '\,', $value);
+        $value = str_replace(';', '\;', $value);
+        return $value;
+    }
+
+    /** RFC 5545 line folding: fold at 75 octets with CRLF + space. */
+    private function foldIcal(string $ical): string
+    {
+        $lines = explode("\r\n", rtrim($ical, "\r\n"));
+        $folded = [];
+        foreach ($lines as $line) {
+            while (strlen($line) > 75) {
+                $folded[] = substr($line, 0, 75);
+                $line = ' ' . substr($line, 75);
+            }
+            $folded[] = $line;
+        }
+        return implode("\r\n", $folded) . "\r\n";
     }
 
     /**
@@ -225,7 +280,7 @@ class KalenderService
         foreach ($teilnehmer as $eintrag) {
             $gruppe = trim((string) ($eintrag['gruppe'] ?? ''));
             if ($gruppe !== '') {
-                $cn = ';CN=' . str_replace([',', ';', ':'], ' ', $gruppe);
+                $cn = ';CN="' . addcslashes($gruppe, '"\\') . '"';
                 $zeilen .= 'ATTENDEE;CUTYPE=GROUP' . $cn
                     . ';ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:'
                     . 'principal:principals/groups/' . rawurlencode($gruppe) . "\r\n";
@@ -236,7 +291,7 @@ class KalenderService
                 continue;
             }
             $name = (string) ($eintrag['name'] ?? '');
-            $cn = $name !== '' ? ';CN=' . str_replace([',', ';', ':'], ' ', $name) : '';
+            $cn = $name !== '' ? ';CN="' . addcslashes($name, '"\\') . '"' : '';
             $zeilen .= 'ATTENDEE' . $cn
                 . ';ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:'
                 . $email . "\r\n";

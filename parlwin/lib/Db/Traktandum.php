@@ -18,13 +18,13 @@ use OCP\AppFramework\Db\Entity;
  * @method int    getNummer()
  * @method string getTitel()
  * @method string getBeschreibung()
- * @method string getUrl()
- * @method bool   getGeloescht()
- * @method string getBemerkungen()
- * @method string getNotizen()
- * @method string getErstelltAm()
- * @method string getAktualisiertAm()
- * @method void   setUrl(string $url)
+ * @method string|null getUrl()
+ * @method bool        getGeloescht()
+ * @method string      getBemerkungen()
+ * @method string      getNotizen()
+ * @method string      getErstelltAm()
+ * @method string      getAktualisiertAm()
+ * @method void        setUrl(?string $url)
  */
 class Traktandum extends Entity {
     /** @var int Fremdschlüssel zur zugehörigen Sitzung */
@@ -42,8 +42,8 @@ class Traktandum extends Entity {
     /** @var string Kurzbeschreibung */
     protected string $beschreibung = '';
 
-    /** @var string URL eines verknüpften Dokuments (Protokoll-PDF etc.) ohne eigenes Geschäft */
-    protected string $url = '';
+    /** @var string|null URL eines verknüpften Dokuments (Protokoll-PDF etc.) ohne eigenes Geschäft */
+    protected ?string $url = null;
 
     /** @var bool Wurde das Traktandum entfernt? */
     protected bool $geloescht = false;

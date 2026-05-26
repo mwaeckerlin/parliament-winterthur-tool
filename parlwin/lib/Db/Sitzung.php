@@ -9,8 +9,8 @@ use OCP\AppFramework\Db\Entity;
 /**
  * Parlamentssitzung des Stadtparlaments Winterthur.
  *
- * @method int    getId()
- * @method string getExternId()
+ * @method int     getId()
+ * @method ?string getExternId()
  * @method string getTitel()
  * @method string getDatum()
  * @method string getZeitVon()
@@ -27,8 +27,8 @@ use OCP\AppFramework\Db\Entity;
  */
 class Sitzung extends Entity
 {
-    /** @var string ID auf der Parlamentswebseite */
-    protected string $externId = '';
+    /** @var ?string ID auf der Parlamentswebseite (NULL für interne Sitzungen) */
+    protected ?string $externId = null;
 
     /** @var string Titel der Sitzung */
     protected string $titel = '';
@@ -77,6 +77,39 @@ class Sitzung extends Entity
     {
         $this->addType('geloescht', 'boolean');
         $this->addType('typId', 'integer');
+    }
+
+    // Explizite Setter für Felder, deren Entity-Default mit dem Leer-Wert übereinstimmt.
+    // Nextcloud's setter() übergeht markFieldUpdated wenn sich der Wert nicht ändert —
+    // bei neuen Entities (alle Properties auf Default) würde dann kein INSERT-Feld erzeugt.
+    public function setExternId(?string $externId): void
+    {
+        $this->markFieldUpdated('externId');
+        $this->externId = $externId;
+    }
+
+    public function setUrl(string $url): void
+    {
+        $this->markFieldUpdated('url');
+        $this->url = $url;
+    }
+
+    public function setGeloescht(bool $geloescht): void
+    {
+        $this->markFieldUpdated('geloescht');
+        $this->geloescht = $geloescht;
+    }
+
+    public function setNotizen(string $notizen): void
+    {
+        $this->markFieldUpdated('notizen');
+        $this->notizen = $notizen;
+    }
+
+    public function setTeilnehmer(string $teilnehmer): void
+    {
+        $this->markFieldUpdated('teilnehmer');
+        $this->teilnehmer = $teilnehmer;
     }
 
     /**
