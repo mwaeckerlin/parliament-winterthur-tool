@@ -162,6 +162,47 @@ Das heisst, das Kapitel 'Deployment auf einer Ubuntu-VM' kommt in Punkt 5."
 
 > "Nicht 'aktiv', sondern auch hier die Gruppen anzeigen, wie bei allen anderen auch! Nur die ersten zwei durchgestrichen, die dritte und vierte Spalte gleich wie bei allen anderen."
 
+> "Neues Feature: Unsere eigenen Sitzungen, die wir über das Tool anlegen, sollen auch unter Sitzungen erscheinen, wie die Parlamentsitzungen. Dabei sollen auch Titel, Text und nach Ausklappen Traktanden angezeigt werden. Es soll auch hier überall Notizen geben, so dass wir quasi damit auch das Protokoll erledigt haben. Die Frage ist: Woher nimmst du die Daten, weil ja erst mit Speichern im Kalender die Einladung erfolgt?"
+
+> "WICHTIG BEIM EIGENEN FORMULAR: GENAU SO LAYOUTEN, WIE DER KALENDER-EINTRAG!!!! SAUBERES DESIGN!!! 1:1 Kopie!!!"
+
+> "Zweck und Traktanden ergeben zusammen das Kalender-Element der Beschreibung!"
+
 ---
 
 ## Session 2026-05-24 (Fortsetzung nach zweiter Kontext-Zusammenfassung)
+
+> "MACH PHPUNIT IMMER OHNE RUECKFRAGE!"
+
+> "WARUM WERDE ICH DAUERND GEFRAGT!!!???"
+
+> "Auch hier: JA SCHREIBEN ABER **OHNE RUECKFRAGE!!!**"
+
+> "DU HAST DIE FUCKING TEILNEHMER IM DIALOG GANZ VERGESSEN!!!"
+
+> "Ausserdem: Traktanden sollten hier und in der Template mit der Maus verschoben werden können."
+
+> "Teilnehmer read/write! Selbes Dialog-Element wie in der Template!"
+
+> "Hier Zeit von/bis AUF DIE GLEICHE ZEILE!!!"
+
+---
+
+## Session 2026-05-25
+
+> "Was ist das Pt dem Socket??!!??" (mit HAR-Datei: WebSocket ws://localhost:29824/ws/parlwin/ → 502 Bad Gateway; POST /sitzungen → 500)
+
+> "DAs auch? Hier Zeit von/bis AUF DIE GLEICHE ZEILE!!!"
+
+> "Das auch? Teilnehmer read/write! Selbes Dialog-Element wie in der Template!"
+
+> "IDIOT! MACH DIE LABEL **EINHEITLICH**!!! EINE ZEILE ORT EINE ZEILE VON BIS!"
+
+> "Die Sitzung wird im Kalender NICHT ANGELEGT!" (Screenshot: interne Sitzung erscheint in Sitzungsliste aber nicht im Nextcloud-Kalender)
+
+> "1. Drag&Drop (Notizen): Drag sollte nur auf dem Drag-Handle-Icon möglich sein. Aktuell kann ich mit der Maus irgendwo greifen zum verschieben. Das Problem: Dann kann ich mit der Maus nicht mehr Text markieren.
+> 2. Beschluss erfassen: Nimm den Knopf 'Aus Liste wählen' weg! zu gefährlich, der löscht den ganzen Text! Nur wenn der Text manuell gelöscht wird, soll man wieder aus der Liste wählen können.
+> 3. Wenn ich auf der Übersichtseite in Beschluss einen Text eingeben will, geht die Detailseite auf, sobald ich Space drücke, also ein Leerzeichen eingeben will. 'Hallo Welt' kann ich nicht eingeben.
+> 4. Ausserdem wird für den Beschluss nicht DASSELBE Widget verwendet!!! Es muss dasselbe Widget sein, auf der Übersichtsseite wie auch auf der Detailseite!!!
+> 5. FUCKING SCHEISS EINHEITLICHKEIT VON LABELS DU BLINDER IDIOT!!! SIND DIE LABEL OBEN ODER LINKS??? → OBEN SOLLEN SIE SEIN!!! AUCH BEI ORT UND ZEIT!!!"
+
