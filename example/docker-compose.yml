@@ -93,7 +93,9 @@ services:
   parlwin-realtime:
     image: mwaeckerlin/parliament-winterthur-tool:realtime
     networks:
-      - realtime-network
+      realtime-network:
+        aliases:
+          - parlwin-ws
 
   smtp-relay:
     image: mwaeckerlin/smtp-relay
