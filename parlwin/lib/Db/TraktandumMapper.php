@@ -61,12 +61,23 @@ class TraktandumMapper extends QBMapper {
         return $this->findEntities($qb);
     }
 
-    public function markiereAlleFuerSitzungAlsGeloescht(int $sitzungId): int {
+    /**
+     * Markiert Traktanden einer Sitzung als gelöscht, die nicht mehr in $bekannteNummern vorkommen.
+     * Bestehende Traktanden (mit Notizen etc.) bleiben erhalten — nur geloescht=true.
+     *
+     * @param int[] $bekannteNummern Traktandum-Nummern die noch aktiv sind
+     */
+    public function markiereNichtMehrVorhandeneAlsGeloescht(int $sitzungId, array $bekannteNummern): int {
+        if (empty($bekannteNummern)) {
+            return 0;
+        }
         $qb = $this->db->getQueryBuilder();
         $qb->update($this->getTableName())
             ->set('geloescht', $qb->createNamedParameter(true, IQueryBuilder::PARAM_BOOL))
             ->set('aktualisiert_am', $qb->createNamedParameter((new \DateTime())->format('Y-m-d H:i:s')))
-            ->where($qb->expr()->eq('sitzung_id', $qb->createNamedParameter($sitzungId, IQueryBuilder::PARAM_INT)));
+            ->where($qb->expr()->eq('sitzung_id', $qb->createNamedParameter($sitzungId, IQueryBuilder::PARAM_INT)))
+            ->andWhere($qb->expr()->eq('geloescht', $qb->createNamedParameter(false, IQueryBuilder::PARAM_BOOL)))
+            ->andWhere($qb->expr()->notIn('nummer', $qb->createNamedParameter($bekannteNummern, IQueryBuilder::PARAM_INT_ARRAY)));
         return $qb->executeStatement();
     }
 

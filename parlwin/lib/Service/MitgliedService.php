@@ -780,6 +780,7 @@ class MitgliedService
             ScraperService::wert($daten, ['aktiv', 'active', 'isActive', 'is_active', 'status'], true),
             true
         ));
+        $mitglied->setGeloescht(false);
         $mitglied->setAktualisiertAm($jetzt);
     }
 
