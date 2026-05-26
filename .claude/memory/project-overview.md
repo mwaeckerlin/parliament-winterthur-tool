@@ -33,6 +33,11 @@ metadata:
   - Arten: `mitglied`, `fraktion`, `kommission`, `rolle`, `eigeneFraktion`, `ncGruppe`, `ncUser`
 - Ziel-Kalender: `parlwin-fraktion-kalender` (URI), Kalender-User aus App-Config `kalender_nutzer`
 
+## Dokumentationssprache
+
+CHANGELOG, README und alle Dokumentationsdateien in diesem Projekt: **Deutsch** (Schweizer Rechtschreibung).
+Code, Variablen, Kommentare im Code: Englisch.
+
 ## Wichtige Constraints
 
 **Why:** `KalenderService` nutzt `CalDavBackend` direkt → kein iTIP-Scheduling → keine automatischen Einladungen.
