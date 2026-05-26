@@ -85,6 +85,8 @@ class SitzungService
             $traktandenCache = $this->scraper->ladeTraktandenJeUrlParallel($detailUrls, $progressCallback);
         }
 
+        $syncFehler = 0;
+
         foreach ($rohdaten as $daten) {
             $verarbeitet++;
             $externId = (string) ScraperService::wert($daten, ['id', 'Id', 'ID', 'guid']);
@@ -123,20 +125,28 @@ class SitzungService
             }
 
             try {
-                $sitzung = $this->sitzungMapper->findByExternId($externId);
-                $this->aktualisiereOeffentlicheFelder($sitzung, $daten);
-                $this->sitzungMapper->update($sitzung);
-                $statistik['aktualisiert']++;
-            } catch (DoesNotExistException) {
-                $sitzung = $this->erstelleAusRohdaten($externId, $daten);
-                $this->sitzungMapper->insert($sitzung);
-                $statistik['neu']++;
-            }
+                try {
+                    $sitzung = $this->sitzungMapper->findByExternId($externId);
+                    $this->aktualisiereOeffentlicheFelder($sitzung, $daten);
+                    $this->sitzungMapper->update($sitzung);
+                    $statistik['aktualisiert']++;
+                } catch (DoesNotExistException) {
+                    $sitzung = $this->erstelleAusRohdaten($externId, $daten);
+                    $this->sitzungMapper->insert($sitzung);
+                    $statistik['neu']++;
+                }
 
-            // Traktanden laden, wenn eine Detail-URL vorhanden ist
-            $detailUrl = (string) ScraperService::wert($daten, ['url', 'Url', 'URL', 'detailUrl', 'link']);
-            if (!empty($detailUrl)) {
-                $this->synchronisiereTraktanden($sitzung, $detailUrl, $daten, $traktandenCache);
+                // Traktanden laden, wenn eine Detail-URL vorhanden ist
+                $detailUrl = (string) ScraperService::wert($daten, ['url', 'Url', 'URL', 'detailUrl', 'link']);
+                if (!empty($detailUrl)) {
+                    $this->synchronisiereTraktanden($sitzung, $detailUrl, $daten, $traktandenCache);
+                }
+            } catch (\Throwable $e) {
+                $syncFehler++;
+                $this->logger->error(
+                    'Parlament Winterthur: Fehler bei Sitzung ' . $externId . ': ' . $e->getMessage(),
+                    ['exception' => $e]
+                );
             }
 
             if ($fortschritt !== null) {
@@ -150,9 +160,15 @@ class SitzungService
             }
         }
 
-        if (!empty($bekannteExternIds)) {
+        // Nur als gelöscht markieren wenn der Sync vollständig fehlerfrei war.
+        // Bei Fehlern: lieber veraltete Daten behalten als korrekte Daten löschen.
+        if ($syncFehler === 0 && !empty($bekannteExternIds)) {
             $bekannteExternIds = array_values(array_unique($bekannteExternIds));
             $statistik['geloescht'] = $this->sitzungMapper->markiereNichtMehrVorhandeneAlsGeloescht($bekannteExternIds);
+        } elseif ($syncFehler > 0) {
+            $this->logger->warning(
+                "Parlament Winterthur: {$syncFehler} Sitzung(en) mit Fehler — markiereNichtMehrVorhandeneAlsGeloescht übersprungen"
+            );
         }
 
         if ($fortschritt !== null && $verarbeitet >= $gesamt) {
@@ -213,9 +229,11 @@ class SitzungService
             return;
         }
 
-        $this->traktandumMapper->markiereAlleFuerSitzungAlsGeloescht($sitzung->getId());
-
+        // Erst alle neuen Daten aufbereiten — kein Schreiben vor dem ersten Fehler.
+        $jetzt = (new \DateTime())->format('Y-m-d H:i:s');
+        $verarbeitetNummern = [];
         $nummer = 0;
+
         foreach ($traktandenDaten as $tDaten) {
             if (!is_array($tDaten)) {
                 continue;
@@ -229,7 +247,6 @@ class SitzungService
             }
             $tNummer = (int) ScraperService::wert($tDaten, ['number', 'Number', 'nummer', 'position'], $nummer);
 
-            // Versuchen, ein verknüpftes Geschäft zu finden
             $geschaeftExternId = (string) ScraperService::wert($tDaten, ['businessId', 'geschaeftId', 'politBusinessId']);
             if ($geschaeftExternId === '') {
                 $geschaeftUrl = (string) ScraperService::wert($tDaten, ['url', 'Url', 'URL', 'link', 'Link', 'geschaeftUrl'], '');
@@ -245,7 +262,9 @@ class SitzungService
                 }
             }
 
-            $jetzt = (new \DateTime())->format('Y-m-d H:i:s');
+            $traktandumUrl = (string) ScraperService::wert($tDaten, ['traktandumUrl'], '');
+
+            // Bestehendes Traktandum suchen (auch gelöschte) — nie neu anlegen wenn eines existiert.
             $traktandum = $this->traktandumMapper->findErstesBySitzungUndNummer($sitzung->getId(), $tNummer);
             $neu = false;
             if ($traktandum === null) {
@@ -254,8 +273,6 @@ class SitzungService
                 $traktandum->setErstelltAm($jetzt);
                 $neu = true;
             }
-
-            $traktandumUrl = (string) ScraperService::wert($tDaten, ['traktandumUrl'], '');
 
             $traktandum->setGeschaeftId($geschaeftId);
             $traktandum->setNummer($tNummer);
@@ -270,6 +287,14 @@ class SitzungService
             } else {
                 $this->traktandumMapper->update($traktandum);
             }
+
+            $verarbeitetNummern[] = $tNummer;
+        }
+
+        // Traktanden die nicht mehr in der Quelle erscheinen als gelöscht markieren.
+        // Notizen bleiben im DB-Datensatz erhalten (nur geloescht=true).
+        if (!empty($verarbeitetNummern)) {
+            $this->traktandumMapper->markiereNichtMehrVorhandeneAlsGeloescht($sitzung->getId(), $verarbeitetNummern);
         }
     }
 

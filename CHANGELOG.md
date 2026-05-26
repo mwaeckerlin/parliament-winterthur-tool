@@ -2,6 +2,24 @@
 
 2026-05-26  Marc Wäckerlin
 
+	Synchronisations-Zuverlässigkeit verbessert: Wenn während der Synchronisation
+	ein Fehler auftritt, werden keine bestehenden Einträge als gelöscht markiert —
+	alle Daten bleiben vollständig erhalten.
+
+	Traktanden werden beim Sync nicht mehr vollständig gelöscht und neu angelegt,
+	sondern einzeln abgeglichen. Bestehende Notizen bleiben erhalten, auch wenn
+	ein Traktandum zwischenzeitlich vom Parlament entfernt und wieder hinzugefügt
+	wurde.
+
+	Objekte (Sitzungen, Geschäfte, Mitglieder), die bei einem früheren Sync
+	fälschlicherweise als gelöscht markiert wurden, werden bei der nächsten
+	Synchronisation automatisch wiederhergestellt — inklusive aller bisherigen
+	Notizen und fraktionsinternen Daten.
+
+	Migrationen werden jetzt beim Container-Start zuverlässig ausgeführt. Schlägt
+	eine Migration fehl, bricht der Container ab und zeigt eine Fehlermeldung im
+	Docker-Log.
+
 	Notizen und Beschlüsse können wieder mit der Maus verschoben werden — nur
 	noch über das ⠿-Symbol, nicht mehr über die ganze Zeile. Text in der Zeile
 	kann wieder normal markiert werden.

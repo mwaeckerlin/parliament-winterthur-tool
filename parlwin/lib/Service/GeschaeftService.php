@@ -146,7 +146,7 @@ class GeschaeftService {
             try {
                 $geschaeft = $this->mapper->findByExternId($externId);
                 $this->mapper->harmonisiereIdMitExternId($geschaeft, $dbId);
-                if ($this->istAbgeschlossenStatus($geschaeft->getStatus())) {
+                if (!$geschaeft->getGeloescht() && $this->istAbgeschlossenStatus($geschaeft->getStatus())) {
                     if ($fortschritt !== null) {
                         $fortschritt([
                             'scope' => 'geschaefte',
