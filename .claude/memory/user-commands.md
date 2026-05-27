@@ -271,3 +271,9 @@ Das heisst, das Kapitel 'Deployment auf einer Ubuntu-VM' kommt in Punkt 5."
 
 > "DAS IST TOTAL ILLEGAL: [Vite-Warnings über <tr> nicht in <table> in GeschaeftDetail.vue; stderr in Kommissionsliste.test.js: Fehler beim Laden der Kommissionen: TypeError: data.map is not a function] DAN NTROITZDEM EXIT 0!!! marc@saturn:~/git/mwaeckerlin/parliament-winterthur-tool$ echo $? → 0 DAS DARF **NIEMALS** PASSIEREN!!! EIN KLEINER FEHLER IRGENDWO IN EINEM KLEINEN TEST → EXIT CODE 1!!! FEHLGESCHLAGEN!!!"
 
+> "WARUM IST DAS VERHAOTEN HIER ANDERS ALS BEI DEN NOTIZEN II GESCHAEFT!!! DAS VERHALTEN VOM DSELBEN ELEMENT HAT UEBERALL IDENTISCH ZU SEIN UN DIESELBE CODEBASIS ZU TEILEN!!! EINE NOTIZ IST EINE NOTZ EGAL WO SIE GESCHRIEBEN WIRD ES GELEN IMMER DIESELBEN REGELN, AUCH WAS SPEICHERN UND AUCH WAS AUSSEHEN BETRIFFT!!! WAS SIND DIE REGELN???"
+
+> "JA! Und prüfe, ob es noch weitere unnütze Duplikate im Code gibt!!! Halte immer KISS ein: So einfach wie möglich, niemals zweimal dasselbe Problem lösen. Keine Copy Paste, dieselbe Code-Basis möglicst weit teilen! → DAS IST EINE GENERELLE GLOBALE Codier-REGEL!! → LERNEN!"
+
+> "Mach das Commit immer erst wenn ich es sage!"
+

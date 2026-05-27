@@ -148,6 +148,7 @@
 import { generateUrl } from '@nextcloud/router'
 import axios from '@nextcloud/axios'
 import { subscribeRealtime } from '../realtime'
+import { vollerName, personKey } from '../utils'
 import GeschaeftDetail from './GeschaeftDetail.vue'
 import NcTextField from '@nextcloud/vue/components/NcTextField'
 import NcSelect from '@nextcloud/vue/components/NcSelect'
@@ -350,14 +351,8 @@ export default {
       else if (!soll && index >= 0) liste.splice(index, 1)
       this[feld] = liste
     },
-    vollerName(m) {
-      return `${m.vorname || ''} ${m.name || ''}`.trim()
-    },
-    personKey(m) {
-      const externId = m.externId || m.extern_id || ''
-      if (externId) return `mitglied:${externId}`
-      return `name:${this.vollerName(m)}`
-    },
+    vollerName,
+    personKey,
     zustaendigOptionenFuer(geschaeft) {
       const zust = Array.isArray(geschaeft.zustaendigkeiten) ? geschaeft.zustaendigkeiten : []
       return zust.map((z) => {

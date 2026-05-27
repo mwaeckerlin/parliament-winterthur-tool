@@ -491,6 +491,7 @@
 <script>
 import { generateUrl } from '@nextcloud/router'
 import axios from '@nextcloud/axios'
+import { vollerName, personKey, parseNotizen } from '../utils'
 import { showError } from '@nextcloud/dialogs'
 import '@nextcloud/dialogs/style.css'
 import { subscribeRealtime } from '../realtime'
@@ -754,14 +755,8 @@ export default {
       this.dragSrcIdx = null
       this.dragOverIdx = null
     },
-    vollerName(m) {
-      return `${m.vorname || ''} ${m.name || ''}`.trim()
-    },
-    personKey(m) {
-      const externId = m.externId || m.extern_id || ''
-      if (externId) return `mitglied:${externId}`
-      return `name:${this.vollerName(m)}`
-    },
+    vollerName,
+    personKey,
     async ladeSitzungen() {
       this.laden = true
       try {
@@ -831,15 +826,7 @@ export default {
         this.offeneSitzungen.forEach((sid) => this.ladeTraktandenFuerSitzung(sid, true))
       }
     },
-    parseNotizen(raw) {
-      if (!raw) return []
-      try {
-        const arr = typeof raw === 'string' ? JSON.parse(raw) : raw
-        return Array.isArray(arr) ? arr : []
-      } catch {
-        return []
-      }
-    },
+    parseNotizen,
     parseTraktandumNotizen(tId) {
       return this.traktandumNotizen[tId] || []
     },
