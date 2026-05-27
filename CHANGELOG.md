@@ -2,6 +2,16 @@
 
 2026-05-27  Marc Wäckerlin
 
+	Notizen speichern jetzt auch in der Sitzungsliste automatisch — bei
+	Fokusverlust oder nach 5 Sekunden Pause. Der «+»-Knopf ist verschwunden.
+	Das Verhalten ist nun identisch mit dem Notizfeld im Geschäftsdetail.
+
+	Gemeinsame Hilfsfunktionen (vollerName, personKey, parseNotizen) wurden in
+	eine zentrale utils.js ausgelagert — Copy-Paste zwischen Sitzungsliste,
+	Geschäftsliste und Geschäftsdetail ist beseitigt.
+
+2026-05-27  Marc Wäckerlin
+
 	Ungültige HTML-Struktur in der Geschäfts-Detailansicht behoben: Tabellenzeilen
 	waren nicht korrekt in ein tbody-Element eingeschlossen, was zu Hydration-
 	Warnungen im Browser führte.

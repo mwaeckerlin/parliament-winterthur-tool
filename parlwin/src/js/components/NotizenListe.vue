@@ -67,14 +67,9 @@
         :placeholder="placeholder"
         class="pw-input pw-notiz-eingabe"
         @keyup.enter="hinzufuegen"
+        @input="debounce"
+        @blur="hinzufuegenBeiBlur"
       />
-      <button
-        type="button"
-        class="button pw-btn-mini"
-        :disabled="!neuerText.trim()"
-        title="Notiz hinzufügen"
-        @click="hinzufuegen"
-      >+</button>
     </div>
   </div>
 </template>
@@ -105,7 +100,11 @@ export default {
       bearbeiteText: '',
       dragVonIdx: -1,
       dragUeberIdx: -1,
+      debounceTimer: null,
     }
+  },
+  beforeUnmount() {
+    if (this.debounceTimer) clearTimeout(this.debounceTimer)
   },
   computed: {
     notizen() {
@@ -120,6 +119,14 @@ export default {
     istEigene(n) {
       const uid = (n?.uid || '').toLowerCase()
       return !!uid && uid === this.eigenerUid
+    },
+    debounce() {
+      if (this.debounceTimer) clearTimeout(this.debounceTimer)
+      this.debounceTimer = setTimeout(() => { this.hinzufuegen(); this.debounceTimer = null }, 5000)
+    },
+    hinzufuegenBeiBlur() {
+      if (this.debounceTimer) { clearTimeout(this.debounceTimer); this.debounceTimer = null }
+      this.hinzufuegen()
     },
     hinzufuegen() {
       const text = (this.neuerText || '').trim()

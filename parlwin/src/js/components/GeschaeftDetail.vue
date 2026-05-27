@@ -172,6 +172,7 @@
 <script>
 import { generateUrl } from '@nextcloud/router'
 import { getCurrentUser } from '@nextcloud/auth'
+import { vollerName, personKey } from '../utils'
 import axios from '@nextcloud/axios'
 import NcSelect from '@nextcloud/vue/components/NcSelect'
 import PwMultiSelect from './PwMultiSelect.vue'
@@ -338,14 +339,8 @@ export default {
     },
   },
   methods: {
-    vollerName(m) {
-      return `${m.vorname || ''} ${m.name || ''}`.trim()
-    },
-    personKey(m) {
-      const externId = m.externId || m.extern_id || ''
-      if (externId) return `mitglied:${externId}`
-      return `name:${this.vollerName(m)}`
-    },
+    vollerName,
+    personKey,
     personLabelByKey(key) {
       const member = this.mitglieder.find(m => this.personKey(m) === key)
       return member ? this.vollerName(member) : key
