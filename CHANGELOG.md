@@ -1,5 +1,18 @@
 # Changelog
 
+2026-05-27  Marc Wäckerlin
+
+	WebSocket-Verbindung zum Echtzeit-Server funktioniert wieder. Der Nginx-Pfad
+	war falsch konfiguriert (/parlwin/ws statt /ws/parlwin/) und der Container-
+	Servicename stimmte nicht mit der nginx-Konvention überein.
+
+	Beim Container-Start blieb Nextcloud im Wartungsmodus hängen, falls ein
+	vorheriger Start abgebrochen wurde. Das wird jetzt automatisch behoben.
+
+	Der freie Beschlusstext wird erst beim Verlassen des Feldes gespeichert,
+	nicht sofort bei der Eingabe. Wenn der Text geleert wird, erscheint wieder
+	die Auswahlliste.
+
 2026-05-26  Marc Wäckerlin
 
 	Synchronisations-Zuverlässigkeit verbessert: Wenn während der Synchronisation

@@ -511,7 +511,18 @@ export default {
       this.beschlussWert = val
       if (!val) {
         if (hatteWert) await this.beschlussZuruecknehmen()
-      } else {
+      } else if (!val.freitext) {
+        await this.beschlussSpeichern()
+      }
+      // freitext: wait for blur via beschlussAutoSpeichern
+    },
+    beschlussFreitextInput() {
+      if (!this.beschlussWert?.label) {
+        this.beschlussWert = null
+      }
+    },
+    async beschlussAutoSpeichern() {
+      if (this.beschlussWert?.freitext && this.beschlussWert.label) {
         await this.beschlussSpeichern()
       }
     },

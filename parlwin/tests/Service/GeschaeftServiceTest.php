@@ -266,6 +266,107 @@ class GeschaeftServiceTest extends TestCase {
         $this->assertSame(['neu' => 0, 'aktualisiert' => 0, 'geloescht' => 0], $result);
     }
 
+    public function testSynchronisierenStelltGeloeschtesGeschaeftWiederHerAuchWennAbgeschlossen(): void {
+        $mapper = $this->createMock(GeschaeftMapper::class);
+        $entwurfMapper = $this->createStub(VorstossEntwurfMapper::class);
+        $ereignisMapper = $this->createMock(GeschaeftEreignisMapper::class);
+        $scraper = $this->createMock(ScraperService::class);
+        $logger = $this->createStub(LoggerInterface::class);
+
+        $service = new GeschaeftService($mapper, $entwurfMapper, $ereignisMapper, $scraper, $logger);
+
+        $bestehend = new Geschaeft();
+        $bestehend->setId(7);
+        $bestehend->setExternId('9999');
+        $bestehend->setStatus('Erledigt');
+        $bestehend->setGeloescht(true);
+
+        $scraper->expects($this->once())
+            ->method('ladeGeschaefte')
+            ->willReturn([[
+                'id' => '9999',
+                'title' => 'Wiederhergestelltes Geschäft',
+                'number' => '2020.1',
+                'type' => 'Motion',
+                'status' => 'Erledigt',
+                'date' => '2020-01-01',
+                'url' => 'https://parlament.winterthur.ch/_rte/information/9999',
+            ]]);
+
+        $mapper->expects($this->once())
+            ->method('findByExternId')
+            ->with('9999')
+            ->willReturn($bestehend);
+
+        $mapper->expects($this->once())
+            ->method('harmonisiereIdMitExternId')
+            ->with($bestehend, 9999);
+
+        $mapper->expects($this->once())
+            ->method('update')
+            ->willReturnCallback(static function (Geschaeft $g): Geschaeft {
+                return $g;
+            });
+
+        $ereignisMapper->expects($this->once())
+            ->method('ersetzeFuerGeschaeft');
+
+        $mapper->expects($this->once())
+            ->method('markiereNichtMehrVorhandeneAlsGeloescht')
+            ->willReturn(0);
+
+        $result = $service->synchronisieren();
+
+        $this->assertFalse($bestehend->getGeloescht(), 'geloescht muss nach Sync auf false zurückgesetzt sein');
+        $this->assertSame(['neu' => 0, 'aktualisiert' => 1, 'geloescht' => 0], $result);
+    }
+
+    public function testSynchronisierenUeberspringtNichtGeloeschtesAbgeschlossenesGeschaeft(): void {
+        $mapper = $this->createMock(GeschaeftMapper::class);
+        $entwurfMapper = $this->createStub(VorstossEntwurfMapper::class);
+        $ereignisMapper = $this->createMock(GeschaeftEreignisMapper::class);
+        $scraper = $this->createMock(ScraperService::class);
+        $logger = $this->createStub(LoggerInterface::class);
+
+        $service = new GeschaeftService($mapper, $entwurfMapper, $ereignisMapper, $scraper, $logger);
+
+        $bestehend = new Geschaeft();
+        $bestehend->setId(8);
+        $bestehend->setExternId('8888');
+        $bestehend->setStatus('Erledigt');
+        $bestehend->setGeloescht(false);
+
+        $scraper->expects($this->once())
+            ->method('ladeGeschaefte')
+            ->willReturn([[
+                'id' => '8888',
+                'title' => 'Erledigtes Geschäft',
+                'number' => '2019.5',
+                'type' => 'Motion',
+                'status' => 'Erledigt',
+                'date' => '2019-01-01',
+                'url' => 'https://parlament.winterthur.ch/_rte/information/8888',
+            ]]);
+
+        $mapper->expects($this->once())
+            ->method('findByExternId')
+            ->with('8888')
+            ->willReturn($bestehend);
+
+        $mapper->expects($this->once())
+            ->method('harmonisiereIdMitExternId');
+
+        $mapper->expects($this->never())->method('update');
+        $ereignisMapper->expects($this->never())->method('ersetzeFuerGeschaeft');
+
+        $mapper->expects($this->once())
+            ->method('markiereNichtMehrVorhandeneAlsGeloescht')
+            ->willReturn(0);
+
+        $result = $service->synchronisieren();
+        $this->assertSame(['neu' => 0, 'aktualisiert' => 0, 'geloescht' => 0], $result);
+    }
+
     public function testAlleLeitetInklusiveErledigtFlagAnMapperWeiter(): void {
         $mapper = $this->createMock(GeschaeftMapper::class);
         $entwurfMapper = $this->createStub(VorstossEntwurfMapper::class);
