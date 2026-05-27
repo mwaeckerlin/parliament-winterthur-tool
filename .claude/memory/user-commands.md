@@ -206,3 +206,68 @@ Das heisst, das Kapitel 'Deployment auf einer Ubuntu-VM' kommt in Punkt 5."
 > 4. Ausserdem wird für den Beschluss nicht DASSELBE Widget verwendet!!! Es muss dasselbe Widget sein, auf der Übersichtsseite wie auch auf der Detailseite!!!
 > 5. FUCKING SCHEISS EINHEITLICHKEIT VON LABELS DU BLINDER IDIOT!!! SIND DIE LABEL OBEN ODER LINKS??? → OBEN SOLLEN SIE SEIN!!! AUCH BEI ORT UND ZEIT!!!"
 
+
+> "4 ISSUES NICHT 3!!! DUMMKOPF!!!"
+
+> "5 sogar"
+
+> "TOTALER FAIL!!! NICHTS IST GELOEST!!!"
+
+> "Zusätzlich, wenn obiges erledigt ist nächster Punkt: 'Telnehmer' ohne '-Regeln'"
+
+> "Nächter Punkt: SCHON WIEDER: Sitzung konnte nicht erstellt werden: Request failed with status code 500" (HAR: POST /sitzungen → 500, Duplicate entry '' for key 'pw_sitzungen_extern_id')
+
+> "Analysiere: Warum kannst du das Problem mit dem Drag-Handle nicht lösen? Nachdenken..."
+
+> "Hier siehst du, wie statt Textauswahl die Box weg gezogen wird." (Screenshot: Aktionszeitleiste — beim Mausziehen wird die Box verschoben statt Text markiert)
+
+> "ALLE LABEL MUESSEN VOM IDENTISCH SEIN VON EINEM EINZIGEN WIDGET, GLEICHE FONTS! (die hellgrauen, kleineren oben, nicht wie unten)."
+
+> "SPEICHER EINES TERMINS GEHT WIEDER NICHT!!!" (HAR: POST /sitzungen → 500, Column 'extern_id' cannot be null)
+
+> "Gut. Jetzt analysiere alle Changes seit dem letzten Commit kontrolliere, dass alles im README angepasst ist und ergänze CHANGELOG, wenn notwendig Tests, dann folge dem /commit Command"
+
+> "ja" (bestätigt Commit-Nachricht)
+
+> "JA, DAS STEHT SO IM /COMMIT COMMAND!!! FOLGE EINFACH DEM COMMAND!!! DAZU IST ES DA!!!" (wütend: Push war nicht automatisch ausgeführt)
+
+> "WARUM HAST DU NICHT **ALLES** COIMMITTET, VOLLIDIOT!!!" (.claude/memory/-Dateien fehlten im Commit)
+
+---
+
+## Session 2026-05-26
+
+> "Problem: Ich habe eben die aktuelle Version auch wieder online publiziert. Schon vorher und jetzt auch habe ich online das Problem, dass die Termine der Sitzung vom 1. Juni nicht mehr angezeigt werden. Für mich ist der Ablauf folgendermassen: Da ich eine Neue Sitzung erstellt hatte und das auch Online published habe, wäre meine Erwartung, dass wenn ich auf 'Sync' drücke dann aktualisiert ist. Aber die Sitzung erscheint nicht im Kalender. Auch aus dem Kalender sind die bestehenden Termine zum Teil verschwunden. Sync-Meldung: 'Unknown column 'url' in 'SET''. Ich sehe zwar die Sitzungen in der Liste, aber im Kalender nichts. Du hast einiges aktualisiert und auch Migrationen. Erst NUR Analyse! Was ist der Mechanismus, dass Termine fehlen können?!? Auch nach Sync?" (mit 4 Screenshots: Produktions-Kalender leer, lokale Sitzungsliste mit intern-Badge, lokaler Kalender mit Einträgen, Produktions-Sitzungsliste ohne interne Sitzung)
+
+
+> "Bei Migrationen:
+> - Wenn der Zustand schon wie erwartet ist, Migrationsschritt skippen
+> - Wenn der Zustand angepasst wurde, ok
+> - Wenn der Zustand NICHT angepasst wurde (egal welcher Fehler) und der Zustand matcht nicht dem gewünschten Zustand → EXIT 1 → Docker muss abbrechen → NUR so sehe ich, wenn es einen Fehler gibt
+> → Wichtig: Guter Trace im Docker, der das Problem erklärt, so dass man fixen kann."
+
+> "Und wenn ein Objekt als geloescht true markiert wurde, was passiert dann, wenn neu gesynct wird? Wichtig ist:
+> - KEIN NEUES OBJEKT ERZEUGEN
+> - Bestehendes OBjekt behalten und zurücksetzen: geloescht→ false
+> Weil: Alle Notizen, etc. am Objekt müssen erhalten bleiben!!! Das gilt für alle Tabellen!"
+
+> "Und: Ich bin sicher, der Eintrag WAR im Kalender und wurde aus dem Kalender gelöscht; kann das sein?!? (darf nicht sein)"
+
+> "Fehlt nun eine Migration??? Und wird die nächstes Mal automatisch nachgeholt???"
+
+> "Was passiert wenn eine Migration fehlschlägt? → Jede Migration MUSS ERFOLGREICH ABGESCHLOSSEN WERDEN!!! SINST MUSS DAS UNIVERSUM ZUSAMMENBRECHEN!!! Und kleine Katzen werden getötet!"
+
+---
+
+## Session 2026-05-27
+
+> "Bleibt es im Wartungsmodur hängen? Es ist nun schon lange im Wartungsmodus..."
+
+> "Ausserdem gibt es ein WS-Problem in der Produktion (aus example gestartet)" [curl-Ausgabe: 502 Bad Gateway für wss://fraktion.svpwinterthur.ch/ws/parlwin/]
+
+> "Add test cases for the latest failures if not yet; i.e. for th socket connection. Make them pass. Then document + commit / push"
+
+> "OK, but there were issues! Tests: 7, Assertions: 31, PHPUnit Notices: 7. NEIN WENN DA ISSUES SIND IST ES **NICHT** OK!!! FUCK!!! ALLE TESTS MUESSEN 100% KORREKT DURCHLAUFEN!!! SKIPPEN VON TESTS IST **IMMER** **STRENGSTENS** VERBOTEN!!! → GLOBALE REGEL ERSTELLEN!!! NIEMALS EINEN TEST SKIPPEN IGNORIEREN ODER AUKLAMMERN!!! WENN EIN TEST NICHT LAEUFT MUSS TEST UND CODE KORRIGIERT WERDEN, SO DASS DER TEST TATSAECHLICH ETWA TESTET UND DAS ERFOLGREICH!!! VERBOTEN IST ES TESTS ZU SKIPPEN ODER ZU KUERZEN!!!"
+
+> "DAS IST TOTAL ILLEGAL: [Vite-Warnings über <tr> nicht in <table> in GeschaeftDetail.vue; stderr in Kommissionsliste.test.js: Fehler beim Laden der Kommissionen: TypeError: data.map is not a function] DAN NTROITZDEM EXIT 0!!! marc@saturn:~/git/mwaeckerlin/parliament-winterthur-tool$ echo $? → 0 DAS DARF **NIEMALS** PASSIEREN!!! EIN KLEINER FEHLER IRGENDWO IN EINEM KLEINEN TEST → EXIT CODE 1!!! FEHLGESCHLAGEN!!!"
+

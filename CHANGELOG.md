@@ -2,6 +2,22 @@
 
 2026-05-27  Marc Wäckerlin
 
+	Ungültige HTML-Struktur in der Geschäfts-Detailansicht behoben: Tabellenzeilen
+	waren nicht korrekt in ein tbody-Element eingeschlossen, was zu Hydration-
+	Warnungen im Browser führte.
+
+	Fehler behoben, bei dem das Laden der Kommissionsliste abstürzte, wenn der
+	Server eine leere Antwort zurückgab. Vorher entstand eine TypeError-Meldung
+	in der Konsole, obwohl der Test trotzdem als erfolgreich galt.
+
+	Teststabilität verbessert: Konsolenausgaben von console.error() führen jetzt
+	sofort zu einem Testfehler statt stillschweigend ignoriert zu werden.
+
+	PHPUnit-Notices in den Live-Scraper-Tests behoben (createStub statt
+	createMock für Logger und HTTP-Client).
+
+2026-05-27  Marc Wäckerlin
+
 	WebSocket-Verbindung zum Echtzeit-Server funktioniert wieder. Der Nginx-Pfad
 	war falsch konfiguriert (/parlwin/ws statt /ws/parlwin/) und der Container-
 	Servicename stimmte nicht mit der nginx-Konvention überein.
