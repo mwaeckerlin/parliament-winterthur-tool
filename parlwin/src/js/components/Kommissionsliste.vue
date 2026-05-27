@@ -215,7 +215,7 @@ export default {
       this.laden = true
       try {
         const { data } = await axios.get(generateUrl('/apps/parlwin/kommissionen'))
-        this.kommissionen = data.map(k => ({
+        this.kommissionen = (Array.isArray(data) ? data : []).map(k => ({
           ...k,
           mitgliederArray: this.parseMitglieder(k.mitglieder),
         }))

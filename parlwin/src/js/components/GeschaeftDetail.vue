@@ -17,17 +17,19 @@
       <div class="pw-detail-abschnitt pw-oeffentlich">
         <h4>Öffentliche Informationen</h4>
         <table class="pw-info-tabelle">
-          <tr><th>Nummer</th><td>{{ geschaeft.nummer }}</td></tr>
-          <tr><th>Typ</th><td>{{ geschaeft.typ }}</td></tr>
-          <tr><th>Status</th><td>{{ geschaeft.status }}</td></tr>
-          <tr><th>Fraktionsstatus</th><td>{{ fraktionsstatusLabel(geschaeft.fraktionsstatus) }}</td></tr>
-          <tr><th>Datum</th><td>{{ formatieredatum(geschaeft.datum) }}</td></tr>
-          <tr><th>Letzte externe Änderung</th><td>{{ formatiereZeitpunkt(geschaeft.letzteExterneAenderungAm) }}</td></tr>
-          <tr><th>Letzte Fraktionsentscheidung</th><td>{{ formatiereZeitpunkt(geschaeft.letzteFraktionsentscheidungAm) }}</td></tr>
-          <tr v-if="geschaeft.url">
-            <th>Link</th>
-            <td><a :href="geschaeft.url" target="_blank">Auf Parlamentswebseite öffnen ↗</a></td>
-          </tr>
+          <tbody>
+            <tr><th>Nummer</th><td>{{ geschaeft.nummer }}</td></tr>
+            <tr><th>Typ</th><td>{{ geschaeft.typ }}</td></tr>
+            <tr><th>Status</th><td>{{ geschaeft.status }}</td></tr>
+            <tr><th>Fraktionsstatus</th><td>{{ fraktionsstatusLabel(geschaeft.fraktionsstatus) }}</td></tr>
+            <tr><th>Datum</th><td>{{ formatieredatum(geschaeft.datum) }}</td></tr>
+            <tr><th>Letzte externe Änderung</th><td>{{ formatiereZeitpunkt(geschaeft.letzteExterneAenderungAm) }}</td></tr>
+            <tr><th>Letzte Fraktionsentscheidung</th><td>{{ formatiereZeitpunkt(geschaeft.letzteFraktionsentscheidungAm) }}</td></tr>
+            <tr v-if="geschaeft.url">
+              <th>Link</th>
+              <td><a :href="geschaeft.url" target="_blank">Auf Parlamentswebseite öffnen ↗</a></td>
+            </tr>
+          </tbody>
         </table>
       </div>
 

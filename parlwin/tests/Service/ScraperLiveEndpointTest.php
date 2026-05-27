@@ -25,8 +25,8 @@ class ScraperLiveEndpointTest extends TestCase {
 
     protected function setUp(): void {
         $this->service = new ScraperService(
-            $this->createMock(IClientService::class),
-            $this->createMock(LoggerInterface::class),
+            $this->createStub(IClientService::class),
+            $this->createStub(LoggerInterface::class),
         );
     }
 
