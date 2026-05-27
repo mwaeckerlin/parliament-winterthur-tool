@@ -77,5 +77,64 @@ class MitgliedServiceTest extends TestCase {
         $this->assertTrue($inserted['200']->getAktiv());
         $this->assertFalse($inserted['300']->getAktiv());
     }
+
+    public function testSynchronisiereMitgliederStelltGeloeschtesMitgliedWiederHer(): void {
+        $mitgliedMapper = $this->createMock(MitgliedMapper::class);
+        $fraktionMapper = $this->createStub(FraktionMapper::class);
+        $kommissionMapper = $this->createStub(KommissionMapper::class);
+        $scraper = $this->createMock(ScraperService::class);
+        $groupManager = $this->createStub(IGroupManager::class);
+        $userManager = $this->createStub(IUserManager::class);
+        $mailer = $this->createStub(IMailer::class);
+        $config = $this->createStub(IConfig::class);
+        $logger = $this->createStub(LoggerInterface::class);
+
+        $service = new MitgliedService(
+            $mitgliedMapper,
+            $fraktionMapper,
+            $kommissionMapper,
+            $scraper,
+            $groupManager,
+            $userManager,
+            $mailer,
+            $config,
+            $logger
+        );
+
+        $geloeschaft = new Mitglied();
+        $geloeschaft->setId(5);
+        $geloeschaft->setExternId('555');
+        $geloeschaft->setName('Muster');
+        $geloeschaft->setVorname('Max');
+        $geloeschaft->setGeloescht(true);
+
+        $scraper->expects($this->once())
+            ->method('ladeMitglieder')
+            ->willReturn([
+                ['id' => '555', 'name' => 'Muster', 'vorname' => 'Max', 'aktiv' => true],
+            ]);
+
+        $mitgliedMapper->expects($this->once())
+            ->method('findByExternId')
+            ->with('555')
+            ->willReturn($geloeschaft);
+
+        $updated = null;
+        $mitgliedMapper->expects($this->once())
+            ->method('update')
+            ->willReturnCallback(static function (Mitglied $m) use (&$updated): Mitglied {
+                $updated = $m;
+                return $m;
+            });
+
+        $mitgliedMapper->expects($this->once())
+            ->method('markiereNichtMehrAktive')
+            ->willReturn(0);
+
+        $service->synchronisiereMitglieder();
+
+        $this->assertNotNull($updated);
+        $this->assertFalse($updated->getGeloescht(), 'geloescht muss nach Sync auf false zurückgesetzt sein');
+    }
 }
 
