@@ -1341,6 +1341,56 @@ class ScraperService
      * @param array<int, string> $urls
      * @return array<string, array<string, mixed>>
      */
+    /**
+     * Parst das Feld «Verfasser/Beteiligte» aus dem rohen HTML einer Geschäfts-Detailseite.
+     *
+     * Rückgabe: Array von ['name' => string, 'rolle' => string, 'externId' => string]
+     * «rolle» ist z.B. «Erstunterzeichner/-in» oder «Mitunterzeichner/-in».
+     *
+     * @return array<int, array{name: string, rolle: string, externId: string}>
+     */
+    private function parseVerfasserBeteiligte(string $rawHtml): array
+    {
+        $einreicher = [];
+
+        // Persons with a link to /_rte/person/{id}
+        if (preg_match_all(
+            '/<a[^>]*href="([^"]*)"[^>]*>\s*([^<]*)<\/a>\s*\(([^)]+)\)/u',
+            $rawHtml,
+            $m,
+            PREG_SET_ORDER
+        )) {
+            foreach ($m as $match) {
+                $externId = '';
+                if (preg_match('#/person/(\d+)#', $match[1], $idMatch) === 1) {
+                    $externId = $idMatch[1];
+                }
+                $einreicher[] = [
+                    'name' => trim($match[2]),
+                    'rolle' => trim($match[3]),
+                    'externId' => $externId,
+                ];
+            }
+        }
+
+        // Persons without a link: remove the linked portions, parse remaining plain text
+        $remaining = (string) preg_replace('/<a[^>]*>.*?<\/a>\s*\([^)]*\)/su', '', $rawHtml);
+        if (preg_match_all('/(?:^|,)\s*([^,<(]+?)\s*\(([^)]+)\)/u', $remaining, $m, PREG_SET_ORDER)) {
+            foreach ($m as $match) {
+                $name = trim($match[1]);
+                if ($name !== '') {
+                    $einreicher[] = [
+                        'name' => $name,
+                        'rolle' => trim($match[2]),
+                        'externId' => '',
+                    ];
+                }
+            }
+        }
+
+        return $einreicher;
+    }
+
     private function ladeGeschaeftDetailsParallel(array $urls, int $parallel, ?callable $beiErfolg = null): array
     {
         $result = [];
@@ -1445,7 +1495,8 @@ class ScraperService
             $index = 0;
             foreach ($matches as $match) {
                 $label = self::bereinigeHtmlText($match[1]);
-                $wert = self::bereinigeHtmlText($match[2]);
+                $rawWert = $match[2];
+                $wert = self::bereinigeHtmlText($rawWert);
                 if ($label === '') {
                     continue;
                 }
@@ -1472,6 +1523,8 @@ class ScraperService
                     $details['status'] = $wert;
                 } elseif ($label === 'Eingangsdatum' && $wert !== '') {
                     $details['date'] = $this->normalisiereDatum($wert);
+                } elseif ($label === 'Verfasser/Beteiligte' && $wert !== '') {
+                    $details['einreicher'] = $this->parseVerfasserBeteiligte($rawWert);
                 }
 
                 $ereignis = $this->klassifiziereGeschaeftDetailEintrag($index, $label, $wert);

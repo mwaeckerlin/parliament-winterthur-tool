@@ -296,6 +296,11 @@ class GeschaeftService {
         $geschaeft->setDatum($datum);
         $geschaeft->setUrl($url);
 
+        $einreicher = ScraperService::wert($daten, ['einreicher'], []);
+        if (is_array($einreicher) && $einreicher !== []) {
+            $geschaeft->setEinreicher((string) json_encode($einreicher, JSON_UNESCAPED_UNICODE));
+        }
+
         $quelleHash = $this->berechneQuellversion($daten);
         if ($quelleHash !== $geschaeft->getQuelleHash()) {
             $geschaeft->setQuelleHash($quelleHash);

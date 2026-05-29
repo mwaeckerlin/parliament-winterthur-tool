@@ -54,6 +54,7 @@
               <td class="pw-titel pw-col-titel" data-label="Titel">
                 <a v-if="g.url" :href="g.url" target="_blank" @click.stop class="pw-inline-link" title="Extern öffnen">↗</a>
                 {{ g.titel }}
+                <span v-if="erstunterzeichner(g)" class="pw-col-einreicher">{{ erstunterzeichner(g) }}</span>
               </td>
               <td v-if="statusSpalteAnzeigen" data-label="Status" class="pw-col-status">
                 <span :class="['pw-status-' + statusKlasse(g.status), 'pw-status-text']" :title="g.status">{{ g.status }}</span>
@@ -502,6 +503,11 @@ export default {
       } catch {
         return datum
       }
+    },
+    erstunterzeichner(g) {
+      const liste = g.einreicher
+      if (!Array.isArray(liste) || liste.length === 0) return ''
+      return liste.map(p => p.name).join(', ')
     },
     formatieredatumKurz(datum) {
       if (!datum) return ''

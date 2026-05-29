@@ -176,6 +176,44 @@ class ScraperServiceTest extends TestCase {
         $this->assertSame('nummer', $details['events'][0]['type']);
     }
 
+    public function testExtrahiereGeschaeftDetailsAusHtmlMitEinreichern(): void {
+        $html = <<<HTML
+        <dl class="row">
+            <dt>Nummer</dt><dd>2018.8</dd>
+            <dt>Verfasser/Beteiligte</dt><dd><a href="/_rte/person/281225" class="icms-link-person icms-link-int"> Stritt Gabriela</a> (Erstunterzeichner/-in), Cometta-Müller Katrin (Mitunterzeichner/-in), Gander Katharina (Mitunterzeichner/-in)</dd>
+        </dl>
+        HTML;
+
+        $details = $this->service->extrahiereGeschaeftDetailsAusHtml($html);
+        $this->assertArrayHasKey('einreicher', $details);
+        $einreicher = $details['einreicher'];
+        $this->assertCount(3, $einreicher);
+
+        $this->assertSame('Stritt Gabriela', $einreicher[0]['name']);
+        $this->assertSame('Erstunterzeichner/-in', $einreicher[0]['rolle']);
+        $this->assertSame('281225', $einreicher[0]['externId']);
+
+        $this->assertSame('Cometta-Müller Katrin', $einreicher[1]['name']);
+        $this->assertSame('Mitunterzeichner/-in', $einreicher[1]['rolle']);
+        $this->assertSame('', $einreicher[1]['externId']);
+
+        $this->assertSame('Gander Katharina', $einreicher[2]['name']);
+        $this->assertSame('Mitunterzeichner/-in', $einreicher[2]['rolle']);
+    }
+
+    public function testExtrahiereGeschaeftDetailsOhneEinreicher(): void {
+        $html = <<<HTML
+        <dl class="row">
+            <dt>Nummer</dt><dd>2021.27</dd>
+            <dt>Geschäftsart</dt><dd>Kreditantrag</dd>
+            <dt>Antragsteller</dt><dd>Stadtrat</dd>
+        </dl>
+        HTML;
+
+        $details = $this->service->extrahiereGeschaeftDetailsAusHtml($html);
+        $this->assertArrayNotHasKey('einreicher', $details);
+    }
+
     public function testLadeGeschaefteAusDataWrapperUndDetailseite(): void {
         $clientService = $this->createMock(IClientService::class);
         $client = $this->createMock(IClient::class);

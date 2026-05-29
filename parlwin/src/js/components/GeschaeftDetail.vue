@@ -23,6 +23,16 @@
             <tr><th>Status</th><td>{{ geschaeft.status }}</td></tr>
             <tr><th>Fraktionsstatus</th><td>{{ fraktionsstatusLabel(geschaeft.fraktionsstatus) }}</td></tr>
             <tr><th>Datum</th><td>{{ formatieredatum(geschaeft.datum) }}</td></tr>
+            <tr v-if="geschaeft.einreicher && geschaeft.einreicher.length">
+              <th>Einreichende</th>
+              <td>
+                <span
+                  v-for="(p, i) in geschaeft.einreicher"
+                  :key="i"
+                  class="pw-einreicher-person"
+                >{{ p.name }}<span class="pw-einreicher-rolle"> ({{ p.rolle }})</span><span v-if="i < geschaeft.einreicher.length - 1">, </span></span>
+              </td>
+            </tr>
             <tr><th>Letzte externe Änderung</th><td>{{ formatiereZeitpunkt(geschaeft.letzteExterneAenderungAm) }}</td></tr>
             <tr><th>Letzte Fraktionsentscheidung</th><td>{{ formatiereZeitpunkt(geschaeft.letzteFraktionsentscheidungAm) }}</td></tr>
             <tr v-if="geschaeft.url">
