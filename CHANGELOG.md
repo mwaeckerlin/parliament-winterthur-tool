@@ -2,6 +2,14 @@
 
 2026-05-29  Marc Wäckerlin
 
+	Miteinreicher (Erstunterzeichner und Mitunterzeichner) werden neu aus dem
+	Feld «Verfasser/Beteiligte» der Parlamentswebseite eingelesen und
+	gespeichert. In der Geschäftsdetailansicht erscheinen alle Einreichenden
+	mit Rolle. In der Geschäftsliste werden die Namen als Zusatzzeile unter
+	dem Titel angezeigt.
+
+2026-05-29  Marc Wäckerlin
+
 	Bugfix: Freier Text im Fraktionsentscheid (Geschäftsdetail) wird jetzt
 	auch in der Geschäftsübersicht korrekt angezeigt. Bisher wurde nur
 	«titel» geprüft; bei Freitext steht der Text in «text».

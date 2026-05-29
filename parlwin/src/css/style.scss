@@ -1880,6 +1880,17 @@ ul.app-navigation__list {
   text-align: center;
 }
 
+.pw-einreicher-rolle {
+  font-size: 0.85em;
+  color: var(--pw-muted);
+}
+
+.pw-col-einreicher {
+  display: block;
+  font-size: 0.8em;
+  color: var(--pw-muted);
+}
+
 .pw-tabelle-geschaefte .pw-col-titel {
   /* Titel-Spalte bekommt den restlichen Platz, mit komfortabler Mindestbreite. */
   inline-size: auto;

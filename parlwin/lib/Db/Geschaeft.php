@@ -28,6 +28,7 @@ use OCP\AppFramework\Db\Entity;
  * @method string getNotizen()
  * @method string getQuelleHash()
  * @method string getQuelleAktualisiertAm()
+ * @method string getEinreicher()
  * @method string getErstelltAm()
  * @method string getAktualisiertAm()
  */
@@ -73,6 +74,9 @@ class Geschaeft extends Entity {
     /** @var string Weitere interne Notizen (JSON-Array) */
     protected string $notizen = '[]';
 
+    /** @var string JSON-Array der Einreicher (Erstunterzeichner und Mitunterzeichner) */
+    protected string $einreicher = '[]';
+
     /** @var string Prüfsumme der zuletzt importierten öffentlichen Quellversion */
     protected string $quelleHash = '';
 
@@ -110,6 +114,7 @@ class Geschaeft extends Entity {
             'antragFraktion' => $this->getAntragFraktion(),
             'entscheidFraktion' => $this->getEntscheidFraktion(),
             'notizen' => $this->getNotizen(),
+            'einreicher' => json_decode($this->getEinreicher(), true) ?? [],
             'quelleHash' => $this->getQuelleHash(),
             'quelleAktualisiertAm' => $this->getQuelleAktualisiertAm(),
             'erstelltAm' => $this->getErstelltAm(),
