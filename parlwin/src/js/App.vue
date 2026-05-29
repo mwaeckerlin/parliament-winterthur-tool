@@ -19,6 +19,9 @@
         <div id="pw-filter-slot" class="pw-nav-filter"></div>
       </li>
     </template>
+    <template v-if="version" #footer>
+      <div class="pw-nav-version">v{{ version }}</div>
+    </template>
   </NcAppNavigation>
 
   <NcAppContent>
@@ -97,6 +100,7 @@ export default {
       kommissionen: [],
       syncMeldung: '',
       syncFehler: false,
+      version: String(window.PARLWIN_CONFIG?.version || ''),
       ansichten: [
         { key: 'geschaefte', bezeichnung: 'Geschäfte', icon: '📋' },
         { key: 'sitzungen', bezeichnung: 'Sitzungen', icon: '📅' },

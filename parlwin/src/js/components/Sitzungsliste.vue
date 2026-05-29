@@ -276,9 +276,6 @@
                         <th class="pw-col-nr">Tr.</th>
                         <th class="pw-col-nr">Nr.</th>
                         <th class="pw-col-titel">Titel</th>
-                        <th class="pw-col-typ">Typ</th>
-                        <th class="pw-col-status">Status</th>
-                        <th class="pw-col-datum">Datum</th>
                         <th class="pw-col-zustaendig">Zuständig</th>
                         <th class="pw-col-beschluss">Beschluss</th>
                       </tr>
@@ -295,7 +292,11 @@
                           @keydown.space.prevent="oeffneGeschaeft(t, sitzung)"
                         >
                           <td data-label="Tr." class="pw-col-nr"><strong>{{ t.nummer }}</strong></td>
-                          <td data-label="Nr." class="pw-col-nr">{{ t.geschaeft?.nummer || '' }}</td>
+                          <td data-label="Nr." class="pw-col-nr">
+                            <strong>{{ t.geschaeft?.nummer || '' }}</strong>
+                            <span class="pw-col-nr-datum">{{ formatieredatumKurz(t.geschaeft?.datum) }}</span>
+                            <span class="pw-col-nr-typ">{{ t.geschaeft?.typ || '' }}</span>
+                          </td>
                           <td class="pw-titel pw-col-titel" data-label="Titel">
                             <a
                               v-if="t.geschaeft?.url"
@@ -323,15 +324,6 @@
                             >↗</a>
                             {{ t.geschaeft?.titel || t.titel }}
                           </td>
-                          <td data-label="Typ" class="pw-col-typ">{{ t.geschaeft?.typ || '' }}</td>
-                          <td data-label="Status" class="pw-col-status">
-                            <span
-                              v-if="t.geschaeft?.status"
-                              :class="['pw-status-' + statusKlasse(t.geschaeft.status), 'pw-status-text']"
-                              :title="t.geschaeft.status"
-                            >{{ t.geschaeft.status }}</span>
-                          </td>
-                          <td data-label="Datum" class="pw-col-datum">{{ formatieredatum(t.geschaeft?.datum) }}</td>
                           <td v-if="t.geschaeft" data-label="Zuständig" class="pw-col-inline-edit pw-col-zustaendig" @click.stop>
                             <PwMultiSelect
                               class="pw-inline-select"
@@ -359,7 +351,7 @@
                         </tr>
                         <tr class="pw-traktandum-notizen-zeile" @click.stop>
                           <td></td>
-                          <td colspan="7">
+                          <td colspan="4">
                             <NotizenListe
                               :model-value="parseTraktandumNotizen(t.id)"
                               placeholder="Notiz zum Traktandum hinzufügen…"
@@ -958,6 +950,18 @@ export default {
         })
       } catch {
         return datum
+      }
+    },
+    formatieredatumKurz(datum) {
+      if (!datum) return ''
+      try {
+        const d = new Date(datum)
+        const tag = String(d.getDate()).padStart(2, '0')
+        const monat = String(d.getMonth() + 1).padStart(2, '0')
+        const jahr = String(d.getFullYear()).slice(-2)
+        return `${tag}.${monat}.${jahr}`
+      } catch {
+        return ''
       }
     },
     statusKlasse(status) {

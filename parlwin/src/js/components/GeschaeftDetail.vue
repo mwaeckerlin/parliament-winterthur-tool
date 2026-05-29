@@ -102,7 +102,8 @@
         >
           <span class="pw-notiz-griff" draggable="true" title="Verschieben" aria-hidden="true">⠿</span>
           <div class="pw-timeline-datum">
-            <span class="pw-timeline-zeit">{{ formatiereZeitpunkt(e.erstelltAm) }}</span>
+            <span class="pw-timeline-datum-tag">{{ formatieredatum(e.erstelltAm) }}</span>
+            <span class="pw-timeline-datum-uhrzeit">{{ formatiereUhrzeit(e.erstelltAm) }}</span>
             <small v-if="e._sitzungInfo" class="pw-traktandum-kontext-meta">{{ e._sitzungInfo }}</small>
           </div>
           <span class="pw-timeline-autor">{{ e.autorName || e.autorUid || 'unbekannt' }}</span>
@@ -766,6 +767,14 @@ export default {
         return new Date(wert).toLocaleString('de-CH')
       } catch {
         return wert
+      }
+    },
+    formatiereUhrzeit(wert) {
+      if (!wert) return ''
+      try {
+        return new Date(wert).toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' })
+      } catch {
+        return ''
       }
     },
     fraktionsstatusLabel(status) {

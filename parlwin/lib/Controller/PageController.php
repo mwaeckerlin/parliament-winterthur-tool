@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OCA\ParliamentWinterthur\Controller;
 
 use OCA\ParliamentWinterthur\AppInfo\Application;
+use OCP\App\IAppManager;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
@@ -21,6 +22,7 @@ class PageController extends Controller
     public function __construct(
         IRequest $request,
         private readonly IConfig $config,
+        private readonly IAppManager $appManager,
     ) {
         parent::__construct(Application::APP_ID, $request);
     }
@@ -45,6 +47,7 @@ class PageController extends Controller
             'fraktion' => $fraktion,
             'nextcloud_gruppe' => $nextcloudGruppe,
             'realtime_ws_url' => $realtimeWsUrl,
+            'version' => $this->appManager->getAppVersion(Application::APP_ID),
         ]);
     }
 

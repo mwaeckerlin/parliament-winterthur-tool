@@ -1141,6 +1141,17 @@ ul.app-navigation__list {
   font-variant-numeric: tabular-nums;
 }
 
+.pw-timeline-datum-tag {
+  font-size: 0.85em;
+  color: var(--pw-muted);
+}
+
+.pw-timeline-datum-uhrzeit {
+  font-size: 0.8em;
+  color: var(--pw-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .pw-timeline-text {
   white-space: pre-wrap;
 }
@@ -1851,6 +1862,22 @@ ul.app-navigation__list {
   inline-size: 1%;
   min-inline-size: var(--pw-col-nr);
   white-space: nowrap;
+}
+
+.pw-col-nr-datum,
+.pw-col-nr-typ {
+  display: block;
+  font-size: 0.8em;
+  color: var(--pw-muted);
+  font-weight: normal;
+  white-space: nowrap;
+}
+
+.pw-nav-version {
+  padding: var(--pw-space-xs) var(--pw-space-md);
+  font-size: 0.75em;
+  color: var(--pw-muted);
+  text-align: center;
 }
 
 .pw-tabelle-geschaefte .pw-col-titel {

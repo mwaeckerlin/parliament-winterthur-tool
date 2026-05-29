@@ -30,9 +30,7 @@
           <tr>
             <th @click="sortiereNach('nummer')" class="pw-sortierbar pw-col-nr">Nr.</th>
             <th @click="sortiereNach('titel')" class="pw-sortierbar pw-col-titel">Titel</th>
-            <th @click="sortiereNach('typ')" class="pw-sortierbar pw-col-typ">Typ</th>
             <th v-if="statusSpalteAnzeigen" @click="sortiereNach('status')" class="pw-sortierbar pw-col-status">Status</th>
-            <th @click="sortiereNach('datum')" class="pw-sortierbar pw-col-datum">Datum</th>
             <th class="pw-col-zustaendig">Zuständig</th>
             <th class="pw-col-beschluss">Beschluss</th>
           </tr>
@@ -48,16 +46,18 @@
               @click="oeffneDetail(g.id)"
               @keydown="zeilenKeydown($event, g.id)"
             >
-              <td data-label="Nr." class="pw-col-nr">{{ g.nummer }}</td>
+              <td data-label="Nr." class="pw-col-nr">
+                <strong>{{ g.nummer }}</strong>
+                <span class="pw-col-nr-datum">{{ formatieredatumKurz(g.datum) }}</span>
+                <span class="pw-col-nr-typ">{{ g.typ }}</span>
+              </td>
               <td class="pw-titel pw-col-titel" data-label="Titel">
                 <a v-if="g.url" :href="g.url" target="_blank" @click.stop class="pw-inline-link" title="Extern öffnen">↗</a>
                 {{ g.titel }}
               </td>
-              <td data-label="Typ" class="pw-col-typ">{{ g.typ }}</td>
               <td v-if="statusSpalteAnzeigen" data-label="Status" class="pw-col-status">
                 <span :class="['pw-status-' + statusKlasse(g.status), 'pw-status-text']" :title="g.status">{{ g.status }}</span>
               </td>
-              <td data-label="Datum" class="pw-col-datum">{{ formatieredatum(g.datum) }}</td>
               <td data-label="Zuständig" class="pw-col-inline-edit pw-col-zustaendig" @click.stop>
                 <PwMultiSelect
                   class="pw-inline-select"
@@ -120,7 +120,7 @@
               </div>
             </div>
 
-            <p class="pw-card-note">{{ g.letzterBeschluss?.titel || 'Noch kein Fraktionsbeschluss erfasst' }}</p>
+            <p class="pw-card-note">{{ g.letzterBeschluss?.text || g.letzterBeschluss?.titel || 'Noch kein Fraktionsbeschluss erfasst' }}</p>
           </article>
         </div>
 
@@ -501,6 +501,18 @@ export default {
         return new Date(datum).toLocaleDateString('de-CH')
       } catch {
         return datum
+      }
+    },
+    formatieredatumKurz(datum) {
+      if (!datum) return ''
+      try {
+        const d = new Date(datum)
+        const tag = String(d.getDate()).padStart(2, '0')
+        const monat = String(d.getMonth() + 1).padStart(2, '0')
+        const jahr = String(d.getFullYear()).slice(-2)
+        return `${tag}.${monat}.${jahr}`
+      } catch {
+        return ''
       }
     },
     statusKlasse(status) {
