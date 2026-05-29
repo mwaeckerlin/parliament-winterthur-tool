@@ -1,5 +1,23 @@
 # Changelog
 
+2026-05-29  Marc Wäckerlin
+
+	Bugfix: Freier Text im Fraktionsentscheid (Geschäftsdetail) wird jetzt
+	auch in der Geschäftsübersicht korrekt angezeigt. Bisher wurde nur
+	«titel» geprüft; bei Freitext steht der Text in «text».
+
+	Geschäftslisten (Geschäfte und Sitzungen): Nr., Datum (dd.mm.jj) und
+	Typ werden neu untereinander in der Nr.-Spalte angezeigt, statt in
+	separaten Spalten. Die separaten Typ- und Datum-Spalten entfallen.
+
+	Sitzungsliste: Status-Spalte in der Traktanden-Tabelle entfernt.
+
+	Aktionszeitleiste: Uhrzeit erscheint jetzt unter dem Datum, nicht mehr
+	daneben — spart Breite und verbessert die Lesbarkeit.
+
+	Versionsnummer der App wird neu in der Navigationsleiste angezeigt
+	(liest aus appinfo/info.xml via IAppManager).
+
 2026-05-27  Marc Wäckerlin
 
 	Notizen speichern jetzt auch in der Sitzungsliste automatisch — bei
