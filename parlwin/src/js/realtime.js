@@ -17,6 +17,13 @@ function resolveWsUrl() {
   return defaultWsUrl()
 }
 
+function updateWsStatus(state) {
+  const el = document.getElementById('pw-ws-status')
+  if (!el) return
+  el.className = 'pw-ws-status pw-ws-' + state
+  el.setAttribute('aria-label', state === 'connected' ? 'WebSocket verbunden' : 'WebSocket getrennt')
+}
+
 export function startRealtimeBridge() {
   const url = resolveWsUrl()
   if (!url) {
@@ -37,6 +44,7 @@ export function startRealtimeBridge() {
 
   const scheduleReconnect = () => {
     if (stopped) return
+    updateWsStatus('disconnected')
     clearTimer()
     reconnectTimer = window.setTimeout(connect, reconnectDelayMs)
     reconnectDelayMs = Math.min(reconnectDelayMs * 2, 15000)
@@ -57,6 +65,7 @@ export function startRealtimeBridge() {
       socket = new WebSocket(url)
       socket.addEventListener('open', () => {
         reconnectDelayMs = 1000
+        updateWsStatus('connected')
       })
       socket.addEventListener('message', onMessage)
       socket.addEventListener('close', scheduleReconnect)
@@ -76,6 +85,7 @@ export function startRealtimeBridge() {
       socket.close()
       socket = null
     }
+    updateWsStatus('disconnected')
   }
 }
 

@@ -22,6 +22,7 @@ use OCA\ParliamentWinterthur\Db\SitzungstypTraktandumMapper;
 use OCA\ParliamentWinterthur\Db\TraktandumMapper;
 use OCA\ParliamentWinterthur\Db\VorstossEntwurfMapper;
 use OCA\ParliamentWinterthur\Service\FraktionsarbeitService;
+use OCA\ParliamentWinterthur\Service\FraktionsraumService;
 use OCA\ParliamentWinterthur\Service\GeschaeftService;
 use OCA\ParliamentWinterthur\Service\KalenderService;
 use OCA\ParliamentWinterthur\Service\MitgliedService;
@@ -169,12 +170,24 @@ class Application extends App implements IBootstrap
                 $c->get(\OCP\IConfig::class),
                 $c->get(\Psr\Log\LoggerInterface::class),
                 $c->get(\OCP\IUserManager::class),
+                $c->get(\OCP\IDBConnection::class),
             );
         });
         $context->registerService(RealtimePublisherService::class, function ($c) {
             return new RealtimePublisherService(
                 $c->get(\OCP\Http\Client\IClientService::class),
                 $c->get(\OCP\IConfig::class),
+                $c->get(\Psr\Log\LoggerInterface::class),
+            );
+        });
+        $context->registerService(FraktionsraumService::class, function ($c) {
+            return new FraktionsraumService(
+                $c->get(\OCP\IConfig::class),
+                $c->get(\OCP\Files\IRootFolder::class),
+                $c->get(\OCP\IGroupManager::class),
+                $c->get(\OCP\IUserManager::class),
+                $c->get(\OCP\IDBConnection::class),
+                $c->get(KalenderService::class),
                 $c->get(\Psr\Log\LoggerInterface::class),
             );
         });

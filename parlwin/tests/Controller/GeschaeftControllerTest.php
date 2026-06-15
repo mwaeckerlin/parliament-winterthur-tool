@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OCA\ParliamentWinterthur\Tests\Controller;
 
 use OCA\ParliamentWinterthur\Controller\GeschaeftController;
+use OCA\ParliamentWinterthur\Db\GeschaeftMapper;
 use OCA\ParliamentWinterthur\Service\FraktionsarbeitService;
 use OCA\ParliamentWinterthur\Service\GeschaeftService;
 use OCA\ParliamentWinterthur\Service\RealtimePublisherService;
@@ -44,6 +45,7 @@ class GeschaeftControllerTest extends TestCase
             $this->createStub(IRootFolder::class),
             $this->createStub(IUserSession::class),
             $this->createStub(LoggerInterface::class),
+            $this->createStub(GeschaeftMapper::class),
         );
 
         $response = $controller->index(50, 5);
@@ -82,6 +84,7 @@ class GeschaeftControllerTest extends TestCase
             $this->createStub(IRootFolder::class),
             $this->createStub(IUserSession::class),
             $this->createStub(LoggerInterface::class),
+            $this->createStub(GeschaeftMapper::class),
         );
 
         $response = $controller->index();

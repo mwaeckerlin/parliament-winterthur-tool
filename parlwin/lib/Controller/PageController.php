@@ -42,12 +42,14 @@ class PageController extends Controller
         $nextcloudGruppe = $this->config->getAppValue(Application::APP_ID, 'nextcloud_gruppe', '');
         $realtimeWsUrl = $this->realtimeWsUrl();
 
+        $statusKuerzel = (string) $this->config->getAppValue(Application::APP_ID, 'status_kuerzel', '[]');
         return new TemplateResponse(Application::APP_ID, 'main', [
             'letzte_synchronisation' => $letzteSync,
             'fraktion' => $fraktion,
             'nextcloud_gruppe' => $nextcloudGruppe,
             'realtime_ws_url' => $realtimeWsUrl,
             'version' => $this->appManager->getAppVersion(Application::APP_ID),
+            'status_kuerzel' => $statusKuerzel,
         ]);
     }
 

@@ -18,7 +18,7 @@
       </li>
     </ul>
 
-    <div v-if="geschaeftNummer" class="pw-dokument-erstellen">
+    <div v-if="geschaeftNummer" class="pw-dokument-aktionen">
       <NcActions v-model:open="menuOffen" :menu-name="'+ Neues Dokument'" type="primary">
         <NcActionButton
           v-for="t in vorlagen"
@@ -28,6 +28,13 @@
           {{ t.label }}
         </NcActionButton>
       </NcActions>
+      <button type="button" class="button" @click="uploadKlick">⤒ Hochladen</button>
+      <input
+        ref="uploadInput"
+        type="file"
+        class="pw-upload-input"
+        @change="uploadDatei"
+      />
     </div>
 
     <Teleport to="body">
@@ -101,6 +108,7 @@ export default {
       neuerName: '',
       laeuft: false,
       meldung: '',
+      uploadLaeuft: false,
     }
   },
   computed: {
@@ -153,6 +161,33 @@ export default {
       this.aktiveVorlage = null
       this.neuerName = ''
     },
+    uploadKlick() {
+      this.$refs.uploadInput.value = ''
+      this.$refs.uploadInput.click()
+    },
+    async uploadDatei(event) {
+      const datei = event.target.files?.[0]
+      if (!datei) return
+      this.uploadLaeuft = true
+      this.meldung = ''
+      const form = new FormData()
+      form.append('datei', datei)
+      try {
+        await axios.post(
+          generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}/dokumente/upload`),
+          form,
+          { headers: { 'Content-Type': 'multipart/form-data' } }
+        )
+        this.meldung = 'Datei hochgeladen'
+        setTimeout(() => { this.meldung = '' }, 2500)
+        await this.laden_()
+      } catch (e) {
+        console.error('parlwin: Upload fehlgeschlagen', e)
+        this.meldung = 'Upload fehlgeschlagen: ' + (e?.response?.data?.fehler || e.message)
+      } finally {
+        this.uploadLaeuft = false
+      }
+    },
     async dokumentErstellen() {
       const name = (this.neuerName || '').trim()
       if (!name || !this.aktiveVorlage) return
@@ -204,5 +239,6 @@ export default {
 .pw-dokument-eintrag a { text-decoration: none; }
 .pw-dokument-name-vorschau { display: flex; align-items: center; gap: 0.25rem; }
 .pw-dokument-praefix, .pw-dokument-suffix { color: var(--pw-muted, #888); font-family: monospace; }
-.pw-dokument-erstellen { margin-top: 0.4rem; }
+.pw-dokument-aktionen { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.4rem; }
+.pw-upload-input { display: none; }
 </style>

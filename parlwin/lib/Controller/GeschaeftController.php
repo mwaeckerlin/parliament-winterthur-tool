@@ -9,6 +9,8 @@ use OCA\ParliamentWinterthur\Service\FraktionsarbeitService;
 use OCA\ParliamentWinterthur\Service\GeschaeftService;
 use OCA\ParliamentWinterthur\Service\RealtimePublisherService;
 use OCP\AppFramework\Controller;
+use OCA\ParliamentWinterthur\Db\Geschaeft;
+use OCA\ParliamentWinterthur\Db\GeschaeftMapper;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\DataResponse;
@@ -33,6 +35,7 @@ class GeschaeftController extends Controller
         private readonly IRootFolder $rootFolder,
         private readonly IUserSession $userSession,
         private readonly LoggerInterface $logger,
+        private readonly GeschaeftMapper $geschaeftMapper,
     ) {
         parent::__construct(Application::APP_ID, $request);
     }
@@ -411,6 +414,90 @@ class GeschaeftController extends Controller
             ]);
         } catch (\Throwable $e) {
             $this->logger->warning('parlwin: dokumentErstellen() Fehler: {msg}', ['msg' => $e->getMessage()]);
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Lädt eine Datei in den Geschäftsordner hoch.
+     */
+    #[NoAdminRequired]
+    public function dokumentHochladen(int $id): DataResponse
+    {
+        $user = $this->userSession->getUser();
+        if ($user === null) {
+            return new DataResponse(['fehler' => 'Nicht angemeldet'], Http::STATUS_UNAUTHORIZED);
+        }
+        $datei = $this->request->getUploadedFile('datei');
+        if (empty($datei) || ($datei['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            return new DataResponse(['fehler' => 'Keine Datei hochgeladen'], Http::STATUS_BAD_REQUEST);
+        }
+        try {
+            $geschaeft = $this->fraktionsarbeitService->angereichertesGeschaeft($id);
+        } catch (\OCP\AppFramework\Db\DoesNotExistException) {
+            return new DataResponse(['fehler' => 'Geschäft nicht gefunden'], Http::STATUS_NOT_FOUND);
+        }
+        $nummer = (string) ($geschaeft['nummer'] ?? '');
+        $jahr = preg_match('/^(\d{4})\./', $nummer, $m) ? $m[1] : (string) date('Y');
+        $originalName = basename((string) ($datei['name'] ?? 'upload'));
+        $sanitisiert = preg_replace('/[\/\\\\]/', '_', $originalName);
+        try {
+            $userFolder = $this->rootFolder->getUserFolder($user->getUID());
+            $ordnerPfad = 'Fraktion/20_Geschäfte/' . $jahr;
+            foreach (explode('/', $ordnerPfad) as $i => $teil) {
+                $pfad = implode('/', array_slice(explode('/', $ordnerPfad), 0, $i + 1));
+                if (!$userFolder->nodeExists($pfad)) {
+                    $userFolder->newFolder($pfad);
+                }
+            }
+            $zielPfad = $ordnerPfad . '/' . ($nummer !== '' ? $nummer . '-' : '') . $sanitisiert;
+            $inhalt = file_get_contents($datei['tmp_name']);
+            $node = $userFolder->nodeExists($zielPfad)
+                ? $userFolder->get($zielPfad)
+                : $userFolder->newFile($zielPfad, $inhalt);
+            if ($userFolder->nodeExists($zielPfad) && $node instanceof \OCP\Files\File) {
+                $node->putContent($inhalt);
+            }
+            return new DataResponse([
+                'name' => $node->getName(),
+                'pfad' => $zielPfad,
+                'fileId' => $node->getId(),
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->warning('parlwin: dokumentHochladen() Fehler: {msg}', ['msg' => $e->getMessage()]);
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Erstellt ein neues eigenes Geschäft (ohne Parlamentszugehörigkeit).
+     */
+    #[NoAdminRequired]
+    public function create(): DataResponse
+    {
+        $titel = trim((string) $this->request->getParam('titel', ''));
+        $typ = trim((string) $this->request->getParam('typ', 'Eigenes Geschäft'));
+        $status = trim((string) $this->request->getParam('status', 'Pendent'));
+        if ($titel === '') {
+            return new DataResponse(['fehler' => 'Titel erforderlich'], Http::STATUS_BAD_REQUEST);
+        }
+        $g = new Geschaeft();
+        $g->setTitel($titel);
+        $g->setTyp($typ);
+        $g->setStatus($status);
+        $g->setGeloescht(false);
+        // Eindeutige ExternId für eigene Geschäfte (nicht aus dem Parlament).
+        $g->setExternId('eigen:' . uniqid('', true));
+        $jetzt = (new \DateTime())->format('Y-m-d H:i:s');
+        $g->setErstelltAm($jetzt);
+        $g->setAktualisiertAm($jetzt);
+        $g->setQuelleAktualisiertAm($jetzt);
+        try {
+            $erstellt = $this->geschaeftMapper->insert($g);
+            $daten = $this->fraktionsarbeitService->angereichertesGeschaeft($erstellt->getId());
+            return new DataResponse($daten, Http::STATUS_CREATED);
+        } catch (\Throwable $e) {
+            $this->logger->warning('parlwin: create() Fehler: {msg}', ['msg' => $e->getMessage()]);
             return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_INTERNAL_SERVER_ERROR);
         }
     }

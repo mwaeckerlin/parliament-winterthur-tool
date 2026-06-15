@@ -85,6 +85,7 @@ if (!class_exists('OCP\BackgroundJob\TimedJob')) {
     // phpcs:ignore
     eval ('namespace OCP\BackgroundJob; class TimedJob {
         public const TIME_INSENSITIVE = 0;
+        public const TIME_SENSITIVE   = 1;
         public function __construct(protected \OCP\AppFramework\Utility\ITimeFactory $time) {}
         protected function setInterval(int $seconds): void {}
         protected function setTimeSensitivity(int $sensitivity): void {}
@@ -385,6 +386,44 @@ if (!class_exists('OCP\AppFramework\Db\QBMapper')) {
         }
         public function insert($entity) { return $entity; }
         public function update($entity) { return $entity; }
+    }');
+}
+
+if (!class_exists('OCP\Constants')) {
+    // phpcs:ignore
+    eval ('namespace OCP; class Constants {
+        public const PERMISSION_READ   = 1;
+        public const PERMISSION_CREATE = 4;
+        public const PERMISSION_UPDATE = 2;
+        public const PERMISSION_DELETE = 8;
+        public const PERMISSION_SHARE  = 16;
+        public const PERMISSION_ALL    = 31;
+    }');
+}
+
+if (!interface_exists('OCP\Share\IShare')) {
+    // phpcs:ignore
+    eval ('namespace OCP\Share; interface IShare {
+        public const TYPE_USER  = 0;
+        public const TYPE_GROUP = 1;
+        public function setNode(\OCP\Files\Node $node): self;
+        public function setShareType(int $type): self;
+        public function setSharedWith(string $with): self;
+        public function setSharedBy(string $by): self;
+        public function setPermissions(int $permissions): self;
+        public function getSharedWith(): string;
+        public function getPermissions(): int;
+        public function getId(): int;
+    }');
+}
+
+if (!interface_exists('OCP\Share\IShareManager')) {
+    // phpcs:ignore
+    eval ('namespace OCP\Share; interface IShareManager {
+        public function newShare(): IShare;
+        public function createShare(IShare $share): IShare;
+        public function getSharesBy(string $userId, int $shareType, $node = null, bool $reshares = false, int $limit = -1, int $offset = 0): array;
+        public function deleteShare(IShare $share): void;
     }');
 }
 

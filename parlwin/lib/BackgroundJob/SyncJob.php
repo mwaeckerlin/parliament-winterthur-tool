@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OCA\ParliamentWinterthur\BackgroundJob;
 
 use OCA\ParliamentWinterthur\Command\SyncCommand;
+use OCA\ParliamentWinterthur\Service\FraktionsraumService;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\BackgroundJob\TimedJob;
 use Psr\Log\LoggerInterface;
@@ -12,31 +13,40 @@ use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\NullOutput;
 
 /**
- * Täglicher Hintergrund-Job zur Synchronisation der Parlamentsdaten.
- *
- * Dieser Job wird täglich ausgeführt und synchronisiert alle relevanten
- * Daten von https://parlament.winterthur.ch/ in die lokale Datenbank.
+ * Zweimal täglich (03:00 und 15:00 Uhr) Synchronisation der Parlamentsdaten.
  */
 class SyncJob extends TimedJob {
+    private const SYNC_HOURS = [3, 15];
+    private const TIMEZONE   = 'Europe/Zurich';
+
     public function __construct(
         ITimeFactory $time,
         private readonly SyncCommand $syncCommand,
         private readonly LoggerInterface $logger,
+        private readonly FraktionsraumService $fraktionsraumService,
     ) {
         parent::__construct($time);
-        // Täglich ausführen (86400 Sekunden = 24 Stunden)
-        $this->setInterval(86400);
-        // Zufälligen Offset von bis zu 1 Stunde, um Server-Last zu verteilen
-        $this->setTimeSensitivity(self::TIME_INSENSITIVE);
+        // Mindestabstand 11 Stunden — verhindert Doppelläufe im selben Zeitfenster
+        $this->setInterval(11 * 3600);
+        $this->setTimeSensitivity(self::TIME_SENSITIVE);
     }
 
     /**
      * Führt die vollständige Synchronisation aller Parlamentsdaten durch.
      */
+    protected function aktuelleStunde(): int {
+        return (int) (new \DateTime('now', new \DateTimeZone(self::TIMEZONE)))->format('G');
+    }
+
     protected function run(mixed $argument): void {
+        if (!in_array($this->aktuelleStunde(), self::SYNC_HOURS, true)) {
+            return;
+        }
+
         @ignore_user_abort(true);
         @set_time_limit(0);
 
+        $this->fraktionsraumService->sicherstellen();
         $this->logger->info('Parlament Winterthur: Starte Datensynchronisation (BackgroundJob)');
 
         try {

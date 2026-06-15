@@ -917,6 +917,14 @@ ul.app-navigation__list {
   z-index: 2010 !important;
 }
 
+// Status-Dropdown: lange Kommissions-Bezeichnungen sollen vollständig lesbar sein.
+.pw-nav-filter .vs__dropdown-option {
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.3;
+  padding-block: 6px;
+}
+
 .pw-modal {
   inline-size: min(72rem, 100%);
   max-block-size: calc(100dvb - var(--pw-space-2xl));

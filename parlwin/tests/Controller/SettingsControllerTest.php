@@ -9,6 +9,7 @@ use OCA\ParliamentWinterthur\Db\Fraktion;
 use OCA\ParliamentWinterthur\Db\Mitglied;
 use OCA\ParliamentWinterthur\Db\FraktionMapper;
 use OCA\ParliamentWinterthur\Service\FraktionsarbeitService;
+use OCA\ParliamentWinterthur\Service\FraktionsraumService;
 use OCA\ParliamentWinterthur\Service\GeschaeftService;
 use OCA\ParliamentWinterthur\Service\KalenderService;
 use OCA\ParliamentWinterthur\Service\MitgliedService;
@@ -72,6 +73,7 @@ class SettingsControllerTest extends TestCase {
             $fraktionMapper,
             $this->createStub(IGroupManager::class),
             $this->createStub(IUserManager::class),
+            $this->createStub(FraktionsraumService::class),
         );
 
         $response = $controller->run();
@@ -128,6 +130,7 @@ class SettingsControllerTest extends TestCase {
             $fraktionMapper,
             $this->createStub(IGroupManager::class),
             $this->createStub(IUserManager::class),
+            $this->createStub(FraktionsraumService::class),
         );
 
         $response = $controller->syncStatus();
@@ -287,6 +290,7 @@ class SettingsControllerTest extends TestCase {
             $fraktionMapper,
             $groupManager,
             $userManager,
+            $this->createStub(FraktionsraumService::class),
         );
 
         $response = $controller->fraktionMitglieder();
@@ -379,6 +383,7 @@ class SettingsControllerTest extends TestCase {
             $fraktionMapper,
             $groupManager,
             $userManager,
+            $this->createStub(FraktionsraumService::class),
         );
 
         $response = $controller->provisionFraktionMitglieder();
@@ -470,6 +475,7 @@ class SettingsControllerTest extends TestCase {
             $fraktionMapper,
             $groupManager,
             $userManager,
+            $this->createStub(FraktionsraumService::class),
         );
 
         $data = $controller->fraktionMitglieder()->getData();
@@ -550,6 +556,7 @@ class SettingsControllerTest extends TestCase {
             $fraktionMapper,
             $groupManager,
             $userManager,
+            $this->createStub(FraktionsraumService::class),
         );
 
         $data = $controller->provisionFraktionMitglieder()->getData();
@@ -635,6 +642,7 @@ class SettingsControllerTest extends TestCase {
             $fraktionMapper,
             $groupManager,
             $userManager,
+            $this->createStub(FraktionsraumService::class),
         );
 
         return [$controller, $config, $publisher];
