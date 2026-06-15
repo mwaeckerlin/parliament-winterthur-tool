@@ -48,26 +48,6 @@ function mountComponent(extraData = {}) {
   })
 }
 
-describe('beschlussFreitextInput', () => {
-  it('setzt beschlussWert auf null wenn label leer ist', () => {
-    const wrapper = mountComponent({ beschlussWert: { label: '', freitext: true } })
-    wrapper.vm.beschlussFreitextInput()
-    expect(wrapper.vm.beschlussWert).toBeNull()
-  })
-
-  it('setzt beschlussWert auf null wenn label undefined ist', () => {
-    const wrapper = mountComponent({ beschlussWert: { label: undefined, freitext: true } })
-    wrapper.vm.beschlussFreitextInput()
-    expect(wrapper.vm.beschlussWert).toBeNull()
-  })
-
-  it('lässt beschlussWert unverändert wenn label nicht leer ist', () => {
-    const wrapper = mountComponent({ beschlussWert: { label: 'Annahme', freitext: true } })
-    wrapper.vm.beschlussFreitextInput()
-    expect(wrapper.vm.beschlussWert).not.toBeNull()
-    expect(wrapper.vm.beschlussWert.label).toBe('Annahme')
-  })
-})
 
 describe('notizBearbeitenStarten – Datenzustand', () => {
   it('setzt bearbeitenNotizId und bearbeitenNotizText', () => {
@@ -203,32 +183,14 @@ describe('beschlussNachWahl', () => {
     expect(spy).not.toHaveBeenCalled()
   })
 
-  it('speichert NICHT sofort bei freitext (wartet auf blur)', async () => {
+  it('speichert sofort bei freitext (BeschlussWidget managed blur/debounce intern)', async () => {
     const wrapper = mountComponent({ beschlussWert: null })
     const spy = vi.spyOn(wrapper.vm, 'beschlussSpeichern').mockResolvedValue()
     await wrapper.vm.beschlussNachWahl({ label: 'Freitext', value: '', freitext: true })
-    expect(spy).not.toHaveBeenCalled()
-  })
-})
-
-describe('beschlussAutoSpeichern', () => {
-  beforeEach(() => { vi.useFakeTimers() })
-  afterEach(() => { vi.useRealTimers() })
-
-  it('speichert freitext bei blur wenn Inhalt vorhanden', async () => {
-    const wrapper = mountComponent({ beschlussWert: { label: 'Freier Text', value: '', freitext: true } })
-    const spy = vi.spyOn(wrapper.vm, 'beschlussSpeichern').mockResolvedValue()
-    await wrapper.vm.beschlussAutoSpeichern()
     expect(spy).toHaveBeenCalledOnce()
   })
-
-  it('speichert NICHT wenn freitext leer ist', async () => {
-    const wrapper = mountComponent({ beschlussWert: { label: '', value: '', freitext: true } })
-    const spy = vi.spyOn(wrapper.vm, 'beschlussSpeichern').mockResolvedValue()
-    await wrapper.vm.beschlussAutoSpeichern()
-    expect(spy).not.toHaveBeenCalled()
-  })
 })
+
 
 describe('notizSpeichern – chirurgisches Update', () => {
   beforeEach(() => { vi.clearAllMocks() })

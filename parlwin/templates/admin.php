@@ -156,6 +156,38 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
                 </section>
 
                 <section class="pw-admin-card">
+                    <h3><?php p($l->t('Fraktions-Infrastruktur')); ?></h3>
+                    <p class="settings-hint">
+                        <?php p($l->t('Gemeinsamer Fraktionsordner und Kalender. Diese werden automatisch angelegt; mit diesem Button können Sie den Prozess manuell triggern.')); ?>
+                    </p>
+                    <button type="button" id="pw-fraktionsraum-sicherstellen" class="button">
+                        <?php p($l->t('Ordner + Kalender jetzt anlegen/teilen')); ?>
+                    </button>
+                    <span id="pw-fraktionsraum-status" class="pw-sync-status"></span>
+                </section>
+
+                <section class="pw-admin-card">
+                    <h3><?php p($l->t('Status-Kürzel')); ?></h3>
+                    <p class="settings-hint">
+                        <?php p($l->t('Texte im Status-Pulldown kürzen: Suchtext eingeben (Vorschläge aus bestehenden Status-Werten) und gewünschtes Kürzel definieren. Beide Mapping-Typen möglich:')); ?>
+                    </p>
+                    <ul class="settings-hint" style="margin-left:1.5rem;list-style:disc">
+                        <li><?php p($l->t('Kommissionsname → Kürzel: «Kommission Bildung, Sport und Kultur» → «BSKK»')); ?></li>
+                        <li><?php p($l->t('Status-Text → Kurzform: «Bei der Kommission Bildung, Sport und Kultur pendent» → «Pendent: BSKK»')); ?></li>
+                    </ul>
+                    <div id="pw-kuerzel-liste"></div>
+                    <button type="button" id="pw-kuerzel-hinzufuegen" class="button">
+                        <?php p($l->t('+ Eintrag hinzufügen')); ?>
+                    </button>
+                    <button type="button" id="pw-kuerzel-speichern" class="button primary" style="margin-left:0.5rem">
+                        <?php p($l->t('Kürzel speichern')); ?>
+                    </button>
+                    <span id="pw-kuerzel-status" class="pw-sync-status"></span>
+                    <input type="hidden" id="pw-status-kuerzel-json" name="status_kuerzel" value="<?php p($_['status_kuerzel'] ?? '{}'); ?>" />
+                    <datalist id="pw-status-kuerzel-liste"></datalist>
+                </section>
+
+                <section class="pw-admin-card">
                     <h3><?php p($l->t('E-Mail-Einladungen')); ?></h3>
 
                     <div class="pw-admin-grid">
@@ -179,6 +211,12 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
         </div>
     </div>
 </div>
+
+<?php if (!empty($_['build_time'])): ?>
+<p class="settings-hint" style="text-align:right;margin-top:4px;padding-right:1.5rem">
+    <?php p($l->t('Parlament Winterthur Tool — Build: %s', [$_['build_time']])); ?>
+</p>
+<?php endif; ?>
 
 <script nonce="<?php p(\OC::$server->getContentSecurityPolicyNonceManager()->getNonce()); ?>">
     window.PARLWIN_ADMIN_CONFIG = <?php print_unescaped(json_encode([
@@ -1267,6 +1305,95 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
             });
         });
         btnMembersProvision?.addEventListener('click', provisionSelectedMembers);
+
+        // ── Status-Kürzel ──────────────────────────────────────────────────────
+        const kuerzelListe = document.getElementById('pw-kuerzel-liste');
+        const kuerzelStatus = document.getElementById('pw-kuerzel-status');
+        let kuerzelEintraege = [];
+
+        const renderKuerzel = () => {
+            if (!kuerzelListe) return;
+            kuerzelListe.innerHTML = '';
+            kuerzelEintraege.forEach((entry, idx) => {
+                const row = document.createElement('div');
+                row.className = 'pw-kuerzel-zeile';
+                row.style.cssText = 'display:flex;gap:0.5rem;margin-bottom:0.4rem;align-items:center';
+                const listId = 'pw-kuerzel-vorschlaege-' + idx;
+                const inSuche = document.createElement('input');
+                inSuche.type = 'text'; inSuche.className = 'pw-input'; inSuche.style.flex = '1';
+                inSuche.placeholder = t('parlwin', 'Suchtext (z.B. Kommission Bildung, Sport und Kultur)');
+                inSuche.value = entry.suche;
+                inSuche.setAttribute('list', listId);
+                inSuche.addEventListener('input', () => { kuerzelEintraege[idx].suche = inSuche.value; });
+                // Datalist mit allen bekannten Status-Werten als Vorschläge
+                const dl = document.createElement('datalist');
+                dl.id = listId;
+                (window.__parlwinStatusWerte || []).forEach(s => {
+                    const opt = document.createElement('option'); opt.value = s; dl.appendChild(opt);
+                });
+                const inKuerzel = document.createElement('input');
+                inKuerzel.type = 'text'; inKuerzel.className = 'pw-input'; inKuerzel.style.width = '120px';
+                inKuerzel.placeholder = t('parlwin', 'Kürzel (z.B. BSKK)');
+                inKuerzel.value = entry.kuerzel;
+                inKuerzel.addEventListener('input', () => { kuerzelEintraege[idx].kuerzel = inKuerzel.value; });
+                const btnDel = document.createElement('button');
+                btnDel.type = 'button'; btnDel.className = 'button pw-btn-mini'; btnDel.textContent = '✕';
+                btnDel.addEventListener('click', () => { kuerzelEintraege.splice(idx, 1); renderKuerzel(); });
+                row.appendChild(dl); row.appendChild(inSuche); row.appendChild(inKuerzel); row.appendChild(btnDel);
+                kuerzelListe.appendChild(row);
+            });
+        };
+
+        // Alle bekannten Status-Werte aus der Geschäfts-API laden für Datalist-Vorschläge.
+        const ladeStatusWerte = () => {
+            fetch(generateUrl('/apps/parlwin/geschaefte?show_erledigt=1&limit=2000'), { headers: authHeaders() })
+                .then(r => r.json())
+                .then(data => {
+                    const werte = new Set();
+                    (Array.isArray(data) ? data : []).forEach(g => {
+                        if (g.status) werte.add(g.status);
+                    });
+                    window.__parlwinStatusWerte = [...werte].sort();
+                })
+                .catch(() => {});
+        };
+
+        const loadKuerzel = () => {
+            fetch(generateUrl('/apps/parlwin/settings/status-kuerzel'), { headers: authHeaders() })
+                .then(r => r.json())
+                .then(data => { kuerzelEintraege = Array.isArray(data) ? data : []; renderKuerzel(); })
+                .catch(() => {});
+        };
+
+        document.getElementById('pw-kuerzel-hinzufuegen')?.addEventListener('click', () => {
+            kuerzelEintraege.push({ suche: '', kuerzel: '' });
+            renderKuerzel();
+        });
+
+        document.getElementById('pw-kuerzel-speichern')?.addEventListener('click', () => {
+            if (kuerzelStatus) kuerzelStatus.textContent = t('parlwin', 'Speichere...');
+            fetch(generateUrl('/apps/parlwin/settings/status-kuerzel'), {
+                method: 'POST',
+                headers: authHeaders({ 'Content-Type': 'application/json' }),
+                body: JSON.stringify({ kuerzel: kuerzelEintraege }),
+            })
+                .then(r => r.json())
+                .then(() => { if (kuerzelStatus) kuerzelStatus.textContent = t('parlwin', 'Gespeichert'); })
+                .catch(() => { if (kuerzelStatus) kuerzelStatus.textContent = t('parlwin', 'Fehler'); });
+        });
+
+        // ── Fraktionsraum Trigger ────────────────────────────────────────
+        document.getElementById('pw-fraktionsraum-sicherstellen')?.addEventListener('click', () => {
+            const status = document.getElementById('pw-fraktionsraum-status');
+            if (status) status.textContent = t('parlwin', 'Wird angelegt...');
+            fetch(generateUrl('/apps/parlwin/sitzungstypen/fraktionsraum-sicherstellen'), { method: 'POST', headers: authHeaders() })
+                .then(r => r.json())
+                .then(() => { if (status) status.textContent = t('parlwin', 'Erfolgreich'); })
+                .catch(e => { if (status) status.textContent = t('parlwin', 'Fehler: ' + e.message); });
+        });
+
+        ladeStatusWerte();
+        loadKuerzel();
 
         updateGroupState();
         updateKalenderState();

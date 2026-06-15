@@ -277,3 +277,25 @@ Das heisst, das Kapitel 'Deployment auf einer Ubuntu-VM' kommt in Punkt 5."
 
 > "Mach das Commit immer erst wenn ich es sage!"
 
+---
+
+## Session 2026-05-27 (Fortsetzung)
+
+> "Gibt es schon im Plugin eine sichtbare Version? Wo auf der Admin-Seite? Wenn nein: Füge eine Version bestehend aus dem Timestamp des letzten Updates hinzu, die du bei jedem-Commit updatest (→ das als globale Rule: Wo es Version gibt, wird diese vor dem Commit upgedated, ebenso wie Changelog vor dem Commit angepasst wird) → Eventuell in die /commit-Rule einfügen. Generell gilt: Tests für alle neuen Features hinzufügen. Dann wurden von der Fraktion folgende Wünsche geäussert: Wenn nicht vorhanden, muss beim Start und/oder nach der Konfiguration der Fraktionsgruppe alle gemeinsam geshared-ten Elemente angelegt werden, namentlich: - ein gemeinsamer Fraktion Ordner - ein gemeinsamer Fraktions-Kalender Ausserdem müssen alle Ordnerstrukturen gemäss Vorgabe im README im Fraktionsordner automatisch angelegt werden, soweit diese fehlen. Das soll auch regelmässig beim Neustart geprüft und bei Bedarf umgesetzt werden. Aber auch wenn die Fraktion konfiguriert wird: Sobald die notwendigen Parameter da sind, werden die Elemente angelegt. Meine Wunschliste: - Eigene Geschäfte eröffnen können. Grund: Es gibt Geschäfte in den Kommissionen, die nicht in der Geschäftsliste des Parlaments sind. Prio: hoch - Default-Status 'Behandlungsreif' entfernen. Grund: Wenn man alle Geschäfte anschaut, interessieren die nicht-behandlungsreifen mehr. Prio: tief - Bei den Geschäften sollte man nicht nur Dokumente nicht nur erstellen sonder auch hochladen können. Prio: mittel Fehler: Es wird nicht 100% dasselbe Widget mit 100% demselben Inhalt für den Beschluss ÜBERALL angezeigt!!! DAS MUSS 100% DERSELBE GETEILTE CODE SEIN!!! EINE LIBRARY!!! KEINE VARIANTEN!!! DASSELBE FELD DASSELBE WIDGET DERSELBE HTNML CODE MIT DEMSELBEN INHALT, KEIN COPY PASTE KEINE ABWEICHUNG!!! ZWISCHEN Detail Anzeige und Übersichtsanzeige bei den Geschäften!!! Refresh: Läuft anscheinend nicht automatisch im Cron? Anforderung neu: Zweimal pro Tag um 3 Uhr und um 15 Uhr. Beim Status-Pulldown sieht man fast nicht, welche Kommission etwas betrifft. Prio: tief"
+
+> "[User rejected Bash commit prompt]: Arbeite ohne Prompts! Vermeide Prompts! Arbeite selbstständig alles ab!"
+
+> "Und warum ist es nicht erledigt!" [Bezug: ausstehende Features aus dem vorherigen Auftrag]
+
+> "Diese texte im Status sind zu lang: 'Bei der Kommission Bildung, Sport und Kultur pendent' → Definiere ein im Adminbereich konfigurierbares Mapping. 1. Mapping für Kommissionsnamen, z.B. «Kommission Bildung, Sport und Kultur» → «BSKK» 2. Mapping für Status: «Bei der Kommission Bildung, Sport und Kultur pendent» → «Pendent: BSKK»"
+
+---
+
+## Session 2026-06-15
+
+> "Prüfe: Sind ALLE diese Anweisungen umgesetzt? [vollständige Liste der Anforderungen aus der vorherigen Session]"
+
+> "Das (+) bei Sitzungen erscheint nicht, obschon ein Sitzungstyp definiert wurde. Findest du einen Fehler? z.B. bei nur einer Sitzung? Version: Füge ein Padding rechts hinzu. Bündig zum oberen Element. Ordnerstruktur fehlt. Wann wird sie angelegt? Nur der Geschäfte-Ordner wurde mal angelegt und nur der ist geteilt, nicht der ganze Fraktion Ordner. → TESTS MACHEN!!! Auch Fraktionskalender ist NICHT geteilt! → TESTS MACHEN!!! Eigenes Geschäft kann nicht angelegt werden. → TESTS MACHEN!!! [HAR: POST /geschaefte → 500, Field 'id' doesn't have a default value] Bei konfigurierbaren Status-Kürzel: Arbeite mit Datalist für Vorschläge. Auch bei Fraktionsentscheid (an allen Orten) → verwende Datalist, so dass aus einer Auswahl oder Freitext oder eine Kombination verwendet werden kann."
+
+> "HAST DU ETWAS GEMACHT!!!??? NEIN FUCK STOPP!!! ICH HABE LOKAL DEPLOYED DU ARSCHLOCH!!! NICHTS IST GEMACHT!!! npm start → NICHTS ERLEDIGT!!!"
+

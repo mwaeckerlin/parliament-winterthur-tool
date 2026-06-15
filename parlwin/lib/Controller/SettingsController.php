@@ -9,6 +9,7 @@ use OCA\ParliamentWinterthur\Command\SyncCommand;
 use OCA\ParliamentWinterthur\Db\FraktionMapper;
 use OCA\ParliamentWinterthur\Db\Mitglied;
 use OCA\ParliamentWinterthur\Service\FraktionsarbeitService;
+use OCA\ParliamentWinterthur\Service\FraktionsraumService;
 use OCA\ParliamentWinterthur\Service\GeschaeftService;
 use OCA\ParliamentWinterthur\Service\KalenderService;
 use OCA\ParliamentWinterthur\Service\MitgliedService;
@@ -60,6 +61,7 @@ class SettingsController extends Controller
         'kalender_nutzer' => '',
         'absender_email' => '',
         'absender_name' => 'Parlament Winterthur Tool',
+        'status_kuerzel' => '[]',
     ];
 
     public function __construct(
@@ -77,6 +79,7 @@ class SettingsController extends Controller
         private readonly FraktionMapper $fraktionMapper,
         private readonly IGroupManager $groupManager,
         private readonly IUserManager $userManager,
+        private readonly FraktionsraumService $fraktionsraumService,
     ) {
         parent::__construct(Application::APP_ID, $request);
     }
@@ -131,6 +134,8 @@ class SettingsController extends Controller
         }
 
         $this->realtimePublisher->publish('settings.updated');
+        // Fraktions-Infrastruktur sicherstellen wenn Konfiguration komplett.
+        try { $this->fraktionsraumService->sicherstellen(); } catch (\Throwable) { /* non-fatal */ }
         return $this->get();
     }
 
@@ -2008,5 +2013,40 @@ class SettingsController extends Controller
             return false;
         }
         return (time() - $startedAt->getTimestamp()) <= self::SYNC_QUEUE_GRACE_SECONDS;
+    }
+
+    /**
+     * Gibt alle Status-Kürzel-Mappings zurück.
+     * Format: [{suche: "...", kuerzel: "..."}]
+     */
+    #[AuthorizedAdminSetting(settings: \OCA\ParliamentWinterthur\Settings\AdminSettings::class)]
+    public function getStatusKuerzel(): DataResponse
+    {
+        $raw = $this->config->getAppValue(Application::APP_ID, 'status_kuerzel', '[]');
+        $list = json_decode($raw, true);
+        return new DataResponse(is_array($list) ? $list : []);
+    }
+
+    /**
+     * Speichert alle Status-Kürzel-Mappings (komplette Liste ersetzen).
+     * Body: { "status_kuerzel": { "Suchtext": "Kürzel", ... } }
+     */
+    #[AuthorizedAdminSetting(settings: \OCA\ParliamentWinterthur\Settings\AdminSettings::class)]
+    public function setStatusKuerzel(): DataResponse
+    {
+        $body = $this->request->getParam('status_kuerzel', []);
+        if (!is_array($body)) {
+            return new DataResponse(['fehler' => 'Ungültiges Format'], Http::STATUS_BAD_REQUEST);
+        }
+        $bereinigt = [];
+        foreach ($body as $suche => $kuerzel) {
+            $suche = trim((string) $suche);
+            $kuerzel = trim((string) $kuerzel);
+            if ($suche !== '' && $kuerzel !== '') {
+                $bereinigt[$suche] = $kuerzel;
+            }
+        }
+        $this->config->setAppValue(Application::APP_ID, 'status_kuerzel', json_encode($bereinigt));
+        return new DataResponse($bereinigt);
     }
 }

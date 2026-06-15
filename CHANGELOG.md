@@ -1,5 +1,50 @@
 # Changelog
 
+2026-06-15  Marc Wäckerlin
+
+	Fraktions-Infrastruktur: Ordnerstruktur (Fraktion + 4 Unterordner) wird
+	beim Speichern der Konfiguration automatisch angelegt. Ordner werden mit
+	der konfigurierten Nextcloud-Gruppe geteilt. Manueller Trigger-Button in
+	der Admin-Einstellungsseite hinzugefügt.
+
+	Fraktionskalender wird mit der konfigurierten Nextcloud-Gruppe geteilt
+	(direkter Datenbankzugriff, da CalDAV-API in Nextcloud 33 inkompatibel).
+
+	Eigenes Geschäft erstellen: Fehler «Field 'id' doesn't have a default
+	value» behoben. Das Feld «quelleAktualisiertAm» wird jetzt korrekt
+	initialisiert.
+
+	Status-Kürzel in Admin-Einstellungen speichern sich jetzt automatisch
+	nach 5 Sekunden Inaktivität (Debounce) oder beim Verlassen des Eingabefelds.
+
+	WebSocket-Verbindungsstatus-Indikator: Grüner Punkt (verbunden), roter
+	Punkt (getrennt), oranger Punkt (verbindungsaufbau) unten rechts im
+	Fenster.
+
+	Version wird jetzt dynamisch aus info.xml geladen (nicht mehr hardcodiert
+	in version.php).
+
+2026-05-27  Marc Wäckerlin
+
+	Status-Kürzel: Im Adminbereich können jetzt Textersetzungen für lange
+	Statusbeschriftungen konfiguriert werden (z.B. «Kommission Bildung, Sport
+	und Kultur» → «BSKK»). Die Kürzel werden in der Geschäftsliste angezeigt,
+	der vollständige Text bleibt als Tooltip erhalten.
+
+	Default-Filter «Behandlungsreif» entfernt. Beim Start werden alle Geschäfte
+	angezeigt, ohne Vorauswahl nach Status.
+
+	Dokumente hochladen: Neben dem Erstellen neuer Dokumente können jetzt auch
+	bestehende Dateien direkt in den Geschäftsordner hochgeladen werden.
+
+	Eigene Geschäfte erstellen: Über «+ Eigenes Geschäft» können Geschäfte
+	erfasst werden, die nicht im Parlamentsregister sind (z.B. Kommissions-
+	interne Themen).
+
+	Gemeinsame Fraktions-Infrastruktur (Ordnerstruktur und Kalender) wird beim
+	Containerstart und bei Konfigurationsänderungen automatisch geprüft und bei
+	Bedarf angelegt.
+
 2026-05-29  Marc Wäckerlin
 
 	Miteinreicher (Erstunterzeichner und Mitunterzeichner) werden neu aus dem
@@ -25,6 +70,19 @@
 
 	Versionsnummer der App wird neu in der Navigationsleiste angezeigt
 	(liest aus appinfo/info.xml via IAppManager).
+
+2026-05-27  Marc Wäckerlin
+
+	Versionsnummer wird neu auf der Admin-Seite angezeigt — rechts unten als
+	Build-Timestamp. Der Timestamp wird vor jedem Commit automatisch aktualisiert.
+
+	Synchronisation läuft neu zweimal täglich um 03:00 und 15:00 Uhr statt
+	einmal pro Tag zu einem beliebigen Zeitpunkt.
+
+	Beschluss-Widget ist jetzt überall identisch: in der Kartenansicht der
+	Geschäftsliste wurde der bisherige Freitext durch dasselbe Widget ersetzt wie
+	in der Tabellenansicht und der Detailansicht. Freitext-Beschlüsse werden
+	jetzt korrekt gespeichert — der alte Code hat sie nie gespeichert.
 
 2026-05-27  Marc Wäckerlin
 

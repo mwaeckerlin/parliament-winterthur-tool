@@ -7,6 +7,7 @@ namespace OCA\ParliamentWinterthur\Service;
 use OCA\ParliamentWinterthur\AppInfo\Application;
 use OCA\ParliamentWinterthur\Db\Sitzung;
 use OCP\IConfig;
+use OCP\IDBConnection;
 use OCP\IUserManager;
 use Psr\Log\LoggerInterface;
 use Sabre\DAV\PropPatch;
@@ -36,6 +37,7 @@ class KalenderService
         private readonly IConfig $config,
         private readonly LoggerInterface $logger,
         private readonly ?IUserManager $userManager = null,
+        private readonly ?IDBConnection $db = null,
     ) {
     }
 
@@ -47,6 +49,58 @@ class KalenderService
      *
      * @param Sitzung[] $sitzungen
      */
+    /**
+     * Stellt sicher, dass der Fraktionskalender für den Nutzer existiert.
+     * Öffentlich für FraktionsraumService.
+     */
+    public function sicherstelleKalenderOeffentlich(string $nutzer, string $gruppe = ''): void
+    {
+        try {
+            $dav = \OC::$server->get(\OCA\DAV\CalDAV\CalDavBackend::class);
+            $kalender = $this->sicherstelleKalender($dav, $nutzer);
+            if ($gruppe !== '' && $kalender !== null) {
+                $this->sicherstelleKalenderFreigabe($dav, $kalender, $nutzer, $gruppe);
+            }
+        } catch (\Throwable $e) {
+            $this->logger->warning('Parlament Winterthur: Kalender sicherstellen fehlgeschlagen: ' . $e->getMessage());
+        }
+    }
+
+    private function sicherstelleKalenderFreigabe(\OCA\DAV\CalDAV\CalDavBackend $dav, array $kalender, string $nutzer, string $gruppe): void
+    {
+        if ($this->db === null) {
+            return;
+        }
+
+        try {
+            $kalenderId = (int) $kalender['id'];
+            $prefix = (string) $this->config->getSystemValue('dbtableprefix', 'oc_');
+
+            // Prüfen ob bereits geteilt
+            $res = $this->db->executeQuery(
+                "SELECT id FROM `{$prefix}dav_shares` WHERE resourceid = ? AND principaluri = ? LIMIT 1",
+                [$kalenderId, "principals/groups/{$gruppe}"]
+            );
+            if ($res->fetchOne()) {
+                return; // Bereits geteilt
+            }
+
+            // Direkt in oc_dav_shares einfügen: type=1 (GROUP), access=3 (Read+Write)
+            $this->db->executeQuery(
+                "INSERT INTO `{$prefix}dav_shares` (principaluri, type, access, resourceid) VALUES (?, ?, ?, ?)",
+                ["principals/groups/{$gruppe}", 1, 3, $kalenderId]
+            );
+
+            $this->logger->info(sprintf(
+                'Parlament Winterthur: Kalender "%s" mit Gruppe "%s" geteilt',
+                $kalender['{DAV:}displayname'] ?? self::KALENDER_URI,
+                $gruppe
+            ));
+        } catch (\Throwable $e) {
+            $this->logger->warning('Parlament Winterthur: Kalender-Sharing fehlgeschlagen: ' . $e->getMessage());
+        }
+    }
+
     public function sitzungenAktualisieren(array $sitzungen): void
     {
         $kalenderNutzer = $this->config->getAppValue(Application::APP_ID, 'kalender_nutzer', '');

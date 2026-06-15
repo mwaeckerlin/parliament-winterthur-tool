@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OCA\ParliamentWinterthur\Controller;
 
 use OCA\ParliamentWinterthur\AppInfo\Application;
+use OCA\ParliamentWinterthur\Service\FraktionsraumService;
 use OCA\ParliamentWinterthur\Service\RealtimePublisherService;
 use OCA\ParliamentWinterthur\Service\SitzungstypService;
 use OCP\AppFramework\Controller;
@@ -29,6 +30,7 @@ class SitzungstypController extends Controller
     private readonly IGroupManager $groupManager,
     private readonly IUserManager $userManager,
     private readonly LoggerInterface $logger,
+    private readonly FraktionsraumService $fraktionsraumService,
   ) {
     parent::__construct(Application::APP_ID, $request);
   }
@@ -166,5 +168,16 @@ class SitzungstypController extends Controller
       'traktanden' => is_array($traktanden) ? $traktanden : [],
       'teilnehmer' => is_array($teilnehmer) ? $teilnehmer : [],
     ];
+  }
+
+  public function fraktionsraumSicherstellen(): DataResponse
+  {
+    try {
+      $this->fraktionsraumService->sicherstellen();
+      return new DataResponse(['erfolg' => true]);
+    } catch (\Throwable $e) {
+      $this->logger->error('parlwin: fraktionsraum-sicherstellen fehlgeschlagen: ' . $e->getMessage());
+      return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_INTERNAL_SERVER_ERROR);
+    }
   }
 }

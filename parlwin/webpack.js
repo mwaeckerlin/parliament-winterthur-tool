@@ -7,6 +7,7 @@ module.exports = {
   entry: {
     'parlwin-main': path.join(__dirname, 'src', 'js', 'main.js'),
     'calendar-prefill': path.join(__dirname, 'src', 'js', 'calendar-prefill.js'),
+    'admin': path.join(__dirname, 'src', 'js', 'admin.js'),
   },
   output: {
     path: path.join(__dirname, 'js'),

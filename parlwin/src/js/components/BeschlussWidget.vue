@@ -1,36 +1,26 @@
 <template>
   <div class="pw-beschluss-widget" @keydown.stop>
-    <textarea
-      v-if="freitextModus"
-      v-model="freitextText"
-      class="pw-textarea"
-      rows="2"
-      :disabled="disabled"
-      placeholder="Freitext Beschluss"
-      @input="freitextInput"
-      @blur="freitextBlur"
-    />
-    <NcSelect
-      v-else
-      :model-value="selektierterWert"
-      :options="options"
-      :taggable="true"
-      :create-option="(text) => ({ label: text, value: '', freitext: true })"
-      :clearable="true"
+    <input
+      :id="listId"
+      type="text"
+      :list="listId + '-dl'"
+      :value="currentText"
       :disabled="disabled"
       :placeholder="placeholder"
-      label="label"
-      @update:model-value="nachWahl"
+      class="pw-input pw-beschluss-input"
+      @input="handleInput"
+      @blur="handleBlur"
+      @change="handleChange"
     />
+    <datalist :id="listId + '-dl'">
+      <option v-for="o in options" :key="o.value" :value="o.label" />
+    </datalist>
   </div>
 </template>
 
 <script>
-import NcSelect from '@nextcloud/vue/components/NcSelect'
-
 export default {
   name: 'BeschlussWidget',
-  components: { NcSelect },
   props: {
     modelValue: { type: Object, default: null },
     options: { type: Array, default: () => [] },
@@ -40,67 +30,59 @@ export default {
   emits: ['update:modelValue'],
   data() {
     return {
-      freitextModus: !!(this.modelValue?.freitext),
-      freitextText: this.modelValue?.freitext ? (this.modelValue.label || '') : '',
+      listId: 'pw-beschluss-' + Math.random().toString(36).slice(2),
       timer: null,
+      localText: this.modelValue?.label || '',
     }
   },
   computed: {
-    selektierterWert() {
-      if (!this.modelValue || this.modelValue.freitext) return null
-      return this.modelValue
+    currentText() {
+      return this.modelValue?.label || ''
     },
   },
   watch: {
     modelValue(val) {
-      if (!val) {
-        this.freitextModus = false
-        this.freitextText = ''
-      } else if (val.freitext) {
-        if (!this.freitextModus) {
-          this.freitextModus = true
-          this.freitextText = val.label || ''
-        }
-      } else {
-        this.freitextModus = false
-      }
+      this.localText = val?.label || ''
     },
   },
   beforeUnmount() {
     if (this.timer) clearTimeout(this.timer)
   },
   methods: {
-    nachWahl(val) {
-      if (!val) {
-        this.freitextModus = false
-        this.freitextText = ''
-        this.$emit('update:modelValue', null)
-        return
-      }
-      if (val.freitext) {
-        this.freitextModus = true
-        this.freitextText = val.label || ''
-        return
-      }
-      this.$emit('update:modelValue', val)
-    },
-    freitextInput() {
-      if (!this.freitextText) {
-        if (this.timer) { clearTimeout(this.timer); this.timer = null }
-        this.freitextModus = false
-        this.$emit('update:modelValue', null)
-        return
-      }
+    handleInput(event) {
+      const text = event.target.value
+      this.localText = text
       if (this.timer) clearTimeout(this.timer)
+      if (!text.trim()) {
+        this.timer = null
+        this.$emit('update:modelValue', null)
+        return
+      }
       this.timer = setTimeout(() => {
         this.timer = null
-        this.$emit('update:modelValue', { label: this.freitextText, value: '', freitext: true })
+        this.emitValue(text)
       }, 5000)
     },
-    freitextBlur() {
+    handleBlur(event) {
       if (this.timer) { clearTimeout(this.timer); this.timer = null }
-      if ((this.freitextText || '').trim()) {
-        this.$emit('update:modelValue', { label: this.freitextText, value: '', freitext: true })
+      this.emitValue(event.target.value)
+    },
+    handleChange(event) {
+      // Change fires when user picks from datalist — emit immediately.
+      if (this.timer) { clearTimeout(this.timer); this.timer = null }
+      this.emitValue(event.target.value)
+    },
+    emitValue(text) {
+      const trimmed = (text || '').trim()
+      if (!trimmed) {
+        this.$emit('update:modelValue', null)
+        return
+      }
+      const match = this.options.find(o => o.label === trimmed)
+      if (match) {
+        this.$emit('update:modelValue', match)
+      } else {
+        this.$emit('update:modelValue', { label: trimmed, value: '', freitext: true })
       }
     },
   },
@@ -111,13 +93,12 @@ export default {
 .pw-beschluss-widget {
   width: 100%;
 }
-.pw-textarea {
+.pw-beschluss-input {
   width: 100%;
   padding: 6px 8px;
   border: 1px solid var(--color-border, #ccc);
   border-radius: var(--border-radius, 4px);
   background: var(--color-main-background, #fff);
   color: var(--color-main-text, #000);
-  resize: vertical;
 }
 </style>

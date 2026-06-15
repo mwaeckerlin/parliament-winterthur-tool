@@ -17,7 +17,7 @@
     "stop": "docker compose down --remove-orphans",
     "build:app": "npm run clean && webpack --node-env production --config parlwin/webpack.js && npm run build:css",
     "build:css": "sass parlwin/src/css/style.scss parlwin/css/parlwin-style.css --no-source-map",
-    "clean": "rm -rf parlwin/js/parlwin-main.js parlwin/js/parlwin-main.js.map parlwin/js/calendar-prefill.js parlwin/js/calendar-prefill.js.map parlwin/js/chunks parlwin/css/parlwin-style.css parlwin/css/parlwin-style.css.map",
+    "clean": "rm -rf parlwin/js/parlwin-main.js parlwin/js/parlwin-main.js.map parlwin/js/calendar-prefill.js parlwin/js/calendar-prefill.js.map parlwin/js/admin.js parlwin/js/admin.js.map parlwin/js/chunks parlwin/css/parlwin-style.css parlwin/css/parlwin-style.css.map",
     "dev": "webpack --node-env development --config parlwin/webpack.js --watch",
     "lint": "eslint parlwin/src --ext .js,.vue",
     "test:unit": "cd parlwin && phpunit --bootstrap tests/bootstrap.php --exclude-group live --fail-on-warning --fail-on-risky --fail-on-deprecation --fail-on-notice --fail-on-skipped --fail-on-incomplete tests",

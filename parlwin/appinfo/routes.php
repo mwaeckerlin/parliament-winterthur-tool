@@ -22,6 +22,8 @@ return [
         ['name' => 'geschaeft#votumPdf', 'url' => '/geschaefte/{id}/votum/pdf', 'verb' => 'GET'],
         ['name' => 'geschaeft#dokumente', 'url' => '/geschaefte/{id}/dokumente', 'verb' => 'GET'],
         ['name' => 'geschaeft#dokumentErstellen', 'url' => '/geschaefte/{id}/dokumente', 'verb' => 'POST'],
+        ['name' => 'geschaeft#dokumentHochladen', 'url' => '/geschaefte/{id}/dokumente/upload', 'verb' => 'POST'],
+        ['name' => 'geschaeft#create', 'url' => '/geschaefte', 'verb' => 'POST'],
 
         // Sitzungen
         ['name' => 'sitzung#index', 'url' => '/sitzungen', 'verb' => 'GET'],
@@ -43,6 +45,7 @@ return [
         ['name' => 'sitzungstyp#show', 'url' => '/sitzungstypen/{id}', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
         ['name' => 'sitzungstyp#update', 'url' => '/sitzungstypen/{id}', 'verb' => 'PUT', 'requirements' => ['id' => '\d+']],
         ['name' => 'sitzungstyp#destroy', 'url' => '/sitzungstypen/{id}', 'verb' => 'DELETE', 'requirements' => ['id' => '\d+']],
+        ['name' => 'sitzungstyp#fraktionsraumSicherstellen', 'url' => '/sitzungstypen/fraktionsraum-sicherstellen', 'verb' => 'POST'],
 
         // Traktanden
         ['name' => 'traktandum#index', 'url' => '/sitzungen/{sitzungId}/traktanden', 'verb' => 'GET'],
@@ -73,6 +76,9 @@ return [
         ['name' => 'settings#addPraesidiumStellvertretung', 'url' => '/settings/praesidium-stellvertretung', 'verb' => 'POST'],
         ['name' => 'settings#addProtokollfuehrerStellvertretung', 'url' => '/settings/protokollfuehrer-stellvertretung', 'verb' => 'POST'],
         ['name' => 'settings#addKommissionsmitglied', 'url' => '/settings/kommissionsmitglied', 'verb' => 'POST'],
+
+        ['name' => 'settings#getStatusKuerzel', 'url' => '/settings/status-kuerzel', 'verb' => 'GET'],
+        ['name' => 'settings#setStatusKuerzel', 'url' => '/settings/status-kuerzel', 'verb' => 'POST'],
 
         // Manuelle Synchronisation auslösen (SettingsController::run)
         ['name' => 'settings#syncStatus', 'url' => '/sync/status', 'verb' => 'GET'],

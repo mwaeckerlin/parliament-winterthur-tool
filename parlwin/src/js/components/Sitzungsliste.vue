@@ -25,7 +25,7 @@
         <template #icon>
           <span style="font-size:1.2em;line-height:1">+</span>
         </template>
-        <NcActionCaption v-if="sitzungstypen.length === 0" :name="'Keine Vorlagen vorhanden'" />
+        <NcActionButton v-if="sitzungstypen.length === 0" :disabled="true">Kein Sitzungstyp definiert</NcActionButton>
         <NcActionButton
           v-for="typ in sitzungstypen"
           :key="typ.id"

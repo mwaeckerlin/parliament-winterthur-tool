@@ -31,6 +31,7 @@ class AdminSettings implements ISettings
     public function getForm(): TemplateResponse
     {
         Util::addStyle(Application::APP_ID, 'parlwin-style');
+        Util::addScript(Application::APP_ID, 'admin');
 
         $fraktion = $this->config->getAppValue(Application::APP_ID, 'fraktion', '');
         $nextcloudGruppe = $this->config->getAppValue(Application::APP_ID, 'nextcloud_gruppe', '');
@@ -38,11 +39,13 @@ class AdminSettings implements ISettings
         $absenderEmail = $this->config->getAppValue(Application::APP_ID, 'absender_email', '');
         $absenderName = $this->config->getAppValue(Application::APP_ID, 'absender_name', 'Parlament Winterthur Tool');
         $letzteSync = $this->config->getAppValue(Application::APP_ID, 'letzte_synchronisation', '');
+        $statusKuerzel = $this->config->getAppValue(Application::APP_ID, 'status_kuerzel', '{}');
         $fraktionsOptionen = $this->fraktionsOptionen();
         $gruppenOptionen = $this->gruppenOptionen();
         $kalenderNutzerOptionen = $this->kalenderNutzerOptionen();
 
         $realtimeWsUrl = $this->realtimeWsUrl();
+        $buildTime = @include __DIR__ . '/../../appinfo/version.php';
         $response = new TemplateResponse(Application::APP_ID, 'admin', [
             'fraktion' => $fraktion,
             'nextcloud_gruppe' => $nextcloudGruppe,
@@ -55,6 +58,8 @@ class AdminSettings implements ISettings
             'kalender_nutzer_optionen_aktiv' => $kalenderNutzerOptionen['aktiv'],
             'kalender_nutzer_optionen_inaktiv' => $kalenderNutzerOptionen['inaktiv'],
             'realtime_ws_url' => $realtimeWsUrl,
+            'build_time' => is_string($buildTime) ? $buildTime : '',
+            'status_kuerzel' => $statusKuerzel,
         ], '');
 
         return $response;

@@ -20,7 +20,33 @@
       <header class="pw-view-header">
         <h2 class="pw-view-title">Geschäfte</h2>
         <span class="pw-view-count">{{ gefilterteGeschaefte.length }}</span>
+        <NcButton type="primary" @click="neuesGeschaeftOeffnen">+ Eigenes Geschäft</NcButton>
       </header>
+
+      <Teleport to="body">
+        <div v-if="neuesGeschaeftDialog" class="pw-modal-overlay" @click.self="neuesGeschaeftDialog = false">
+          <div class="pw-modal">
+            <div class="pw-modal-kopf">
+              <h3>Eigenes Geschäft erstellen</h3>
+              <button type="button" class="button pw-btn-schliessen" @click="neuesGeschaeftDialog = false">✕</button>
+            </div>
+            <div class="pw-modal-body">
+              <div class="pw-form-zeile">
+                <label>Titel</label>
+                <input v-model="neuesGeschaeftTitel" type="text" class="pw-input" placeholder="Titel des Geschäfts" @keyup.enter="neuesGeschaeftErstellen" />
+              </div>
+              <div class="pw-form-zeile">
+                <label>Typ</label>
+                <input v-model="neuesGeschaeftTyp" type="text" class="pw-input" placeholder="z.B. Kommissionsgeschäft" />
+              </div>
+            </div>
+            <div class="pw-modal-footer">
+              <button type="button" class="button" @click="neuesGeschaeftDialog = false">Abbrechen</button>
+              <button type="button" class="button primary" :disabled="!neuesGeschaeftTitel.trim() || neuesGeschaeftLaeuft" @click="neuesGeschaeftErstellen">Erstellen</button>
+            </div>
+          </div>
+        </div>
+      </Teleport>
       <div v-if="laden" class="pw-laden"><NcLoadingIcon :size="32" /></div>
 
       <template v-else>
@@ -57,7 +83,7 @@
                 <span v-if="erstunterzeichner(g)" class="pw-col-einreicher">{{ erstunterzeichner(g) }}</span>
               </td>
               <td v-if="statusSpalteAnzeigen" data-label="Status" class="pw-col-status">
-                <span :class="['pw-status-' + statusKlasse(g.status), 'pw-status-text']" :title="g.status">{{ g.status }}</span>
+                <span :class="['pw-status-' + statusKlasse(g.status), 'pw-status-text']" :title="g.status">{{ statusKuerzen(g.status) }}</span>
               </td>
               <td data-label="Zuständig" class="pw-col-inline-edit pw-col-zustaendig" @click.stop>
                 <PwMultiSelect
@@ -103,7 +129,7 @@
                 </p>
                 <h3>{{ g.titel }}</h3>
               </div>
-              <span :class="'pw-status-' + statusKlasse(g.status)">{{ g.status || '—' }}</span>
+              <span :class="'pw-status-' + statusKlasse(g.status)">{{ statusKuerzen(g.status) || '—' }}</span>
             </div>
 
             <div class="pw-data-card-grid">
@@ -121,7 +147,14 @@
               </div>
             </div>
 
-            <p class="pw-card-note">{{ g.letzterBeschluss?.text || g.letzterBeschluss?.titel || 'Noch kein Fraktionsbeschluss erfasst' }}</p>
+            <div class="pw-card-beschluss" @click.stop>
+              <BeschlussWidget
+                :model-value="beschlussOptionFuer(g)"
+                :options="beschlussOptionenFuer(g)"
+                placeholder="—"
+                @update:model-value="aenderungBeschluss(g, $event)"
+              />
+            </div>
           </article>
         </div>
 
@@ -172,8 +205,13 @@ export default {
       filterReady: false,
       geschaefte: [],
       laden: true,
+      statusKuerzelListe: window.PARLWIN_CONFIG?.statusKuerzel || [],
       suche: '',
-      filterStatus: ['Behandlungsreif'],
+      filterStatus: [],
+      neuesGeschaeftDialog: false,
+      neuesGeschaeftTitel: '',
+      neuesGeschaeftTyp: 'Eigenes Geschäft',
+      neuesGeschaeftLaeuft: false,
       filterTyp: [],
       filterZustaendige: [],
       filterBeschluss: [],
@@ -200,6 +238,7 @@ export default {
     },
     alleStatus() {
       return [...new Set(this.geschaefte.map(g => g.status).filter(Boolean))].sort()
+        .map(s => ({ label: this.statusKuerzen(s), value: s }))
     },
     statusSpalteAnzeigen() {
       // Wenn genau ein Status gefiltert ist, wäre die Spalte redundant.
@@ -299,7 +338,8 @@ export default {
         )
       }
       if (this.filterStatus.length > 0) {
-        liste = liste.filter(g => this.filterStatus.includes(g.status))
+        const statusWerte = this.filterStatus.map(o => (o && typeof o === 'object' ? o.value : o))
+        liste = liste.filter(g => statusWerte.includes(g.status))
       }
       if (this.filterTyp.length > 0) {
         liste = liste.filter(g => this.filterTyp.includes(g.typ))
@@ -478,6 +518,37 @@ export default {
     },
     oeffneDetail(geschaeftId) {
       this.ausgewaehlteGeschaeftId = geschaeftId
+    },
+    statusKuerzen(text) {
+      if (!text) return text
+      let result = String(text)
+      for (const { suche, kuerzel } of (this.statusKuerzelListe || [])) {
+        if (suche && kuerzel) result = result.split(suche).join(kuerzel)
+      }
+      return result
+    },
+    neuesGeschaeftOeffnen() {
+      this.neuesGeschaeftTitel = ''
+      this.neuesGeschaeftTyp = 'Eigenes Geschäft'
+      this.neuesGeschaeftDialog = true
+    },
+    async neuesGeschaeftErstellen() {
+      const titel = (this.neuesGeschaeftTitel || '').trim()
+      if (!titel) return
+      this.neuesGeschaeftLaeuft = true
+      try {
+        const { data } = await axios.post(generateUrl('/apps/parlwin/geschaefte'), {
+          titel,
+          typ: this.neuesGeschaeftTyp || 'Eigenes Geschäft',
+        })
+        this.neuesGeschaeftDialog = false
+        await this.ladeGeschaefte()
+        this.ausgewaehlteGeschaeftId = data.id
+      } catch (e) {
+        console.error('parlwin: Eigenes Geschäft erstellen fehlgeschlagen', e)
+      } finally {
+        this.neuesGeschaeftLaeuft = false
+      }
     },
     resetFilter() {
       this.suche = ''
