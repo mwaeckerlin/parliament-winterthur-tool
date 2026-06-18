@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OCA\ParliamentWinterthur\Db;
 
 use OCP\AppFramework\Db\DoesNotExistException;
+use OCP\AppFramework\Db\Entity;
 use OCP\AppFramework\Db\QBMapper;
 use OCP\DB\QueryBuilder\IQueryBuilder;
 use OCP\IDBConnection;
@@ -19,6 +20,45 @@ class GeschaeftMapper extends QBMapper
     public function __construct(IDBConnection $db)
     {
         parent::__construct($db, 'pw_geschaefte', Geschaeft::class);
+    }
+
+    /**
+     * Nächste freie Primärschlüssel-ID (max + 1, mindestens 1).
+     *
+     * Wird für selbst angelegte Geschäfte benötigt: die Tabelle wird nicht in
+     * allen Installationen mit AUTO_INCREMENT geführt (die importierten
+     * Geschäfte tragen die Geschäftsnummer als ID), deshalb muss beim Anlegen
+     * ohne externe Nummer eine ID explizit vergeben werden.
+     */
+    public function naechsteId(): int
+    {
+        $qb = $this->db->getQueryBuilder();
+        $qb->select($qb->func()->max('id'))->from($this->getTableName());
+        $result = $qb->executeQuery();
+        $max = (int) $result->fetchOne();
+        $result->closeCursor();
+        return $max + 1;
+    }
+
+    /**
+     * Wandelt eine Datenbankzeile in eine Geschaeft-Entity um und ersetzt dabei
+     * NULL-Spaltenwerte durch Leerstrings.
+     *
+     * Die String-Properties der Entity (z.B. quelleAktualisiertAm, das in der DB
+     * eine nullable datetime-Spalte ist) sind nicht nullable typisiert. Eine
+     * einzige NULL-Zeile würde sonst beim Mapping einen TypeError werfen und damit
+     * die GESAMTE Geschäftsliste mit HTTP 500 abbrechen lassen («Keine Geschäfte
+     * gefunden»). Nullable Spalten gibt es hier nur für String-Felder, daher ist
+     * die Ersetzung NULL → '' unbedenklich.
+     */
+    protected function mapRowToEntity(array $row): Entity
+    {
+        foreach ($row as $spalte => $wert) {
+            if ($wert === null) {
+                $row[$spalte] = '';
+            }
+        }
+        return parent::mapRowToEntity($row);
     }
 
     /**

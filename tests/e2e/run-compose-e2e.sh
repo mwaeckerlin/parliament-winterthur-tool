@@ -11,7 +11,9 @@ export NEXTCLOUD_ADMIN_PASSWORD="${NEXTCLOUD_ADMIN_PASSWORD:-parlwin_admin_local
 export NEXTCLOUD_HTTP_PORT="${NEXTCLOUD_HTTP_PORT:-29824}"
 export HOST="${HOST:-nextcloud-nginx:8080}"
 export PROTOCOL="${PROTOCOL:-http}"
-export PARLWIN_REALTIME_WS_URL="${PARLWIN_REALTIME_WS_URL:-ws://parlwin-realtime:3001/ws}"
+# Frontend-WS-URL: muss vom BROWSER erreichbar sein, nicht der interne Broker-Host.
+# Der Browser spricht nextcloud-nginx:8080 an; nginx proxyt /ws/parlwin/ zum Broker.
+export PARLWIN_REALTIME_WS_URL="${PARLWIN_REALTIME_WS_URL:-ws://nextcloud-nginx:8080/ws/parlwin/}"
 export PARLWIN_REALTIME_PUBLISH_URL="${PARLWIN_REALTIME_PUBLISH_URL:-http://parlwin-realtime:3001/publish}"
 export PARLWIN_REALTIME_SECRET="${PARLWIN_REALTIME_SECRET:-parlwin_realtime_local_ChangeMe_2026}"
 export PARLWIN_REALTIME_AUTH_REQUIRED="${PARLWIN_REALTIME_AUTH_REQUIRED:-1}"
@@ -200,6 +202,29 @@ create_app_password() {
   local raw
   raw="$(occ user:auth-tokens:add "$uid" --name="$name" --no-interaction)"
   awk '/^app password:/{getline; gsub(/^[ \t]+|[ \t]+$/, ""); print; exit}' <<<"$raw"
+}
+
+# WebDAV/OCS-Request als Nutzer (Basic-Auth via App-Passwort), liefert den
+# HTTP-Statuscode auf stdout. Läuft im PHP-FPM-Container gegen den internen Host
+# (im E2E-Stack ist kein Host-Port veröffentlicht).
+# Aufruf: http_status_as METHODE UID TOKEN PFAD [BODY] [CONTENT_TYPE] [EXTRA_HEADER]
+http_status_as() {
+  docker compose exec -T \
+    -e HX_M="$1" -e HX_U="$2" -e HX_TOK="$3" -e HX_PATH="$4" \
+    -e HX_BODY="${5:-}" -e HX_CT="${6:-application/octet-stream}" -e HX_EXTRA="${7:-}" \
+    nextcloud-php-fpm php -r '
+    $h  = "Authorization: Basic ".base64_encode(getenv("HX_U").":".getenv("HX_TOK"))."\r\n";
+    $h .= "OCS-APIRequest: true\r\n";
+    $h .= "Content-Type: ".getenv("HX_CT")."\r\n";
+    $extra = getenv("HX_EXTRA"); if ($extra !== false && $extra !== "") { $h .= $extra."\r\n"; }
+    $opts = ["method"=>getenv("HX_M"), "header"=>$h, "ignore_errors"=>true, "timeout"=>20];
+    $body = getenv("HX_BODY"); if ($body !== false && $body !== "") { $opts["content"]=$body; }
+    $ctx = stream_context_create(["http"=>$opts]);
+    @file_get_contents("http://nextcloud-nginx:8080".getenv("HX_PATH"), false, $ctx);
+    $code = "000";
+    if (isset($http_response_header[0]) && preg_match("#\s(\d{3})\s#", $http_response_header[0], $m)) { $code = $m[1]; }
+    echo $code;
+  '
 }
 
 websocket_expect_denied() {
@@ -684,4 +709,157 @@ assert_int_ge "$ROLLEN_DB_COUNT" 3 "DB: Fraktionsrollen wurden nicht gespeichert
 TRAKT_BEM_DB="$(sql "SELECT bemerkungen FROM ${TABLE_PREFIX}pw_traktanden WHERE id=${FIRST_T_ID} LIMIT 1;")"
 [[ "$TRAKT_BEM_DB" == E2E\ Traktandumskommentar* ]] || fail "DB: Traktandums-Bemerkung nicht persistiert"
 
-echo "E2E erfolgreich: frische DB, Live-Sync, Plausibilität, API-/Frontend-nahe Writes, Rechteprüfung und DB-Verifikation abgeschlossen."
+echo "[E2E] Status-Verteilung der synchronisierten Geschäfte (Diagnose):"
+sql "SELECT COALESCE(NULLIF(status,''),'(leer)') AS status, COUNT(*) AS anzahl FROM ${TABLE_PREFIX}pw_geschaefte WHERE geloescht=0 GROUP BY status;" || true
+ALLE_DB="$(sql "SELECT COUNT(*) FROM ${TABLE_PREFIX}pw_geschaefte WHERE geloescht=0;")"
+PENDENT_DB="$(sql "SELECT COUNT(*) FROM ${TABLE_PREFIX}pw_geschaefte WHERE geloescht=0 AND (status IS NULL OR (LOWER(status) NOT LIKE '%erledigt%' AND LOWER(status) NOT LIKE '%abgeschlossen%' AND LOWER(status) NOT LIKE '%aufgehoben%'));")"
+echo "[E2E] DB: gesamt=${ALLE_DB} pendent=${PENDENT_DB}"
+
+echo "[E2E] Prüfung 1/4: Geschäftsliste (inkl. erledigte) stimmt mit Datenbank überein"
+api_expect_status GET "admin" "$ADMIN_TOKEN" "/geschaefte?limit=1000&show_erledigt=1" "200"
+ALLE_API="$(jq 'length' <<<"$LAST_BODY")"
+assert_int_ge "$ALLE_API" 1 "API liefert keine Geschäfte trotz erfolgtem Sync"
+assert_eq "$ALLE_API" "$ALLE_DB" "API-Gesamtliste weicht von der DB ab"
+
+echo "[E2E] Prüfung 2/4: Standardfilter zeigt genau die pendenten Geschäfte"
+api_expect_status GET "admin" "$ADMIN_TOKEN" "/geschaefte?limit=1000" "200"
+DEFAULT_API="$(jq 'length' <<<"$LAST_BODY")"
+assert_eq "$DEFAULT_API" "$PENDENT_DB" "Standardansicht zeigt nicht exakt die pendenten Geschäfte (API=$DEFAULT_API DB-pendent=$PENDENT_DB)"
+jq -e 'all(.[]; (.status==null) or ((.status|ascii_downcase|contains("erledigt")|not) and (.status|ascii_downcase|contains("abgeschlossen")|not) and (.status|ascii_downcase|contains("aufgehoben")|not)))' <<<"$LAST_BODY" >/dev/null \
+  || fail "Standardansicht enthält erledigte/abgeschlossene/aufgehobene Geschäfte"
+
+echo "[E2E] Prüfung 3/4: Pflichtfelder vorhanden und Detailabruf möglich"
+api_expect_status GET "admin" "$ADMIN_TOKEN" "/geschaefte?limit=1000&show_erledigt=1" "200"
+jq -e 'all(.[]; .id and .titel and .status)' <<<"$LAST_BODY" >/dev/null || fail "Geschäfte fehlen erforderliche Felder"
+FIRST_ID="$(jq -r '.[0].id' <<<"$LAST_BODY")"
+api_expect_status GET "admin" "$ADMIN_TOKEN" "/geschaefte/${FIRST_ID}" "200"
+jq -e '.id and .titel' <<<"$LAST_BODY" >/dev/null || fail "Geschäft-Detail fehlen Felder"
+
+echo "[E2E] Prüfung 4/4: Alle Mitglieder sehen dieselbe Geschäftsliste"
+api_expect_status GET "admin" "$ADMIN_TOKEN" "/geschaefte?limit=200" "200"
+ADMIN_COUNT="$(jq 'length' <<<"$LAST_BODY")"
+api_expect_status GET "parlwin_praesidium" "$PRAESIDIUM_TOKEN" "/geschaefte?limit=200" "200"
+PRAESIDENT_COUNT="$(jq 'length' <<<"$LAST_BODY")"
+api_expect_status GET "parlwin_mitglied" "$MITGLIED_TOKEN" "/geschaefte?limit=200" "200"
+MITGLIED_COUNT="$(jq 'length' <<<"$LAST_BODY")"
+
+if [[ "$ADMIN_COUNT" != "$PRAESIDENT_COUNT" ]] || [[ "$ADMIN_COUNT" != "$MITGLIED_COUNT" ]]; then
+  fail "Mitglieder sehen unterschiedliche Anzahl Geschäfte (admin=$ADMIN_COUNT praesident=$PRAESIDENT_COUNT mitglied=$MITGLIED_COUNT)"
+fi
+
+echo "[E2E] Fraktionsraum einrichten (Gruppe + geteilter Ordner + Kalender)"
+FRAKTION_GRUPPE="parlwin-fraktion"
+occ group:add "$FRAKTION_GRUPPE" >/dev/null 2>&1 || true
+occ group:adduser "$FRAKTION_GRUPPE" parlwin_praesidium >/dev/null 2>&1 || true
+occ group:adduser "$FRAKTION_GRUPPE" parlwin_protokoll >/dev/null 2>&1 || true
+occ group:adduser "$FRAKTION_GRUPPE" parlwin_mitglied >/dev/null 2>&1 || true
+# --- Migrations-Ausgangslage: ein MITGLIED hat bereits einen eigenen "Fraktion"-
+# Ordner mit der Gruppe geteilt (mit Daten), BEVOR der offizielle Admin-Ordner
+# existiert. Beim Einrichten muss der Service diesen sauber übernehmen:
+#   a (praesidium) ist Besitzer und teilt; b (protokoll) und c (mitglied) arbeiten mit.
+DAV="/remote.php/dav/files"
+MIG_A="parlwin_praesidium"; MIG_B="parlwin_protokoll"; MIG_C="parlwin_mitglied"
+MIG_GESCH="20_Gesch%C3%A4fte" # 20_Geschäfte URL-kodiert
+
+echo "[E2E] Migrations-Setup: a legt eigenen Fraktion-Ordner an und teilt ihn mit der Gruppe"
+http_status_as MKCOL "$MIG_A" "$PRAESIDIUM_TOKEN" "$DAV/$MIG_A/Fraktion" >/dev/null
+http_status_as MKCOL "$MIG_A" "$PRAESIDIUM_TOKEN" "$DAV/$MIG_A/Fraktion/$MIG_GESCH" >/dev/null
+S=$(http_status_as PUT "$MIG_A" "$PRAESIDIUM_TOKEN" "$DAV/$MIG_A/Fraktion/$MIG_GESCH/a.txt" "Datei von a")
+[[ "$S" =~ ^2 ]] || fail "a konnte erste Datei nicht anlegen (HTTP $S)"
+S=$(http_status_as POST "$MIG_A" "$PRAESIDIUM_TOKEN" "/ocs/v2.php/apps/files_sharing/api/v1/shares?format=json" \
+  "path=/Fraktion&shareType=1&shareWith=$FRAKTION_GRUPPE&permissions=31" "application/x-www-form-urlencoded")
+[[ "$S" == "200" ]] || fail "a konnte Fraktion nicht mit der Gruppe teilen (HTTP $S)"
+
+echo "[E2E] Migrations-Setup: b ergänzt eine zweite Datei und einen Nicht-Schema-Ordner Test"
+S=$(http_status_as PUT "$MIG_B" "$PROTOKOLL_TOKEN" "$DAV/$MIG_B/Fraktion/$MIG_GESCH/b.txt" "Datei von b")
+[[ "$S" =~ ^2 ]] || fail "b konnte zweite Datei nicht anlegen (HTTP $S)"
+http_status_as MKCOL "$MIG_B" "$PROTOKOLL_TOKEN" "$DAV/$MIG_B/Fraktion/Test" >/dev/null
+S=$(http_status_as PUT "$MIG_B" "$PROTOKOLL_TOKEN" "$DAV/$MIG_B/Fraktion/Test/test.txt" "Testdatei von b")
+[[ "$S" =~ ^2 ]] || fail "b konnte Test-Datei nicht anlegen (HTTP $S)"
+
+echo "[E2E] Migrations-Setup: c liest die Datei in Fraktion/Test (geteilter Zugriff)"
+S=$(http_status_as GET "$MIG_C" "$MITGLIED_TOKEN" "$DAV/$MIG_C/Fraktion/Test/test.txt")
+[[ "$S" == "200" ]] || fail "c kann Datei in Fraktion/Test nicht lesen (HTTP $S)"
+
+# Reproduktion des Bugs «Fraktionsordner fehlt beim Mitglied»: Dieses Mitglied
+# akzeptiert eingehende Freigaben NICHT automatisch (default_accept=no) – erst JETZT
+# setzen, nachdem c den geteilten Ordner gelesen hat. Der Auto-Accept-Listener von
+# Nextcloud lässt den offiziellen Gruppen-Share damit auf STATUS_PENDING; in diesem
+# Zustand mountet Nextcloud den Ordner nicht. Der Fraktionsraum-Service muss den
+# Share bei jedem Lauf für ALLE Mitglieder explizit akzeptieren.
+occ user:setting parlwin_mitglied files_sharing default_accept no >/dev/null 2>&1 || true
+
+# Gruppe über die Settings-API setzen (läuft in PHP-FPM, gleicher APCu-Cache wie
+# der Fraktionsraum-Endpoint). occ config:app:set würde nur den CLI-Cache treffen,
+# FPM sähe den Wert nicht. Das Speichern triggert sicherstellen() bereits selbst.
+api_expect_status POST "admin" "$ADMIN_TOKEN" "/settings" "200" \
+  --data-urlencode "nextcloud_gruppe=$FRAKTION_GRUPPE"
+api_expect_status POST "admin" "$ADMIN_TOKEN" "/sitzungstypen/fraktionsraum-sicherstellen" "200"
+echo "[E2E] Fraktionsraum-Bericht: ${LAST_BODY}"
+assert_json '.erfolg == true' "Fraktionsraum konnte nicht eingerichtet werden"
+
+echo "[E2E] Migrations-Erwartungen prüfen (Übernahme des Mitglied-Ordners in den offiziellen)"
+# 1. a hat den offiziellen Fraktion-Ordner UND die Sicherung Fraktion.bak.
+S=$(http_status_as PROPFIND "$MIG_A" "$PRAESIDIUM_TOKEN" "$DAV/$MIG_A/Fraktion" "" "application/xml" "Depth: 0")
+[[ "$S" == "207" ]] || fail "a sieht den offiziellen Fraktion-Ordner nicht (HTTP $S)"
+S=$(http_status_as PROPFIND "$MIG_A" "$PRAESIDIUM_TOKEN" "$DAV/$MIG_A/Fraktion.bak" "" "application/xml" "Depth: 0")
+[[ "$S" == "207" ]] || fail "a hat keine Sicherung Fraktion.bak (HTTP $S)"
+# 2. b und c haben NUR den neuen Fraktion-Ordner, kein Fraktion.bak.
+for ut in "$MIG_B:$PROTOKOLL_TOKEN" "$MIG_C:$MITGLIED_TOKEN"; do
+  u="${ut%%:*}"; t="${ut##*:}"
+  S=$(http_status_as PROPFIND "$u" "$t" "$DAV/$u/Fraktion" "" "application/xml" "Depth: 0")
+  [[ "$S" == "207" ]] || fail "$u sieht den offiziellen Fraktion-Ordner nicht (HTTP $S)"
+  S=$(http_status_as PROPFIND "$u" "$t" "$DAV/$u/Fraktion.bak" "" "application/xml" "Depth: 0")
+  [[ "$S" == "404" ]] || fail "$u sieht fälschlich Fraktion.bak (HTTP $S, erwartet 404)"
+done
+# 3. Ordner Test und alle drei zuvor erzeugten Dateien sind im offiziellen Ordner
+#    für a, b und c lesbar.
+for ut in "$MIG_A:$PRAESIDIUM_TOKEN" "$MIG_B:$PROTOKOLL_TOKEN" "$MIG_C:$MITGLIED_TOKEN"; do
+  u="${ut%%:*}"; t="${ut##*:}"
+  for f in "$MIG_GESCH/a.txt" "$MIG_GESCH/b.txt" "Test/test.txt"; do
+    S=$(http_status_as GET "$u" "$t" "$DAV/$u/Fraktion/$f")
+    [[ "$S" == "200" ]] || fail "$u kann Fraktion/$f nicht lesen (HTTP $S)"
+  done
+done
+# 4. Die Sicherung Fraktion.bak bei a enthält weiterhin die drei alten Dateien.
+for f in "$MIG_GESCH/a.txt" "$MIG_GESCH/b.txt" "Test/test.txt"; do
+  S=$(http_status_as GET "$MIG_A" "$PRAESIDIUM_TOKEN" "$DAV/$MIG_A/Fraktion.bak/$f")
+  [[ "$S" == "200" ]] || fail "Fraktion.bak/$f fehlt bei a (HTTP $S)"
+done
+echo "[E2E] Migrations-Erwartungen erfüllt"
+
+echo "[E2E] Diagnose: Ordner-Share + Kalender + Kalender-Shares"
+sql "SELECT id,share_type,share_with,item_type,file_target FROM ${TABLE_PREFIX}share WHERE share_type=1;" || true
+sql "SELECT id,principaluri,uri,displayname FROM ${TABLE_PREFIX}calendars WHERE uri LIKE '%parlwin%';" || true
+sql "SELECT id,principaluri,type,access,resourceid FROM ${TABLE_PREFIX}dav_shares;" || true
+echo "[E2E] Diagnose: parlwin-Logzeilen (Sharing-Fehler):"
+docker compose exec -T nextcloud-php-fpm php -r '
+$cands=["/app/data/nextcloud.log","/var/www/html/data/nextcloud.log","/data/nextcloud.log"];
+foreach($cands as $c){ if(is_file($c)){ echo "Log: $c\n"; foreach(array_slice(file($c),-300) as $l){ if(stripos($l,"parlwin")!==false){ echo mb_substr(trim($l),0,700),"\n"; } } } }
+' || true
+echo "[E2E] Diagnose: parlwin-Meldungen aus Container-Logs:"
+docker compose logs --tail=800 nextcloud-php-fpm 2>&1 | grep -iE 'parlwin|sharing fehlgeschlagen|not allowed to share|share' | tail -40 || true
+
+echo "[E2E] First-Run-Wizard deaktivieren (Modal würde Browser-Klicks blockieren)"
+occ app:disable firstrunwizard >/dev/null 2>&1 || true
+
+echo "[E2E] Fraktionssitzungsmodus zurücksetzen (sonst Beschluss für Nicht-Protokollführer gesperrt)"
+api_expect_status POST "parlwin_praesidium" "$PRAESIDIUM_TOKEN" "/settings/fraktionssitzung" "200" \
+  --data-urlencode "aktiv=0"
+
+# Reproduktion des Bugs «Keine Geschäfte gefunden»: ein pendentes Geschäft mit
+# NULL in quelle_aktualisiert_am. Beim Mapping einer NULL-Spalte auf die als
+# string typisierte Entity-Property bricht sonst die GESAMTE Liste mit HTTP 500 ab.
+# Die synchronisierten E2E-Daten sind sonst alle erledigt, daher zusätzlich auf
+# Pendent setzen, damit das Geschäft in der Standardansicht erscheinen muss.
+echo "[E2E] Reproduktion: pendentes Geschäft mit NULL-Quelldatum erzeugen"
+sql "UPDATE ${TABLE_PREFIX}pw_geschaefte SET status='Pendent', quelle_aktualisiert_am=NULL WHERE id=(SELECT id FROM (SELECT id FROM ${TABLE_PREFIX}pw_geschaefte WHERE geloescht=0 ORDER BY datum DESC LIMIT 1) AS x);"
+
+echo "[E2E] Multi-User-Browser-Test (Playwright, 3 gleichzeitige Nutzer)"
+export PW_U1="parlwin_praesidium" PW_P1="PwtP4ss!Praesidium"
+export PW_U2="parlwin_protokoll"  PW_P2="PwtP4ss!Protokoll"
+export PW_U3="parlwin_mitglied"   PW_P3="PwtP4ss!Mitglied"
+export PW_ADMIN_PASS="${NEXTCLOUD_ADMIN_PASSWORD}"
+docker compose run --rm playwright || fail "Multi-User-Browser-E2E (Playwright) fehlgeschlagen"
+
+echo "[E2E] Abgeschlossen: Integrationsprüfungen und Multi-User-Browser-Test bestanden."

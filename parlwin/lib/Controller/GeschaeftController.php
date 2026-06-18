@@ -49,6 +49,8 @@ class GeschaeftController extends Controller
         $filterLetzterBeschluss = (string) $this->request->getParam('letzter_beschluss', '');
         $filterEntscheidungsbedarfRaw = strtolower((string) $this->request->getParam('entscheidungsbedarf', ''));
         $showErledigtRaw = strtolower((string) $this->request->getParam('show_erledigt', '0'));
+        $filterStatus = (string) $this->request->getParam('status', '');
+
         $inklusiveErledigt = in_array($showErledigtRaw, ['1', 'true', 'ja'], true);
         $filterEntscheidungsbedarf = null;
         if (in_array($filterEntscheidungsbedarfRaw, ['1', 'true', 'ja'], true)) {
@@ -56,13 +58,20 @@ class GeschaeftController extends Controller
         } elseif (in_array($filterEntscheidungsbedarfRaw, ['0', 'false', 'nein'], true)) {
             $filterEntscheidungsbedarf = false;
         }
+
         $geschaefte = $this->service->alle($limit, $offset, $inklusiveErledigt);
+
+        // Filter nach Status wenn angegeben
+        if ($filterStatus !== '') {
+            $geschaefte = array_filter($geschaefte, fn($g) => $g->getStatus() === $filterStatus);
+        }
+
         $daten = $this->fraktionsarbeitService->angereicherteGeschaefte(
             $geschaefte,
             $filterLetzterBeschluss,
             $filterEntscheidungsbedarf
         );
-        return new DataResponse($daten);
+        return new DataResponse(array_values($daten));
     }
 
     /**
@@ -482,6 +491,9 @@ class GeschaeftController extends Controller
             return new DataResponse(['fehler' => 'Titel erforderlich'], Http::STATUS_BAD_REQUEST);
         }
         $g = new Geschaeft();
+        // Explizite ID vergeben: die Tabelle führt importierte Geschäfte mit
+        // der Geschäftsnummer als ID und ist nicht überall AUTO_INCREMENT.
+        $g->setId($this->geschaeftMapper->naechsteId());
         $g->setTitel($titel);
         $g->setTyp($typ);
         $g->setStatus($status);

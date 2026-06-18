@@ -394,7 +394,7 @@ In den Plugin-Einstellungen kann folgendes konfiguriert werden:
 
 Wichtige UI-Regeln der Admin-Seite:
 - **Nextcloud-Gruppe** kann als bestehende Gruppe gewählt oder als neuer Gruppenname eingetragen werden; die UI markiert sichtbar, ob der Name bereits existiert.
-- **Kalender-Benutzer** wird aus vorhandenen Nextcloud-Benutzern vorgeschlagen; aktive Benutzer stehen zuerst, inaktive darunter.
+- **Fraktionsraum** (gemeinsamer Ordner und Kalender) wird automatisch über das Admin-Konto bereitgestellt und mit der Fraktionsgruppe geteilt – beim Öffnen der App und bei jeder Änderung der Fraktionsgruppe. Es gibt dafür weder eine «Kalender-Benutzer»-Einstellung noch einen manuellen Knopf. Hat ein Mitglied bereits einen eigenen «Fraktion»-Ordner mit der Gruppe geteilt, wird dieser übernommen: der bisherige Ordner bleibt beim Eigentümer als «Fraktion.bak» erhalten, sein Inhalt wandert in den offiziellen Ordner.
 - **Fraktionsmitglieder-Mapping** zeigt nach Fraktionswahl alle aktiven Mitglieder:
   - Default-Username-Vorschlag: `vorname-nachname` (klein, normalisiert)
   - Username ist editierbar und wird in `pw_mitglieder.nextcloud_uid` gespeichert

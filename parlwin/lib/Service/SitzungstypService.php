@@ -396,8 +396,6 @@ class SitzungstypService
       }
     }
 
-    $kalenderNutzer = $this->config->getAppValue(Application::APP_ID, 'kalender_nutzer', '');
-
     return [
       'titel'         => $typ->getName(),
       'ort'           => $typ->getStandardOrt(),
@@ -406,7 +404,7 @@ class SitzungstypService
       'beschreibung'  => implode("\n", $beschreibungTeile),
       'teilnehmer'    => $this->materialisiereTeilnehmer($typ),
       'kalenderUri'   => 'parlwin-fraktion-kalender',
-      'kalenderNutzer' => $kalenderNutzer,
+      'kalenderNutzer' => 'admin',
     ];
   }
 

@@ -4,3 +4,36 @@ services:
 
   parlwin-realtime:
     ports: !reset []
+
+  # Browser-basierter Multi-User-E2E-Test. Läuft im selben Compose-Netz und
+  # erreicht Nextcloud daher über den internen Hostnamen nextcloud-nginx:8080.
+  # Wird gezielt über `docker compose run --rm playwright` aus run-compose-e2e.sh
+  # gestartet (Profil verhindert Autostart bei `docker compose up`).
+  playwright:
+    image: mcr.microsoft.com/playwright:v1.49.1-jammy
+    profiles: ["tools"]
+    # Muss im selben Netz wie nextcloud-nginx liegen, sonst ist der interne
+    # Hostname nextcloud-nginx:8080 nicht auflösbar.
+    networks:
+      - nginx-php
+    working_dir: /work
+    volumes:
+      # Relativ zum Compose-Projektverzeichnis (= Repo-Wurzel), nicht zum
+      # Speicherort dieser Datei. Mountet das ganze Repo nach /work.
+      - .:/work
+      # node_modules als container-eigenes (anonymes) Volume: das `npm ci` im
+      # Container bleibt isoliert und verschmutzt nicht die Host-node_modules.
+      - /work/node_modules
+    environment:
+      PARLWIN_BASE_URL: "http://nextcloud-nginx:8080"
+      PW_U1: "${PW_U1:-parlwin_praesidium}"
+      PW_P1: "${PW_P1:-}"
+      PW_U2: "${PW_U2:-parlwin_protokoll}"
+      PW_P2: "${PW_P2:-}"
+      PW_U3: "${PW_U3:-parlwin_mitglied}"
+      PW_P3: "${PW_P3:-}"
+      PW_ADMIN_PASS: "${PW_ADMIN_PASS:-}"
+      CI: "1"
+    command: >
+      bash -lc "npm ci --no-audit --no-fund &&
+                npx playwright test --config tests/e2e/playwright.config.js"

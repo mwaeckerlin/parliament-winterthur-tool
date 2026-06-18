@@ -160,24 +160,6 @@ class SettingsControllerTest extends TestCase {
         self::assertStringContainsString('Fraktion', (string) ($data['fehler'] ?? ''));
     }
 
-    public function testSetLehntUnbekanntenKalenderBenutzerAbOhneTeilwrites(): void {
-        [$controller, $config, $publisher] = $this->buildController(
-            [
-                'fraktion' => 'SP/Grüne',
-                'kalender_nutzer' => 'nicht-vorhanden',
-                'nextcloud_gruppe' => 'Fraktion-SP-Gruene',
-            ],
-            ['SP/Grüne'],
-            []
-        );
-
-        $config->expects(self::never())->method('setAppValue');
-        $publisher->expects(self::never())->method('publish');
-
-        $response = $controller->set();
-        self::assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
-    }
-
     public function testSetLehntInaktiveFraktionAb(): void {
         [$controller, $config, $publisher] = $this->buildController(
             ['fraktion' => 'SVP-Fraktion'],
@@ -207,7 +189,6 @@ class SettingsControllerTest extends TestCase {
         [$controller, $config, $publisher] = $this->buildController(
             [
                 'fraktion' => 'SP/Grüne',
-                'kalender_nutzer' => 'admin',
                 'nextcloud_gruppe' => 'Fraktion-SP-Gruene',
                 'absender_email' => 'noreply@example.com',
                 'absender_name' => 'Parliament',
@@ -216,8 +197,10 @@ class SettingsControllerTest extends TestCase {
             ['admin' => $bekannterUser]
         );
 
+        // Kein kalender_nutzer mehr: fraktion, nextcloud_gruppe, absender_email,
+        // absender_name → 4 Writes.
         $writes = [];
-        $config->expects(self::exactly(5))
+        $config->expects(self::exactly(4))
             ->method('setAppValue')
             ->willReturnCallback(static function (string $_app, string $key, string $value) use (&$writes): void {
                 $writes[$key] = $value;
@@ -229,7 +212,7 @@ class SettingsControllerTest extends TestCase {
         $data = $response->getData();
         self::assertIsArray($data);
         self::assertSame('SP/Grüne', $writes['fraktion'] ?? null);
-        self::assertSame('admin', $writes['kalender_nutzer'] ?? null);
+        self::assertArrayNotHasKey('kalender_nutzer', $writes);
         self::assertSame('Fraktion-SP-Gruene', $writes['nextcloud_gruppe'] ?? null);
         self::assertSame(['FDP', 'SP/Grüne'], $data['optionen']['fraktionen'] ?? []);
     }
@@ -573,6 +556,83 @@ class SettingsControllerTest extends TestCase {
      * @param array<string, IUser> $benutzer
      * @return array{0: SettingsController, 1: MockObject&IConfig, 2: MockObject&RealtimePublisherService}
      */
+    public function testStatusKuerzelRoundtripListenformat(): void
+    {
+        $store = [];
+        $config = $this->createStub(IConfig::class);
+        $config->method('getAppValue')->willReturnCallback(
+            static function (string $_a, string $k, string $d = '') use (&$store): string {
+                return $store[$k] ?? $d;
+            }
+        );
+        $config->method('setAppValue')->willReturnCallback(
+            static function (string $_a, string $k, string $v) use (&$store): void {
+                $store[$k] = $v;
+            }
+        );
+        $request = $this->createStub(IRequest::class);
+        $request->method('getParam')->willReturnCallback(
+            static fn(string $key, mixed $default = null): mixed => $key === 'status_kuerzel'
+                ? [
+                    ['suche' => 'Kommission Bildung', 'kuerzel' => 'BSKK'],
+                    ['suche' => '', 'kuerzel' => 'ignoriert'],
+                ]
+                : $default
+        );
+        $controller = $this->buildStatusController($request, $config);
+
+        // Speichern verwirft ungültige Einträge und behält die Listenform.
+        $resp = $controller->setStatusKuerzel();
+        self::assertSame(Http::STATUS_OK, $resp->getStatus());
+        self::assertSame([['suche' => 'Kommission Bildung', 'kuerzel' => 'BSKK']], $resp->getData());
+        self::assertSame('[{"suche":"Kommission Bildung","kuerzel":"BSKK"}]', $store['status_kuerzel']);
+
+        // Laden liefert exakt dieselbe Liste – kein {object Object}.
+        $get = $controller->getStatusKuerzel();
+        self::assertSame([['suche' => 'Kommission Bildung', 'kuerzel' => 'BSKK']], $get->getData());
+    }
+
+    public function testGetStatusKuerzelMigriertAlteMapForm(): void
+    {
+        $store = ['status_kuerzel' => json_encode(['Bei der Kommission pendent' => 'Pendent'])];
+        $config = $this->createStub(IConfig::class);
+        $config->method('getAppValue')->willReturnCallback(
+            static fn(string $_a, string $k, string $d = ''): string => $store[$k] ?? $d
+        );
+        $request = $this->createStub(IRequest::class);
+        $request->method('getParam')->willReturnCallback(
+            static fn(string $key, mixed $default = null): mixed => $default
+        );
+        $controller = $this->buildStatusController($request, $config);
+
+        $resp = $controller->getStatusKuerzel();
+        self::assertSame(
+            [['suche' => 'Bei der Kommission pendent', 'kuerzel' => 'Pendent']],
+            $resp->getData()
+        );
+    }
+
+    private function buildStatusController(IRequest $request, IConfig $config): SettingsController
+    {
+        return new SettingsController(
+            $request,
+            $config,
+            $this->createStub(GeschaeftService::class),
+            $this->createStub(SitzungService::class),
+            $this->createStub(MitgliedService::class),
+            $this->createStub(ScraperService::class),
+            $this->createStub(KalenderService::class),
+            $this->createStub(FraktionsarbeitService::class),
+            $this->createStub(RealtimePublisherService::class),
+            $this->createStub(SyncLockService::class),
+            $this->createStub(SyncProcessService::class),
+            $this->createStub(FraktionMapper::class),
+            $this->createStub(IGroupManager::class),
+            $this->createStub(IUserManager::class),
+            $this->createStub(FraktionsraumService::class),
+        );
+    }
+
     private function buildController(array $requestParams, array $fraktionen, array $benutzer): array
     {
         $request = $this->createStub(IRequest::class);

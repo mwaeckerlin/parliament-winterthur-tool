@@ -33,6 +33,14 @@ class KalenderService
     private const KALENDER_URI = 'parlwin-fraktion-kalender';
     private const KALENDER_COLOR = '#1e6c9b';
 
+    /**
+     * Besitzer des gemeinsamen Fraktionskalenders. Fest auf den Admin-Account –
+     * analog zur Fraktions-Ordnerstruktur (FraktionsraumService::ADMIN_USER).
+     * Der Kalender wird in diesem Account angelegt und mit der Fraktionsgruppe
+     * geteilt; es braucht dafür keine separate Konfiguration.
+     */
+    private const KALENDER_NUTZER = 'admin';
+
     public function __construct(
         private readonly IConfig $config,
         private readonly LoggerInterface $logger,
@@ -85,10 +93,13 @@ class KalenderService
                 return; // Bereits geteilt
             }
 
-            // Direkt in oc_dav_shares einfügen: type=1 (GROUP), access=3 (Read+Write)
-            $this->db->executeQuery(
+            // Direkt in oc_dav_shares einfügen. dav_shares.type ist der Ressourcen-
+            // typ als String ('calendar'); ein Integer matcht in getCalendarsForUser
+            // nicht. access=2 = Read+Write (3 wäre read-only). executeStatement statt
+            // executeQuery, sonst wird der INSERT auf MariaDB nicht ausgeführt.
+            $this->db->executeStatement(
                 "INSERT INTO `{$prefix}dav_shares` (principaluri, type, access, resourceid) VALUES (?, ?, ?, ?)",
-                ["principals/groups/{$gruppe}", 1, 3, $kalenderId]
+                ["principals/groups/{$gruppe}", 'calendar', 2, $kalenderId]
             );
 
             $this->logger->info(sprintf(
@@ -103,17 +114,11 @@ class KalenderService
 
     public function sitzungenAktualisieren(array $sitzungen): void
     {
-        $kalenderNutzer = $this->config->getAppValue(Application::APP_ID, 'kalender_nutzer', '');
-        if (empty($kalenderNutzer)) {
-            $this->logger->info('Parlament Winterthur: Kein Kalendernutzer konfiguriert, überspringe Kalenderaktualisierung');
-            return;
-        }
-
         try {
             // CalDAV-Backend über Nextcloud-DI verwenden
             $dav = \OC::$server->get(\OCA\DAV\CalDAV\CalDavBackend::class);
 
-            $kalender = $this->sicherstelleKalender($dav, $kalenderNutzer);
+            $kalender = $this->sicherstelleKalender($dav, self::KALENDER_NUTZER);
 
             foreach ($sitzungen as $sitzung) {
                 $this->erstelleOderAktualisiere($dav, $kalender, $sitzung, null);
@@ -201,13 +206,9 @@ class KalenderService
      */
     public function erstelleInterneSitzung(Sitzung $sitzung, string $beschreibung): void
     {
-        $kalenderNutzer = $this->config->getAppValue(Application::APP_ID, 'kalender_nutzer', '');
-        if (empty($kalenderNutzer)) {
-            return;
-        }
         try {
             $dav = \OC::$server->get(\OCA\DAV\CalDAV\CalDavBackend::class);
-            $kalender = $this->sicherstelleKalender($dav, $kalenderNutzer);
+            $kalender = $this->sicherstelleKalender($dav, self::KALENDER_NUTZER);
             $this->erstelleOderAktualisiere($dav, $kalender, $sitzung, $beschreibung);
         } catch (\Throwable $e) {
             $this->logger->error(
@@ -355,11 +356,10 @@ class KalenderService
 
     private function organizerEmail(): string
     {
-        $uid = (string) $this->config->getAppValue(Application::APP_ID, 'kalender_nutzer', '');
-        if ($uid === '' || $this->userManager === null) {
+        if ($this->userManager === null) {
             return '';
         }
-        $user = $this->userManager->get($uid);
+        $user = $this->userManager->get(self::KALENDER_NUTZER);
         if ($user === null) {
             return '';
         }

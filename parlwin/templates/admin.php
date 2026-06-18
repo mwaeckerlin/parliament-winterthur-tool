@@ -4,8 +4,6 @@
 
 $fraktionOptionen = is_array($_['fraktion_optionen'] ?? null) ? $_['fraktion_optionen'] : [];
 $gruppenOptionen = is_array($_['nextcloud_gruppen_optionen'] ?? null) ? $_['nextcloud_gruppen_optionen'] : [];
-$kalenderAktiv = is_array($_['kalender_nutzer_optionen_aktiv'] ?? null) ? $_['kalender_nutzer_optionen_aktiv'] : [];
-$kalenderInaktiv = is_array($_['kalender_nutzer_optionen_inaktiv'] ?? null) ? $_['kalender_nutzer_optionen_inaktiv'] : [];
 $fraktionAktuell = (string) ($_['fraktion'] ?? '');
 $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true);
 ?>
@@ -130,43 +128,6 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
                 </section>
 
                 <section class="pw-admin-card">
-                    <h3><?php p($l->t('Kalenderintegration')); ?></h3>
-
-                    <div class="pw-admin-grid">
-                        <div class="pw-admin-field">
-                            <label for="pw-kalender-nutzer">
-                                <?php p($l->t('Nextcloud-Benutzer für Termineinträge')); ?>
-                            </label>
-                            <input type="text" id="pw-kalender-nutzer" name="kalender_nutzer" class="pw-input"
-                                list="pw-kalender-nutzer-liste" value="<?php p($_['kalender_nutzer']); ?>"
-                                placeholder="z.B. admin" />
-                            <datalist id="pw-kalender-nutzer-liste">
-                                <?php foreach ($kalenderAktiv as $user): ?>
-                                    <option value="<?php p((string) ($user['uid'] ?? '')); ?>"
-                                        label="<?php p((string) ($user['label'] ?? '')); ?>"></option>
-                                <?php endforeach; ?>
-                                <?php foreach ($kalenderInaktiv as $user): ?>
-                                    <option value="<?php p((string) ($user['uid'] ?? '')); ?>"
-                                        label="<?php p((string) ($user['label'] ?? '')); ?> [inaktiv]"></option>
-                                <?php endforeach; ?>
-                            </datalist>
-                            <div id="pw-kalender-nutzer-state" class="pw-selection-state"></div>
-                        </div>
-                    </div>
-                </section>
-
-                <section class="pw-admin-card">
-                    <h3><?php p($l->t('Fraktions-Infrastruktur')); ?></h3>
-                    <p class="settings-hint">
-                        <?php p($l->t('Gemeinsamer Fraktionsordner und Kalender. Diese werden automatisch angelegt; mit diesem Button können Sie den Prozess manuell triggern.')); ?>
-                    </p>
-                    <button type="button" id="pw-fraktionsraum-sicherstellen" class="button">
-                        <?php p($l->t('Ordner + Kalender jetzt anlegen/teilen')); ?>
-                    </button>
-                    <span id="pw-fraktionsraum-status" class="pw-sync-status"></span>
-                </section>
-
-                <section class="pw-admin-card">
                     <h3><?php p($l->t('Status-Kürzel')); ?></h3>
                     <p class="settings-hint">
                         <?php p($l->t('Texte im Status-Pulldown kürzen: Suchtext eingeben (Vorschläge aus bestehenden Status-Werten) und gewünschtes Kürzel definieren. Beide Mapping-Typen möglich:')); ?>
@@ -176,15 +137,11 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
                         <li><?php p($l->t('Status-Text → Kurzform: «Bei der Kommission Bildung, Sport und Kultur pendent» → «Pendent: BSKK»')); ?></li>
                     </ul>
                     <div id="pw-kuerzel-liste"></div>
+                    <datalist id="pw-status-kuerzel-liste"></datalist>
                     <button type="button" id="pw-kuerzel-hinzufuegen" class="button">
                         <?php p($l->t('+ Eintrag hinzufügen')); ?>
                     </button>
-                    <button type="button" id="pw-kuerzel-speichern" class="button primary" style="margin-left:0.5rem">
-                        <?php p($l->t('Kürzel speichern')); ?>
-                    </button>
                     <span id="pw-kuerzel-status" class="pw-sync-status"></span>
-                    <input type="hidden" id="pw-status-kuerzel-json" name="status_kuerzel" value="<?php p($_['status_kuerzel'] ?? '{}'); ?>" />
-                    <datalist id="pw-status-kuerzel-liste"></datalist>
                 </section>
 
                 <section class="pw-admin-card">
@@ -225,8 +182,6 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
     ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT)); ?>;
     window.PARLWIN_ADMIN_BOOTSTRAP = <?php print_unescaped(json_encode([
         'nextcloudGruppen' => $gruppenOptionen,
-        'kalenderNutzerAktiv' => $kalenderAktiv,
-        'kalenderNutzerInaktiv' => $kalenderInaktiv,
     ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT)); ?>;
 
     (function () {
@@ -238,11 +193,9 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
         const syncProgress = document.getElementById('pw-sync-progress');
         const syncPercent = document.getElementById('pw-sync-percent');
         const inputGruppe = document.getElementById('pw-nextcloud-gruppe');
-        const inputKalenderNutzer = document.getElementById('pw-kalender-nutzer');
         const selectFraktion = document.getElementById('pw-fraktion');
         const autosaveStatus = document.getElementById('pw-admin-autosave');
         const gruppeState = document.getElementById('pw-nextcloud-gruppe-state');
-        const kalenderState = document.getElementById('pw-kalender-nutzer-state');
         const membersBody = document.getElementById('pw-members-body');
         const membersEmpty = document.getElementById('pw-members-empty');
         const membersStatus = document.getElementById('pw-members-status');
@@ -309,8 +262,6 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
 
         const bootstrap = window.PARLWIN_ADMIN_BOOTSTRAP || {};
         const knownGroups = new Set((bootstrap.nextcloudGruppen || []).map((name) => String(name).toLowerCase().trim()).filter(Boolean));
-        const activeCalendarUsers = new Map((bootstrap.kalenderNutzerAktiv || []).map((user) => [String(user.uid || '').toLowerCase(), user]));
-        const inactiveCalendarUsers = new Map((bootstrap.kalenderNutzerInaktiv || []).map((user) => [String(user.uid || '').toLowerCase(), user]));
 
         const resolveRequestToken = () => {
             if (ncOC?.Util && typeof ncOC.Util.getRequestToken === 'function') {
@@ -454,23 +405,6 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
                 return;
             }
             setSelectionState(gruppeState, 'new', t('parlwin', 'Neue Gruppe wird angelegt'));
-        };
-
-        const updateKalenderState = () => {
-            const value = String(inputKalenderNutzer?.value || '').trim().toLowerCase();
-            if (!value) {
-                setSelectionState(kalenderState, '', '');
-                return;
-            }
-            if (activeCalendarUsers.has(value)) {
-                setSelectionState(kalenderState, 'existing', t('parlwin', 'Aktiver Benutzer'));
-                return;
-            }
-            if (inactiveCalendarUsers.has(value)) {
-                setSelectionState(kalenderState, 'inactive', t('parlwin', 'Inaktiver Benutzer'));
-                return;
-            }
-            setSelectionState(kalenderState, 'invalid', t('parlwin', 'Benutzer nicht gefunden'));
         };
 
         const aktuelleFraktionsGruppe = () => {
@@ -852,7 +786,6 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
                 .then(() => {
                     lastSavedSettingsPayload = serialized;
                     updateGroupState();
-                    updateKalenderState();
                     setAutosaveStatus(t('parlwin', 'Alle Änderungen gespeichert'));
                 })
                 .catch((err) => {
@@ -1293,7 +1226,6 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
         inputGruppe?.addEventListener('input', updateGroupState);
         inputGruppe?.addEventListener('input', aktualisiereAlleGruppenZellen);
         inputGruppe?.addEventListener('change', aktualisiereAlleGruppenZellen);
-        inputKalenderNutzer?.addEventListener('input', updateKalenderState);
         selectFraktion?.addEventListener('change', () => {
             queueSettingsSave(true).catch(() => { });
             loadFraktionMembers().catch(() => { });
@@ -1306,97 +1238,11 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
         });
         btnMembersProvision?.addEventListener('click', provisionSelectedMembers);
 
-        // ── Status-Kürzel ──────────────────────────────────────────────────────
-        const kuerzelListe = document.getElementById('pw-kuerzel-liste');
-        const kuerzelStatus = document.getElementById('pw-kuerzel-status');
-        let kuerzelEintraege = [];
-
-        const renderKuerzel = () => {
-            if (!kuerzelListe) return;
-            kuerzelListe.innerHTML = '';
-            kuerzelEintraege.forEach((entry, idx) => {
-                const row = document.createElement('div');
-                row.className = 'pw-kuerzel-zeile';
-                row.style.cssText = 'display:flex;gap:0.5rem;margin-bottom:0.4rem;align-items:center';
-                const listId = 'pw-kuerzel-vorschlaege-' + idx;
-                const inSuche = document.createElement('input');
-                inSuche.type = 'text'; inSuche.className = 'pw-input'; inSuche.style.flex = '1';
-                inSuche.placeholder = t('parlwin', 'Suchtext (z.B. Kommission Bildung, Sport und Kultur)');
-                inSuche.value = entry.suche;
-                inSuche.setAttribute('list', listId);
-                inSuche.addEventListener('input', () => { kuerzelEintraege[idx].suche = inSuche.value; });
-                // Datalist mit allen bekannten Status-Werten als Vorschläge
-                const dl = document.createElement('datalist');
-                dl.id = listId;
-                (window.__parlwinStatusWerte || []).forEach(s => {
-                    const opt = document.createElement('option'); opt.value = s; dl.appendChild(opt);
-                });
-                const inKuerzel = document.createElement('input');
-                inKuerzel.type = 'text'; inKuerzel.className = 'pw-input'; inKuerzel.style.width = '120px';
-                inKuerzel.placeholder = t('parlwin', 'Kürzel (z.B. BSKK)');
-                inKuerzel.value = entry.kuerzel;
-                inKuerzel.addEventListener('input', () => { kuerzelEintraege[idx].kuerzel = inKuerzel.value; });
-                const btnDel = document.createElement('button');
-                btnDel.type = 'button'; btnDel.className = 'button pw-btn-mini'; btnDel.textContent = '✕';
-                btnDel.addEventListener('click', () => { kuerzelEintraege.splice(idx, 1); renderKuerzel(); });
-                row.appendChild(dl); row.appendChild(inSuche); row.appendChild(inKuerzel); row.appendChild(btnDel);
-                kuerzelListe.appendChild(row);
-            });
-        };
-
-        // Alle bekannten Status-Werte aus der Geschäfts-API laden für Datalist-Vorschläge.
-        const ladeStatusWerte = () => {
-            fetch(generateUrl('/apps/parlwin/geschaefte?show_erledigt=1&limit=2000'), { headers: authHeaders() })
-                .then(r => r.json())
-                .then(data => {
-                    const werte = new Set();
-                    (Array.isArray(data) ? data : []).forEach(g => {
-                        if (g.status) werte.add(g.status);
-                    });
-                    window.__parlwinStatusWerte = [...werte].sort();
-                })
-                .catch(() => {});
-        };
-
-        const loadKuerzel = () => {
-            fetch(generateUrl('/apps/parlwin/settings/status-kuerzel'), { headers: authHeaders() })
-                .then(r => r.json())
-                .then(data => { kuerzelEintraege = Array.isArray(data) ? data : []; renderKuerzel(); })
-                .catch(() => {});
-        };
-
-        document.getElementById('pw-kuerzel-hinzufuegen')?.addEventListener('click', () => {
-            kuerzelEintraege.push({ suche: '', kuerzel: '' });
-            renderKuerzel();
-        });
-
-        document.getElementById('pw-kuerzel-speichern')?.addEventListener('click', () => {
-            if (kuerzelStatus) kuerzelStatus.textContent = t('parlwin', 'Speichere...');
-            fetch(generateUrl('/apps/parlwin/settings/status-kuerzel'), {
-                method: 'POST',
-                headers: authHeaders({ 'Content-Type': 'application/json' }),
-                body: JSON.stringify({ kuerzel: kuerzelEintraege }),
-            })
-                .then(r => r.json())
-                .then(() => { if (kuerzelStatus) kuerzelStatus.textContent = t('parlwin', 'Gespeichert'); })
-                .catch(() => { if (kuerzelStatus) kuerzelStatus.textContent = t('parlwin', 'Fehler'); });
-        });
-
-        // ── Fraktionsraum Trigger ────────────────────────────────────────
-        document.getElementById('pw-fraktionsraum-sicherstellen')?.addEventListener('click', () => {
-            const status = document.getElementById('pw-fraktionsraum-status');
-            if (status) status.textContent = t('parlwin', 'Wird angelegt...');
-            fetch(generateUrl('/apps/parlwin/sitzungstypen/fraktionsraum-sicherstellen'), { method: 'POST', headers: authHeaders() })
-                .then(r => r.json())
-                .then(() => { if (status) status.textContent = t('parlwin', 'Erfolgreich'); })
-                .catch(e => { if (status) status.textContent = t('parlwin', 'Fehler: ' + e.message); });
-        });
-
-        ladeStatusWerte();
-        loadKuerzel();
+        // Status-Kürzel werden vollständig in src/js/admin.js verwaltet
+        // (Laden, Rendern, Auto-Save). Keine zweite Implementierung hier, sonst
+        // überschreiben sich die beiden gegenseitig.
 
         updateGroupState();
-        updateKalenderState();
         const initialFraktion = <?php print_unescaped(json_encode((string) ($_['fraktion'] ?? ''), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE)); ?>;
         if (selectFraktion && initialFraktion && selectFraktion.value !== initialFraktion) {
             selectFraktion.value = initialFraktion;

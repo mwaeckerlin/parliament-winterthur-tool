@@ -417,9 +417,9 @@ if (!interface_exists('OCP\Share\IShare')) {
     }');
 }
 
-if (!interface_exists('OCP\Share\IShareManager')) {
+if (!interface_exists('OCP\Share\IManager')) {
     // phpcs:ignore
-    eval ('namespace OCP\Share; interface IShareManager {
+    eval ('namespace OCP\Share; interface IManager {
         public function newShare(): IShare;
         public function createShare(IShare $share): IShare;
         public function getSharesBy(string $userId, int $shareType, $node = null, bool $reshares = false, int $limit = -1, int $offset = 0): array;

@@ -7,6 +7,7 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./parlwin/src/js/tests/setup.js'],
+    exclude: ['tests/e2e/**', 'node_modules'],
   },
   resolve: {
     alias: {
