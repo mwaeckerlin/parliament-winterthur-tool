@@ -19,45 +19,48 @@ function showStatusMessage(elementId, message, isError = false) {
   }
 }
 
+// Erstellt eine Eingabezeile (Suchtext + Kürzel + Löschen) mit Auto-Save.
+function kuerzelZeileErstellen(suche = '', kuerzel = '') {
+  const liste = document.getElementById('pw-kuerzel-liste')
+  if (!liste) return null
+
+  const row = document.createElement('div')
+  row.className = 'pw-kuerzel-row'
+  row.innerHTML = `
+    <input type="text" class="pw-kuerzel-suchtext" value="${escapeHtml(suche)}" placeholder="Suchtext" list="pw-status-kuerzel-liste" />
+    <input type="text" class="pw-kuerzel-wert" value="${escapeHtml(kuerzel)}" placeholder="Kürzel" />
+    <button type="button" class="button pw-kuerzel-delete" title="Löschen">×</button>
+  `
+  liste.appendChild(row)
+
+  row.querySelector('.pw-kuerzel-delete').addEventListener('click', (e) => {
+    e.preventDefault()
+    row.remove()
+    kurzelAutoSpeichern()
+  })
+  row.querySelectorAll('input').forEach((input) => {
+    input.addEventListener('change', kurzelAutoSpeichern)
+    input.addEventListener('blur', kurzelAutoSpeichern)
+    input.addEventListener('input', kurzelAutoSpeichern)
+  })
+  return row
+}
+
+// Lädt die gespeicherten Kürzel vom Server (Liste von {suche, kuerzel}) und rendert sie.
 function kuerzeleRendern() {
   const liste = document.getElementById('pw-kuerzel-liste')
   if (!liste) return
 
-  const kuerzelInput = document.getElementById('pw-status-kuerzel-json')
-  let kuerzel = {}
-  if (kuerzelInput && kuerzelInput.value) {
-    try {
-      kuerzel = JSON.parse(kuerzelInput.value)
-    } catch {
-      kuerzel = {}
-    }
-  }
-
-  liste.innerHTML = ''
-  Object.entries(kuerzel).forEach(([suchtext, kuerzel_wert]) => {
-    const row = document.createElement('div')
-    row.className = 'pw-kuerzel-row'
-    row.innerHTML = `
-      <input type="text" class="pw-kuerzel-suchtext" value="${escapeHtml(suchtext)}" placeholder="Suchtext" />
-      <input type="text" class="pw-kuerzel-wert" value="${escapeHtml(kuerzel_wert)}" placeholder="Kürzel" list="pw-status-kuerzel-liste" />
-      <button type="button" class="button pw-kuerzel-delete" title="Löschen">×</button>
-    `
-    liste.appendChild(row)
-
-    const deleteBtn = row.querySelector('.pw-kuerzel-delete')
-    deleteBtn.addEventListener('click', (e) => {
-      e.preventDefault()
-      row.remove()
-      kurzelAutoSpeichern()
+  axios
+    .get(generateUrl('/apps/parlwin/settings/status-kuerzel'))
+    .then((response) => {
+      const eintraege = Array.isArray(response.data) ? response.data : []
+      liste.innerHTML = ''
+      eintraege.forEach((e) => kuerzelZeileErstellen(e.suche || '', e.kuerzel || ''))
     })
-
-    const inputs = row.querySelectorAll('input')
-    inputs.forEach(input => {
-      input.addEventListener('change', kurzelAutoSpeichern)
-      input.addEventListener('blur', kurzelAutoSpeichern)
-      input.addEventListener('input', kurzelAutoSpeichern)
+    .catch((err) => {
+      console.error('Fehler beim Laden der Status-Kürzel:', err)
     })
-  })
 }
 
 function kurzelAutoSpeichern() {
@@ -68,22 +71,17 @@ function kurzelAutoSpeichern() {
     const liste = document.getElementById('pw-kuerzel-liste')
     if (!liste) return
 
-    const kuerzel = {}
-    document.querySelectorAll('#pw-kuerzel-liste .pw-kuerzel-row').forEach(row => {
-      const suchtext = row.querySelector('.pw-kuerzel-suchtext').value.trim()
-      const wert = row.querySelector('.pw-kuerzel-wert').value.trim()
-      if (suchtext && wert) {
-        kuerzel[suchtext] = wert
+    const eintraege = []
+    document.querySelectorAll('#pw-kuerzel-liste .pw-kuerzel-row').forEach((row) => {
+      const suche = row.querySelector('.pw-kuerzel-suchtext').value.trim()
+      const kuerzel = row.querySelector('.pw-kuerzel-wert').value.trim()
+      if (suche && kuerzel) {
+        eintraege.push({ suche, kuerzel })
       }
     })
 
-    const kuerzelInput = document.getElementById('pw-status-kuerzel-json')
-    if (kuerzelInput) {
-      kuerzelInput.value = JSON.stringify(kuerzel)
-    }
-
     axios
-      .post(generateUrl('/apps/parlwin/settings/status-kuerzel'), { status_kuerzel: kuerzel })
+      .post(generateUrl('/apps/parlwin/settings/status-kuerzel'), { status_kuerzel: eintraege })
       .then(() => {
         showStatusMessage('pw-kuerzel-status', 'Gespeichert', false)
       })
@@ -95,33 +93,8 @@ function kurzelAutoSpeichern() {
 }
 
 function kuerzleHinzufuegen() {
-  const liste = document.getElementById('pw-kuerzel-liste')
-  if (!liste) return
-
-  const row = document.createElement('div')
-  row.className = 'pw-kuerzel-row'
-  row.innerHTML = `
-    <input type="text" class="pw-kuerzel-suchtext" value="" placeholder="Suchtext" />
-    <input type="text" class="pw-kuerzel-wert" value="" placeholder="Kürzel" list="pw-status-kuerzel-liste" />
-    <button type="button" class="button pw-kuerzel-delete" title="Löschen">×</button>
-  `
-  liste.appendChild(row)
-
-  const deleteBtn = row.querySelector('.pw-kuerzel-delete')
-  deleteBtn.addEventListener('click', (e) => {
-    e.preventDefault()
-    row.remove()
-    kurzelAutoSpeichern()
-  })
-
-  const inputs = row.querySelectorAll('input')
-  inputs.forEach(input => {
-    input.addEventListener('change', kurzelAutoSpeichern)
-    input.addEventListener('blur', kurzelAutoSpeichern)
-    input.addEventListener('input', kurzelAutoSpeichern)
-  })
-
-  row.querySelector('.pw-kuerzel-suchtext').focus()
+  const row = kuerzelZeileErstellen('', '')
+  if (row) row.querySelector('.pw-kuerzel-suchtext').focus()
 }
 
 function ladeStatusWerte() {
@@ -134,10 +107,10 @@ function ladeStatusWerte() {
         datalist.innerHTML = ''
         const seen = new Set()
         response.data.forEach((g) => {
-          if (g.status_kurz && !seen.has(g.status_kurz)) {
-            seen.add(g.status_kurz)
+          if (g.status && !seen.has(g.status)) {
+            seen.add(g.status)
             const option = document.createElement('option')
-            option.value = g.status_kurz
+            option.value = g.status
             datalist.appendChild(option)
           }
         })
@@ -164,30 +137,6 @@ document.addEventListener('DOMContentLoaded', () => {
     hinzufuegenBtn.addEventListener('click', (e) => {
       e.preventDefault()
       kuerzleHinzufuegen()
-    })
-  }
-
-  // Verstecke den manuellen Speichern-Button (auto-save übernimmt es)
-  const speichernBtn = document.getElementById('pw-kuerzel-speichern')
-  if (speichernBtn) {
-    speichernBtn.style.display = 'none'
-  }
-
-  // Ordner + Kalender manuell anlegen
-  const fraktionsraumBtn = document.getElementById('pw-fraktionsraum-sicherstellen')
-  if (fraktionsraumBtn) {
-    fraktionsraumBtn.addEventListener('click', (e) => {
-      e.preventDefault()
-      showStatusMessage('pw-fraktionsraum-status', 'Wird angelegt...', false)
-      axios
-        .post(generateUrl('/apps/parlwin/sitzungstypen/fraktionsraum-sicherstellen'))
-        .then(() => {
-          showStatusMessage('pw-fraktionsraum-status', 'Fertig', false)
-        })
-        .catch((err) => {
-          console.error('Fehler beim Anlegen der Fraktionsinfrastruktur:', err)
-          showStatusMessage('pw-fraktionsraum-status', `Fehler: ${err.response?.data?.fehler || err.message}`, true)
-        })
     })
   }
 })

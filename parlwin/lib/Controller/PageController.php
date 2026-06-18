@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OCA\ParliamentWinterthur\Controller;
 
 use OCA\ParliamentWinterthur\AppInfo\Application;
+use OCA\ParliamentWinterthur\Service\FraktionsraumService;
 use OCP\App\IAppManager;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
@@ -23,6 +24,7 @@ class PageController extends Controller
         IRequest $request,
         private readonly IConfig $config,
         private readonly IAppManager $appManager,
+        private readonly FraktionsraumService $fraktionsraumService,
     ) {
         parent::__construct(Application::APP_ID, $request);
     }
@@ -36,6 +38,14 @@ class PageController extends Controller
     {
         Util::addScript(Application::APP_ID, 'parlwin-main');
         Util::addStyle(Application::APP_ID, 'parlwin-style');
+
+        // Fraktions-Infrastruktur (geteilter Ordner + Kalender) bei jedem
+        // App-Start prüfen und fehlende Teile automatisch ergänzen.
+        try {
+            $this->fraktionsraumService->sicherstellen();
+        } catch (\Throwable) {
+            /* non-fatal: Seite muss auch ohne Infrastruktur laden */
+        }
 
         $letzteSync = $this->config->getAppValue(Application::APP_ID, 'letzte_synchronisation', '');
         $fraktion = $this->config->getAppValue(Application::APP_ID, 'fraktion', '');

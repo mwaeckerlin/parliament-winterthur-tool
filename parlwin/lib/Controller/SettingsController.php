@@ -58,10 +58,8 @@ class SettingsController extends Controller
     private const EINSTELLUNGEN = [
         'fraktion' => '',
         'nextcloud_gruppe' => '',
-        'kalender_nutzer' => '',
         'absender_email' => '',
         'absender_name' => 'Parlament Winterthur Tool',
-        'status_kuerzel' => '[]',
     ];
 
     public function __construct(
@@ -120,11 +118,6 @@ class SettingsController extends Controller
             if ($schluessel === 'fraktion' && $wert !== '' && !$this->istGueltigeFraktion($wert, $fraktionsOptionen)) {
                 return new DataResponse([
                     'fehler' => 'Bitte eine vorhandene Fraktion aus der Liste wählen.',
-                ], Http::STATUS_BAD_REQUEST);
-            }
-            if ($schluessel === 'kalender_nutzer' && $wert !== '' && $this->userManager->get($wert) === null) {
-                return new DataResponse([
-                    'fehler' => 'Der gewählte Kalender-Benutzer existiert nicht.',
                 ], Http::STATUS_BAD_REQUEST);
             }
             $zuSpeichern[$schluessel] = $wert;
@@ -2023,13 +2016,12 @@ class SettingsController extends Controller
     public function getStatusKuerzel(): DataResponse
     {
         $raw = $this->config->getAppValue(Application::APP_ID, 'status_kuerzel', '[]');
-        $list = json_decode($raw, true);
-        return new DataResponse(is_array($list) ? $list : []);
+        return new DataResponse(self::normalisiereStatusKuerzel(json_decode($raw, true)));
     }
 
     /**
      * Speichert alle Status-Kürzel-Mappings (komplette Liste ersetzen).
-     * Body: { "status_kuerzel": { "Suchtext": "Kürzel", ... } }
+     * Body: { "status_kuerzel": [ { "suche": "...", "kuerzel": "..." }, ... ] }
      */
     #[AuthorizedAdminSetting(settings: \OCA\ParliamentWinterthur\Settings\AdminSettings::class)]
     public function setStatusKuerzel(): DataResponse
@@ -2038,15 +2030,40 @@ class SettingsController extends Controller
         if (!is_array($body)) {
             return new DataResponse(['fehler' => 'Ungültiges Format'], Http::STATUS_BAD_REQUEST);
         }
-        $bereinigt = [];
-        foreach ($body as $suche => $kuerzel) {
-            $suche = trim((string) $suche);
-            $kuerzel = trim((string) $kuerzel);
-            if ($suche !== '' && $kuerzel !== '') {
-                $bereinigt[$suche] = $kuerzel;
-            }
-        }
+        $bereinigt = self::normalisiereStatusKuerzel($body);
         $this->config->setAppValue(Application::APP_ID, 'status_kuerzel', json_encode($bereinigt));
         return new DataResponse($bereinigt);
+    }
+
+    /**
+     * Bringt beliebige gespeicherte/empfangene Status-Kürzel-Daten in das
+     * kanonische Format: eine Liste von {suche, kuerzel}.
+     *
+     * Akzeptiert sowohl die aktuelle Listenform als auch die alte Map-Form
+     * ({Suchtext: Kürzel}) und verwirft ungültige Einträge.
+     *
+     * @return list<array{suche: string, kuerzel: string}>
+     */
+    private static function normalisiereStatusKuerzel(mixed $daten): array
+    {
+        if (!is_array($daten)) {
+            return [];
+        }
+        $result = [];
+        foreach ($daten as $key => $value) {
+            if (is_array($value)) {
+                // Listenform: {suche, kuerzel}
+                $suche = trim((string) ($value['suche'] ?? ''));
+                $kuerzel = trim((string) ($value['kuerzel'] ?? ''));
+            } else {
+                // Alte Map-Form: Suchtext => Kürzel
+                $suche = trim((string) $key);
+                $kuerzel = trim((string) $value);
+            }
+            if ($suche !== '' && $kuerzel !== '') {
+                $result[] = ['suche' => $suche, 'kuerzel' => $kuerzel];
+            }
+        }
+        return $result;
     }
 }

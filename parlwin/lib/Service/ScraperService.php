@@ -1366,8 +1366,8 @@ class ScraperService
                     $externId = $idMatch[1];
                 }
                 $einreicher[] = [
-                    'name' => trim($match[2]),
-                    'rolle' => trim($match[3]),
+                    'name' => self::bereinigeHtmlText($match[2]),
+                    'rolle' => self::bereinigeHtmlText($match[3]),
                     'externId' => $externId,
                 ];
             }
@@ -1377,11 +1377,11 @@ class ScraperService
         $remaining = (string) preg_replace('/<a[^>]*>.*?<\/a>\s*\([^)]*\)/su', '', $rawHtml);
         if (preg_match_all('/(?:^|,)\s*([^,<(]+?)\s*\(([^)]+)\)/u', $remaining, $m, PREG_SET_ORDER)) {
             foreach ($m as $match) {
-                $name = trim($match[1]);
+                $name = self::bereinigeHtmlText($match[1]);
                 if ($name !== '') {
                     $einreicher[] = [
                         'name' => $name,
-                        'rolle' => trim($match[2]),
+                        'rolle' => self::bereinigeHtmlText($match[2]),
                         'externId' => '',
                     ];
                 }

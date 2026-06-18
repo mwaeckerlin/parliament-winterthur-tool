@@ -201,6 +201,34 @@ class ScraperServiceTest extends TestCase {
         $this->assertSame('Mitunterzeichner/-in', $einreicher[2]['rolle']);
     }
 
+    /**
+     * Regression: Namen/Rollen aus «Verfasser/Beteiligte» dürfen keine
+     * HTML-Entities (z.B. &#39; für ') roh enthalten — sie müssen dekodiert
+     * gespeichert werden, sonst erscheint in der UI «D&#39;Amato» statt «D'Amato».
+     */
+    public function testEinreicherNamenWerdenHtmlDekodiert(): void {
+        $html = <<<HTML
+        <dl class="row">
+            <dt>Nummer</dt><dd>2024.99</dd>
+            <dt>Verfasser/Beteiligte</dt><dd><a href="/_rte/person/123" class="icms-link-person"> D&#39;Amato Luca</a> (Erstunterzeichner/-in), O&#39;Brien Sean &amp; Co (Mitunterzeichner/-in)</dd>
+        </dl>
+        HTML;
+
+        $details = $this->service->extrahiereGeschaeftDetailsAusHtml($html);
+        $einreicher = $details['einreicher'];
+
+        $this->assertSame("D'Amato Luca", $einreicher[0]['name']);
+        $this->assertSame('Erstunterzeichner/-in', $einreicher[0]['rolle']);
+        $this->assertSame("O'Brien Sean & Co", $einreicher[1]['name']);
+        $this->assertSame('Mitunterzeichner/-in', $einreicher[1]['rolle']);
+
+        // Kein roher Entity-Code mehr in den gespeicherten Werten
+        foreach ($einreicher as $e) {
+            $this->assertStringNotContainsString('&#', $e['name']);
+            $this->assertStringNotContainsString('&amp;', $e['name']);
+        }
+    }
+
     public function testExtrahiereGeschaeftDetailsOhneEinreicher(): void {
         $html = <<<HTML
         <dl class="row">

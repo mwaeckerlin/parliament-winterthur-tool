@@ -174,7 +174,7 @@ class SitzungstypController extends Controller
   {
     try {
       $this->fraktionsraumService->sicherstellen();
-      return new DataResponse(['erfolg' => true]);
+      return new DataResponse(['erfolg' => true, 'bericht' => $this->fraktionsraumService->getBericht()]);
     } catch (\Throwable $e) {
       $this->logger->error('parlwin: fraktionsraum-sicherstellen fehlgeschlagen: ' . $e->getMessage());
       return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_INTERNAL_SERVER_ERROR);

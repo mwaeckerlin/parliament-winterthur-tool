@@ -11,3 +11,11 @@ Thumbs.db
 
 # Lokal abgelegte E-Mails des Fake-SMTP-Servers
 mails/
+
+# Playwright-Testausgaben (Screenshots, Traces, Reports)
+test-results/
+playwright-report/
+
+# JUnit-Zwischenberichte der Testauswertung
+tests/.junit/
+tests/e2e/.junit/

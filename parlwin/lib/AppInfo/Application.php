@@ -188,6 +188,7 @@ class Application extends App implements IBootstrap
                 $c->get(\OCP\IUserManager::class),
                 $c->get(\OCP\IDBConnection::class),
                 $c->get(KalenderService::class),
+                $c->get(\OCP\Share\IManager::class),
                 $c->get(\Psr\Log\LoggerInterface::class),
             );
         });

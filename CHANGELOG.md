@@ -1,217 +1,120 @@
 # Changelog
 
-2026-06-15  Marc Wäckerlin
-
-	Fraktions-Infrastruktur: Ordnerstruktur (Fraktion + 4 Unterordner) wird
-	beim Speichern der Konfiguration automatisch angelegt. Ordner werden mit
-	der konfigurierten Nextcloud-Gruppe geteilt. Manueller Trigger-Button in
-	der Admin-Einstellungsseite hinzugefügt.
-
-	Fraktionskalender wird mit der konfigurierten Nextcloud-Gruppe geteilt
-	(direkter Datenbankzugriff, da CalDAV-API in Nextcloud 33 inkompatibel).
-
-	Eigenes Geschäft erstellen: Fehler «Field 'id' doesn't have a default
-	value» behoben. Das Feld «quelleAktualisiertAm» wird jetzt korrekt
-	initialisiert.
-
-	Status-Kürzel in Admin-Einstellungen speichern sich jetzt automatisch
-	nach 5 Sekunden Inaktivität (Debounce) oder beim Verlassen des Eingabefelds.
-
-	WebSocket-Verbindungsstatus-Indikator: Grüner Punkt (verbunden), roter
-	Punkt (getrennt), oranger Punkt (verbindungsaufbau) unten rechts im
-	Fenster.
-
-	Version wird jetzt dynamisch aus info.xml geladen (nicht mehr hardcodiert
-	in version.php).
-
-2026-05-27  Marc Wäckerlin
-
-	Status-Kürzel: Im Adminbereich können jetzt Textersetzungen für lange
-	Statusbeschriftungen konfiguriert werden (z.B. «Kommission Bildung, Sport
-	und Kultur» → «BSKK»). Die Kürzel werden in der Geschäftsliste angezeigt,
-	der vollständige Text bleibt als Tooltip erhalten.
-
-	Default-Filter «Behandlungsreif» entfernt. Beim Start werden alle Geschäfte
-	angezeigt, ohne Vorauswahl nach Status.
-
-	Dokumente hochladen: Neben dem Erstellen neuer Dokumente können jetzt auch
-	bestehende Dateien direkt in den Geschäftsordner hochgeladen werden.
-
-	Eigene Geschäfte erstellen: Über «+ Eigenes Geschäft» können Geschäfte
-	erfasst werden, die nicht im Parlamentsregister sind (z.B. Kommissions-
-	interne Themen).
-
-	Gemeinsame Fraktions-Infrastruktur (Ordnerstruktur und Kalender) wird beim
-	Containerstart und bei Konfigurationsänderungen automatisch geprüft und bei
-	Bedarf angelegt.
-
-2026-05-29  Marc Wäckerlin
-
-	Miteinreicher (Erstunterzeichner und Mitunterzeichner) werden neu aus dem
-	Feld «Verfasser/Beteiligte» der Parlamentswebseite eingelesen und
-	gespeichert. In der Geschäftsdetailansicht erscheinen alle Einreichenden
-	mit Rolle. In der Geschäftsliste werden die Namen als Zusatzzeile unter
-	dem Titel angezeigt.
-
-2026-05-29  Marc Wäckerlin
-
-	Bugfix: Freier Text im Fraktionsentscheid (Geschäftsdetail) wird jetzt
-	auch in der Geschäftsübersicht korrekt angezeigt. Bisher wurde nur
-	«titel» geprüft; bei Freitext steht der Text in «text».
-
-	Geschäftslisten (Geschäfte und Sitzungen): Nr., Datum (dd.mm.jj) und
-	Typ werden neu untereinander in der Nr.-Spalte angezeigt, statt in
-	separaten Spalten. Die separaten Typ- und Datum-Spalten entfallen.
-
-	Sitzungsliste: Status-Spalte in der Traktanden-Tabelle entfernt.
-
-	Aktionszeitleiste: Uhrzeit erscheint jetzt unter dem Datum, nicht mehr
-	daneben — spart Breite und verbessert die Lesbarkeit.
-
-	Versionsnummer der App wird neu in der Navigationsleiste angezeigt
-	(liest aus appinfo/info.xml via IAppManager).
-
-2026-05-27  Marc Wäckerlin
-
-	Versionsnummer wird neu auf der Admin-Seite angezeigt — rechts unten als
-	Build-Timestamp. Der Timestamp wird vor jedem Commit automatisch aktualisiert.
-
-	Synchronisation läuft neu zweimal täglich um 03:00 und 15:00 Uhr statt
-	einmal pro Tag zu einem beliebigen Zeitpunkt.
-
-	Beschluss-Widget ist jetzt überall identisch: in der Kartenansicht der
-	Geschäftsliste wurde der bisherige Freitext durch dasselbe Widget ersetzt wie
-	in der Tabellenansicht und der Detailansicht. Freitext-Beschlüsse werden
-	jetzt korrekt gespeichert — der alte Code hat sie nie gespeichert.
-
-2026-05-27  Marc Wäckerlin
-
-	Notizen speichern jetzt auch in der Sitzungsliste automatisch — bei
-	Fokusverlust oder nach 5 Sekunden Pause. Der «+»-Knopf ist verschwunden.
-	Das Verhalten ist nun identisch mit dem Notizfeld im Geschäftsdetail.
-
-	Gemeinsame Hilfsfunktionen (vollerName, personKey, parseNotizen) wurden in
-	eine zentrale utils.js ausgelagert — Copy-Paste zwischen Sitzungsliste,
-	Geschäftsliste und Geschäftsdetail ist beseitigt.
-
-2026-05-27  Marc Wäckerlin
-
-	Ungültige HTML-Struktur in der Geschäfts-Detailansicht behoben: Tabellenzeilen
-	waren nicht korrekt in ein tbody-Element eingeschlossen, was zu Hydration-
-	Warnungen im Browser führte.
-
-	Fehler behoben, bei dem das Laden der Kommissionsliste abstürzte, wenn der
-	Server eine leere Antwort zurückgab. Vorher entstand eine TypeError-Meldung
-	in der Konsole, obwohl der Test trotzdem als erfolgreich galt.
-
-	Teststabilität verbessert: Konsolenausgaben von console.error() führen jetzt
-	sofort zu einem Testfehler statt stillschweigend ignoriert zu werden.
-
-	PHPUnit-Notices in den Live-Scraper-Tests behoben (createStub statt
-	createMock für Logger und HTTP-Client).
-
-2026-05-27  Marc Wäckerlin
-
-	WebSocket-Verbindung zum Echtzeit-Server funktioniert wieder. Der Nginx-Pfad
-	war falsch konfiguriert (/parlwin/ws statt /ws/parlwin/) und der Container-
-	Servicename stimmte nicht mit der nginx-Konvention überein.
-
-	Beim Container-Start blieb Nextcloud im Wartungsmodus hängen, falls ein
-	vorheriger Start abgebrochen wurde. Das wird jetzt automatisch behoben.
-
-	Der freie Beschlusstext wird erst beim Verlassen des Feldes gespeichert,
-	nicht sofort bei der Eingabe. Wenn der Text geleert wird, erscheint wieder
-	die Auswahlliste.
-
-2026-05-26  Marc Wäckerlin
-
-	Synchronisations-Zuverlässigkeit verbessert: Wenn während der Synchronisation
-	ein Fehler auftritt, werden keine bestehenden Einträge als gelöscht markiert —
-	alle Daten bleiben vollständig erhalten.
-
-	Traktanden werden beim Sync nicht mehr vollständig gelöscht und neu angelegt,
-	sondern einzeln abgeglichen. Bestehende Notizen bleiben erhalten, auch wenn
-	ein Traktandum zwischenzeitlich vom Parlament entfernt und wieder hinzugefügt
-	wurde.
-
-	Objekte (Sitzungen, Geschäfte, Mitglieder), die bei einem früheren Sync
-	fälschlicherweise als gelöscht markiert wurden, werden bei der nächsten
-	Synchronisation automatisch wiederhergestellt — inklusive aller bisherigen
-	Notizen und fraktionsinternen Daten.
-
-	Migrationen werden jetzt beim Container-Start zuverlässig ausgeführt. Schlägt
-	eine Migration fehl, bricht der Container ab und zeigt eine Fehlermeldung im
-	Docker-Log.
-
-	Notizen und Beschlüsse können wieder mit der Maus verschoben werden — nur
-	noch über das ⠿-Symbol, nicht mehr über die ganze Zeile. Text in der Zeile
-	kann wieder normal markiert werden.
-
-	Beschluss-Widget ist jetzt überall gleich: in der Übersicht und in der
-	Detailansicht dasselbe Eingabefeld. Der Knopf «Aus Liste wählen» ist
-	verschwunden — nur wenn der Freitext manuell geleert wird, erscheint die
-	Listenauswahl wieder. Freier Text wird automatisch gespeichert.
-
-	Alle Beschriftungen im Formular sind jetzt einheitlich: gleiche Schrift,
-	gleiche Farbe — egal ob Label über Eingabefeld oder Abschnittstitel.
-
-	Sitzungstypen: Teilnehmerliste direkt wählen statt Regelwerk definieren.
-	Eigene Fraktion per Checkbox, einzelne Mitglieder per Mehrfachauswahl.
-
-	Zweite (und weitere) interne Sitzungen konnten nicht gespeichert werden.
-	Fehler behoben.
-
-2026-05-24  Marc Wäckerlin
-
-	Interne Fraktionssitzungen erscheinen jetzt neben den Parlamentssitzungen in
-	der Sitzungsliste — mit Titel, Zweck, aufklappbaren Traktanden und Notizen für
-	das Protokoll.
-
-	Neues Erstellungsformular im Stil des Nextcloud-Kalenders: Sitzungstyp wählen,
-	alle Felder werden aus der Vorlage vorausgefüllt (Titel, Ort, Von/Bis, Zweck,
-	Traktanden) und können vor dem Speichern angepasst werden. Optional wird
-	gleichzeitig ein Kalender-Eintrag erstellt.
-
-	Interne Sitzungen sind in der Liste mit «intern» gekennzeichnet. Der Zwecktext
-	ist direkt sichtbar ohne Aufklappen.
-
-	Der Parlamentssync löscht interne Sitzungen nicht mehr.
-
-	In «Fraktionsmitglieder ↔ Nextcloud-User» erscheinen jetzt auch Personen, die
-	in der NC-Gruppe sind, aber keinen aktiven Parlamentseintrag haben — mit
-	durchgestrichenem Namen. Nur wenn diese Person explizit ausgewählt wird, wird
-	sie beim «Ausgewählte abgleichen» deaktiviert.
-
-	Traktandum-Bemerkungen werden wieder korrekt gespeichert.
-
-2026-05-24  Marc Wäckerlin
-
-	Notizen und Beschlüsse speichern automatisch — kein «Speichern»-Knopf mehr.
-	Notizen speichern bei Fokusverlust oder nach 5 Sekunden ohne Eingabe.
-	Beschlüsse speichern sofort nach Auswahl aus der Liste.
-
-	Beim Speichern flimmert nichts mehr und offene Popups bleiben offen —
-	auch wenn mehrere Personen gleichzeitig arbeiten.
-
-	In der Zeitleiste wird bei Zuständigkeitsänderungen «Von: X → Nach: Y»
-	angezeigt.
-
-	Die Traktanden-Tabelle wechselt auf schmalen Bildschirmen in ein Karten-Layout.
-
-	Dokument-Links (PDF) werden direkt beim Traktandum angezeigt (↗).
-
-2026-05-22  Marc Wäckerlin
-
-	Fehler beim Erstellen einer Sitzung aus einer Vorlage behoben.
-	Standard-Teilnehmerkreis ist nun die eigene Fraktion.
-
-2026-05-21  Marc Wäckerlin
-
-	Sitzungstyp-Formular vollständig funktionsfähig — Vorlagen können angelegt,
-	bearbeitet und für neue Sitzungen verwendet werden.
-
-	Notizen können pro Sitzung erfasst werden (Protokollführung).
-
-	Kommissionen können per Suchfeld gefunden werden.
-
-	Dokumente können direkt aus dem Tool erstellt werden.
+- 2026-06-18 **1.5.3**
+    - Hatte ein Mitglied selbst schon einen «Fraktion»-Ordner mit der Gruppe geteilt, wird dieser jetzt sauber in den offiziellen Ordner überführt: der bisherige Ordner bleibt beim Eigentümer als «Fraktion.bak» erhalten, sein Inhalt (auch eigene Unterordner und Dateien) wird in den offiziellen Ordner übernommen, und alle anderen Mitglieder sehen nur noch den offiziellen Ordner
+    - Beim Zusammenführen gehen keine Dateien verloren: bei gleichem Namen wird die übernommene Datei als «name.migrated» abgelegt
+    - Der offizielle Fraktionsordner erscheint bei allen Mitgliedern zuverlässig unter «Fraktion» (nicht mehr versehentlich als «Fraktion (2)»)
+
+- 2026-06-18 **1.5.2**
+    - Der geteilte Fraktionsordner erscheint jetzt zuverlässig bei allen Mitgliedern – auch wenn die Freigabe zuvor nicht automatisch angenommen wurde oder ein Mitglied erst später dazukam (die Freigabe wird beim Öffnen und bei jeder Gruppenänderung für alle Mitglieder bestätigt)
+
+- 2026-06-17 **1.5.1**
+    - Status-Kürzel-Verwaltung: Suchtext-Feld nutzt jetzt die volle verfügbare Breite, das Kürzel-Feld behält eine passende Breite und der Löschen-Knopf beansprucht nur den nötigen Platz
+
+- 2026-06-17 **1.5.0**
+    - Geschäfteliste zeigt wieder zuverlässig alle Geschäfte: eine einzelne unvollständige Datenzeile (fehlendes Quell-Datum) blendete bisher die gesamte Liste aus («Keine Geschäfte gefunden»)
+    - Synchronisation bricht nicht mehr ab, wenn Miteinreicher importiert werden
+    - Namen von Einreichenden werden korrekt dargestellt (keine «&#39;»-Zeichen mehr bei Apostrophen)
+    - Geschäfte lassen sich serverseitig nach Status filtern
+    - Geteilter Fraktionsordner erscheint jetzt zuverlässig bei allen Mitgliedern und bleibt erhalten (wurde vorher teils wieder entfernt)
+    - Geteilter Fraktionskalender erscheint und ist bearbeitbar bei allen Mitgliedern
+    - Fraktionsordner und Kalender werden automatisch beim Öffnen und bei Wechsel der Fraktionsgruppe geprüft und ergänzt – der manuelle Knopf und die Einstellung «Kalender-Benutzer» entfallen (es wird immer das Admin-Konto verwendet)
+    - Eigene Geschäfte lassen sich wieder anlegen (Speicherfehler behoben)
+    - Status-Kürzel bleiben gespeichert, werden automatisch gespeichert und in der Verwaltung korrekt angezeigt (vorher «[object Object]» bzw. in Firefox eine leere Liste durch zwei sich überschreibende Implementierungen)
+    - Beschluss- und Notizänderungen erscheinen bei allen Mitgliedern sofort ohne Neuladen
+    - Zusammenarbeit mehrerer Mitglieder durchgehend per Mehrnutzer-Test abgesichert (Ordner, Kalender, Dokumente, Echtzeit)
+
+- 2026-06-15 **1.4.1**
+    - Fraktionsordner und Kalender funktionieren jetzt korrekt mit Gruppenmitgliedern
+        - Admin-Account erstellt Infrastruktur, Gruppe teilt korrekt
+        - Alle Member sehen Ordner und Kalender
+        - Dateien und Termine für alle Mitglieder lesbar und bearbeitbar
+
+- 2026-06-14 **1.3.4**
+    - Status-Kürzel in Admin-Einstellungen
+        - Textersetzungen für lange Statusbeschriftungen (z.B. «BSKK»)
+        - Auto-Save nach 5s oder beim Feldverlust
+    - Dokumente hochladen: bestehende Dateien direkt hochladen
+    - Eigene Geschäfte erstellen: Geschäfte ausserhalb Parlamentsregister
+    - Fraktions-Infrastruktur automatisch beim Start prüfen
+
+- 2026-05-29 **1.3.3**
+    - Miteinreicher aus Parlamentswebseite einlesen
+        - Alle Einreichenden mit Rolle in Detailansicht
+        - Namen als Zusatzzeile in Geschäftsliste
+    - Bugfix: Freier Text im Fraktionsentscheid korrekt anzeigen
+    - Geschäftslisten: Nr., Datum, Typ untereinander in Nr.-Spalte
+    - Sitzungsliste: Status-Spalte entfernt
+    - Aktionszeitleiste: Uhrzeit unter Datum
+
+- 2026-05-27 **1.3.2**
+    - Versionsnummer in Navigationsleiste (aus info.xml)
+    - Synchronisation: 2x täglich (03:00 + 15:00 Uhr)
+    - Beschluss-Widget überall identisch
+        - Kartensicht, Tabellenansicht, Detailansicht gleich
+        - Freitext-Beschlüsse korrekt gespeichert
+
+- 2026-05-27 **1.3.1**
+    - Notizen Auto-Save in Sitzungsliste
+        - Bei Fokusverlust oder nach 5s Pause
+        - «+»-Knopf entfernt
+    - Gemeinsame Hilfsfunktionen (vollerName, personKey, parseNotizen)
+        - Zentrale utils.js
+        - Copy-Paste beseitigt
+
+- 2026-05-27 **1.3.0**
+    - Ungültige HTML-Struktur in Geschäfts-Detail behoben
+    - Fehler beim Laden der Kommissionsliste behoben
+    - Teststabilität verbessert (console.error → Testfehler)
+    - PHPUnit-Notices in Live-Scraper-Tests behoben
+
+- 2026-05-27 **1.2.9**
+    - WebSocket-Verbindung funktioniert wieder
+        - Nginx-Pfad korrekt konfiguriert
+        - Container-Servicename angepasst
+    - Nextcloud bleibt nicht im Wartungsmodus hängen
+    - Beschlusstext speichert beim Feldverlust, nicht sofort
+
+- 2026-05-26 **1.2.8**
+    - Synchronisations-Zuverlässigkeit verbessert
+        - Fehler während Sync führen keine falschen Löschungen
+    - Traktanden einzeln abgeglichen statt neu angelegt
+        - Bestehende Notizen bleiben
+    - Gelöschte Objekte automatisch bei nächster Sync wiederhergestellt
+    - Migrationen beim Start zuverlässig ausgeführt
+    - Notizen/Beschlüsse mit Maus verschiebbar (nur über ⠿-Symbol)
+    - Beschluss-Widget überall gleich, Freitext speichert automatisch
+    - Formular-Beschriftungen einheitlich
+
+- 2026-05-24 **1.2.7**
+    - Interne Fraktionssitzungen in Liste
+        - Mit Titel, Zweck, Traktanden, Notizen
+    - Erstellungsformular im NC-Kalender-Stil
+    - Interne Sitzungen gekennzeichnet
+    - Parlamentssync löscht interne Sitzungen nicht
+    - «Fraktionsmitglieder ↔ NC-User»: auch inaktive Personen anzeigen
+
+- 2026-05-22 **1.2.6**
+    - Fehler beim Erstellen Sitzung aus Vorlage behoben
+
+- 2026-05-21 **1.2.5**
+    - Sitzungstyp-Formular vollständig funktionsfähig
+    - Notizen pro Sitzung (Protokollführung)
+    - Kommissionen per Suchfeld findbar
+    - Dokumente direkt aus Tool erstellen
+
+- 2026-05-24 **1.2.4**
+    - Notizen und Beschlüsse speichern automatisch
+        - Kein «Speichern»-Knopf mehr
+        - Bei Fokusverlust oder nach 5s Pause
+    - Beim Speichern flimmert nichts
+    - Offene Popups bleiben offen bei gleichzeitiger Arbeit
+    - Zeitleiste zeigt «Von: X → Nach: Y»
+    - Traktanden-Tabelle: Karten-Layout auf schmalen Bildschirmen
+    - Dokument-Links (PDF) direkt beim Traktandum
+
+---
+
+### Ältere Versionen
+
+Siehe Git-History für Details zu Versionen vor 1.2.4.

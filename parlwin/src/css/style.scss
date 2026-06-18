@@ -394,6 +394,32 @@ ul.app-navigation__list {
   box-shadow: none;
 }
 
+// Status-Kürzel-Tabelle: Suchtext füllt den verbleibenden Platz (1fr),
+// das Kürzel-Feld behält eine feste Breite, der Löschen-Knopf nur das Nötige.
+#pw-kuerzel-liste {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pw-gap-1);
+}
+
+.pw-kuerzel-row {
+  display: grid;
+  grid-template-columns: 1fr 12rem auto;
+  gap: var(--pw-gap-1);
+  align-items: center;
+
+  input {
+    width: 100%;
+    box-sizing: border-box;
+    margin: 0;
+  }
+
+  .pw-kuerzel-delete {
+    width: auto;
+    flex: 0 0 auto;
+  }
+}
+
 .pw-app-branding h1,
 .pw-app-main-header h2,
 .pw-toolbar h2,

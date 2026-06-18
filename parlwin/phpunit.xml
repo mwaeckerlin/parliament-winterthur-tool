@@ -13,7 +13,13 @@
 >
     <testsuites>
         <testsuite name="unit">
-            <directory>tests</directory>
+            <directory>tests/Service</directory>
+            <directory>tests/Db</directory>
+            <directory>tests/Controller</directory>
+            <exclude>tests/LiveTests</exclude>
+        </testsuite>
+        <testsuite name="live">
+            <directory>tests/LiveTests</directory>
         </testsuite>
     </testsuites>
     <php>

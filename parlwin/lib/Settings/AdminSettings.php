@@ -35,31 +35,24 @@ class AdminSettings implements ISettings
 
         $fraktion = $this->config->getAppValue(Application::APP_ID, 'fraktion', '');
         $nextcloudGruppe = $this->config->getAppValue(Application::APP_ID, 'nextcloud_gruppe', '');
-        $kalenderNutzer = $this->config->getAppValue(Application::APP_ID, 'kalender_nutzer', '');
         $absenderEmail = $this->config->getAppValue(Application::APP_ID, 'absender_email', '');
         $absenderName = $this->config->getAppValue(Application::APP_ID, 'absender_name', 'Parlament Winterthur Tool');
         $letzteSync = $this->config->getAppValue(Application::APP_ID, 'letzte_synchronisation', '');
-        $statusKuerzel = $this->config->getAppValue(Application::APP_ID, 'status_kuerzel', '{}');
         $fraktionsOptionen = $this->fraktionsOptionen();
         $gruppenOptionen = $this->gruppenOptionen();
-        $kalenderNutzerOptionen = $this->kalenderNutzerOptionen();
 
         $realtimeWsUrl = $this->realtimeWsUrl();
         $buildTime = @include __DIR__ . '/../../appinfo/version.php';
         $response = new TemplateResponse(Application::APP_ID, 'admin', [
             'fraktion' => $fraktion,
             'nextcloud_gruppe' => $nextcloudGruppe,
-            'kalender_nutzer' => $kalenderNutzer,
             'absender_email' => $absenderEmail,
             'absender_name' => $absenderName,
             'letzte_synchronisation' => $letzteSync,
             'fraktion_optionen' => $fraktionsOptionen,
             'nextcloud_gruppen_optionen' => $gruppenOptionen,
-            'kalender_nutzer_optionen_aktiv' => $kalenderNutzerOptionen['aktiv'],
-            'kalender_nutzer_optionen_inaktiv' => $kalenderNutzerOptionen['inaktiv'],
             'realtime_ws_url' => $realtimeWsUrl,
             'build_time' => is_string($buildTime) ? $buildTime : '',
-            'status_kuerzel' => $statusKuerzel,
         ], '');
 
         return $response;
@@ -154,59 +147,5 @@ class AdminSettings implements ISettings
         $gruppen = array_values(array_unique($gruppen));
         natcasesort($gruppen);
         return array_values($gruppen);
-    }
-
-    /**
-     * @return array{aktiv: array<int, array{uid: string, label: string}>, inaktiv: array<int, array{uid: string, label: string}>}
-     */
-    private function kalenderNutzerOptionen(): array
-    {
-        $aktiv = [];
-        $inaktiv = [];
-        foreach ($this->userManager->search('', 500, 0) as $user) {
-            $eintrag = $this->kalenderNutzerEintrag($user);
-            if ($eintrag === null) {
-                continue;
-            }
-            if ($eintrag['aktiv']) {
-                $aktiv[] = $eintrag['daten'];
-            } else {
-                $inaktiv[] = $eintrag['daten'];
-            }
-        }
-
-        $sort = static function (array &$items): void {
-            usort($items, static function (array $a, array $b): int {
-                return strcasecmp($a['label'], $b['label']);
-            });
-        };
-        $sort($aktiv);
-        $sort($inaktiv);
-
-        return [
-            'aktiv' => $aktiv,
-            'inaktiv' => $inaktiv,
-        ];
-    }
-
-    /**
-     * @return array{aktiv: bool, daten: array{uid: string, label: string}}|null
-     */
-    private function kalenderNutzerEintrag(IUser $user): ?array
-    {
-        $uid = trim($user->getUID());
-        if ($uid === '') {
-            return null;
-        }
-
-        $anzeigename = trim($user->getDisplayName() ?? '');
-        $label = $anzeigename !== '' ? sprintf('%s (%s)', $anzeigename, $uid) : $uid;
-        return [
-            'aktiv' => $user->isEnabled(),
-            'daten' => [
-                'uid' => $uid,
-                'label' => $label,
-            ],
-        ];
     }
 }
