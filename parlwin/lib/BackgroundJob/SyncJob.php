@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace OCA\ParliamentWinterthur\BackgroundJob;
 
+use OCA\ParliamentWinterthur\AppInfo\Application;
 use OCA\ParliamentWinterthur\Command\SyncCommand;
 use OCA\ParliamentWinterthur\Service\FraktionsraumService;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\BackgroundJob\TimedJob;
+use OCP\IConfig;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\NullOutput;
@@ -16,7 +18,7 @@ use Symfony\Component\Console\Output\NullOutput;
  * Zweimal täglich (03:00 und 15:00 Uhr) Synchronisation der Parlamentsdaten.
  */
 class SyncJob extends TimedJob {
-    private const SYNC_HOURS = [3, 15];
+    private const SYNC_HOURS_DEFAULT = '3,15';
     private const TIMEZONE   = 'Europe/Zurich';
 
     public function __construct(
@@ -24,6 +26,7 @@ class SyncJob extends TimedJob {
         private readonly SyncCommand $syncCommand,
         private readonly LoggerInterface $logger,
         private readonly FraktionsraumService $fraktionsraumService,
+        private readonly IConfig $config,
     ) {
         parent::__construct($time);
         // Mindestabstand 11 Stunden — verhindert Doppelläufe im selben Zeitfenster
@@ -38,8 +41,30 @@ class SyncJob extends TimedJob {
         return (int) (new \DateTime('now', new \DateTimeZone(self::TIMEZONE)))->format('G');
     }
 
+    /**
+     * Stunden (0–23, Europe/Zurich), zu denen synchronisiert wird. Konfigurierbar
+     * über die App-Einstellung `sync_stunden` (kommagetrennt), Default 3 und 15 Uhr.
+     *
+     * @return int[]
+     */
+    protected function syncStunden(): array {
+        $roh = (string) $this->config->getAppValue(Application::APP_ID, 'sync_stunden', self::SYNC_HOURS_DEFAULT);
+        $stunden = [];
+        foreach (explode(',', $roh) as $teil) {
+            $teil = trim($teil);
+            if ($teil === '' || !is_numeric($teil)) {
+                continue;
+            }
+            $h = (int) $teil;
+            if ($h >= 0 && $h <= 23) {
+                $stunden[] = $h;
+            }
+        }
+        return $stunden !== [] ? $stunden : [3, 15];
+    }
+
     protected function run(mixed $argument): void {
-        if (!in_array($this->aktuelleStunde(), self::SYNC_HOURS, true)) {
+        if (!in_array($this->aktuelleStunde(), $this->syncStunden(), true)) {
             return;
         }
 

@@ -90,12 +90,8 @@
   --pw-col-beschluss: 4em;
   --pw-col-titel: 15em;
 
-  /* Sidebar-Breite (NcAppNavigation) – bewusst schmaler als der
-     Nextcloud-Default von 300px, damit Filter-Selects schmal bleiben. */
-  --pw-sidebar-width: 300px;
-  /* 224px */
-  /* Nextcloud-Server-Variable ueberschreiben (nur fuer parlwin geladen). */
-  --app-navigation-width: var(--pw-sidebar-width);
+  /* Seitenleiste: Nextcloud-Standardbreite und -Layout 1:1 übernehmen (wie die
+     Files-App). Keine Überschreibung von --app-navigation-width o.ä. */
 
   /* Breakpoints fuer Container-/Media-Queries (em / rem) */
   --pw-bp-card-em: 60em;
@@ -117,15 +113,6 @@
   --pw-focus-ring: 0 0 0 var(--pw-space-2xs) color-mix(in srgb, var(--color-primary-element) 24%, transparent);
 }
 
-/* NcAppNavigation-List als Flex, damit margin-top:auto im letzten Item greift */
-.app-navigation__list,
-.app-navigation-list,
-ul.app-navigation__list {
-  display: flex !important;
-  flex-direction: column;
-  min-block-size: 0;
-}
-
 /* ---- App-Shell wie Files/Photos/Activity (via @nextcloud/vue) ---- */
 
 #parlwin-root {
@@ -144,16 +131,6 @@ ul.app-navigation__list {
 
 .section#parlwin-admin-settings {
   max-inline-size: none;
-}
-
-.pw-nav-emoji {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  inline-size: var(--pw-font-xl);
-  block-size: var(--pw-font-xl);
-  font-size: var(--pw-space-lg);
-  line-height: 1;
 }
 
 .pw-nav-search-item {
@@ -215,35 +192,6 @@ ul.app-navigation__list {
 .pw-nav-filter .v-select,
 .pw-nav-filter .vs__dropdown-toggle {
   min-block-size: var(--pw-click-sm);
-}
-
-/* NcAppNavigation-Sidebar schmaeler:
-   Quelle setzt `.app-navigation[data-v-3b634fbd] { width: 300px }`
-   (Spezifitaet 0,2,0). Wir kontern mit (1,1,0) ueber `#content`. */
-#content .app-navigation {
-  inline-size: var(--pw-sidebar-width);
-  width: var(--pw-sidebar-width);
-  min-inline-size: var(--pw-sidebar-width);
-}
-
-/* Beim Schliessen verschiebt Nextcloud die Navigation per
-   `margin-inline-start: -300px` (hartkodiert in der Quelle) nach links.
-   Da unsere Sidebar nur `--pw-sidebar-width` breit ist, wuerde der
-   Differenzbetrag (300px - 14rem) den NcAppContent-Bereich nach links
-   aus dem Viewport schieben. Wir setzen den negativen Margin daher
-   exakt auf unsere Sidebar-Breite, damit der Inhalt nach dem Schliessen
-   buendig bei 0 startet und 100 % Breite einnimmt. */
-#content .app-navigation.app-navigation--closed {
-  margin-inline-start: calc(-1 * var(--pw-sidebar-width));
-}
-
-/* Falls Splitpanes-basierter Master/Detail-Pane verwendet wird, ebenfalls
-   schmaeler stellen (Quelle: [data-v-ea1e6879] ... min-width:300px). */
-#content .splitpanes.default-theme .splitpanes__pane.splitpanes__pane-list,
-#content .splitpanes .splitpanes__pane-list {
-  min-width: var(--pw-sidebar-width);
-  inline-size: var(--pw-sidebar-width);
-  max-width: var(--pw-sidebar-width);
 }
 
 .pw-filter-panel {

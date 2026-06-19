@@ -299,3 +299,5 @@ Das heisst, das Kapitel 'Deployment auf einer Ubuntu-VM' kommt in Punkt 5."
 
 > "HAST DU ETWAS GEMACHT!!!??? NEIN FUCK STOPP!!! ICH HABE LOKAL DEPLOYED DU ARSCHLOCH!!! NICHTS IST GEMACHT!!! npm start → NICHTS ERLEDIGT!!!"
 
+
+> "Meine Vorgabe war, alles CSS soweit möglich 1:1 von Nextcloud und den existierenden (i.e. standard) Plugins zu verwenden! Ziel: Unser Plugin soll GENAU GLEICH aussehen und auf dem GENAU GLEICHEN CSS basieren, wie alles andere auch, INSBESONDERE wie die App files! → DAS IST VERDAMMT WICHTIG!!! SPEICHERE DAS!!! Und das hast du im Seitenbereich NICHT KORREKT GEMACHT!!! Genau darum sieht es nun nicht mehr gleich aus nach dem Update, sondern einfach nur SCHEISSE!!! Vergleiche Seitenleiste Dateien und Seitenleiste Parlwin!" (→ feedback_css_nextcloud_standard: kein eigenes --pw-* Design-System / .pw-nav-* Umstilisierung der Seitenleiste; NcAppNavigation 1:1 wie files, NC-CSS-Variablen)

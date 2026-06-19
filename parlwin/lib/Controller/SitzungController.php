@@ -74,8 +74,12 @@ class SitzungController extends Controller
      * Gibt alle Sitzungen zurück.
      */
     #[NoAdminRequired]
-    public function index(int $limit = 50, int $offset = 0): DataResponse
+    public function index(): DataResponse
     {
+        // limit/offset über getParam: Nextcloud 34 begrenzt einen Controller-
+        // Parameter namens "limit" hart auf 1–500 (ParameterOutOfRangeException).
+        $limit = max(1, (int) $this->request->getParam('limit', 50));
+        $offset = max(0, (int) $this->request->getParam('offset', 0));
         $sitzungen = $this->service->alle($limit, $offset);
         return new DataResponse(array_map(
             fn($s) => $s->jsonSerialize(),

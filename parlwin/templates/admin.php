@@ -175,7 +175,13 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
 </p>
 <?php endif; ?>
 
-<script nonce="<?php p(\OC::$server->getContentSecurityPolicyNonceManager()->getNonce()); ?>">
+<?php
+// CSP-Nonce für das Inline-Script. Nextcloud 34 hat den Getter
+// \OC::$server->getContentSecurityPolicyNonceManager() entfernt; die Klasse
+// selbst ist über den DI-Container erreichbar (funktioniert in NC 33 und 34).
+$parlwinAdminNonce = \OCP\Server::get(\OC\Security\CSP\ContentSecurityPolicyNonceManager::class)->getNonce();
+?>
+<script nonce="<?php p($parlwinAdminNonce); ?>">
     window.PARLWIN_ADMIN_CONFIG = <?php print_unescaped(json_encode([
         'realtimeWsUrl' => (string) ($_['realtime_ws_url'] ?? ''),
         'webroot' => rtrim((string) \OC::$WEBROOT, '/'),

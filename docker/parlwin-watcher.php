@@ -16,22 +16,30 @@ function pwLog(string $message): void
 /**
  * @return array{0:int, 1:string}
  */
-function pwOcc(array $args): array
+function pwPhp(array $args): array
 {
-  $cmd = array_merge(['/usr/bin/php', '/app/occ'], $args);
-  // stderr → stdout: avoids pipe deadlock when occ produces large output
+  $cmd = array_merge(['/usr/bin/php'], $args);
+  // stderr → stdout: avoids pipe deadlock when the command produces large output
   $proc = proc_open(
     $cmd,
     [1 => ['pipe', 'w'], 2 => ['redirect', 1]],
     $pipes
   );
   if (!is_resource($proc)) {
-    return [1, 'failed to spawn occ'];
+    return [1, 'failed to spawn php'];
   }
   $out = stream_get_contents($pipes[1]);
   fclose($pipes[1]);
   $code = proc_close($proc);
   return [is_int($code) ? $code : 1, trim((string) $out)];
+}
+
+/**
+ * @return array{0:int, 1:string}
+ */
+function pwOcc(array $args): array
+{
+  return pwPhp(array_merge(['/app/occ'], $args));
 }
 
 /**
@@ -102,7 +110,23 @@ for ($i = 0; $i < $maxAttempts; $i++) {
     pwLog('occ upgrade completed successfully');
     pwLog("upgrade output:\n{$output}");
 
-    exit(0);
+    // Cron: Ohne externen Tick führt Nextcloud keine Background-Jobs aus — die
+    // automatische Synchronisation (SyncJob) liefe nie. Die Basis bringt keinen
+    // Cron-Daemon mit, deshalb übernimmt dieser Watcher-Prozess den Tick selbst.
+    pwOcc(['config:app:set', 'core', 'backgroundjobs_mode', '--value=cron', '--no-ansi']);
+
+    $cronInterval = (int) (getenv('PARLWIN_CRON_INTERVAL') ?: '300');
+    if ($cronInterval < 5) {
+      $cronInterval = 5;
+    }
+    pwLog("Entering cron loop (php /app/cron.php every {$cronInterval}s)...");
+    while (true) {
+      sleep($cronInterval);
+      [$code, $cronOut] = pwPhp(['/app/cron.php']);
+      if ($code !== 0) {
+        pwLog("cron tick failed (exit={$code}): {$cronOut}");
+      }
+    }
   }
   sleep($sleepSeconds);
 }

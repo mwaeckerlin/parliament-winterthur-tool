@@ -19,7 +19,7 @@ Funktionen:
 - Automatische Kalendereinträge für Sitzungen
 - Synchronisation der Fraktionsmitglieder als Nextcloud-Gruppe
     ]]></description>
-    <version>1.5.3</version>
+    <version>1.6.1</version>
     <licence>mit</licence>
     <author mail="marc@waeckerlin.org" homepage="https://github.com/mwaeckerlin">Marc Wäckerlin</author>
     <namespace>ParliamentWinterthur</namespace>
@@ -28,7 +28,7 @@ Funktionen:
     <screenshot>https://raw.githubusercontent.com/mwaeckerlin/parliament-winterthur-tool/main/screenshots/main.png</screenshot>
     <dependencies>
         <php min-version="8.0"/>
-        <nextcloud min-version="25" max-version="33"/>
+        <nextcloud min-version="25" max-version="1000"/>
     </dependencies>
     <background-jobs>
         <job>OCA\ParliamentWinterthur\BackgroundJob\SyncJob</job>
