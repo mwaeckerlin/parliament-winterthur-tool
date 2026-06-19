@@ -109,4 +109,34 @@ class SitzungControllerTest extends TestCase
 
         $this->assertSame(Http::STATUS_NOT_FOUND, $response->getStatus());
     }
+
+    /**
+     * Regression (Nextcloud 34): index() darf "limit" nicht als typisierten
+     * Controller-Parameter entgegennehmen — Nextcloud 34 begrenzt einen
+     * Parameter namens "limit" hart auf 1–500 (ParameterOutOfRangeException)
+     * und liess die Sitzungsliste sonst mit «Interner Serverfehler» abbrechen.
+     * limit/offset müssen über getParam gelesen werden.
+     */
+    public function testIndexLiestLimitUndOffsetUeberGetParam(): void
+    {
+        $request = $this->makeRequest(['limit' => '200', 'offset' => '10']);
+
+        $service = $this->createMock(SitzungService::class);
+        $service->expects($this->once())
+            ->method('alle')
+            ->with(200, 10)
+            ->willReturn([$this->makeSitzung()]);
+
+        $controller = new SitzungController(
+            $request,
+            $service,
+            $this->createStub(SitzungstypService::class),
+            $this->createStub(RealtimePublisherService::class),
+            $this->createStub(IUserSession::class),
+        );
+
+        $response = $controller->index();
+
+        $this->assertCount(1, $response->getData());
+    }
 }

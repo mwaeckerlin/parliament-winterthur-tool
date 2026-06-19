@@ -137,6 +137,7 @@ if (!interface_exists('OCP\IDBConnection')) {
     // phpcs:ignore
     eval ('namespace OCP; interface IDBConnection {
         public function getQueryBuilder();
+        public function executeStatement($sql, array $params = [], array $types = []): int;
     }');
 }
 
@@ -145,6 +146,29 @@ if (!interface_exists('OCP\IConfig')) {
     eval ('namespace OCP; interface IConfig {
         public function getAppValue(string $app, string $key, string $default = ""): string;
         public function setAppValue(string $app, string $key, string $value): void;
+        public function getSystemValue(string $key, $default = "");
+    }');
+}
+
+if (!interface_exists('OCP\Migration\IOutput')) {
+    // phpcs:ignore
+    eval ('namespace OCP\Migration; interface IOutput {
+        public function info(string $message): void;
+        public function warning(string $message): void;
+        public function startProgress(int $max = 0): void;
+        public function advance(int $step = 1, ?string $description = null): void;
+        public function finishProgress(): void;
+    }');
+}
+
+if (!class_exists('OCP\Migration\SimpleMigrationStep')) {
+    // phpcs:ignore
+    eval ('namespace OCP\Migration; abstract class SimpleMigrationStep {
+        public function name(): string { return ""; }
+        public function description(): string { return ""; }
+        public function preSchemaChange(IOutput $output, \Closure $schemaClosure, array $options): void {}
+        public function changeSchema(IOutput $output, \Closure $schemaClosure, array $options) { return null; }
+        public function postSchemaChange(IOutput $output, \Closure $schemaClosure, array $options): void {}
     }');
 }
 

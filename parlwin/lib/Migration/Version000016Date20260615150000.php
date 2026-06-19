@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OCA\ParliamentWinterthur\Migration;
 
 use Doctrine\DBAL\Schema\Schema;
+use OCP\IConfig;
 use OCP\IDBConnection;
 use OCP\Migration\IOutput;
 use OCP\Migration\SimpleMigrationStep;
@@ -16,10 +17,16 @@ use OCP\Migration\SimpleMigrationStep;
  * ALTER TABLE (falsches Diff bei PRIMARY KEY ohne AUTO_INCREMENT). Diese
  * Migration nutzt postSchemaChange() mit direktem SQL, was zuverlässig
  * funktioniert.
+ *
+ * Das Tabellen-Prefix kommt aus der System-Konfiguration (dbtableprefix). Das
+ * früher genutzte IDBConnection::getTablePrefix() wurde in Nextcloud 34
+ * entfernt und liess «occ app:enable parlwin» mit «Call to undefined method»
+ * abstürzen.
  */
 class Version000016Date20260615150000 extends SimpleMigrationStep {
     public function __construct(
         private readonly IDBConnection $connection,
+        private readonly IConfig $config,
     ) {
     }
 
@@ -30,7 +37,7 @@ class Version000016Date20260615150000 extends SimpleMigrationStep {
 
     public function postSchemaChange(IOutput $output, \Closure $schemaClosure, array $options): void
     {
-        $tbl = $this->connection->getTablePrefix() . 'pw_geschaefte';
+        $tbl = ((string) $this->config->getSystemValue('dbtableprefix', 'oc_')) . 'pw_geschaefte';
         try {
             $this->connection->executeStatement(
                 "ALTER TABLE `{$tbl}` MODIFY COLUMN `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT"
