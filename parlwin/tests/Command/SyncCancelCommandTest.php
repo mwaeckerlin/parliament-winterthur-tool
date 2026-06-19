@@ -54,6 +54,10 @@ class SyncCancelCommandTest extends TestCase {
             public function setAppValue(string $app, string $key, string $value): void {
                 $this->values[$key] = $value;
             }
+
+            public function getSystemValue(string $key, $default = '') {
+                return $this->values[$key] ?? $default;
+            }
         };
 
         $realtimePublisher = $this->createMock(RealtimePublisherService::class);
@@ -125,6 +129,10 @@ class SyncCancelCommandTest extends TestCase {
 
             public function setAppValue(string $app, string $key, string $value): void {
                 $this->values[$key] = $value;
+            }
+
+            public function getSystemValue(string $key, $default = '') {
+                return $this->values[$key] ?? $default;
             }
         };
 

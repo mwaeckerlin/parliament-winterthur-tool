@@ -1,5 +1,8 @@
 # Changelog
 
+- 2026-06-19 **1.6.2**
+    - Behebt, dass sich die App nach einem Nextcloud-Upgrade nicht mehr aktivieren liess («could not enable app»): Eine Datenbank-Anpassung beim Aktivieren verwendete eine in Nextcloud 34 entfernte interne Funktion und brach die Aktivierung ab. Sie ermittelt den Tabellennamen jetzt über die System-Konfiguration
+
 - 2026-06-19 **1.6.1**
     - Weitere Anpassungen an Nextcloud 34 (Fortsetzung von 1.6.0):
         - Geschäfts- und Sitzungslisten laden wieder vollständig (Nextcloud 34 wies grosse Listenabfragen mit «Interner Serverfehler» ab; betraf auch die Admin-Seite und die Status-Kürzel)
