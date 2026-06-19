@@ -1,5 +1,18 @@
 # Changelog
 
+- 2026-06-19 **1.6.1**
+    - Weitere Anpassungen an Nextcloud 34 (Fortsetzung von 1.6.0):
+        - Geschäfts- und Sitzungslisten laden wieder vollständig (Nextcloud 34 wies grosse Listenabfragen mit «Interner Serverfehler» ab; betraf auch die Admin-Seite und die Status-Kürzel)
+        - Auch die Admin-Seite öffnet wieder fehlerfrei (gleiche in Nextcloud 34 entfernte interne Schnittstelle wie bei der Startseite)
+        - Seitenleiste sieht wieder genau wie die übrigen Nextcloud-Apps (z.B. Dateien) aus: durchgängig Nextclouds Standard-Aufbau und -Symbole übernommen (statt eigener Darstellung mit Emoji), inklusive korrektem Hintergrund und Layout nach dem Update
+
+- 2026-06-19 **1.6.0**
+    - Kompatibilität mit Nextcloud 34 wiederhergestellt: Nextcloud wurde kurz nach dem letzten Release von Version 33 auf 34 angehoben. Dieser Versionssprung brachte mehrere Änderungen, mit denen das bisherige Tool nicht mehr zusammenpasste – es wurde unter Nextcloud 34 sogar automatisch abgeschaltet. Die folgenden Anpassungen stellen die Kompatibilität wieder her (fortgesetzt in 1.6.1):
+        - Die App bleibt nach Nextcloud-Updates aktiv: die obere Nextcloud-Versionsgrenze wurde aufgehoben, sodass ein Nextcloud-Upgrade die App nicht mehr automatisch deaktiviert
+        - Lauffähig unter Nextcloud 34: die Startseite lädt wieder (eine in Nextcloud 34 entfernte interne Schnittstelle wird nicht mehr verwendet; vorher «Interner Serverfehler»)
+    - Die Uhrzeiten der automatischen Synchronisation sind konfigurierbar (Standard 03:00 und 15:00 Uhr)
+    - Bugfix: Automatische Synchronisation lief nicht
+
 - 2026-06-18 **1.5.3**
     - Hatte ein Mitglied selbst schon einen «Fraktion»-Ordner mit der Gruppe geteilt, wird dieser jetzt sauber in den offiziellen Ordner überführt: der bisherige Ordner bleibt beim Eigentümer als «Fraktion.bak» erhalten, sein Inhalt (auch eigene Unterordner und Dateien) wird in den offiziellen Ordner übernommen, und alle anderen Mitglieder sehen nur noch den offiziellen Ordner
     - Beim Zusammenführen gehen keine Dateien verloren: bei gleichem Namen wird die übernommene Datei als «name.migrated» abgelegt

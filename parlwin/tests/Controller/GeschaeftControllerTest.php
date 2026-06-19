@@ -23,7 +23,11 @@ class GeschaeftControllerTest extends TestCase
         $request = $this->createStub(IRequest::class);
         $request->method('getParam')
             ->willReturnCallback(static function (string $key, mixed $default = null): mixed {
-                return $default;
+                return match ($key) {
+                    'limit' => '50',
+                    'offset' => '5',
+                    default => $default,
+                };
             });
 
         $service = $this->createMock(GeschaeftService::class);
@@ -49,7 +53,7 @@ class GeschaeftControllerTest extends TestCase
             $this->createStub(GeschaeftMapper::class),
         );
 
-        $response = $controller->index(50, 5);
+        $response = $controller->index();
         $this->assertSame([], $response->getData());
     }
 

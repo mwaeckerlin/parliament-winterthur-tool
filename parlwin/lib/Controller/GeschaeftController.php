@@ -44,8 +44,14 @@ class GeschaeftController extends Controller
      * Gibt alle Geschäfte zurück.
      */
     #[NoAdminRequired]
-    public function index(int $limit = 100, int $offset = 0): DataResponse
+    public function index(): DataResponse
     {
+        // limit/offset bewusst über getParam statt typisierte Methoden-Parameter:
+        // Nextcloud 34 begrenzt einen Controller-Parameter namens "limit" hart auf
+        // 1–500 (ParameterOutOfRangeException im Dispatcher). parlwin lädt aber die
+        // ganze Geschäftsliste auf einmal (z.B. limit=2000).
+        $limit = max(1, (int) $this->request->getParam('limit', 100));
+        $offset = max(0, (int) $this->request->getParam('offset', 0));
         $filterLetzterBeschluss = (string) $this->request->getParam('letzter_beschluss', '');
         $filterEntscheidungsbedarfRaw = strtolower((string) $this->request->getParam('entscheidungsbedarf', ''));
         $showErledigtRaw = strtolower((string) $this->request->getParam('show_erledigt', '0'));

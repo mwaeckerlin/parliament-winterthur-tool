@@ -3,7 +3,14 @@
 /** @var \OCP\IL10N $l */
 ?>
 <div id="parlwin-root"></div>
-<script nonce="<?php p(\OC::$server->getContentSecurityPolicyNonceManager()->getNonce()); ?>">
+<?php
+// CSP-Nonce für das Inline-Script. Nextcloud 34 hat den Getter
+// \OC::$server->getContentSecurityPolicyNonceManager() entfernt; die Klasse
+// selbst existiert weiter und ist über den DI-Container erreichbar (funktioniert
+// in NC 33 und 34).
+$parlwinNonce = \OCP\Server::get(\OC\Security\CSP\ContentSecurityPolicyNonceManager::class)->getNonce();
+?>
+<script nonce="<?php p($parlwinNonce); ?>">
     window.PARLWIN_CONFIG = <?php
         $kuerzelRaw = (string) ($_['status_kuerzel'] ?? '[]');
         $kuerzelArr = json_decode($kuerzelRaw, true);

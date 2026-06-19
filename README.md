@@ -558,18 +558,21 @@ Fortschritt bereit:
 - API-Status: `GET /apps/parlwin/sync/status`
 - API-Abbruch: `POST /apps/parlwin/sync/cancel`
 
-**Automatischer Cron-Job (via Nextcloud-Cron):**
+**Automatische Synchronisation (Hintergrund-Job):**
 
-Das Plugin registriert automatisch einen täglichen Hintergrund-Job in Nextcloud.
-Voraussetzung ist, dass der Nextcloud-Cron korrekt konfiguriert ist:
+Das Plugin registriert einen Hintergrund-Job, der die Daten automatisch
+synchronisiert – standardmässig um **03:00 und 15:00 Uhr** (Europe/Zurich).
+Die Uhrzeiten sind über die App-Einstellung `sync_stunden` (kommagetrennt, z.B.
+`3,15`) konfigurierbar.
 
-```
-*/5 * * * * php /path/to/nextcloud/cron.php
-```
+Der mitgelieferte Container bringt den nötigen Cron-Takt selbst mit: der
+parlwin-Watcher setzt `backgroundjobs_mode=cron` und tickt den Nextcloud-Cron
+periodisch (Intervall über `PARLWIN_CRON_INTERVAL`, Standard 300 s) – ein
+externer Cron-Daemon ist nicht erforderlich.
 
-Der Cron-Job nutzt denselben Sync-Command wie das Admin-UI (`--source=background-job`).
-Damit erscheint ein Cron-gestarteter Lauf ebenfalls im Admin-Progress (`/sync/status`)
-inkl. Quelle/Progress/ETA.
+Der Hintergrund-Job nutzt denselben Sync-Command wie das Admin-UI
+(`--source=background-job`). Damit erscheint ein automatisch gestarteter Lauf
+ebenfalls im Admin-Progress (`/sync/status`) inkl. Quelle/Progress/ETA.
 
 
 ## Entwicklung

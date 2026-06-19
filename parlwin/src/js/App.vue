@@ -1,70 +1,81 @@
 <template>
-  <NcAppNavigation>
-    <template #list>
-      <li class="pw-nav-search-item">
-        <div id="pw-search-slot" class="pw-nav-search"></div>
-      </li>
-      <NcAppNavigationItem
-        v-for="ansicht in ansichten"
-        :key="ansicht.key"
-        :name="ansicht.bezeichnung"
-        :active="aktiveAnsicht === ansicht.key"
-        @click="aktiveAnsicht = ansicht.key"
-      >
-        <template #icon>
-          <span class="pw-nav-emoji" aria-hidden="true">{{ ansicht.icon }}</span>
-        </template>
-      </NcAppNavigationItem>
-      <li class="pw-nav-filter-item">
-        <div id="pw-filter-slot" class="pw-nav-filter"></div>
-      </li>
-    </template>
-    <template v-if="version" #footer>
-      <div class="pw-nav-version">v{{ version }}</div>
-    </template>
-  </NcAppNavigation>
+  <NcContent app-name="parlwin">
+    <NcAppNavigation>
+      <template #list>
+        <li class="pw-nav-search-item">
+          <div id="pw-search-slot" class="pw-nav-search"></div>
+        </li>
+        <NcAppNavigationItem
+          v-for="ansicht in ansichten"
+          :key="ansicht.key"
+          :name="ansicht.bezeichnung"
+          :active="aktiveAnsicht === ansicht.key"
+          @click="aktiveAnsicht = ansicht.key"
+        >
+          <template #icon>
+            <NcIconSvgWrapper :path="ansicht.icon" :size="20" />
+          </template>
+        </NcAppNavigationItem>
+        <li class="pw-nav-filter-item">
+          <div id="pw-filter-slot" class="pw-nav-filter"></div>
+        </li>
+      </template>
+      <template v-if="version" #footer>
+        <div class="pw-nav-version">v{{ version }}</div>
+      </template>
+    </NcAppNavigation>
 
-  <NcAppContent>
-    <div v-if="syncMeldung" class="pw-sync-meldung" :class="syncFehler ? 'fehler' : 'erfolg'">
-      {{ syncMeldung }}
-    </div>
+    <NcAppContent>
+      <div v-if="syncMeldung" class="pw-sync-meldung" :class="syncFehler ? 'fehler' : 'erfolg'">
+        {{ syncMeldung }}
+      </div>
 
-    <Geschaeftsliste
-      v-if="aktiveAnsicht === 'geschaefte'"
-      :mitglieder="mitglieder"
-      @aktualisiert="ladeGeschaefte"
-    />
-    <Sitzungsliste
-      v-else-if="aktiveAnsicht === 'sitzungen'"
-      :mitglieder="mitglieder"
-      :fraktionen="fraktionen"
-      :kommissionen="kommissionen"
-    />
-    <Mitgliederliste
-      v-else-if="aktiveAnsicht === 'mitglieder'"
-      :mitglieder="mitglieder"
-      :fraktionen="fraktionen"
-      :kommissionen="kommissionen"
-    />
-    <Kommissionsliste
-      v-else-if="aktiveAnsicht === 'kommissionen'"
-      :mitglieder="mitglieder"
-    />
-    <Sitzungstypenliste
-      v-else-if="aktiveAnsicht === 'sitzungstypen'"
-      :mitglieder="mitglieder"
-      :fraktionen="fraktionen"
-      :kommissionen="kommissionen"
-    />
-  </NcAppContent>
+      <Geschaeftsliste
+        v-if="aktiveAnsicht === 'geschaefte'"
+        :mitglieder="mitglieder"
+        @aktualisiert="ladeGeschaefte"
+      />
+      <Sitzungsliste
+        v-else-if="aktiveAnsicht === 'sitzungen'"
+        :mitglieder="mitglieder"
+        :fraktionen="fraktionen"
+        :kommissionen="kommissionen"
+      />
+      <Mitgliederliste
+        v-else-if="aktiveAnsicht === 'mitglieder'"
+        :mitglieder="mitglieder"
+        :fraktionen="fraktionen"
+        :kommissionen="kommissionen"
+      />
+      <Kommissionsliste
+        v-else-if="aktiveAnsicht === 'kommissionen'"
+        :mitglieder="mitglieder"
+      />
+      <Sitzungstypenliste
+        v-else-if="aktiveAnsicht === 'sitzungstypen'"
+        :mitglieder="mitglieder"
+        :fraktionen="fraktionen"
+        :kommissionen="kommissionen"
+      />
+    </NcAppContent>
+  </NcContent>
 </template>
 
 <script>
 import { generateUrl } from '@nextcloud/router'
 import axios from '@nextcloud/axios'
+import NcContent from '@nextcloud/vue/components/NcContent'
 import NcAppNavigation from '@nextcloud/vue/components/NcAppNavigation'
 import NcAppNavigationItem from '@nextcloud/vue/components/NcAppNavigationItem'
 import NcAppContent from '@nextcloud/vue/components/NcAppContent'
+import NcIconSvgWrapper from '@nextcloud/vue/components/NcIconSvgWrapper'
+import {
+  mdiClipboardTextOutline,
+  mdiCalendarBlankOutline,
+  mdiAccountGroupOutline,
+  mdiBankOutline,
+  mdiFileDocumentEditOutline,
+} from '@mdi/js'
 import { subscribeRealtime } from './realtime'
 import Geschaeftsliste from './components/Geschaeftsliste.vue'
 import Sitzungsliste from './components/Sitzungsliste.vue'
@@ -75,22 +86,16 @@ import Sitzungstypenliste from './components/Sitzungstypenliste.vue'
 export default {
   name: 'ParliamentWinterthurApp',
   components: {
+    NcContent,
     NcAppNavigation,
     NcAppNavigationItem,
     NcAppContent,
+    NcIconSvgWrapper,
     Geschaeftsliste,
     Sitzungsliste,
     Mitgliederliste,
     Kommissionsliste,
     Sitzungstypenliste,
-  },
-  provide() {
-    // NcAppNavigation / NcAppContent in @nextcloud/vue v9 erwarten diesen Inject
-    // normalerweise vom NcContent-Wrapper. Da wir ohne NcContent direkt im
-    // Nextcloud-#content-Element mounten, liefern wir den No-Op selbst.
-    return {
-      'NcContent:setHasAppNavigation': () => {},
-    }
   },
   data() {
     return {
@@ -102,11 +107,11 @@ export default {
       syncFehler: false,
       version: String(window.PARLWIN_CONFIG?.version || ''),
       ansichten: [
-        { key: 'geschaefte', bezeichnung: 'Geschäfte', icon: '📋' },
-        { key: 'sitzungen', bezeichnung: 'Sitzungen', icon: '📅' },
-        { key: 'mitglieder', bezeichnung: 'Mitglieder', icon: '👥' },
-        { key: 'kommissionen', bezeichnung: 'Kommissionen', icon: '🏛' },
-        { key: 'sitzungstypen', bezeichnung: 'Sitzungstypen', icon: '📝' },
+        { key: 'geschaefte', bezeichnung: 'Geschäfte', icon: mdiClipboardTextOutline },
+        { key: 'sitzungen', bezeichnung: 'Sitzungen', icon: mdiCalendarBlankOutline },
+        { key: 'mitglieder', bezeichnung: 'Mitglieder', icon: mdiAccountGroupOutline },
+        { key: 'kommissionen', bezeichnung: 'Kommissionen', icon: mdiBankOutline },
+        { key: 'sitzungstypen', bezeichnung: 'Sitzungstypen', icon: mdiFileDocumentEditOutline },
       ],
       unsubRealtime: null,
     }

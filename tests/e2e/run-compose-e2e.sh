@@ -419,6 +419,14 @@ assert_non_empty "$PRAESIDIUM_TOKEN" "Praesidium-App-Passwort konnte nicht erzeu
 assert_non_empty "$PROTOKOLL_TOKEN" "Protokoll-App-Passwort konnte nicht erzeugt werden"
 assert_non_empty "$MITGLIED_TOKEN" "Mitglied-App-Passwort konnte nicht erzeugt werden"
 
+# Automatischen Cron-Sync während der Tests verhindern: Der parlwin-Watcher tickt
+# den Nextcloud-Cron; fällt ein Tick auf eine Sync-Stunde (Standard 03/15 Uhr),
+# würde ein echter Sync die reproduzierten Testdaten überschreiben. Daher
+# sync_stunden auf eine Stunde setzen, die garantiert NICHT die aktuelle ist.
+# Der dedizierte Cron-Job-Test am Ende setzt sync_stunden explizit auf "alle".
+SAFE_SYNC_HOUR=$(( ($(TZ=Europe/Zurich date +%-H) + 6) % 24 ))
+occ config:app:set parlwin sync_stunden --value="$SAFE_SYNC_HOUR" >/dev/null 2>&1 || true
+
 echo "[E2E] Prüfe WebSocket-Authentisierung"
 websocket_expect_denied || fail "WebSocket ohne Login wurde nicht blockiert"
 ADMIN_AUTH_B64="$(printf '%s' "admin:${ADMIN_TOKEN}" | base64 | tr -d '\n')"
@@ -631,12 +639,16 @@ api_expect_status POST "parlwin_praesidium" "$PRAESIDIUM_TOKEN" "/settings/proto
   --data-urlencode "uid=parlwin_protokoll" \
   --data-urlencode "name=Protokoll E2E"
 
-TODAY="$(date +%F)"
+# Gültigkeit mit Puffer (gestern–morgen): eine reine "heute"-Gültigkeit wäre um
+# Mitternacht nicht zuverlässig, weil das Host-Datum (date) und die Container-Zeit
+# (UTC, mit der hasAktiveRolle vergleicht) im Zeitzonenversatz auseinanderliegen.
+STV_VON="$(date -u -d 'yesterday' +%F 2>/dev/null || date -u +%F)"
+STV_BIS="$(date -u -d 'tomorrow' +%F 2>/dev/null || date -u +%F)"
 api_expect_status POST "parlwin_praesidium" "$PRAESIDIUM_TOKEN" "/settings/protokollfuehrer-stellvertretung" "200" \
   --data-urlencode "uid=parlwin_mitglied" \
   --data-urlencode "name=Mitglied E2E" \
-  --data-urlencode "gueltig_von=${TODAY}" \
-  --data-urlencode "gueltig_bis=${TODAY}"
+  --data-urlencode "gueltig_von=${STV_VON}" \
+  --data-urlencode "gueltig_bis=${STV_BIS}"
 
 api_expect_status POST "parlwin_protokoll" "$PROTOKOLL_TOKEN" "/geschaefte/${FIRST_G_ID}/beschluesse" "200" \
   --data-urlencode "code=${ERSTER_BESCHLUSS_CODE}" \
@@ -651,8 +663,8 @@ assert_json '.autorUid == "parlwin_mitglied"' "Beschluss-Autor Stellvertretung f
 api_expect_status POST "parlwin_praesidium" "$PRAESIDIUM_TOKEN" "/settings/kommissionsmitglied" "200" \
   --data-urlencode "uid=parlwin_mitglied" \
   --data-urlencode "name=Mitglied E2E" \
-  --data-urlencode "gueltig_von=${TODAY}" \
-  --data-urlencode "gueltig_bis=${TODAY}"
+  --data-urlencode "gueltig_von=${STV_VON}" \
+  --data-urlencode "gueltig_bis=${STV_BIS}"
 
 echo "[E2E] Sitzung/Traktandum-Updates testen"
 api_expect_status PUT "admin" "$ADMIN_TOKEN" "/sitzungen/${FIRST_S_ID}" "200" \
@@ -861,5 +873,52 @@ export PW_U2="parlwin_protokoll"  PW_P2="PwtP4ss!Protokoll"
 export PW_U3="parlwin_mitglied"   PW_P3="PwtP4ss!Mitglied"
 export PW_ADMIN_PASS="${NEXTCLOUD_ADMIN_PASSWORD}"
 docker compose run --rm playwright || fail "Multi-User-Browser-E2E (Playwright) fehlgeschlagen"
+
+# --- Cron-/Background-Job-Test -------------------------------------------------
+# Prüft den ECHTEN automatischen Mechanismus, der in Produktion fehlte: der
+# parlwin-Watcher tickt selbst den Nextcloud-Cron (PARLWIN_CRON_INTERVAL, im Test
+# 5s). Es wird NICHT manuell getriggert. Ablauf: sicherstellen dass kein Sync
+# läuft, den SyncJob fällig machen, dann abwarten, bis der automatische Cron-Tick
+# einen Sync mit Quelle "background-job" startet. Bewusst zuletzt, damit ein
+# ausgelöster Sync die übrigen Prüfungen nicht beeinflusst.
+echo "[E2E] Cron-Job-Test: automatischer Cron-Tick löst die Synchronisation aus"
+
+# 1. Sicherstellen, dass kein Sync läuft; Fortschritt über die DB prüfen (der Job
+#    läuft per CLI, daher nicht über den FPM-APCu-Cache der /sync/status-API).
+api_expect_status POST "admin" "$ADMIN_TOKEN" "/sync/cancel" "200" || true
+CRON_CLEAN=0
+for _ in $(seq 1 60); do
+  CRON_PROG="$(sql "SELECT configvalue FROM ${TABLE_PREFIX}appconfig WHERE appid='parlwin' AND configkey='sync_progress';")"
+  if ! grep -q '"running":true' <<<"$CRON_PROG"; then CRON_CLEAN=1; break; fi
+  sleep 1
+done
+[[ "$CRON_CLEAN" == "1" ]] || fail "Vor dem Cron-Test läuft noch eine Synchronisation"
+# Fortschritt zurücksetzen, damit ein neuer Lauf eindeutig erkennbar ist.
+sql "DELETE FROM ${TABLE_PREFIX}appconfig WHERE appid='parlwin' AND configkey='sync_progress';" || true
+
+# 2. Sync-Stunden für den Test auf jede Stunde setzen (sonst synchronisiert der Job
+#    nur um 03:00/15:00 und der Test wäre nicht deterministisch).
+occ config:app:set parlwin sync_stunden --value="$(seq -s, 0 23)" >/dev/null
+
+# 3. Den registrierten Background-Job ermitteln und fällig machen. Der nächste
+#    automatische Cron-Tick des Watchers führt ihn dann aus.
+CRON_JOB_ID="$(sql "SELECT id FROM ${TABLE_PREFIX}jobs WHERE class LIKE '%ParliamentWinterthur%SyncJob%' ORDER BY id LIMIT 1;")"
+[[ -n "$CRON_JOB_ID" ]] || fail "SyncJob ist nicht im JobList registriert – Cron würde ihn nie ausführen"
+sql "UPDATE ${TABLE_PREFIX}jobs SET last_run=0, last_checked=0, reserved_at=0 WHERE id=${CRON_JOB_ID};"
+
+# 4. KEIN manueller Trigger: abwarten, bis der automatische Cron-Tick des Watchers
+#    einen Sync mit Quelle "background-job" startet (Tick alle PARLWIN_CRON_INTERVAL=5s).
+CRON_TRIGGERED=0
+for _ in $(seq 1 40); do
+  CRON_PROG="$(sql "SELECT configvalue FROM ${TABLE_PREFIX}appconfig WHERE appid='parlwin' AND configkey='sync_progress';")"
+  if grep -q '"source":"background-job"' <<<"$CRON_PROG"; then CRON_TRIGGERED=1; break; fi
+  sleep 1
+done
+[[ "$CRON_TRIGGERED" == "1" ]] || fail "Der automatische Cron-Tick hat keinen Sync ausgelöst (sync_progress ohne source=background-job): ${CRON_PROG}"
+echo "[E2E] Cron-Job-Test bestanden: Background-Job hat die Synchronisation ausgelöst"
+
+# 6. Aufräumen: laufenden Sync stoppen, Test-Konfiguration entfernen.
+api_expect_status POST "admin" "$ADMIN_TOKEN" "/sync/cancel" "200" || true
+occ config:app:delete parlwin sync_stunden >/dev/null 2>&1 || true
 
 echo "[E2E] Abgeschlossen: Integrationsprüfungen und Multi-User-Browser-Test bestanden."

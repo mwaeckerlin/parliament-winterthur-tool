@@ -2,6 +2,12 @@ services:
   nextcloud-nginx:
     ports: !reset []
 
+  nextcloud-php-fpm:
+    environment:
+      # Kurzer Cron-Tick für den E2E-Test (Produktion: 300s Default im Watcher),
+      # damit der automatische Background-Job-Lauf im Test zügig greift.
+      PARLWIN_CRON_INTERVAL: "5"
+
   parlwin-realtime:
     ports: !reset []
 
@@ -10,7 +16,7 @@ services:
   # Wird gezielt über `docker compose run --rm playwright` aus run-compose-e2e.sh
   # gestartet (Profil verhindert Autostart bei `docker compose up`).
   playwright:
-    image: mcr.microsoft.com/playwright:v1.49.1-jammy
+    image: mcr.microsoft.com/playwright:v1.61.0-noble
     profiles: ["tools"]
     # Muss im selben Netz wie nextcloud-nginx liegen, sonst ist der interne
     # Hostname nextcloud-nginx:8080 nicht auflösbar.
