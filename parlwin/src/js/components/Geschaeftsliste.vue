@@ -479,12 +479,30 @@ export default {
           params.entscheidungsbedarf = this.filterEntscheidungsbedarf
         }
         const { data } = await axios.get(generateUrl('/apps/parlwin/geschaefte'), { params })
-        this.geschaefte = data
+        this.mergeGeschaefte(Array.isArray(data) ? data : [])
       } catch (fehler) {
         console.error('Fehler beim Laden der Geschäfte:', fehler)
       } finally {
         this.laden = false
       }
+    },
+    // In-place-Merge (wie bei den Sitzungen): ein Realtime-Sync baut so nicht das
+    // ganze DOM neu auf, der Scrollbalken bleibt stehen.
+    mergeGeschaefte(neu) {
+      const neuMap = new Map(neu.map(g => [g.id, g]))
+      for (const g of this.geschaefte) {
+        const n = neuMap.get(g.id)
+        if (n) Object.assign(g, n)
+      }
+      const vorhanden = new Set(this.geschaefte.map(g => g.id))
+      for (const n of neu) {
+        if (!vorhanden.has(n.id)) this.geschaefte.push(n)
+      }
+      for (let i = this.geschaefte.length - 1; i >= 0; i--) {
+        if (!neuMap.has(this.geschaefte[i].id)) this.geschaefte.splice(i, 1)
+      }
+      const reihenfolge = new Map(neu.map((g, i) => [g.id, i]))
+      this.geschaefte.sort((a, b) => (reihenfolge.get(a.id) ?? 0) - (reihenfolge.get(b.id) ?? 0))
     },
     handleRealtimeEvent(event) {
       const type = event?.type || ''

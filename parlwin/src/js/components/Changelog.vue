@@ -1,6 +1,5 @@
 <template>
   <div class="pw-changelog">
-    <h2 class="pw-changelog-titel">Änderungsverlauf</h2>
     <div class="pw-changelog-inhalt" v-html="html" />
   </div>
 </template>
@@ -15,7 +14,10 @@ export default {
     // Der Changelog wird zur Build-Zeit als Rohtext eingebunden und hier als
     // (gesäubertes) HTML gerendert.
     html() {
-      return markdownZuHtml(changelogText)
+      // Die führende «# Changelog»-Überschrift entfernen – die anderen Ansichten
+      // haben keinen eigenen Seitentitel im Inhalt (Konsistenz; der Tab-Name genügt).
+      const ohneTitel = String(changelogText).replace(/^#\s+Changelog\s*\n+/i, '')
+      return markdownZuHtml(ohneTitel)
     },
   },
 }
