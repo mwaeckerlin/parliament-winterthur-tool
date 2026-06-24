@@ -57,6 +57,7 @@
         :fraktionen="fraktionen"
         :kommissionen="kommissionen"
       />
+      <Changelog v-else-if="aktiveAnsicht === 'changelog'" />
     </NcAppContent>
   </NcContent>
 </template>
@@ -75,6 +76,7 @@ import {
   mdiAccountGroupOutline,
   mdiBankOutline,
   mdiFileDocumentEditOutline,
+  mdiHistory,
 } from '@mdi/js'
 import { subscribeRealtime } from './realtime'
 import Geschaeftsliste from './components/Geschaeftsliste.vue'
@@ -82,6 +84,7 @@ import Sitzungsliste from './components/Sitzungsliste.vue'
 import Mitgliederliste from './components/Mitgliederliste.vue'
 import Kommissionsliste from './components/Kommissionsliste.vue'
 import Sitzungstypenliste from './components/Sitzungstypenliste.vue'
+import Changelog from './components/Changelog.vue'
 
 export default {
   name: 'ParliamentWinterthurApp',
@@ -96,6 +99,7 @@ export default {
     Mitgliederliste,
     Kommissionsliste,
     Sitzungstypenliste,
+    Changelog,
   },
   data() {
     return {
@@ -112,6 +116,7 @@ export default {
         { key: 'mitglieder', bezeichnung: 'Mitglieder', icon: mdiAccountGroupOutline },
         { key: 'kommissionen', bezeichnung: 'Kommissionen', icon: mdiBankOutline },
         { key: 'sitzungstypen', bezeichnung: 'Sitzungstypen', icon: mdiFileDocumentEditOutline },
+        { key: 'changelog', bezeichnung: 'Änderungsverlauf', icon: mdiHistory },
       ],
       unsubRealtime: null,
     }

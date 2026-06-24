@@ -86,6 +86,19 @@
           />
         </div>
 
+        <!-- Verknüpfen mit (nur wenn der Sitzungstyp es vorsieht) -->
+        <div v-if="gewaehlterTyp && gewaehlterTyp.verknuepfen" class="pw-form-zeile pw-form-zeile-oben">
+          <span class="pw-form-ikon" aria-hidden="true">🔗</span>
+          <PwField label="Verknüpfen mit" class="pw-form-feld-flex">
+            <NcSelect
+              v-model="verknuepfungsAuswahl"
+              :options="verknuepfungsOptionen"
+              label="label"
+              placeholder="Andere Sitzung wählen (optional) …"
+            />
+          </PwField>
+        </div>
+
         <hr class="pw-form-divider" />
 
         <!-- Traktanden -->
@@ -534,6 +547,7 @@ export default {
       neueSitzungBemerkungen: '',
       neueSitzungTraktanden: [],
       neueSitzungTeilnehmer: [],
+      neueSitzungVerknuepfungId: null,
       neuerSitzungLaden: false,
       neuerSitzungFehler: '',
       // Drag & Drop
@@ -564,6 +578,31 @@ export default {
     },
     aktiveMitglieder() {
       return (this.mitglieder || []).filter(m => m.aktiv !== false)
+    },
+    // Auswahl für «Verknüpfen mit»: zukünftige Sitzungen zuerst (aufsteigend),
+    // danach vergangene (absteigend). Die gerade angelegte Sitzung ist noch
+    // nicht in der Liste, daher keine Selbst-Ausfilterung nötig.
+    verknuepfungsOptionen() {
+      const heute = this.heuteDatum
+      const sitzungen = (this.sitzungen || []).filter(s => !s.geloescht)
+      const kuenftig = sitzungen
+        .filter(s => (s.datum || '') >= heute)
+        .sort((a, b) => (a.datum || '').localeCompare(b.datum || ''))
+      const vergangen = sitzungen
+        .filter(s => (s.datum || '') < heute)
+        .sort((a, b) => (b.datum || '').localeCompare(a.datum || ''))
+      return [...kuenftig, ...vergangen].map(s => ({
+        id: s.id,
+        label: `${this.formatieredatum(s.datum)} – ${s.titel}`,
+      }))
+    },
+    verknuepfungsAuswahl: {
+      get() {
+        return this.verknuepfungsOptionen.find(o => o.id === this.neueSitzungVerknuepfungId) || null
+      },
+      set(opt) {
+        this.neueSitzungVerknuepfungId = opt ? opt.id : null
+      },
     },
     aktiveFraktionen() {
       return (this.fraktionen || []).filter(f => f.aktiv !== false)
@@ -667,6 +706,7 @@ export default {
         referenzId: p.referenzId || 0,
         referenzName: p.referenzName || '',
       }))
+      this.neueSitzungVerknuepfungId = null
       this.neuerSitzungFehler = ''
     },
     async erstelleNeueSession() {
@@ -685,11 +725,24 @@ export default {
           traktanden:  this.neueSitzungTraktanden,
           teilnehmer:  this.neueSitzungTeilnehmer,
         })
-        this.sitzungen.push(data)
+        let neueSitzung = data
+        // Optional mit einer bestehenden Sitzung verknüpfen (gemeinsame Sicht).
+        if (this.neueSitzungVerknuepfungId) {
+          try {
+            const { data: verknuepft } = await axios.post(
+              generateUrl(`/apps/parlwin/sitzungen/${data.id}/verknuepfen`),
+              { zielId: this.neueSitzungVerknuepfungId },
+            )
+            neueSitzung = verknuepft || data
+          } catch (e) {
+            showError('Sitzung erstellt, Verknüpfung fehlgeschlagen: ' + (e?.response?.data?.fehler || e?.message || ''))
+          }
+        }
+        this.sitzungen.push(neueSitzung)
         this.sitzungen.sort((a, b) => (a.datum || '').localeCompare(b.datum || ''))
-        this.sitzungNotizen[data.id] = []
-        this.offeneSitzungen.push(data.id)
-        await this.ladeTraktandenFuerSitzung(data.id)
+        this.sitzungNotizen[neueSitzung.id] = []
+        this.offeneSitzungen.push(neueSitzung.id)
+        await this.ladeTraktandenFuerSitzung(neueSitzung.id)
         this.gewaehlterTyp = null
       } catch (e) {
         const meldung = e?.response?.data?.fehler || e?.message || 'Unbekannter Fehler'
