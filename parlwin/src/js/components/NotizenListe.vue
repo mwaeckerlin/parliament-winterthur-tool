@@ -58,7 +58,7 @@
         >✕</button>
       </template>
     </div>
-    <div class="pw-neue-notiz">
+    <div v-if="!readonly" class="pw-neue-notiz">
       <PwWysiwyg
         :model-value="neuerText"
         :placeholder="placeholder"
@@ -90,6 +90,8 @@ export default {
     modelValue: { type: Array, default: () => [] },
     /** Placeholder für das Eingabefeld einer neuen Notiz. */
     placeholder: { type: String, default: 'Notiz hinzufügen…' },
+    /** Nur-Anzeige (kein Eingabefeld, kein Bearbeiten) – für aggregierte Sichten. */
+    readonly: { type: Boolean, default: false },
   },
   emits: ['update:modelValue'],
   data() {
@@ -117,6 +119,7 @@ export default {
   methods: {
     markdownZuHtml,
     istEigene(n) {
+      if (this.readonly) return false
       const uid = (n?.uid || '').toLowerCase()
       return !!uid && uid === this.eigenerUid
     },

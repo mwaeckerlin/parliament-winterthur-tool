@@ -239,6 +239,21 @@
             />
           </div>
 
+          <!-- Verknüpfte Sitzungen: aggregierte Notizen (nur Anzeige) -->
+          <div v-if="sitzung.verknuepfungId" class="pw-verknuepfte-sitzungen">
+            <h4>
+              🔗 Verknüpfte Sitzungen
+              <button type="button" class="button pw-btn-mini" @click.stop="entkoppleSitzung(sitzung)">Entkoppeln</button>
+            </h4>
+            <div v-if="!(verknuepfteSitzungen[sitzung.id] || []).length" class="pw-hinweis">
+              Keine weiteren Sitzungen in dieser Verknüpfung.
+            </div>
+            <div v-for="vs in (verknuepfteSitzungen[sitzung.id] || [])" :key="vs.id" class="pw-verknuepfte-sitzung">
+              <h5>{{ formatieredatum(vs.datum) }} – {{ vs.titel }}</h5>
+              <NotizenListe :model-value="parseNotizen(vs.notizen)" :readonly="true" />
+            </div>
+          </div>
+
           <!-- Traktanden -->
           <div class="pw-traktanden">
             <h4>Traktanden</h4>
@@ -533,6 +548,7 @@ export default {
       ladenTraktanden: {},
       sitzungNotizen: {},
       traktandumNotizen: {},
+      verknuepfteSitzungen: {},
       ausgewaehlteGeschaeftId: null,
       ausgewaehltesGeschaeftTraktandumKontext: null,
       unsubRealtime: null,
@@ -829,6 +845,30 @@ export default {
       } else {
         this.offeneSitzungen.push(id)
         await this.ladeTraktandenFuerSitzung(id)
+        await this.ladeVerknuepfteSitzungen(id)
+      }
+    },
+    async ladeVerknuepfteSitzungen(id) {
+      const sitzung = this.sitzungen.find(s => s.id === id)
+      if (!sitzung || !sitzung.verknuepfungId) {
+        this.verknuepfteSitzungen = { ...this.verknuepfteSitzungen, [id]: [] }
+        return
+      }
+      try {
+        const { data } = await axios.get(generateUrl(`/apps/parlwin/sitzungen/${id}/verknuepft`))
+        const andere = (Array.isArray(data) ? data : []).filter(s => s.id !== id)
+        this.verknuepfteSitzungen = { ...this.verknuepfteSitzungen, [id]: andere }
+      } catch (e) {
+        this.verknuepfteSitzungen = { ...this.verknuepfteSitzungen, [id]: [] }
+      }
+    },
+    async entkoppleSitzung(sitzung) {
+      try {
+        const { data } = await axios.post(generateUrl(`/apps/parlwin/sitzungen/${sitzung.id}/entkoppeln`))
+        sitzung.verknuepfungId = (data && data.verknuepfungId) || null
+        this.verknuepfteSitzungen = { ...this.verknuepfteSitzungen, [sitzung.id]: [] }
+      } catch (e) {
+        showError('Entkoppeln fehlgeschlagen: ' + (e?.response?.data?.fehler || e?.message || ''))
       }
     },
     async ladeTraktandenFuerSitzung(sitzungId, force = false, silent = false) {

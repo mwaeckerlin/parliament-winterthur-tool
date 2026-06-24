@@ -1,5 +1,8 @@
 # Changelog
 
+- 2026-06-24 **1.7.3**
+    - Verknüpfte Sitzungen zeigen nun die Notizen der jeweils anderen Sitzungen der Verknüpfung gesammelt an (nur Anzeige); eine Sitzung lässt sich direkt wieder entkoppeln, wobei alle Notizen an ihrem Platz bleiben
+
 - 2026-06-24 **1.7.2**
     - Bugfix: Das Docker-Image liess sich nicht mehr bauen (und damit die Umgebung nicht starten), seit der «Änderungsverlauf»-Tab eingeführt wurde – die Änderungsliste wird nun korrekt in den Build einbezogen
 
