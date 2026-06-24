@@ -9,6 +9,12 @@
       @trailing-button-click="suche = ''"
     />
   </Teleport>
+  <Teleport v-if="filterReady" to="#pw-filter-slot">
+    <div class="pw-filter-body">
+      <NcSelect v-model="herkunftOption" :options="herkunftOptionen" :clearable="false" input-label="Herkunft" />
+      <NcSelect v-model="statusOption" :options="statusOptionen" :clearable="false" input-label="Status" />
+    </div>
+  </Teleport>
 
   <section class="pw-view-content pw-vorstoesse">
     <header class="pw-view-header">
@@ -16,21 +22,6 @@
       <span class="pw-view-count">{{ gefiltert.length }}</span>
       <NcButton type="primary" @click="neuerVorstoss">+ Neuer Vorstoss</NcButton>
     </header>
-
-    <div class="pw-vorstoss-filter">
-      <PwField label="Herkunft">
-        <select v-model="herkunftFilter" class="pw-input">
-          <option value="">Alle</option>
-          <option v-for="h in HERKUENFTE" :key="h.code" :value="h.code">{{ h.label }}</option>
-        </select>
-      </PwField>
-      <PwField label="Status">
-        <select v-model="statusFilter" class="pw-input">
-          <option value="">Alle</option>
-          <option v-for="s in STATUS" :key="s.code" :value="s.code">{{ s.label }}</option>
-        </select>
-      </PwField>
-    </div>
 
     <div v-if="laden" class="pw-laden"><NcLoadingIcon :size="32" /></div>
 
@@ -120,6 +111,7 @@ import { showError } from '@nextcloud/dialogs'
 import '@nextcloud/dialogs/style.css'
 import NcTextField from '@nextcloud/vue/components/NcTextField'
 import NcButton from '@nextcloud/vue/components/NcButton'
+import NcSelect from '@nextcloud/vue/components/NcSelect'
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 import PwField from './PwField.vue'
 
@@ -138,15 +130,15 @@ const STATUS = [
 
 export default {
   name: 'Vorstoesseliste',
-  components: { NcTextField, NcButton, NcLoadingIcon, PwField },
+  components: { NcTextField, NcButton, NcSelect, NcLoadingIcon, PwField },
   data() {
     return {
       vorstoesse: [],
       laden: true,
       filterReady: false,
       suche: '',
-      herkunftFilter: '',
-      statusFilter: '',
+      herkunftOption: { label: 'Alle', value: '' },
+      statusOption: { label: 'Alle', value: '' },
       bearbeitung: null,
       speichernLaeuft: false,
       HERKUENFTE,
@@ -154,11 +146,19 @@ export default {
     }
   },
   computed: {
+    herkunftOptionen() {
+      return [{ label: 'Alle', value: '' }, ...HERKUENFTE.map(h => ({ label: h.label, value: h.code }))]
+    },
+    statusOptionen() {
+      return [{ label: 'Alle', value: '' }, ...STATUS.map(s => ({ label: s.label, value: s.code }))]
+    },
     gefiltert() {
       const q = (this.suche || '').toLowerCase().trim()
+      const herkunft = this.herkunftOption?.value || ''
+      const status = this.statusOption?.value || ''
       return this.vorstoesse.filter(v => {
-        if (this.herkunftFilter && v.herkunft !== this.herkunftFilter) return false
-        if (this.statusFilter && v.status !== this.statusFilter) return false
+        if (herkunft && v.herkunft !== herkunft) return false
+        if (status && v.status !== status) return false
         if (!q) return true
         return (v.titel || '').toLowerCase().includes(q) ||
           (v.art || '').toLowerCase().includes(q) ||
@@ -249,11 +249,6 @@ export default {
 </script>
 
 <style scoped>
-.pw-vorstoss-filter {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 12px;
-}
 .pw-vorstoss-karte {
   border: 1px solid var(--color-border, #ddd);
   border-radius: 6px;

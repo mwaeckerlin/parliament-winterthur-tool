@@ -878,7 +878,35 @@ export PW_U1="parlwin_praesidium" PW_P1="PwtP4ss!Praesidium"
 export PW_U2="parlwin_protokoll"  PW_P2="PwtP4ss!Protokoll"
 export PW_U3="parlwin_mitglied"   PW_P3="PwtP4ss!Mitglied"
 export PW_ADMIN_PASS="${NEXTCLOUD_ADMIN_PASSWORD}"
-docker compose run --rm playwright || fail "Multi-User-Browser-E2E (Playwright) fehlgeschlagen"
+# WICHTIG: Auf den Exit-Code von `docker compose run` allein ist KEIN Verlass —
+# er kam in der Praxis als 0 zurück, obwohl Playwright-Tests fehlschlugen (der
+# Exit-Code des Containers ging verloren). Ein maskierter Testfehler ist
+# gravierend, weil rote Tests dann unbemerkt als grün durchgehen. Daher wird der
+# Lauf doppelt abgesichert: Exit-Code UND verbindliche Auswertung des
+# JUnit-Reports (Anzahl tests/failures/errors).
+PW_REPORT="${ROOT_DIR}/tests/e2e/.junit/e2e.xml"
+# Alten Report best-effort entfernen: die Datei wird vom Playwright-Container als
+# root angelegt, der Host-User kann sie evtl. nicht löschen — das darf den Lauf
+# NICHT abbrechen (Permission-Fehler tolerieren). Playwright überschreibt den
+# Report beim Lauf ohnehin; Frische und Gültigkeit sichern Exit-Code + der
+# Timestamp-Check unten ab.
+PW_REPORT_VORHER=""
+[ -f "$PW_REPORT" ] && PW_REPORT_VORHER="$(stat -c %Y "$PW_REPORT" 2>/dev/null || echo '')"
+rm -f "$PW_REPORT" 2>/dev/null || true
+PW_EXIT=0
+docker compose run --rm playwright || PW_EXIT=$?
+[ "$PW_EXIT" -eq 0 ] || fail "Multi-User-Browser-E2E (Playwright) fehlgeschlagen (Exit-Code $PW_EXIT)"
+[ -f "$PW_REPORT" ] || fail "Playwright-JUnit-Report fehlt ($PW_REPORT) — Testlauf nicht verifizierbar"
+# Sicherstellen, dass der Report vom AKTUELLEN Lauf stammt (nicht ein alter, der
+# nicht gelöscht werden konnte): mtime muss sich geändert haben.
+if [ -n "$PW_REPORT_VORHER" ]; then
+  PW_REPORT_NACHHER="$(stat -c %Y "$PW_REPORT" 2>/dev/null || echo '')"
+  [ "$PW_REPORT_NACHHER" != "$PW_REPORT_VORHER" ] || fail "Playwright-JUnit-Report wurde nicht aktualisiert ($PW_REPORT) — Lauf nicht verifizierbar"
+fi
+if grep -qE 'failures="[1-9][0-9]*"|errors="[1-9][0-9]*"' "$PW_REPORT"; then
+  fail "Multi-User-Browser-E2E (Playwright): fehlgeschlagene Tests laut JUnit-Report ($PW_REPORT)"
+fi
+grep -qE 'tests="[1-9][0-9]*"' "$PW_REPORT" || fail "Playwright-JUnit-Report meldet 0 Tests ($PW_REPORT) — Lauf ungültig"
 
 # --- Cron-/Background-Job-Test -------------------------------------------------
 # Prüft den ECHTEN automatischen Mechanismus, der in Produktion fehlte: der
