@@ -1,11 +1,13 @@
 # Changelog
 
-- 2026-06-24 **1.8.0**
+- 2026-06-24 **1.7.1**
     - Notizen lassen sich jetzt formatieren: Eingabe über eine Werkzeugleiste mit Fett, Kursiv, Unterstrichen, Durchgestrichen, Überschriften, Aufzählungen, nummerierten Listen, Zitat, Code und Links
         - Alle Notizfelder (Geschäfte, Sitzungen, Traktanden) verwenden denselben Editor; neue und bestehende Notizen werden formatiert angezeigt
         - Intern werden Notizen als Markdown gespeichert
     - Gemeinsames Aufgaben-Board: Ein Deck-Board «Fraktion» wird automatisch angelegt und mit der Fraktionsgruppe geteilt (analog zum gemeinsamen Ordner und Kalender), mit den Spalten «To-do», «In Arbeit» und «Erledigt». Ist Deck nicht installiert, bleibt die Funktion einfach inaktiv
     - Erweiterte Ordnerstruktur im Fraktionsordner: neuer Ordner «40_Vorstösse» mit den Unterordnern «10_Eigene» und «20_Fremde» sowie ein Ordner «50_Finanzen»; die bisherigen Ordner «Wahlkampf» und «Medien» heissen neu «60_Wahlkampf» und «70_Medien» – die Inhalte werden dabei automatisch und verlustfrei übernommen
+    - Sitzungen lassen sich verknüpfen: Sitzungstypen können «Verknüpfen» aktivieren; beim Anlegen einer solchen Sitzung kann sie mit einer anderen Sitzung verknüpft werden (zukünftige Sitzungen zuerst, danach vergangene)
+    - Neuer Tab «Änderungsverlauf» zeigt diese Änderungsliste direkt in der App
 
 - 2026-06-24 **1.7.0**
     - Tab «Mitglieder»: neue Sortier- und Filtermöglichkeiten
