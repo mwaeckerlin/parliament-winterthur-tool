@@ -266,6 +266,22 @@
             />
           </div>
 
+          <!-- To-do als Deck-Karte -->
+          <div class="pw-sitzung-todo">
+            <h4>To-do zu Deck</h4>
+            <div class="pw-todo-eingabe">
+              <input
+                :value="neuesTodoText[sitzung.id] || ''"
+                type="text"
+                class="pw-input"
+                placeholder="Aufgabe für das Fraktions-Board…"
+                @input="e => neuesTodoText = { ...neuesTodoText, [sitzung.id]: e.target.value }"
+                @keyup.enter="todoZuDeck(sitzung)"
+              />
+              <NcButton type="secondary" @click="todoZuDeck(sitzung)">Hinzufügen</NcButton>
+            </div>
+          </div>
+
           <!-- Verknüpfte Sitzungen: aggregierte Notizen (nur Anzeige) -->
           <div v-if="sitzung.verknuepfungId" class="pw-verknuepfte-sitzungen">
             <h4>
@@ -579,6 +595,7 @@ export default {
       verknuepfteSitzungen: {},
       verknuepfteGeschaeftIds: {},
       geschaefteAlle: [],
+      neuesTodoText: {},
       ausgewaehlteGeschaeftId: null,
       ausgewaehltesGeschaeftTraktandumKontext: null,
       unsubRealtime: null,
@@ -935,6 +952,19 @@ export default {
         this.verknuepfteGeschaeftIds = { ...this.verknuepfteGeschaeftIds, [sitzungId]: (data && data.geschaeftIds) || [] }
       } catch (e) {
         showError('Geschäft konnte nicht verknüpft werden: ' + (e?.response?.data?.fehler || e?.message || ''))
+      }
+    },
+    async todoZuDeck(sitzung) {
+      const titel = (this.neuesTodoText[sitzung.id] || '').trim()
+      if (!titel) return
+      try {
+        await axios.post(generateUrl(`/apps/parlwin/sitzungen/${sitzung.id}/todo`), {
+          titel,
+          beschreibung: `Aus Sitzung: ${sitzung.titel} (${sitzung.datum})`,
+        })
+        this.neuesTodoText = { ...this.neuesTodoText, [sitzung.id]: '' }
+      } catch (e) {
+        showError('To-do konnte nicht zu Deck hinzugefügt werden: ' + (e?.response?.data?.fehler || e?.message || ''))
       }
     },
     async entlinkeGeschaeftVonSitzung(sitzungId, geschaeftId) {

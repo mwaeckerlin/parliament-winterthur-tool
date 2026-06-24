@@ -38,6 +38,7 @@ return [
         ['name' => 'sitzung#geschaefte', 'url' => '/sitzungen/{id}/geschaefte', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
         ['name' => 'sitzung#geschaeftVerlinken', 'url' => '/sitzungen/{id}/geschaefte', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
         ['name' => 'sitzung#geschaeftEntlinken', 'url' => '/sitzungen/{id}/geschaefte/{geschaeftId}', 'verb' => 'DELETE', 'requirements' => ['id' => '\d+', 'geschaeftId' => '\d+']],
+        ['name' => 'sitzung#todoErstellen', 'url' => '/sitzungen/{id}/todo', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
 
         // Sitzungs-Vorlagen / Sitzungstypen.
         // Hinweis: Die spezifischen /nc/groups und /nc/users Routen MUESSEN

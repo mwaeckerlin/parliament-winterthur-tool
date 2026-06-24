@@ -71,26 +71,73 @@ class FakeBoardService {
 }
 
 /** Test-Double für OCA\Deck\Service\StackService. */
+class FakeDeckStack {
+    public function __construct(public int $id) {
+    }
+    public function getId(): int {
+        return $this->id;
+    }
+}
+
 class FakeStackService {
     public array $created = [];
     public function create(string $titel, int $boardId, int $order): void {
         $this->created[] = [$titel, $boardId, $order];
     }
+    public function findAll(int $boardId): array {
+        return [new FakeDeckStack(10)];
+    }
+}
+
+class FakeCardService {
+    public array $created = [];
+    public function create(string $titel, int $stackId, string $type, int $order, string $owner, string $desc = ''): object {
+        $this->created[] = [$titel, $stackId, $owner, $desc];
+        return new class {
+            public function getId(): int {
+                return 77;
+            }
+        };
+    }
 }
 
 class DeckServiceTest extends TestCase {
     private ?FakeStackService $stackService = null;
+    private ?FakeCardService $cardService = null;
 
     private function service(FakeBoardService $bs, bool $deckInstalliert = true): DeckService {
         $this->stackService = new FakeStackService();
+        $this->cardService = new FakeCardService();
         $appManager = $this->createStub(IAppManager::class);
         $appManager->method('isInstalled')->willReturn($deckInstalliert);
         $container = $this->createStub(ContainerInterface::class);
-        $container->method('get')->willReturnCallback(
-            fn (string $id) => str_contains($id, 'StackService') ? $this->stackService : $bs
-        );
+        $container->method('get')->willReturnCallback(function (string $id) use ($bs) {
+            if (str_contains($id, 'CardService')) {
+                return $this->cardService;
+            }
+            if (str_contains($id, 'StackService')) {
+                return $this->stackService;
+            }
+            return $bs;
+        });
         $logger = $this->createStub(LoggerInterface::class);
         return new DeckService($appManager, $container, $logger);
+    }
+
+    public function testErstelltTodoKarteImErstenStack(): void {
+        $bs = new FakeBoardService([new FakeDeckBoard(5, 'Fraktion', [])]);
+        $kartenId = $this->service($bs)->erstelleTodoKarte('admin', 'fraktion', 'Mein Todo', 'Details');
+
+        $this->assertSame(77, $kartenId);
+        $this->assertCount(1, $this->cardService->created);
+        $this->assertSame('Mein Todo', $this->cardService->created[0][0]);
+        $this->assertSame(10, $this->cardService->created[0][1]);
+    }
+
+    public function testErstelltKeineKarteOhneTitel(): void {
+        $bs = new FakeBoardService([new FakeDeckBoard(5, 'Fraktion', [])]);
+        $this->assertNull($this->service($bs)->erstelleTodoKarte('admin', 'fraktion', '  '));
+        $this->assertCount(0, $this->cardService->created);
     }
 
     public function testErstelltBoardUndTeiltMitGruppe(): void {

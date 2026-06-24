@@ -558,6 +558,16 @@
   grid-template-columns: repeat(auto-fit, minmax(min(40rem, 100%), 1fr));
 }
 
+// Changelog-Eintraege: gerendertes Markdown sichtbar machen (Nextcloud setzt
+// Listen global zurueck) – Aufzaehlung, Verschachtelung, Fettschrift.
+.pw-changelog-eintraege {
+  ul { list-style: disc; padding-inline-start: 1.5em; margin-block: 0.3em; }
+  ul ul { list-style: circle; }
+  li { margin-block: 0.15em; }
+  strong { font-weight: 600; }
+  code { font-family: var(--pw-font-mono, monospace); }
+}
+
 .pw-data-card,
 .pw-kommission-karte,
 .pw-mitglied-karte {

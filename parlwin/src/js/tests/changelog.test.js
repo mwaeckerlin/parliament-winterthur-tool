@@ -24,6 +24,16 @@ describe('Changelog-Ansicht', () => {
     expect(wrapper.text()).not.toContain('**wichtig**')
   })
 
+  it('rendert die Einträge als formatiertes Markdown (Liste + fett)', () => {
+    const wrapper = mount(Changelog)
+    const inhalt = wrapper.find('.pw-changelog-eintraege')
+    expect(inhalt.exists()).toBe(true)
+    const html = inhalt.html()
+    expect(html).toContain('<ul>')
+    expect(html).toContain('<li>')
+    expect(html).toContain('<strong>wichtig</strong>')
+  })
+
   it('klappt Versionen wie eine Handorgel auf und zu', async () => {
     const wrapper = mount(Changelog)
     // Neueste Version ist standardmässig offen → Eintragsliste sichtbar

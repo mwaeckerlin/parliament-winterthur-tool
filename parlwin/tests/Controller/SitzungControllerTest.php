@@ -44,6 +44,7 @@ class SitzungControllerTest extends TestCase
     private function makeController(
         IRequest $request,
         ?SitzungstypService $sitzungstypService = null,
+        ?\OCA\ParliamentWinterthur\Service\DeckService $deckService = null,
     ): SitzungController {
         return new SitzungController(
             $request,
@@ -54,7 +55,38 @@ class SitzungControllerTest extends TestCase
             $this->createStub(\OCP\Files\IRootFolder::class),
             $this->createStub(\Psr\Log\LoggerInterface::class),
             $this->createStub(\OCA\ParliamentWinterthur\Service\SitzungGeschaeftService::class),
+            $deckService ?? $this->createStub(\OCA\ParliamentWinterthur\Service\DeckService::class),
+            $this->createStub(\OCP\IConfig::class),
         );
+    }
+
+    public function testTodoErstellenLegtDeckKarteAnUndGibtIdZurueck(): void
+    {
+        $deck = $this->createStub(\OCA\ParliamentWinterthur\Service\DeckService::class);
+        $deck->method('erstelleTodoKarte')->willReturn(42);
+
+        $request = $this->makeRequest(['titel' => 'Protokoll versenden']);
+        $response = $this->makeController($request, null, $deck)->todoErstellen(1);
+
+        $this->assertSame(42, $response->getData()['kartenId']);
+    }
+
+    public function testTodoErstellenGibt400OhneTitel(): void
+    {
+        $response = $this->makeController($this->makeRequest([]))->todoErstellen(1);
+
+        $this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+    }
+
+    public function testTodoErstellenGibt400WennDeckFehlt(): void
+    {
+        $deck = $this->createStub(\OCA\ParliamentWinterthur\Service\DeckService::class);
+        $deck->method('erstelleTodoKarte')->willReturn(null);
+
+        $request = $this->makeRequest(['titel' => 'Aufgabe']);
+        $response = $this->makeController($request, null, $deck)->todoErstellen(1);
+
+        $this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
     }
 
     public function testCreateGibtSitzungZurueckMitStatus201(): void
@@ -139,6 +171,8 @@ class SitzungControllerTest extends TestCase
             $this->createStub(\OCP\Files\IRootFolder::class),
             $this->createStub(\Psr\Log\LoggerInterface::class),
             $this->createStub(\OCA\ParliamentWinterthur\Service\SitzungGeschaeftService::class),
+            $this->createStub(\OCA\ParliamentWinterthur\Service\DeckService::class),
+            $this->createStub(\OCP\IConfig::class),
         );
 
         $response = $controller->index();
