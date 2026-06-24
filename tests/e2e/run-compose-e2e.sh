@@ -427,6 +427,12 @@ assert_non_empty "$MITGLIED_TOKEN" "Mitglied-App-Passwort konnte nicht erzeugt w
 SAFE_SYNC_HOUR=$(( ($(TZ=Europe/Zurich date +%-H) + 6) % 24 ))
 occ config:app:set parlwin sync_stunden --value="$SAFE_SYNC_HOUR" >/dev/null 2>&1 || true
 
+# Admin-Sprache auf Deutsch: Nextcloud lädt die App-Übersetzung l10n/de.js
+# (OC.L10N.register) nur bei deutscher Sprache. Genau diese Datei löst
+# «OC is not defined» aus, wenn sie vor dem Core lädt. Ohne deutsche Sprache
+# würde der Browser-Test (0b) den Fehler nie sehen.
+occ user:setting admin core lang de >/dev/null 2>&1 || true
+
 echo "[E2E] Prüfe WebSocket-Authentisierung"
 websocket_expect_denied || fail "WebSocket ohne Login wurde nicht blockiert"
 ADMIN_AUTH_B64="$(printf '%s' "admin:${ADMIN_TOKEN}" | base64 | tr -d '\n')"

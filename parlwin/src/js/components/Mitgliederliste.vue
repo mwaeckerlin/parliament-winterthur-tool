@@ -4,11 +4,20 @@
   </Teleport>
   <Teleport v-if="filterReady" to="#pw-filter-slot">
     <div class="pw-filter-body">
-      <NcSelect v-model="filterFraktionOption" :options="fraktionOptions" :clearable="false" input-label="Fraktion" />
-      <NcSelect v-model="filterParteiOption" :options="parteiOptions" :clearable="false" input-label="Partei" />
-      <NcCheckboxRadioSwitch v-model="nurAktive" type="switch">
-        Nur aktive Mitglieder
-      </NcCheckboxRadioSwitch>
+      <section class="pw-filter-panel pw-filter-gruppe">
+        <div class="pw-filter-header"><h3>Sortieren</h3></div>
+        <NcSelect v-model="sortierModusOption" :options="sortierOptions" :clearable="false" input-label="Sortieren nach" />
+      </section>
+      <section class="pw-filter-panel pw-filter-gruppe">
+        <div class="pw-filter-header"><h3>Filter</h3></div>
+        <NcSelect v-model="filterFraktionOption" :options="fraktionOptions" :clearable="false" input-label="Fraktion" />
+        <NcSelect v-model="filterParteiOption" :options="parteiOptions" :clearable="false" input-label="Partei" />
+        <NcSelect v-model="filterKommissionOption" :options="kommissionOptions" :clearable="false" input-label="Kommission" />
+        <NcSelect v-model="funktionFilterOption" :options="funktionFilterOptions" :clearable="false" input-label="Funktion" />
+        <NcCheckboxRadioSwitch v-model="nurAktive" type="switch">
+          Nur aktive Mitglieder
+        </NcCheckboxRadioSwitch>
+      </section>
     </div>
   </Teleport>
 
@@ -79,7 +88,10 @@ export default {
       suche: '',
       filterFraktion: '',
       filterPartei: '',
+      filterKommission: '',
       nurAktive: true,
+      filterFunktion: '',
+      sortierModus: 'funktion',
     }
   },
   computed: {
@@ -103,6 +115,43 @@ export default {
       get() { return this.parteiOptions.find(o => o.value === this.filterPartei) || this.parteiOptions[0] },
       set(v) { this.filterPartei = v ? v.value : '' },
     },
+    sortierOptions() {
+      return [
+        { label: 'Funktion', value: 'funktion' },
+        { label: 'Fraktion', value: 'fraktion' },
+        { label: 'Partei', value: 'partei' },
+        { label: 'Name', value: 'name' },
+      ]
+    },
+    sortierModusOption: {
+      get() { return this.sortierOptions.find(o => o.value === this.sortierModus) || this.sortierOptions[0] },
+      set(v) { this.sortierModus = v ? v.value : 'funktion' },
+    },
+    alleKommissionen() {
+      const namen = (this.kommissionen || [])
+        .filter(k => k?.aktiv !== false)
+        .map(k => k?.name)
+        .filter(Boolean)
+      return [...new Set(namen)].sort((a, b) => a.localeCompare(b, 'de'))
+    },
+    kommissionOptions() {
+      return [{ label: 'Alle Kommissionen', value: '' }, ...this.alleKommissionen.map(k => ({ label: k, value: k }))]
+    },
+    filterKommissionOption: {
+      get() { return this.kommissionOptions.find(o => o.value === this.filterKommission) || this.kommissionOptions[0] },
+      set(v) { this.filterKommission = v ? v.value : '' },
+    },
+    funktionFilterOptions() {
+      return [
+        { label: 'Alle Funktionen', value: '' },
+        { label: 'Fraktionspräsident', value: 'fraktionspraesident' },
+        { label: 'Kommissionspräsident', value: 'kommissionspraesident' },
+      ]
+    },
+    funktionFilterOption: {
+      get() { return this.funktionFilterOptions.find(o => o.value === this.filterFunktion) || this.funktionFilterOptions[0] },
+      set(v) { this.filterFunktion = v ? v.value : '' },
+    },
     basisMitglieder() {
       return this.nurAktive ? this.mitglieder.filter(m => m.aktiv) : this.mitglieder
     },
@@ -123,7 +172,34 @@ export default {
       if (this.filterPartei) {
         liste = liste.filter(m => m.partei === this.filterPartei)
       }
-      return liste.sort((a, b) => `${a.name}${a.vorname}`.localeCompare(`${b.name}${b.vorname}`))
+      if (this.filterKommission) {
+        liste = liste.filter(m => this.kommissionenVon(m).some(k => k.name === this.filterKommission))
+      }
+      if (this.filterFunktion === 'fraktionspraesident') {
+        liste = liste.filter(m => this.fraktionsRolle(m) === 'Fraktionspräsident')
+      } else if (this.filterFunktion === 'kommissionspraesident') {
+        liste = liste.filter(m => this.kommissionenVon(m).some(k => k.rolle === 'Präsident'))
+      }
+      return liste.sort(this.sortierVergleich)
+    },
+    sortierVergleich() {
+      const name = m => `${m.name} ${m.vorname}`
+      const cmpName = (a, b) => name(a).localeCompare(name(b), 'de')
+      const cmpPartei = (a, b) => (a.partei || '').localeCompare(b.partei || '', 'de')
+      const cmpFraktion = (a, b) => (a.fraktion || '').localeCompare(b.fraktion || '', 'de')
+      switch (this.sortierModus) {
+        case 'name':
+          return cmpName
+        case 'partei':
+          return (a, b) => cmpPartei(a, b) || cmpName(a, b)
+        case 'fraktion':
+          return (a, b) => cmpFraktion(a, b) || cmpName(a, b)
+        case 'funktion':
+        default:
+          // Funktions-Reihenfolge: Fraktionspräsident, Stellvertreter,
+          // Kommissionspräsident, Kommissionsmitglied, dann Partei, Name.
+          return (a, b) => this.funktionsRang(a) - this.funktionsRang(b) || cmpPartei(a, b) || cmpName(a, b)
+      }
     },
     fraktionsrolleNachExternId() {
       const map = new Map()
@@ -207,6 +283,15 @@ export default {
     fraktionsRolle(m) {
       const id = String(m?.externId || m?.extern_id || '')
       return id ? (this.fraktionsrolleNachExternId.get(id) || '') : ''
+    },
+    funktionsRang(m) {
+      const fr = this.fraktionsRolle(m)
+      if (fr === 'Fraktionspräsident') return 0
+      if (fr === 'Vize Fraktionspräsident') return 1
+      const koms = this.kommissionenVon(m)
+      if (koms.some(k => k.rolle === 'Präsident')) return 2
+      if (koms.length > 0) return 3
+      return 4
     },
     kommissionenVon(m) {
       const id = String(m?.externId || m?.extern_id || '')

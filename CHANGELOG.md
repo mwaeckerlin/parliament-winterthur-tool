@@ -1,5 +1,18 @@
 # Changelog
 
+- 2026-06-24 **1.7.0**
+    - Tab «Mitglieder»: neue Sortier- und Filtermöglichkeiten
+        - Sortierung wählbar über «Sortieren»: Funktion (Standard), Fraktion, Partei, Name
+        - Standard-Sortierung nach Funktion: Fraktionspräsident, Stellvertreter, Kommissionspräsident, Kommissionsmitglied, danach Partei und Name
+        - Neuer Filter «Funktion»: nur Fraktionspräsidenten oder nur Kommissionspräsidenten anzeigen
+        - Neuer Filter «Kommission»: nur Mitglieder einer bestimmten Kommission anzeigen
+        - Sortieren und Filtern sind nun deutlich voneinander abgegrenzt (eigene Abschnitte)
+    - App-Symbol einfarbig wie die übrigen Nextcloud-Apps (vorher als einziges zweifarbig)
+    - Neue Sitzungen sind als Datum standardmässig auf eine Woche im Voraus vorbelegt
+    - Bugfix: In der Geschäftsliste war der Beschluss nicht lesbar – die Spalte war zu schmal und schnitt den Text ab (z.B. nur «Zu» statt «Zustimmung»); sie ist jetzt breit genug
+    - Bugfix: Bei nur einem Sitzungstyp liess sich keine neue Sitzung anlegen – der «+»-Knopf führte die Aktion direkt aus, statt das Auswahlmenü zu öffnen; jetzt erscheint immer das Menü
+    - Bugfix: Geschäfts-Detailansicht – lange Verfasser-Listen sprengten die Breite; die Tabelle bricht jetzt um. «Einreichende» heisst neu «Einreicher», und die Rollen erscheinen ohne Schrägstrich-Gendern (z.B. «Erstunterzeichner» statt «Erstunterzeichner/-in»)
+
 - 2026-06-19 **1.6.2**
     - Behebt, dass sich die App nach einem Nextcloud-Upgrade nicht mehr aktivieren liess («could not enable app»): Eine Datenbank-Anpassung beim Aktivieren verwendete eine in Nextcloud 34 entfernte interne Funktion und brach die Aktivierung ab. Sie ermittelt den Tabellennamen jetzt über die System-Konfiguration
 

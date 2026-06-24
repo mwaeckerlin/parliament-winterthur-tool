@@ -87,7 +87,7 @@
   --pw-col-status: 6em;
   --pw-col-datum: 5em;
   --pw-col-zustaendig: 4em;
-  --pw-col-beschluss: 4em;
+  --pw-col-beschluss: 14em;
   --pw-col-titel: 15em;
 
   /* Seitenleiste: Nextcloud-Standardbreite und -Layout 1:1 übernehmen (wie die
@@ -226,6 +226,19 @@
   display: flex;
   flex-direction: column;
   gap: var(--pw-gap-1);
+}
+
+/* Sortieren und Filtern deutlich voneinander abgrenzen. */
+.pw-filter-gruppe {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pw-gap-1);
+}
+
+.pw-filter-gruppe + .pw-filter-gruppe {
+  margin-block-start: var(--pw-gap-1);
+  padding-block-start: var(--pw-gap-1);
+  border-block-start: 1px solid var(--color-border);
 }
 
 .pw-view-content {
@@ -727,8 +740,24 @@
   inline-size: 100%;
   max-inline-size: 100%;
   border-collapse: collapse;
-  /* Spaltenbreiten passen sich dynamisch an den Inhalt an. */
-  table-layout: auto;
+  /* Feste Spaltenbreiten, damit lange Inhalte (z.B. die Einreicher-Liste) in der
+     Zelle umbrechen, statt die ganze Tabelle in die Breite zu sprengen. */
+  table-layout: fixed;
+}
+
+/* Jede Zelle der Info-Tabelle bricht um statt überzulaufen. */
+.pw-info-tabelle th,
+.pw-info-tabelle td {
+  overflow-wrap: anywhere;
+  word-break: normal;
+  white-space: normal;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+
+/* Schmale Label-Spalte, damit der Wert (td) den meisten Platz bekommt. */
+.pw-info-tabelle th {
+  inline-size: 14em;
 }
 
 .pw-tabelle th,
@@ -1917,7 +1946,7 @@
   /* Wrap mit Silbentrennung erlaubt. */
   inline-size: 1%;
   min-inline-size: var(--pw-col-beschluss);
-  max-inline-size: 12em;
+  max-inline-size: 18em;
   white-space: normal;
   overflow-wrap: anywhere;
   word-break: normal;

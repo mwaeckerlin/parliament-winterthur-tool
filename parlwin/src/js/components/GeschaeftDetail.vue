@@ -24,7 +24,7 @@
             <tr><th>Fraktionsstatus</th><td>{{ fraktionsstatusLabel(geschaeft.fraktionsstatus) }}</td></tr>
             <tr><th>Datum</th><td>{{ formatieredatum(geschaeft.datum) }}</td></tr>
             <tr v-if="geschaeft.einreicher && geschaeft.einreicher.length">
-              <th>Einreichende</th>
+              <th>Einreicher</th>
               <td>
                 <span
                   v-for="(p, i) in geschaeft.einreicher"

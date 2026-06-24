@@ -1367,7 +1367,7 @@ class ScraperService
                 }
                 $einreicher[] = [
                     'name' => self::bereinigeHtmlText($match[2]),
-                    'rolle' => self::bereinigeHtmlText($match[3]),
+                    'rolle' => self::entgendere(self::bereinigeHtmlText($match[3])),
                     'externId' => $externId,
                 ];
             }
@@ -1381,7 +1381,7 @@ class ScraperService
                 if ($name !== '') {
                     $einreicher[] = [
                         'name' => $name,
-                        'rolle' => self::bereinigeHtmlText($match[2]),
+                        'rolle' => self::entgendere(self::bereinigeHtmlText($match[2])),
                         'externId' => '',
                     ];
                 }
@@ -1389,6 +1389,16 @@ class ScraperService
         }
 
         return $einreicher;
+    }
+
+    /**
+     * Reduziert Schrägstrich-Gendern auf das generische Maskulinum, z.B.
+     * «Erstunterzeichner/-in» → «Erstunterzeichner», «Einreicher/innen» →
+     * «Einreicher». Regel: nie gendern.
+     */
+    public static function entgendere(string $text): string
+    {
+        return preg_replace('#/-?in(?:nen)?\b#u', '', $text) ?? $text;
     }
 
     private function ladeGeschaeftDetailsParallel(array $urls, int $parallel, ?callable $beiErfolg = null): array

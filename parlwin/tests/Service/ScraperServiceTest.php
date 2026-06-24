@@ -190,15 +190,15 @@ class ScraperServiceTest extends TestCase {
         $this->assertCount(3, $einreicher);
 
         $this->assertSame('Stritt Gabriela', $einreicher[0]['name']);
-        $this->assertSame('Erstunterzeichner/-in', $einreicher[0]['rolle']);
+        $this->assertSame('Erstunterzeichner', $einreicher[0]['rolle']);
         $this->assertSame('281225', $einreicher[0]['externId']);
 
         $this->assertSame('Cometta-Müller Katrin', $einreicher[1]['name']);
-        $this->assertSame('Mitunterzeichner/-in', $einreicher[1]['rolle']);
+        $this->assertSame('Mitunterzeichner', $einreicher[1]['rolle']);
         $this->assertSame('', $einreicher[1]['externId']);
 
         $this->assertSame('Gander Katharina', $einreicher[2]['name']);
-        $this->assertSame('Mitunterzeichner/-in', $einreicher[2]['rolle']);
+        $this->assertSame('Mitunterzeichner', $einreicher[2]['rolle']);
     }
 
     /**
@@ -218,9 +218,9 @@ class ScraperServiceTest extends TestCase {
         $einreicher = $details['einreicher'];
 
         $this->assertSame("D'Amato Luca", $einreicher[0]['name']);
-        $this->assertSame('Erstunterzeichner/-in', $einreicher[0]['rolle']);
+        $this->assertSame('Erstunterzeichner', $einreicher[0]['rolle']);
         $this->assertSame("O'Brien Sean & Co", $einreicher[1]['name']);
-        $this->assertSame('Mitunterzeichner/-in', $einreicher[1]['rolle']);
+        $this->assertSame('Mitunterzeichner', $einreicher[1]['rolle']);
 
         // Kein roher Entity-Code mehr in den gespeicherten Werten
         foreach ($einreicher as $e) {
@@ -639,5 +639,16 @@ class ScraperServiceTest extends TestCase {
         $this->assertSame('Wahlen', $traktanden[0]['type']);
         $this->assertSame('1388420', $traktanden[0]['businessId']);
         $this->assertSame('https://parlament.winterthur.ch/_rte/information/1388420', $traktanden[0]['url']);
+    }
+
+    /**
+     * Regel: nie gendern. Schrägstrich-Gendern in den von der Parlamentswebseite
+     * gelieferten Rollen muss auf das generische Maskulinum reduziert werden.
+     */
+    public function testEntgendereEntferntSchraegstrichGendern(): void {
+        $this->assertSame('Erstunterzeichner', ScraperService::entgendere('Erstunterzeichner/-in'));
+        $this->assertSame('Mitunterzeichner', ScraperService::entgendere('Mitunterzeichner/-in'));
+        $this->assertSame('Einreicher', ScraperService::entgendere('Einreicher/innen'));
+        $this->assertSame('Kommissionspräsident', ScraperService::entgendere('Kommissionspräsident'));
     }
 }

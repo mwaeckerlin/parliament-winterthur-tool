@@ -170,6 +170,36 @@ test.describe('Fraktion: drei Nutzer arbeiten gleichzeitig zusammen', () => {
     ).toHaveCount(0)
   })
 
+  // 0b: Regression (Nextcloud 34) – die Übersetzungsdatei l10n/<lang>.js der App
+  // nutzt OC.L10N.register und darf nicht vor dem Nextcloud-Core laden, sonst
+  // «Uncaught ReferenceError: OC is not defined» (real auf der Admin-Seite
+  // beobachtet). Wir laden die Admin-Einstellungsseite (lädt admin.js + l10n) als
+  // Admin mit einem Fehler-Wächter und prüfen, dass kein solcher Fehler auftritt.
+  test('0b: Admin-Seite lädt ohne JavaScript-Fehler (OC is not defined)', async ({ browser }) => {
+    const adminPass = process.env.PW_ADMIN_PASS || ''
+    expect(adminPass, 'Admin-Passwort (PW_ADMIN_PASS) nicht gesetzt').not.toBe('')
+
+    // Deutsch erzwingen: Die Übersetzungsdatei l10n/de.js (OC.L10N.register) wird
+    // nur bei deutscher Sprache geladen – genau sie löst «OC is not defined» aus,
+    // wenn sie vor dem Nextcloud-Core lädt. Auf Englisch gibt es keine solche Datei,
+    // der Fehler bliebe unentdeckt.
+    const ctx = await browser.newContext({ locale: 'de-DE' })
+    const page = await ctx.newPage()
+    const jsFehler = []
+    page.on('pageerror', (e) => jsFehler.push(e.message))
+
+    await login(page, { name: 'admin', pass: adminPass })
+    await page.goto(`${BASE_URL}/index.php/settings/admin/parlwin`)
+    await page.waitForLoadState('networkidle')
+    await ctx.close()
+
+    const ocFehler = jsFehler.filter((m) => /OC is not defined|OC is undefined/.test(m))
+    expect(
+      ocFehler,
+      `JavaScript-Ladefehler auf der Admin-Seite: ${jsFehler.join(' | ') || '(keine)'}`,
+    ).toEqual([])
+  })
+
   // 1–3: Alle drei sehen den Fraktionsordner (Browser) und den Fraktionskalender (CalDAV).
   test('1–3: Alle drei Nutzer sehen Fraktionsordner und Fraktionskalender', async () => {
     for (const [page, dav, user] of [[page1, dav1, USERS.u1], [page2, dav2, USERS.u2], [page3, dav3, USERS.u3]]) {

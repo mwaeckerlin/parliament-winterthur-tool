@@ -14,6 +14,8 @@ export default defineConfig({
       '@nextcloud/router': '/home/marc/git/mwaeckerlin/parliament-winterthur-tool/parlwin/src/js/tests/__mocks__/@nextcloud/router.js',
       '@nextcloud/auth': '/home/marc/git/mwaeckerlin/parliament-winterthur-tool/parlwin/src/js/tests/__mocks__/@nextcloud/auth.js',
       '@nextcloud/axios': '/home/marc/git/mwaeckerlin/parliament-winterthur-tool/parlwin/src/js/tests/__mocks__/@nextcloud/axios.js',
+      '@nextcloud/dialogs/style.css': '/home/marc/git/mwaeckerlin/parliament-winterthur-tool/parlwin/src/js/tests/__mocks__/empty.js',
+      '@nextcloud/dialogs': '/home/marc/git/mwaeckerlin/parliament-winterthur-tool/parlwin/src/js/tests/__mocks__/@nextcloud/dialogs.js',
       '@nextcloud/vue/components/NcSelect': '/home/marc/git/mwaeckerlin/parliament-winterthur-tool/parlwin/src/js/tests/__mocks__/@nextcloud/vue/NcComponent.js',
       '@nextcloud/vue/components/NcActions': '/home/marc/git/mwaeckerlin/parliament-winterthur-tool/parlwin/src/js/tests/__mocks__/@nextcloud/vue/NcComponent.js',
       '@nextcloud/vue/components/NcActionButton': '/home/marc/git/mwaeckerlin/parliament-winterthur-tool/parlwin/src/js/tests/__mocks__/@nextcloud/vue/NcComponent.js',

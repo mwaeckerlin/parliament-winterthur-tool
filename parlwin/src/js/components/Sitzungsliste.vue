@@ -21,7 +21,7 @@
     <header class="pw-view-header">
       <h2 class="pw-view-title">Sitzungen</h2>
       <span class="pw-view-count">{{ gefilterteSitzungen.length }}</span>
-      <NcActions :aria-label="'Neue Sitzung aus Vorlage erstellen'" type="primary" class="pw-neue-sitzung-btn">
+      <NcActions :aria-label="'Neue Sitzung aus Vorlage erstellen'" type="primary" :force-menu="true" class="pw-neue-sitzung-btn">
         <template #icon>
           <span style="font-size:1.2em;line-height:1">+</span>
         </template>
@@ -557,6 +557,11 @@ export default {
     heuteDatum() {
       return new Date().toISOString().slice(0, 10)
     },
+    datumInEinerWoche() {
+      const d = new Date()
+      d.setDate(d.getDate() + 7)
+      return d.toISOString().slice(0, 10)
+    },
     aktiveMitglieder() {
       return (this.mitglieder || []).filter(m => m.aktiv !== false)
     },
@@ -647,7 +652,7 @@ export default {
     },
     waehleTypFuerNeueSitzung(typ) {
       this.gewaehlterTyp = typ
-      this.neueSitzungDatum = this.heuteDatum
+      this.neueSitzungDatum = this.datumInEinerWoche
       this.neueSitzungTitel = typ.name || ''
       this.neueSitzungOrt = typ.standardOrt || ''
       this.neueSitzungZeitVon = typ.standardZeitVon || ''
