@@ -1,5 +1,9 @@
 # Changelog
 
+- 2026-06-24 **1.7.4**
+    - Bugfix: Nach einem Neustart erschien beim Öffnen der App ein «Interner Serverfehler» – die App startet wieder normal
+    - Bugfix: Beim automatischen Aktualisieren (wenn jemand anderes etwas speichert) sprang die Sitzungsliste an den Anfang; die Liste wird nun an Ort und Stelle aktualisiert, ohne dass die Ansicht springt
+
 - 2026-06-24 **1.7.3**
     - Verknüpfte Sitzungen zeigen nun die Notizen der jeweils anderen Sitzungen der Verknüpfung gesammelt an (nur Anzeige); eine Sitzung lässt sich direkt wieder entkoppeln, wobei alle Notizen an ihrem Platz bleiben
 
