@@ -12,8 +12,11 @@ use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\DataResponse;
 use OCP\AppFramework\Http;
+use OCP\Files\IRootFolder;
+use OCP\Files\NotFoundException;
 use OCP\IRequest;
 use OCP\IUserSession;
+use Psr\Log\LoggerInterface;
 
 /**
  * REST-Controller für Parlamentssitzungen und Traktanden.
@@ -26,8 +29,124 @@ class SitzungController extends Controller
         private readonly SitzungstypService $sitzungstypService,
         private readonly RealtimePublisherService $realtimePublisher,
         private readonly IUserSession $userSession,
+        private readonly IRootFolder $rootFolder,
+        private readonly LoggerInterface $logger,
     ) {
         parent::__construct(Application::APP_ID, $request);
+    }
+
+    /** Relativer Ordner für die Dokumente einer Sitzung (im Jahr der Sitzung). */
+    private function sitzungOrdnerPfad(\OCA\ParliamentWinterthur\Db\Sitzung $sitzung): array
+    {
+        $datum = (string) $sitzung->getDatum();
+        $jahr = preg_match('/^(\d{4})-/', $datum, $m) ? $m[1] : date('Y');
+        // Dateipräfix = Datum, analog zur Geschäftsnummer bei Geschäftsdokumenten.
+        return ['Fraktion/10_Sitzungen/' . $jahr, $datum];
+    }
+
+    /** Listet die Dokumente einer Sitzung (Dateien mit Datums-Präfix). */
+    #[NoAdminRequired]
+    public function dokumente(int $id): DataResponse
+    {
+        try {
+            $sitzung = $this->service->eins($id);
+        } catch (\OCP\AppFramework\Db\DoesNotExistException) {
+            return new DataResponse(['fehler' => 'Sitzung nicht gefunden'], Http::STATUS_NOT_FOUND);
+        }
+        $user = $this->userSession->getUser();
+        if ($user === null) {
+            return new DataResponse(['fehler' => 'Nicht angemeldet'], Http::STATUS_UNAUTHORIZED);
+        }
+        [$ordnerPfad, $praefix] = $this->sitzungOrdnerPfad($sitzung);
+        try {
+            $userFolder = $this->rootFolder->getUserFolder($user->getUID());
+            if (!$userFolder->nodeExists($ordnerPfad)) {
+                return new DataResponse([]);
+            }
+            $ordner = $userFolder->get($ordnerPfad);
+            if (!($ordner instanceof \OCP\Files\Folder)) {
+                return new DataResponse([]);
+            }
+            $eintraege = [];
+            foreach ($ordner->getDirectoryListing() as $node) {
+                $name = $node->getName();
+                if (!str_starts_with($name, $praefix . '-')) {
+                    continue;
+                }
+                $eintraege[] = [
+                    'name' => $name,
+                    'pfad' => ltrim($ordnerPfad . '/' . $name, '/'),
+                    'mime' => $node instanceof \OCP\Files\File ? $node->getMimeType() : 'httpd/unix-directory',
+                    'groesse' => $node->getSize(),
+                    'mtime' => $node->getMTime(),
+                    'fileId' => $node->getId(),
+                ];
+            }
+            usort($eintraege, fn (array $a, array $b): int => strcmp($a['name'], $b['name']));
+            return new DataResponse($eintraege);
+        } catch (NotFoundException) {
+            return new DataResponse([]);
+        } catch (\Throwable $e) {
+            $this->logger->warning('parlwin: sitzung dokumente() Fehler: {msg}', ['msg' => $e->getMessage()]);
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /** Erstellt ein neues Dokument zu einer Sitzung (Datums-Präfix + Name). */
+    #[NoAdminRequired]
+    public function dokumentErstellen(int $id): DataResponse
+    {
+        $name = trim((string) $this->request->getParam('name', ''));
+        $extension = ltrim(trim((string) $this->request->getParam('extension', '')), '.');
+        $vorlage = trim((string) $this->request->getParam('vorlage', ''));
+        if ($name === '' || $extension === '') {
+            return new DataResponse(['fehler' => 'Name und Endung erforderlich'], Http::STATUS_BAD_REQUEST);
+        }
+        try {
+            $sitzung = $this->service->eins($id);
+        } catch (\OCP\AppFramework\Db\DoesNotExistException) {
+            return new DataResponse(['fehler' => 'Sitzung nicht gefunden'], Http::STATUS_NOT_FOUND);
+        }
+        $user = $this->userSession->getUser();
+        if ($user === null) {
+            return new DataResponse(['fehler' => 'Nicht angemeldet'], Http::STATUS_UNAUTHORIZED);
+        }
+        [$ordnerPfad, $praefix] = $this->sitzungOrdnerPfad($sitzung);
+        $sanitisiert = str_replace([' ', '/', '\\'], ['_', '_', '_'], $name);
+        $dateiName = $praefix . '-' . $sanitisiert . '.' . $extension;
+        try {
+            $userFolder = $this->rootFolder->getUserFolder($user->getUID());
+            $aktuell = '';
+            foreach (explode('/', $ordnerPfad) as $teil) {
+                $aktuell = $aktuell === '' ? $teil : $aktuell . '/' . $teil;
+                if (!$userFolder->nodeExists($aktuell)) {
+                    $userFolder->newFolder($aktuell);
+                }
+            }
+            $zielPfad = $ordnerPfad . '/' . $dateiName;
+            if ($userFolder->nodeExists($zielPfad)) {
+                return new DataResponse(['fehler' => 'Datei existiert bereits'], Http::STATUS_CONFLICT);
+            }
+            $inhalt = '';
+            if ($vorlage !== '' && $userFolder->nodeExists($vorlage)) {
+                $vorlageNode = $userFolder->get($vorlage);
+                if ($vorlageNode instanceof \OCP\Files\File) {
+                    $inhalt = $vorlageNode->getContent();
+                }
+            }
+            $datei = $userFolder->newFile($zielPfad, $inhalt);
+            return new DataResponse([
+                'name' => $datei->getName(),
+                'pfad' => $zielPfad,
+                'fileId' => $datei->getId(),
+                'mime' => $datei->getMimeType(),
+                'groesse' => $datei->getSize(),
+                'mtime' => $datei->getMTime(),
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->warning('parlwin: sitzung dokumentErstellen() Fehler: {msg}', ['msg' => $e->getMessage()]);
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_INTERNAL_SERVER_ERROR);
+        }
     }
 
     /**

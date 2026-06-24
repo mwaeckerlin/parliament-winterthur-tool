@@ -239,6 +239,16 @@
             />
           </div>
 
+          <!-- Dokumente zur Sitzung -->
+          <div class="pw-sitzung-dokumente">
+            <GeschaeftDokumente
+              :api-basis="`/apps/parlwin/sitzungen/${sitzung.id}`"
+              :praefix="sitzung.datum"
+              :jahr-text="(sitzung.datum || '').slice(0, 4)"
+              :ordner-hinweis="`Fraktion/10_Sitzungen/${(sitzung.datum || '').slice(0, 4)}/${sitzung.datum}-*`"
+            />
+          </div>
+
           <!-- Verknüpfte Sitzungen: aggregierte Notizen (nur Anzeige) -->
           <div v-if="sitzung.verknuepfungId" class="pw-verknuepfte-sitzungen">
             <h4>
@@ -517,6 +527,7 @@ import '@nextcloud/dialogs/style.css'
 import { subscribeRealtime } from '../realtime'
 import GeschaeftDetail from './GeschaeftDetail.vue'
 import NotizenListe from './NotizenListe.vue'
+import GeschaeftDokumente from './GeschaeftDokumente.vue'
 import NcActions from '@nextcloud/vue/components/NcActions'
 import NcActionButton from '@nextcloud/vue/components/NcActionButton'
 import NcActionCaption from '@nextcloud/vue/components/NcActionCaption'
@@ -530,7 +541,7 @@ import PwField from './PwField.vue'
 
 export default {
   name: 'Sitzungsliste',
-  components: { GeschaeftDetail, NotizenListe, NcActions, NcActionButton, NcActionCaption, NcButton, NcCheckboxRadioSwitch, NcLoadingIcon, NcSelect, NcTextField, PwMultiSelect, PwField },
+  components: { GeschaeftDetail, NotizenListe, GeschaeftDokumente, NcActions, NcActionButton, NcActionCaption, NcButton, NcCheckboxRadioSwitch, NcLoadingIcon, NcSelect, NcTextField, PwMultiSelect, PwField },
   props: {
     mitglieder:   { type: Array, default: () => [] },
     fraktionen:   { type: Array, default: () => [] },

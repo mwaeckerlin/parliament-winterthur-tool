@@ -51,6 +51,8 @@ class SitzungControllerTest extends TestCase
             $sitzungstypService ?? $this->createStub(SitzungstypService::class),
             $this->createStub(RealtimePublisherService::class),
             $this->createStub(IUserSession::class),
+            $this->createStub(\OCP\Files\IRootFolder::class),
+            $this->createStub(\Psr\Log\LoggerInterface::class),
         );
     }
 
@@ -133,6 +135,8 @@ class SitzungControllerTest extends TestCase
             $this->createStub(SitzungstypService::class),
             $this->createStub(RealtimePublisherService::class),
             $this->createStub(IUserSession::class),
+            $this->createStub(\OCP\Files\IRootFolder::class),
+            $this->createStub(\Psr\Log\LoggerInterface::class),
         );
 
         $response = $controller->index();

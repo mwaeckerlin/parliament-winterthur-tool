@@ -2,7 +2,7 @@
   <div class="pw-dokumente">
     <div class="pw-dokumente-kopf">
       <h4>Dokumente</h4>
-      <small class="pw-hinweis">Pfad: <code>Fraktion/20_Geschäfte/{{ jahr }}/{{ geschaeftNummer }}-*</code></small>
+      <small class="pw-hinweis">Pfad: <code>{{ ordnerHinweis || ('Fraktion/20_Geschäfte/' + jahr + '/' + praefixWert + '-*') }}</code></small>
     </div>
 
     <div v-if="laden" class="pw-laden">Lädt…</div>
@@ -18,7 +18,7 @@
       </li>
     </ul>
 
-    <div v-if="geschaeftNummer" class="pw-dokument-aktionen">
+    <div v-if="bereit" class="pw-dokument-aktionen">
       <NcActions v-model:open="menuOffen" :menu-name="'+ Neues Dokument'" type="primary">
         <NcActionButton
           v-for="t in vorlagen"
@@ -48,7 +48,7 @@
             <label>
               Dateiname (ohne Präfix und Endung)
               <div class="pw-dokument-name-vorschau">
-                <span class="pw-dokument-praefix">{{ geschaeftNummer }}-</span>
+                <span class="pw-dokument-praefix">{{ praefixWert }}-</span>
                 <input v-model="neuerName" type="text" class="pw-input" placeholder="z. B. Überweisung Rede" @keyup.enter="dokumentErstellen" />
                 <span class="pw-dokument-suffix">.{{ aktiveVorlage?.extension }}</span>
               </div>
@@ -94,8 +94,14 @@ export default {
   name: 'GeschaeftDokumente',
   components: { NcActions, NcActionButton },
   props: {
-    geschaeftId: { type: Number, required: true },
-    geschaeftNummer: { type: String, required: true },
+    // Geschäfts-Modus (abwärtskompatibel)
+    geschaeftId: { type: Number, default: 0 },
+    geschaeftNummer: { type: String, default: '' },
+    // Generischer Modus (z.B. für Sitzungen): API-Basis + Datei-Präfix + Hinweistext
+    apiBasis: { type: String, default: '' },
+    praefix: { type: String, default: '' },
+    jahrText: { type: String, default: '' },
+    ordnerHinweis: { type: String, default: '' },
   },
   data() {
     return {
@@ -112,25 +118,39 @@ export default {
     }
   },
   computed: {
+    // API-Basis: generischer apiBasis-Prop hat Vorrang, sonst Geschäfts-URL.
+    basis() {
+      return this.apiBasis || `/apps/parlwin/geschaefte/${this.geschaeftId}`
+    },
+    // Datei-Präfix (vor «-name.ext»): generischer praefix-Prop oder Geschäftsnummer.
+    praefixWert() {
+      return this.praefix || this.geschaeftNummer
+    },
     jahr() {
+      if (this.jahrText) return this.jahrText
       const m = (this.geschaeftNummer || '').match(/^(\d{4})\./)
       return m ? m[1] : ''
+    },
+    bereit() {
+      return !!(this.apiBasis ? this.praefixWert : (this.geschaeftId && this.geschaeftNummer))
     },
   },
   watch: {
     geschaeftId() { this.laden_() },
     geschaeftNummer() { this.laden_() },
+    apiBasis() { this.laden_() },
+    praefix() { this.laden_() },
   },
   mounted() { this.laden_() },
   methods: {
     async laden_() {
-      if (!this.geschaeftId || !this.geschaeftNummer) {
+      if (!this.bereit) {
         this.dokumente = []
         return
       }
       this.laden = true
       try {
-        const { data } = await axios.get(generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}/dokumente`))
+        const { data } = await axios.get(generateUrl(`${this.basis}/dokumente`))
         this.dokumente = Array.isArray(data) ? data : []
       } catch (e) {
         console.error('parlwin: Dokumente laden fehlgeschlagen', e)
@@ -174,7 +194,7 @@ export default {
       form.append('datei', datei)
       try {
         await axios.post(
-          generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}/dokumente/upload`),
+          generateUrl(`${this.basis}/dokumente/upload`),
           form,
           { headers: { 'Content-Type': 'multipart/form-data' } }
         )
@@ -202,7 +222,7 @@ export default {
       try { neuerTab = window.open('about:blank', '_blank') } catch (e) { neuerTab = null }
       try {
         const { data } = await axios.post(
-          generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}/dokumente`),
+          generateUrl(`${this.basis}/dokumente`),
           { name, extension: this.aktiveVorlage.extension }
         )
         const fileId = data && data.fileId
