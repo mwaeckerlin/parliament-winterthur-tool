@@ -1,5 +1,8 @@
 # Changelog
 
+- 2026-06-24 **1.7.2**
+    - Bugfix: Das Docker-Image liess sich nicht mehr bauen (und damit die Umgebung nicht starten), seit der «Änderungsverlauf»-Tab eingeführt wurde – die Änderungsliste wird nun korrekt in den Build einbezogen
+
 - 2026-06-24 **1.7.1**
     - Notizen lassen sich jetzt formatieren: Eingabe über eine Werkzeugleiste mit Fett, Kursiv, Unterstrichen, Durchgestrichen, Überschriften, Aufzählungen, nummerierten Listen, Zitat, Code und Links
         - Alle Notizfelder (Geschäfte, Sitzungen, Traktanden) verwenden denselben Editor; neue und bestehende Notizen werden formatiert angezeigt

@@ -14,6 +14,9 @@ COPY --chown=${BUILD_USER} package*.json ./
 RUN npm install --no-audit --no-fund
 
 COPY --chown=${BUILD_USER} parlwin/ ./parlwin/
+# CHANGELOG.md wird zur Build-Zeit in die «Änderungsverlauf»-Ansicht eingebunden
+# (Webpack-Alias @changelog → ../CHANGELOG.md relativ zu parlwin/).
+COPY --chown=${BUILD_USER} CHANGELOG.md ./CHANGELOG.md
 RUN npm run build:app \
     && rm -rf node_modules \
     parlwin/src \
