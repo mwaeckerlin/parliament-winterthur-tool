@@ -64,12 +64,10 @@
 
         <div class="pw-form-zeile">
           <label>Notiz hinzufügen</label>
-          <textarea
-            v-model="neueNotiz"
-            class="pw-textarea"
-            rows="2"
+          <PwWysiwyg
+            :model-value="neueNotiz"
             placeholder="Kommentar, Beobachtung, Hinweis"
-            @input="notizDebounce"
+            @update:model-value="val => { neueNotiz = val; notizDebounce() }"
             @blur="notizSpeichernBeiBlur"
           />
         </div>
@@ -127,17 +125,15 @@
                 title="Zur Sitzung springen"
                 @click="$emit('oeffneTraktandum', e._sitzungId)"
                 @keydown.enter.prevent="$emit('oeffneTraktandum', e._sitzungId)"
-              >{{ e.text }}</span>
-              <span v-else class="pw-timeline-text">{{ e.text }}</span>
+                v-html="markdownZuHtml(e.text)"
+              />
+              <span v-else class="pw-timeline-text" v-html="markdownZuHtml(e.text)" />
             </template>
             <template v-else-if="e.aktionTyp === 'notiz' && istEigeneAktion(e)">
               <div v-if="bearbeitenNotizId === e.id" class="pw-notiz-bearbeiten-zeile">
-                <textarea
-                  ref="notizBearbeitenInput"
+                <PwWysiwyg
                   v-model="bearbeitenNotizText"
-                  class="pw-textarea"
-                  rows="2"
-                  @keydown.escape="notizBearbeitenAbbrechen"
+                  placeholder="Notiz bearbeiten…"
                 />
                 <div class="pw-notiz-bearbeiten-aktionen">
                   <button type="button" class="button pw-btn-mini" @click="notizBearbeitenSpeichern(e)">✓</button>
@@ -152,7 +148,8 @@
                 title="Klicken zum Bearbeiten"
                 @click="notizBearbeitenStarten(e, $event)"
                 @keydown.enter.prevent="notizBearbeitenStarten(e)"
-              >{{ e.text }}</span>
+                v-html="markdownZuHtml(e.text)"
+              />
             </template>
             <div v-else-if="e.text && e.aktionTyp === 'votum'" class="pw-timeline-text pw-timeline-html" v-html="e.text" />
             <template v-else-if="e.titel && e.aktionTyp !== 'notiz'">
@@ -183,7 +180,7 @@
 <script>
 import { generateUrl } from '@nextcloud/router'
 import { getCurrentUser } from '@nextcloud/auth'
-import { vollerName, personKey } from '../utils'
+import { vollerName, personKey, markdownZuHtml } from '../utils'
 import axios from '@nextcloud/axios'
 import NcSelect from '@nextcloud/vue/components/NcSelect'
 import PwMultiSelect from './PwMultiSelect.vue'
@@ -350,6 +347,7 @@ export default {
     },
   },
   methods: {
+    markdownZuHtml,
     vollerName,
     personKey,
     personLabelByKey(key) {
@@ -523,28 +521,9 @@ export default {
         await this.beschlussSpeichern()
       }
     },
-    notizBearbeitenStarten(a, clickEvent) {
+    notizBearbeitenStarten(a) {
       this.bearbeitenNotizId = a.id
       this.bearbeitenNotizText = a.text || ''
-      let caretOffset = (a.text || '').length
-      if (clickEvent) {
-        const pos = document.caretPositionFromPoint?.(clickEvent.clientX, clickEvent.clientY)
-        if (pos) {
-          caretOffset = pos.offset
-        } else {
-          const range = document.caretRangeFromPoint?.(clickEvent.clientX, clickEvent.clientY)
-          if (range) caretOffset = range.startOffset
-        }
-      }
-      this.$nextTick(() => {
-        const el = Array.isArray(this.$refs.notizBearbeitenInput)
-          ? this.$refs.notizBearbeitenInput[0]
-          : this.$refs.notizBearbeitenInput
-        if (el) {
-          el.focus()
-          el.setSelectionRange(caretOffset, caretOffset)
-        }
-      })
     },
     notizBearbeitenAbbrechen() {
       this.bearbeitenNotizId = null

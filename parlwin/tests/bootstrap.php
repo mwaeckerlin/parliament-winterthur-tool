@@ -150,6 +150,21 @@ if (!interface_exists('OCP\IConfig')) {
     }');
 }
 
+if (!interface_exists('Psr\Container\ContainerInterface')) {
+    // phpcs:ignore
+    eval ('namespace Psr\Container; interface ContainerInterface {
+        public function get(string $id);
+        public function has(string $id): bool;
+    }');
+}
+
+if (!interface_exists('OCP\App\IAppManager')) {
+    // phpcs:ignore
+    eval ('namespace OCP\App; interface IAppManager {
+        public function isInstalled(string $appId): bool;
+    }');
+}
+
 if (!interface_exists('OCP\Migration\IOutput')) {
     // phpcs:ignore
     eval ('namespace OCP\Migration; interface IOutput {
@@ -253,6 +268,7 @@ if (!interface_exists('OCP\Files\Node')) {
         public function getMTime(): int;
         public function getSize(): int|float;
         public function getMimeType(): string;
+        public function move(string $targetPath);
     }');
 }
 if (!interface_exists('OCP\Files\Folder')) {
@@ -263,6 +279,7 @@ if (!interface_exists('OCP\Files\Folder')) {
         public function get(string $path);
         public function newFolder(string $path);
         public function newFile(string $path, $content = null);
+        public function getFullPath(string $path = ""): string;
     }');
 }
 if (!interface_exists('OCP\Files\File')) {

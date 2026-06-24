@@ -56,6 +56,23 @@ class SitzungMapper extends QBMapper
     }
 
     /**
+     * Gibt alle Sitzungen einer Verknüpfungs-Gruppe zurück (gleiche
+     * verknuepfung_id), inklusive gelöschter ausgenommen.
+     *
+     * @return Sitzung[]
+     */
+    public function findByVerknuepfungId(int $verknuepfungId): array
+    {
+        $qb = $this->db->getQueryBuilder();
+        $qb->select('*')
+            ->from($this->getTableName())
+            ->where($qb->expr()->eq('geloescht', $qb->createNamedParameter(false, IQueryBuilder::PARAM_BOOL)))
+            ->andWhere($qb->expr()->eq('verknuepfung_id', $qb->createNamedParameter($verknuepfungId, IQueryBuilder::PARAM_INT)))
+            ->orderBy('datum', 'ASC');
+        return $this->findEntities($qb);
+    }
+
+    /**
      * Gibt eine Sitzung anhand ihrer ID zurück.
      *
      * @throws DoesNotExistException wenn nicht gefunden

@@ -30,6 +30,8 @@ return [
         ['name' => 'sitzung#create', 'url' => '/sitzungen', 'verb' => 'POST'],
         ['name' => 'sitzung#show', 'url' => '/sitzungen/{id}', 'verb' => 'GET'],
         ['name' => 'sitzung#update', 'url' => '/sitzungen/{id}', 'verb' => 'PUT'],
+        ['name' => 'sitzung#verknuepfen', 'url' => '/sitzungen/{id}/verknuepfen', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
+        ['name' => 'sitzung#entkoppeln', 'url' => '/sitzungen/{id}/entkoppeln', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
 
         // Sitzungs-Vorlagen / Sitzungstypen.
         // Hinweis: Die spezifischen /nc/groups und /nc/users Routen MUESSEN

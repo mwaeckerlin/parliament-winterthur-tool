@@ -38,12 +38,15 @@
     "@tiptap/extension-underline": "^3.23.4",
     "@tiptap/starter-kit": "^3.23.4",
     "@tiptap/vue-3": "^3.23.4",
+    "dompurify": "^3.4.11",
+    "markdown-it": "^14.2.0",
+    "tiptap-markdown": "^0.9.0",
     "vue": "^3.5.13"
   },
   "devDependencies": {
     "@nextcloud/eslint-config": "^8.4.1",
-    "@playwright/test": "1.61.0",
     "@nextcloud/webpack-vue-config": "^7.0.2",
+    "@playwright/test": "1.61.0",
     "@vitejs/plugin-vue": "^6.0.7",
     "@vue/test-utils": "^2.4.10",
     "babel-loader": "^10.0.0",

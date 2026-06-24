@@ -60,7 +60,13 @@ kann die Fraktion eigene Notizen, Zuständigkeiten und Argumente dazu erfassen
   - Die Zuweisung für Kommissionsgeschäfte erfolgt **automatisch**: Wer in der
     zuständigen Kommission sitzt, wird vorgeschlagen.
   - Pro Geschäft können **Notizen, Argumente, Hintergrund­dokumente** abgelegt
-    werden.
+    werden. Notizen lassen sich **formatieren** (Fett, Kursiv, Listen,
+    Überschriften, Zitate, Code, Links) und werden intern als Markdown
+    gespeichert.
+- **Gemeinsames Aufgaben-Board (Deck)** – ein mit der Fraktion geteiltes
+  Kanban-Board «Fraktion» wird automatisch eingerichtet (analog zum gemeinsamen
+  Ordner und Kalender); ist die Deck-App nicht installiert, bleibt die Funktion
+  inaktiv.
 - **Live-Aktualisierung** – wenn jemand in der Fraktion etwas ändert, sehen
   alle anderen es sofort, ohne die Seite neu zu laden.
 - **Suche & Filter** über alle Geschäfte, Sitzungen und Mitglieder.

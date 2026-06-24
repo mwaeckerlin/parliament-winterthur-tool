@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { shallowMount } from '@vue/test-utils'
 import NotizenListe from '../components/NotizenListe.vue'
+import PwWysiwyg from '../components/PwWysiwyg.vue'
 
 vi.mock('@nextcloud/auth', () => ({
   getCurrentUser: () => ({ uid: 'testuser', displayName: 'Test User' }),
@@ -12,14 +13,26 @@ function mount(notizen = []) {
   })
 }
 
-// ── Autosave: no '+' button ──────────────────────────────────────────────────
+// Das Eingabefeld für neue Notizen ist ein WYSIWYG-Editor (PwWysiwyg) am Ende
+// der Liste. Beim Bearbeiten erscheint ein weiterer Editor in der Notiz-Zeile.
+function neueNotizEditor(wrapper) {
+  const editoren = wrapper.findAllComponents(PwWysiwyg)
+  return editoren[editoren.length - 1]
+}
 
-describe('NotizenListe — kein Speichern-Button', () => {
+// ── Eingabefeld ist WYSIWYG ───────────────────────────────────────────────────
+
+describe('NotizenListe — WYSIWYG-Eingabefeld', () => {
+  it('nutzt einen PwWysiwyg-Editor (kein einfaches input) für neue Notizen', () => {
+    const wrapper = mount()
+    expect(wrapper.findComponent(PwWysiwyg).exists()).toBe(true)
+    expect(wrapper.find('input.pw-notiz-eingabe').exists()).toBe(false)
+  })
+
   it('hat keinen + Button im Template', () => {
     const wrapper = mount()
     expect(wrapper.find('button[title="Notiz hinzufügen"]').exists()).toBe(false)
-    const buttons = wrapper.findAll('button')
-    const hasPlus = buttons.some(b => b.text() === '+')
+    const hasPlus = wrapper.findAll('button').some(b => b.text() === '+')
     expect(hasPlus).toBe(false)
   })
 })
@@ -29,42 +42,31 @@ describe('NotizenListe — kein Speichern-Button', () => {
 describe('NotizenListe — Autosave bei Blur', () => {
   it('emittiert update:modelValue bei blur mit Text', async () => {
     const wrapper = mount()
-    const input = wrapper.find('input.pw-notiz-eingabe')
-    await input.setValue('Neue Notiz')
-    await input.trigger('blur')
+    const editor = neueNotizEditor(wrapper)
+    editor.vm.$emit('update:modelValue', 'Neue Notiz')
+    await wrapper.vm.$nextTick()
+    editor.vm.$emit('blur')
+    await wrapper.vm.$nextTick()
     const emits = wrapper.emitted('update:modelValue')
     expect(emits).toBeTruthy()
-    expect(emits[0][0].at(-1).text).toBe('Neue Notiz')
+    expect(emits.at(-1)[0].at(-1).text).toBe('Neue Notiz')
   })
 
   it('emittiert nichts bei blur mit leerem Feld', async () => {
     const wrapper = mount()
-    const input = wrapper.find('input.pw-notiz-eingabe')
-    await input.setValue('   ')
-    await input.trigger('blur')
+    neueNotizEditor(wrapper).vm.$emit('blur')
+    await wrapper.vm.$nextTick()
     expect(wrapper.emitted('update:modelValue')).toBeFalsy()
   })
 
   it('leert das Eingabefeld nach Blur-Speicherung', async () => {
     const wrapper = mount()
-    const input = wrapper.find('input.pw-notiz-eingabe')
-    await input.setValue('Text')
-    await input.trigger('blur')
+    const editor = neueNotizEditor(wrapper)
+    editor.vm.$emit('update:modelValue', 'Text')
+    await wrapper.vm.$nextTick()
+    editor.vm.$emit('blur')
+    await wrapper.vm.$nextTick()
     expect(wrapper.vm.neuerText).toBe('')
-  })
-})
-
-// ── Autosave: Enter ──────────────────────────────────────────────────────────
-
-describe('NotizenListe — Autosave bei Enter', () => {
-  it('emittiert update:modelValue bei Enter', async () => {
-    const wrapper = mount()
-    const input = wrapper.find('input.pw-notiz-eingabe')
-    await input.setValue('Enter-Notiz')
-    await input.trigger('keyup', { key: 'Enter' })
-    const emits = wrapper.emitted('update:modelValue')
-    expect(emits).toBeTruthy()
-    expect(emits[0][0].at(-1).text).toBe('Enter-Notiz')
   })
 })
 
@@ -76,9 +78,8 @@ describe('NotizenListe — Debounce (5s)', () => {
 
   it('speichert nach 5 Sekunden ohne weiteren Input', async () => {
     const wrapper = mount()
-    const input = wrapper.find('input.pw-notiz-eingabe')
-    await input.setValue('Debounce-Notiz')
-    await input.trigger('input')
+    neueNotizEditor(wrapper).vm.$emit('update:modelValue', 'Debounce-Notiz')
+    await wrapper.vm.$nextTick()
     expect(wrapper.emitted('update:modelValue')).toBeFalsy()
     vi.advanceTimersByTime(5000)
     await wrapper.vm.$nextTick()
@@ -87,10 +88,11 @@ describe('NotizenListe — Debounce (5s)', () => {
 
   it('bricht den Timer ab wenn Blur früher kommt', async () => {
     const wrapper = mount()
-    const input = wrapper.find('input.pw-notiz-eingabe')
-    await input.setValue('Früh blur')
-    await input.trigger('input')
-    await input.trigger('blur')
+    const editor = neueNotizEditor(wrapper)
+    editor.vm.$emit('update:modelValue', 'Früh blur')
+    await wrapper.vm.$nextTick()
+    editor.vm.$emit('blur')
+    await wrapper.vm.$nextTick()
     vi.advanceTimersByTime(5000)
     await wrapper.vm.$nextTick()
     // Nur ein einzelnes Emit — Blur hat schon gespeichert, Timer darf nicht nochmal auslösen
@@ -105,8 +107,7 @@ describe('NotizenListe — Bearbeiten', () => {
 
   it('öffnet Bearbeitungsmodus bei Klick auf eigene Notiz', async () => {
     const wrapper = mount([eigeneNotiz])
-    const text = wrapper.find('.pw-notiz-text-klickbar')
-    await text.trigger('click')
+    await wrapper.find('.pw-notiz-text-klickbar').trigger('click')
     expect(wrapper.vm.bearbeiteIdx).toBe(0)
   })
 
@@ -114,8 +115,9 @@ describe('NotizenListe — Bearbeiten', () => {
     const wrapper = mount([eigeneNotiz])
     await wrapper.find('.pw-notiz-text-klickbar').trigger('click')
     await wrapper.vm.$nextTick()
-    const input = wrapper.find('input.pw-notiz-eingabe')
-    await input.setValue('Neu')
+    // Editor in der Notiz-Zeile (erstes PwWysiwyg) speist v-model bearbeiteText
+    wrapper.findAllComponents(PwWysiwyg)[0].vm.$emit('update:modelValue', 'Neu')
+    await wrapper.vm.$nextTick()
     await wrapper.find('button[title="Speichern"]').trigger('click')
     expect(wrapper.emitted('update:modelValue')[0][0][0].text).toBe('Neu')
   })

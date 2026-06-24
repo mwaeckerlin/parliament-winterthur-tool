@@ -114,6 +114,14 @@
               />
             </PwField>
           </fieldset>
+
+          <fieldset class="pw-fieldset">
+            <legend>Optionen</legend>
+            <NcCheckboxRadioSwitch
+              :checked="bearbeitung.verknuepfen"
+              @update:checked="v => bearbeitung.verknuepfen = v"
+            >Beim Anlegen Verknüpfung mit anderen Sitzungen anbieten</NcCheckboxRadioSwitch>
+          </fieldset>
         </div>
         <footer class="pw-modal-footer">
           <NcButton type="tertiary" @click="abbrechen">Abbrechen</NcButton>
@@ -281,6 +289,7 @@ export default {
         zweck: '',
         kalenderAnlegen: true,
         einladungVersenden: true,
+        verknuepfen: false,
         standardOrt: '',
         standardZeitVon: '',
         standardZeitBis: '',
@@ -295,6 +304,7 @@ export default {
         zweck: typ.zweck || '',
         kalenderAnlegen: typ.kalenderAnlegen !== false,
         einladungVersenden: typ.einladungVersenden !== false,
+        verknuepfen: typ.verknuepfen === true,
         standardOrt: typ.standardOrt || '',
         standardZeitVon: typ.standardZeitVon || '',
         standardZeitBis: typ.standardZeitBis || '',

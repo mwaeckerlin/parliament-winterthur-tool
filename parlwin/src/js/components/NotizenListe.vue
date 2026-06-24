@@ -20,13 +20,10 @@
       <span class="pw-notiz-datum">{{ n.datum }}</span>
       <span class="pw-notiz-autor">{{ n.displayName || n.uid }}</span>
       <template v-if="bearbeiteIdx === idx">
-        <input
-          ref="bearbeitenInput"
+        <PwWysiwyg
           v-model="bearbeiteText"
-          type="text"
-          class="pw-input pw-notiz-eingabe"
-          @keyup.enter="bearbeitenSpeichern"
-          @keyup.escape="bearbeitenAbbrechen"
+          class="pw-notiz-eingabe-wysiwyg"
+          placeholder="Notiz bearbeiten…"
         />
         <button
           type="button"
@@ -50,7 +47,8 @@
           :title="istEigene(n) ? 'Klicken zum Bearbeiten' : ''"
           @click="istEigene(n) && starteBearbeiten(idx, n)"
           @keydown.enter.prevent="istEigene(n) && starteBearbeiten(idx, n)"
-        >{{ n.text }}</span>
+          v-html="markdownZuHtml(n.text)"
+        />
         <button
           v-if="istEigene(n)"
           type="button"
@@ -61,13 +59,11 @@
       </template>
     </div>
     <div class="pw-neue-notiz">
-      <input
-        v-model="neuerText"
-        type="text"
+      <PwWysiwyg
+        :model-value="neuerText"
         :placeholder="placeholder"
-        class="pw-input pw-notiz-eingabe"
-        @keyup.enter="hinzufuegen"
-        @input="debounce"
+        class="pw-notiz-eingabe-wysiwyg"
+        @update:model-value="val => { neuerText = val; debounce() }"
         @blur="hinzufuegenBeiBlur"
       />
     </div>
@@ -76,6 +72,8 @@
 
 <script>
 import { getCurrentUser } from '@nextcloud/auth'
+import { markdownZuHtml } from '../utils'
+import PwWysiwyg from './PwWysiwyg.vue'
 
 /**
  * Anzeige + Bearbeitung einer Notizen-Liste.
@@ -86,6 +84,7 @@ import { getCurrentUser } from '@nextcloud/auth'
  */
 export default {
   name: 'NotizenListe',
+  components: { PwWysiwyg },
   props: {
     /** Aktuelle Notizen-Liste. */
     modelValue: { type: Array, default: () => [] },
@@ -116,6 +115,7 @@ export default {
     },
   },
   methods: {
+    markdownZuHtml,
     istEigene(n) {
       const uid = (n?.uid || '').toLowerCase()
       return !!uid && uid === this.eigenerUid
@@ -152,11 +152,6 @@ export default {
       if (!this.istEigene(n)) return
       this.bearbeiteIdx = idx
       this.bearbeiteText = String(n.text || '')
-      this.$nextTick(() => {
-        const ref = this.$refs.bearbeitenInput
-        const el = Array.isArray(ref) ? ref[0] : ref
-        el?.focus?.()
-      })
     },
     bearbeitenAbbrechen() {
       this.bearbeiteIdx = -1
