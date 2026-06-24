@@ -7,6 +7,7 @@ namespace OCA\ParliamentWinterthur\BackgroundJob;
 use OCA\ParliamentWinterthur\AppInfo\Application;
 use OCA\ParliamentWinterthur\Command\SyncCommand;
 use OCA\ParliamentWinterthur\Service\FraktionsraumService;
+use OCA\ParliamentWinterthur\Service\VorstossImportService;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\BackgroundJob\TimedJob;
 use OCP\IConfig;
@@ -27,6 +28,7 @@ class SyncJob extends TimedJob {
         private readonly LoggerInterface $logger,
         private readonly FraktionsraumService $fraktionsraumService,
         private readonly IConfig $config,
+        private readonly VorstossImportService $vorstossImport,
     ) {
         parent::__construct($time);
         // Mindestabstand 11 Stunden — verhindert Doppelläufe im selben Zeitfenster
@@ -72,6 +74,12 @@ class SyncJob extends TimedJob {
         @set_time_limit(0);
 
         $this->fraktionsraumService->sicherstellen();
+
+        $importiert = $this->vorstossImport->importiere();
+        if ($importiert > 0) {
+            $this->logger->info('Parlament Winterthur: ' . $importiert . ' Vorstösse aus 40_Vorstösse übernommen');
+        }
+
         $this->logger->info('Parlament Winterthur: Starte Datensynchronisation (BackgroundJob)');
 
         try {

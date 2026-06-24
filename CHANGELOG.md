@@ -1,5 +1,12 @@
 # Changelog
 
+- 2026-06-24 **1.7.9**
+    - Neuer Bereich «Vorstösse» (zwischen Kommissionen und Sitzungstypen): politische Vorstösse erfassen und verwalten
+        - Herkunft «eigene» oder «fremde»; bei fremden Vorstössen lässt sich die eigene Haltung als Beschluss festhalten
+        - Status neu, Entwurf, bereit, eingereicht, erledigt oder pausiert; mit Zuständigkeit, Art und Inhalt
+        - Filter nach Herkunft und Status sowie Suche nach Titel, Art und Zuständigkeit
+        - Dokumente im Ordner «Fraktion/40_Vorstösse» (10_Eigene/20_Fremde) werden automatisch als Vorstösse übernommen
+
 - 2026-06-24 **1.7.8**
     - In einer aufgeklappten Sitzung lassen sich To-dos erfassen, die als Karte im Deck-Board «Fraktion» (Spalte «To-do») landen – mit Bezug auf die Sitzung
     - Änderungsverlauf: die Einträge werden nun sauber als Liste mit Aufzählung, Verschachtelung und Fettschrift dargestellt statt als zusammenhängender Textblock

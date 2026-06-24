@@ -51,6 +51,9 @@
         v-else-if="aktiveAnsicht === 'kommissionen'"
         :mitglieder="mitglieder"
       />
+      <Vorstoesseliste
+        v-else-if="aktiveAnsicht === 'vorstoesse'"
+      />
       <Sitzungstypenliste
         v-else-if="aktiveAnsicht === 'sitzungstypen'"
         :mitglieder="mitglieder"
@@ -75,6 +78,7 @@ import {
   mdiCalendarBlankOutline,
   mdiAccountGroupOutline,
   mdiBankOutline,
+  mdiBullhornOutline,
   mdiFileDocumentEditOutline,
   mdiHistory,
 } from '@mdi/js'
@@ -83,6 +87,7 @@ import Geschaeftsliste from './components/Geschaeftsliste.vue'
 import Sitzungsliste from './components/Sitzungsliste.vue'
 import Mitgliederliste from './components/Mitgliederliste.vue'
 import Kommissionsliste from './components/Kommissionsliste.vue'
+import Vorstoesseliste from './components/Vorstoesseliste.vue'
 import Sitzungstypenliste from './components/Sitzungstypenliste.vue'
 import Changelog from './components/Changelog.vue'
 
@@ -98,6 +103,7 @@ export default {
     Sitzungsliste,
     Mitgliederliste,
     Kommissionsliste,
+    Vorstoesseliste,
     Sitzungstypenliste,
     Changelog,
   },
@@ -115,6 +121,7 @@ export default {
         { key: 'sitzungen', bezeichnung: 'Sitzungen', icon: mdiCalendarBlankOutline },
         { key: 'mitglieder', bezeichnung: 'Mitglieder', icon: mdiAccountGroupOutline },
         { key: 'kommissionen', bezeichnung: 'Kommissionen', icon: mdiBankOutline },
+        { key: 'vorstoesse', bezeichnung: 'Vorstösse', icon: mdiBullhornOutline },
         { key: 'sitzungstypen', bezeichnung: 'Sitzungstypen', icon: mdiFileDocumentEditOutline },
         { key: 'changelog', bezeichnung: 'Änderungsverlauf', icon: mdiHistory },
       ],
