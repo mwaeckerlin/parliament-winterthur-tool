@@ -91,6 +91,33 @@ class DeckService {
         }
     }
 
+    /**
+     * Legt eine To-do-Karte im Fraktions-Board (erste Spalte «To-do») an.
+     * Gibt die Karten-ID zurück oder null, wenn Deck fehlt/keine Gruppe.
+     */
+    public function erstelleTodoKarte(string $owner, string $gruppe, string $titel, string $beschreibung = ''): ?int {
+        if (!$this->deckVerfuegbar() || trim($titel) === '') {
+            return null;
+        }
+        try {
+            $boardId = $this->sicherstellenBoard($owner, $gruppe);
+            if ($boardId === null) {
+                return null;
+            }
+            $stackService = $this->container->get('OCA\\Deck\\Service\\StackService');
+            $stacks = $stackService->findAll($boardId);
+            if (!$stacks) {
+                return null;
+            }
+            $stackId = (int) $stacks[0]->getId();
+            $cardService = $this->container->get('OCA\\Deck\\Service\\CardService');
+            return (int) $cardService->create($titel, $stackId, 'plain', 999, $owner, $beschreibung)->getId();
+        } catch (\Throwable $e) {
+            $this->logger->warning('Deck-Karte konnte nicht erstellt werden: ' . $e->getMessage());
+            return null;
+        }
+    }
+
     /** Lazy-Auflösung des Deck-BoardService über den DI-Container. */
     private function boardService() {
         return $this->container->get('OCA\\Deck\\Service\\BoardService');

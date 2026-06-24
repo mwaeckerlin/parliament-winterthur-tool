@@ -33,8 +33,27 @@ class SitzungController extends Controller
         private readonly IRootFolder $rootFolder,
         private readonly LoggerInterface $logger,
         private readonly SitzungGeschaeftService $sitzungGeschaeftService,
+        private readonly \OCA\ParliamentWinterthur\Service\DeckService $deckService,
+        private readonly \OCP\IConfig $config,
     ) {
         parent::__construct(Application::APP_ID, $request);
+    }
+
+    /** Legt aus einer Sitzung ein To-do als Deck-Karte im Fraktions-Board an. */
+    #[NoAdminRequired]
+    public function todoErstellen(int $id): DataResponse
+    {
+        $titel = trim((string) $this->request->getParam('titel', ''));
+        if ($titel === '') {
+            return new DataResponse(['fehler' => 'Titel fehlt'], Http::STATUS_BAD_REQUEST);
+        }
+        $beschreibung = (string) $this->request->getParam('beschreibung', '');
+        $gruppe = trim((string) $this->config->getAppValue(Application::APP_ID, 'nextcloud_gruppe', ''));
+        $kartenId = $this->deckService->erstelleTodoKarte('admin', $gruppe, $titel, $beschreibung);
+        if ($kartenId === null) {
+            return new DataResponse(['fehler' => 'Deck nicht verfügbar oder keine Gruppe konfiguriert'], Http::STATUS_BAD_REQUEST);
+        }
+        return new DataResponse(['kartenId' => $kartenId]);
     }
 
     /** Verknüpft ein Geschäft mit einer Sitzung. */

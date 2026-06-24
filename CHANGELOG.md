@@ -1,5 +1,9 @@
 # Changelog
 
+- 2026-06-24 **1.7.8**
+    - In einer aufgeklappten Sitzung lassen sich To-dos erfassen, die als Karte im Deck-Board «Fraktion» (Spalte «To-do») landen – mit Bezug auf die Sitzung
+    - Änderungsverlauf: die Einträge werden nun sauber als Liste mit Aufzählung, Verschachtelung und Fettschrift dargestellt statt als zusammenhängender Textblock
+
 - 2026-06-24 **1.7.7**
     - Sitzungstypen können «beratene» Kommissionen festlegen: die in diesen Kommissionen hängigen Geschäfte werden für künftige Sitzungen dieses Typs automatisch verknüpft (regelmässig im Hintergrund, sodass kurz vor der Sitzung alles bereitsteht)
 
