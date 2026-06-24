@@ -1,13 +1,13 @@
 # Changelog
 
+- 2026-06-24 **1.7.5**
+    - Zu jeder Sitzung lassen sich Dokumente ablegen und öffnen (im Ordner «Fraktion/10_Sitzungen/{Jahr}», nach Sitzungsdatum benannt) – gleiche Bedienung wie die Dokumente bei den Geschäften
+
 - 2026-06-24 **1.7.4**
     - Bugfix: Beim automatischen Aktualisieren (wenn jemand anderes etwas speichert) sprangen die Sitzungs- und die Geschäftsliste an den Anfang; sie werden nun an Ort und Stelle aktualisiert, ohne dass die Ansicht springt
 
 - 2026-06-24 **1.7.3**
     - Verknüpfte Sitzungen zeigen nun die Notizen der jeweils anderen Sitzungen der Verknüpfung gesammelt an (nur Anzeige); eine Sitzung lässt sich direkt wieder entkoppeln, wobei alle Notizen an ihrem Platz bleiben
-
-- 2026-06-24 **1.7.2**
-    - Bugfix: Das Docker-Image liess sich nicht mehr bauen (und damit die Umgebung nicht starten), seit der «Änderungsverlauf»-Tab eingeführt wurde – die Änderungsliste wird nun korrekt in den Build einbezogen
 
 - 2026-06-24 **1.7.1**
     - Notizen lassen sich jetzt formatieren: Eingabe über eine Werkzeugleiste mit Fett, Kursiv, Unterstrichen, Durchgestrichen, Überschriften, Aufzählungen, nummerierten Listen, Zitat, Code und Links

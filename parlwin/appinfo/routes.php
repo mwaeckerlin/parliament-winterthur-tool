@@ -33,6 +33,8 @@ return [
         ['name' => 'sitzung#verknuepft', 'url' => '/sitzungen/{id}/verknuepft', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
         ['name' => 'sitzung#verknuepfen', 'url' => '/sitzungen/{id}/verknuepfen', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
         ['name' => 'sitzung#entkoppeln', 'url' => '/sitzungen/{id}/entkoppeln', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
+        ['name' => 'sitzung#dokumente', 'url' => '/sitzungen/{id}/dokumente', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
+        ['name' => 'sitzung#dokumentErstellen', 'url' => '/sitzungen/{id}/dokumente', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
 
         // Sitzungs-Vorlagen / Sitzungstypen.
         // Hinweis: Die spezifischen /nc/groups und /nc/users Routen MUESSEN
