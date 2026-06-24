@@ -32,6 +32,8 @@ class Sitzungstyp extends Entity
   protected bool $kalenderAnlegen = true;
   protected bool $einladungVersenden = true;
   protected bool $verknuepfen = false;
+  /** @var string JSON-Array von Kommissions-IDs, deren hängige Geschäfte automatisch verknüpft werden. */
+  protected string $kommissionen = '[]';
   protected string $standardOrt = '';
   protected string $standardZeitVon = '';
   protected string $standardZeitBis = '';
@@ -59,6 +61,7 @@ class Sitzungstyp extends Entity
       'kalenderAnlegen' => $this->getKalenderAnlegen(),
       'einladungVersenden' => $this->getEinladungVersenden(),
       'verknuepfen' => $this->getVerknuepfen(),
+      'kommissionen' => json_decode($this->getKommissionen() ?: '[]', true) ?: [],
       'standardOrt' => $this->getStandardOrt(),
       'standardZeitVon' => $this->getStandardZeitVon(),
       'standardZeitBis' => $this->getStandardZeitBis(),

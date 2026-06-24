@@ -35,6 +35,9 @@ return [
         ['name' => 'sitzung#entkoppeln', 'url' => '/sitzungen/{id}/entkoppeln', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
         ['name' => 'sitzung#dokumente', 'url' => '/sitzungen/{id}/dokumente', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
         ['name' => 'sitzung#dokumentErstellen', 'url' => '/sitzungen/{id}/dokumente', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
+        ['name' => 'sitzung#geschaefte', 'url' => '/sitzungen/{id}/geschaefte', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
+        ['name' => 'sitzung#geschaeftVerlinken', 'url' => '/sitzungen/{id}/geschaefte', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
+        ['name' => 'sitzung#geschaeftEntlinken', 'url' => '/sitzungen/{id}/geschaefte/{geschaeftId}', 'verb' => 'DELETE', 'requirements' => ['id' => '\d+', 'geschaeftId' => '\d+']],
 
         // Sitzungs-Vorlagen / Sitzungstypen.
         // Hinweis: Die spezifischen /nc/groups und /nc/users Routen MUESSEN

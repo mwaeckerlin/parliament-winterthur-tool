@@ -249,6 +249,23 @@
             />
           </div>
 
+          <!-- Verknüpfte Geschäfte -->
+          <div class="pw-sitzung-geschaefte">
+            <h4>Verknüpfte Geschäfte</h4>
+            <ul v-if="(verknuepfteGeschaeftIds[sitzung.id] || []).length" class="pw-verknuepfte-geschaefte">
+              <li v-for="gid in verknuepfteGeschaeftIds[sitzung.id]" :key="gid">
+                <span>{{ geschaeftTitel(gid) }}</span>
+                <button type="button" class="button pw-btn-mini" title="Verknüpfung lösen" @click="entlinkeGeschaeftVonSitzung(sitzung.id, gid)">✕</button>
+              </li>
+            </ul>
+            <NcSelect
+              :options="geschaefteOptionenFuer(sitzung.id)"
+              label="label"
+              placeholder="Geschäft verknüpfen…"
+              @update:model-value="opt => geschaeftAusgewaehlt(sitzung.id, opt)"
+            />
+          </div>
+
           <!-- Verknüpfte Sitzungen: aggregierte Notizen (nur Anzeige) -->
           <div v-if="sitzung.verknuepfungId" class="pw-verknuepfte-sitzungen">
             <h4>
@@ -560,6 +577,8 @@ export default {
       sitzungNotizen: {},
       traktandumNotizen: {},
       verknuepfteSitzungen: {},
+      verknuepfteGeschaeftIds: {},
+      geschaefteAlle: [],
       ausgewaehlteGeschaeftId: null,
       ausgewaehltesGeschaeftTraktandumKontext: null,
       unsubRealtime: null,
@@ -876,6 +895,54 @@ export default {
         this.offeneSitzungen.push(id)
         await this.ladeTraktandenFuerSitzung(id)
         await this.ladeVerknuepfteSitzungen(id)
+        await this.ladeGeschaefteAlle()
+        await this.ladeVerknuepfteGeschaefte(id)
+      }
+    },
+    async ladeVerknuepfteGeschaefte(id) {
+      try {
+        const { data } = await axios.get(generateUrl(`/apps/parlwin/sitzungen/${id}/geschaefte`))
+        this.verknuepfteGeschaeftIds = { ...this.verknuepfteGeschaeftIds, [id]: (data && data.geschaeftIds) || [] }
+      } catch (e) {
+        this.verknuepfteGeschaeftIds = { ...this.verknuepfteGeschaeftIds, [id]: [] }
+      }
+    },
+    async ladeGeschaefteAlle() {
+      if (this.geschaefteAlle.length) return
+      try {
+        const { data } = await axios.get(generateUrl('/apps/parlwin/geschaefte'), { params: { limit: 500 } })
+        this.geschaefteAlle = Array.isArray(data) ? data : []
+      } catch (e) {
+        this.geschaefteAlle = []
+      }
+    },
+    geschaeftTitel(geschaeftId) {
+      const g = this.geschaefteAlle.find(x => x.id === geschaeftId)
+      return g ? `${g.nummer || ''} ${g.titel || ''}`.trim() : ('#' + geschaeftId)
+    },
+    geschaefteOptionenFuer(sitzungId) {
+      const verknuepft = new Set(this.verknuepfteGeschaeftIds[sitzungId] || [])
+      return this.geschaefteAlle
+        .filter(g => !verknuepft.has(g.id))
+        .map(g => ({ id: g.id, label: `${g.nummer || ''} ${g.titel || ''}`.trim() }))
+    },
+    geschaeftAusgewaehlt(sitzungId, opt) {
+      if (opt && opt.id) this.verlinkeGeschaeftMitSitzung(sitzungId, opt.id)
+    },
+    async verlinkeGeschaeftMitSitzung(sitzungId, geschaeftId) {
+      try {
+        const { data } = await axios.post(generateUrl(`/apps/parlwin/sitzungen/${sitzungId}/geschaefte`), { geschaeftId })
+        this.verknuepfteGeschaeftIds = { ...this.verknuepfteGeschaeftIds, [sitzungId]: (data && data.geschaeftIds) || [] }
+      } catch (e) {
+        showError('Geschäft konnte nicht verknüpft werden: ' + (e?.response?.data?.fehler || e?.message || ''))
+      }
+    },
+    async entlinkeGeschaeftVonSitzung(sitzungId, geschaeftId) {
+      try {
+        const { data } = await axios.delete(generateUrl(`/apps/parlwin/sitzungen/${sitzungId}/geschaefte/${geschaeftId}`))
+        this.verknuepfteGeschaeftIds = { ...this.verknuepfteGeschaeftIds, [sitzungId]: (data && data.geschaeftIds) || [] }
+      } catch (e) {
+        showError('Verknüpfung konnte nicht gelöst werden: ' + (e?.response?.data?.fehler || e?.message || ''))
       }
     },
     async ladeVerknuepfteSitzungen(id) {

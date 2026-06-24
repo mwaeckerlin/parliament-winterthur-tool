@@ -163,6 +163,7 @@ class SitzungstypController extends Controller
       'kalenderAnlegen' => (bool) $this->request->getParam('kalenderAnlegen', true),
       'einladungVersenden' => (bool) $this->request->getParam('einladungVersenden', true),
       'verknuepfen' => (bool) $this->request->getParam('verknuepfen', false),
+      'kommissionen' => $this->request->getParam('kommissionen', []),
       'standardOrt' => (string) $this->request->getParam('standardOrt', ''),
       'standardZeitVon' => (string) $this->request->getParam('standardZeitVon', ''),
       'standardZeitBis' => (string) $this->request->getParam('standardZeitBis', ''),
