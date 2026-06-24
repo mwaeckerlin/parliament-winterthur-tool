@@ -829,14 +829,33 @@ export default {
         const { data } = await axios.get(generateUrl('/apps/parlwin/sitzungen'), {
           params: { limit: 100 },
         })
-        this.sitzungen = data
-        data.forEach(s => {
-          this.sitzungNotizen[s.id] = this.parseNotizen(s.notizen)
-        })
+        this.mergeSitzungen(Array.isArray(data) ? data : [])
       } catch (e) {
         console.error('Fehler beim Laden der Sitzungen:', e)
       } finally {
         this.laden = false
+      }
+    },
+    // Aktualisiert die Sitzungsliste in-place, damit ein Realtime-Sync nicht das
+    // ganze DOM neu aufbaut (sonst springt der Scrollbalken). Bestehende Objekte
+    // werden gemerged (Referenz bleibt), neue ergänzt, entfernte gelöscht.
+    mergeSitzungen(neu) {
+      const neuMap = new Map(neu.map(s => [s.id, s]))
+      for (const s of this.sitzungen) {
+        const n = neuMap.get(s.id)
+        if (n) Object.assign(s, n)
+      }
+      const vorhanden = new Set(this.sitzungen.map(s => s.id))
+      for (const n of neu) {
+        if (!vorhanden.has(n.id)) this.sitzungen.push(n)
+      }
+      for (let i = this.sitzungen.length - 1; i >= 0; i--) {
+        if (!neuMap.has(this.sitzungen[i].id)) this.sitzungen.splice(i, 1)
+      }
+      const reihenfolge = new Map(neu.map((s, i) => [s.id, i]))
+      this.sitzungen.sort((a, b) => (reihenfolge.get(a.id) ?? 0) - (reihenfolge.get(b.id) ?? 0))
+      for (const n of neu) {
+        this.sitzungNotizen[n.id] = this.parseNotizen(n.notizen)
       }
     },
     async toggleSitzung(id) {

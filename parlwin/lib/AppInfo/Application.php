@@ -190,6 +190,14 @@ class Application extends App implements IBootstrap
                 $c->get(KalenderService::class),
                 $c->get(\OCP\Share\IManager::class),
                 $c->get(\Psr\Log\LoggerInterface::class),
+                $c->get(\OCA\ParliamentWinterthur\Service\DeckService::class),
+            );
+        });
+        $context->registerService(\OCA\ParliamentWinterthur\Service\DeckService::class, function ($c) {
+            return new \OCA\ParliamentWinterthur\Service\DeckService(
+                $c->get(\OCP\App\IAppManager::class),
+                $c,
+                $c->get(\Psr\Log\LoggerInterface::class),
             );
         });
         $context->registerService(SyncLockService::class, function ($c) {
