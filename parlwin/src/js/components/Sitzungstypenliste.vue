@@ -121,6 +121,15 @@
               :checked="bearbeitung.verknuepfen"
               @update:checked="v => bearbeitung.verknuepfen = v"
             >Beim Anlegen Verknüpfung mit anderen Sitzungen anbieten</NcCheckboxRadioSwitch>
+            <PwField label="Kommissionen beraten (hängige Geschäfte automatisch verknüpfen)">
+              <PwMultiSelect
+                :model-value="kommissionenAuswahl"
+                :options="kommissionenOptionen"
+                placeholder="Kommissionen wählen…"
+                label="label"
+                @update:model-value="updateKommissionen"
+              />
+            </PwField>
           </fieldset>
         </div>
         <footer class="pw-modal-footer">
@@ -206,6 +215,13 @@ export default {
         .filter(p => p.art === 'mitglied')
         .map(p => ({ value: p.referenzId, label: p.referenzName || this.mitgliedLabel(this.aktiveMitglieder.find(m => m.id === p.referenzId) || {}) }))
     },
+    kommissionenOptionen() {
+      return (this.kommissionen || []).map(k => ({ id: k.id, label: k.name }))
+    },
+    kommissionenAuswahl() {
+      const ids = new Set(this.bearbeitung?.kommissionen || [])
+      return this.kommissionenOptionen.filter(o => ids.has(o.id))
+    },
   },
   mounted() {
     this.$nextTick(() => { this.filterReady = true })
@@ -250,6 +266,10 @@ export default {
       })
       this.bearbeitung.teilnehmer = [...andere, ...mitglieder]
     },
+    updateKommissionen(optionen) {
+      if (!this.bearbeitung) return
+      this.bearbeitung.kommissionen = (optionen || []).map(o => o.id)
+    },
     async ladeNcGruppen(search = '') {
       this.ncGruppenLaden = true
       try {
@@ -290,6 +310,7 @@ export default {
         kalenderAnlegen: true,
         einladungVersenden: true,
         verknuepfen: false,
+        kommissionen: [],
         standardOrt: '',
         standardZeitVon: '',
         standardZeitBis: '',
@@ -305,6 +326,7 @@ export default {
         kalenderAnlegen: typ.kalenderAnlegen !== false,
         einladungVersenden: typ.einladungVersenden !== false,
         verknuepfen: typ.verknuepfen === true,
+        kommissionen: Array.isArray(typ.kommissionen) ? typ.kommissionen : [],
         standardOrt: typ.standardOrt || '',
         standardZeitVon: typ.standardZeitVon || '',
         standardZeitBis: typ.standardZeitBis || '',

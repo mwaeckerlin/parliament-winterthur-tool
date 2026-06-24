@@ -1,5 +1,8 @@
 # Changelog
 
+- 2026-06-24 **1.7.7**
+    - Sitzungstypen können «beratene» Kommissionen festlegen: die in diesen Kommissionen hängigen Geschäfte werden für künftige Sitzungen dieses Typs automatisch verknüpft (regelmässig im Hintergrund, sodass kurz vor der Sitzung alles bereitsteht)
+
 - 2026-06-24 **1.7.6**
     - In einer aufgeklappten Sitzung lassen sich Geschäfte verknüpfen: bereits verknüpfte Geschäfte werden aufgelistet, weitere können über eine Auswahl hinzugefügt und einzeln wieder entfernt werden
 
