@@ -49,7 +49,9 @@ kann die Fraktion eigene Notizen, Zuständigkeiten und Argumente dazu erfassen
 - **Sitzungskalender** – kommende Parlaments- und Kommissionssitzungen samt
   Traktandenliste; automatisch in den Nextcloud-Kalender integriert.
 - **Mitgliederverzeichnis** – alle Parlamentarier mit Partei,
-  Fraktion und Kommissionszugehörigkeit.
+  Fraktion und Kommissionszugehörigkeit; sortierbar nach Funktion (Standard),
+  Fraktion, Partei oder Name und filterbar nach Funktion (Fraktions- bzw.
+  Kommissionspräsident) sowie nach einzelner Kommission.
 - **Kommissionsübersicht** – welche Kommission behandelt welches Geschäft, wer
   sitzt drin.
 - **Fraktionsarbeit**
