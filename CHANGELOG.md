@@ -1,5 +1,8 @@
 # Changelog
 
+- 2026-06-25 **1.7.10**
+    - Einheitliche Bedienung: «Neue Sitzung» erscheint nun – wie «Neuer Vorstoss», «Neuer Typ» und «Eigenes Geschäft» – als beschrifteter Knopf statt als rundes Symbol; Filter erscheinen überall in der Seitenleiste
+
 - 2026-06-24 **1.7.9**
     - Neuer Bereich «Vorstösse» (zwischen Kommissionen und Sitzungstypen): politische Vorstösse erfassen und verwalten
         - Herkunft «eigene» oder «fremde»; bei fremden Vorstössen lässt sich die eigene Haltung als Beschluss festhalten

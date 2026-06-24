@@ -31,10 +31,10 @@ describe('Vorstoesseliste', () => {
       { id: 1, titel: 'A', herkunft: 'eigene', status: 'neu' },
       { id: 2, titel: 'B', herkunft: 'fremde', status: 'erledigt' },
     ]
-    wrapper.vm.herkunftFilter = 'fremde'
+    wrapper.vm.herkunftOption = { label: 'Fremde', value: 'fremde' }
     expect(wrapper.vm.gefiltert.map(v => v.id)).toEqual([2])
-    wrapper.vm.herkunftFilter = ''
-    wrapper.vm.statusFilter = 'neu'
+    wrapper.vm.herkunftOption = { label: 'Alle', value: '' }
+    wrapper.vm.statusOption = { label: 'Neu', value: 'neu' }
     expect(wrapper.vm.gefiltert.map(v => v.id)).toEqual([1])
   })
 

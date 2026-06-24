@@ -21,10 +21,7 @@
     <header class="pw-view-header">
       <h2 class="pw-view-title">Sitzungen</h2>
       <span class="pw-view-count">{{ gefilterteSitzungen.length }}</span>
-      <NcActions :aria-label="'Neue Sitzung aus Vorlage erstellen'" type="primary" :force-menu="true" class="pw-neue-sitzung-btn">
-        <template #icon>
-          <span style="font-size:1.2em;line-height:1">+</span>
-        </template>
+      <NcActions :aria-label="'Neue Sitzung aus Vorlage erstellen'" type="primary" menu-name="+ Neue Sitzung" :force-menu="true" class="pw-neue-sitzung-btn">
         <NcActionButton v-if="sitzungstypen.length === 0" :disabled="true">Kein Sitzungstyp definiert</NcActionButton>
         <NcActionButton
           v-for="typ in sitzungstypen"
