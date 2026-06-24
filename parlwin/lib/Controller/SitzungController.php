@@ -147,6 +147,18 @@ class SitzungController extends Controller
         }
     }
 
+    /** Liefert alle Sitzungen der Verknüpfungs-Gruppe (inkl. dieser) für die aggregierte Sicht. */
+    #[NoAdminRequired]
+    public function verknuepft(int $id): DataResponse
+    {
+        try {
+            $sitzungen = $this->service->verknuepfteSitzungen($id);
+            return new DataResponse(array_map(static fn ($s) => $s->jsonSerialize(), $sitzungen));
+        } catch (\OCP\AppFramework\Db\DoesNotExistException) {
+            return new DataResponse(['fehler' => 'Nicht gefunden'], Http::STATUS_NOT_FOUND);
+        }
+    }
+
     /** Löst die Sitzung aus ihrer Verknüpfungs-Gruppe; Daten bleiben erhalten. */
     #[NoAdminRequired]
     public function entkoppeln(int $id): DataResponse
