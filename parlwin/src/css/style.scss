@@ -553,6 +553,11 @@
   grid-template-columns: repeat(auto-fit, minmax(min(22rem, 100%), 1fr));
 }
 
+// Changelog: aufklappbare Karten mindestens 40rem breit.
+.pw-changelog .pw-card-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(40rem, 100%), 1fr));
+}
+
 .pw-data-card,
 .pw-kommission-karte,
 .pw-mitglied-karte {
