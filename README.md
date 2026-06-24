@@ -67,9 +67,24 @@ kann die Fraktion eigene Notizen, Zuständigkeiten und Argumente dazu erfassen
   Kanban-Board «Fraktion» wird automatisch eingerichtet (analog zum gemeinsamen
   Ordner und Kalender); ist die Deck-App nicht installiert, bleibt die Funktion
   inaktiv.
+- **Sitzungs-Verknüpfung & -Dokumente** – Sitzungen lassen sich miteinander
+  verknüpfen (z.B. eine Kommissions- mit der vorbereitenden Fraktionssitzung),
+  Dokumente pro Sitzung ablegen und einzelne Geschäfte mit einer Sitzung
+  verknüpfen.
+- **Automatische Geschäfts-Verknüpfung** – Sitzungstypen können «beratene»
+  Kommissionen festlegen; die in diesen Kommissionen hängigen Geschäfte werden
+  vor jeder Sitzung dieses Typs automatisch verknüpft.
+- **Sitzungs-To-dos ins Deck-Board** – aus einer Sitzung lassen sich Aufgaben
+  direkt als Karte im Fraktions-Board «Fraktion» anlegen.
+- **Vorstösse** – eigene und fremde politische Vorstösse (Motion, Postulat,
+  Interpellation …) erfassen und verwalten: Herkunft (eigene/fremde), Status,
+  Zuständigkeit und – bei fremden Vorstössen – die eigene Beschluss-Haltung;
+  Dokumente aus «Fraktion/40_Vorstösse» werden automatisch übernommen.
+- **Änderungsverlauf** – ein eigener Bereich zeigt die Versionshistorie der App
+  als aufklappbare, formatierte Liste.
 - **Live-Aktualisierung** – wenn jemand in der Fraktion etwas ändert, sehen
   alle anderen es sofort, ohne die Seite neu zu laden.
-- **Suche & Filter** über alle Geschäfte, Sitzungen und Mitglieder.
+- **Suche & Filter** über alle Geschäfte, Sitzungen, Mitglieder und Vorstösse.
 
 ### Fraktionsarbeit – aktueller Stand
 
@@ -104,6 +119,18 @@ Aktuell umgesetzt:
 11. **Erledigte standardmässig ausgeblendet**: In der Geschäftsliste werden
     `erledigt`/`abgeschlossen` standardmässig nicht angezeigt
     (Checkbox `Erledigte anzeigen` blendet sie ein).
+12. **Notizen mit Formatierung**: Notizen zu Geschäften und Sitzungen werden in
+    einem WYSIWYG-Editor erfasst (Fett, Kursiv, Listen, Überschriften, Zitate,
+    Code, Links) und intern als Markdown gespeichert.
+13. **Sitzungen verknüpfen und dokumentieren**: Sitzungen lassen sich
+    untereinander sowie mit einzelnen Geschäften verknüpfen; pro Sitzung können
+    Dokumente abgelegt werden. Sitzungstypen mit «beratenen» Kommissionen
+    verknüpfen deren hängige Geschäfte automatisch vor der Sitzung.
+14. **Vorstösse**: Eigene und fremde Vorstösse mit Herkunft, Status,
+    Zuständigkeit, Beschluss-Haltung und Inhalt; Filter nach Herkunft/Status,
+    automatische Übernahme aus «Fraktion/40_Vorstösse».
+15. **Änderungsverlauf**: Eigener Bereich mit der Versionshistorie als
+    aufklappbare, formatierte Liste.
 
 ### Wie nutzt die Fraktion das im Alltag?
 
@@ -972,7 +999,30 @@ typ_id -> pw_sitzungstypen
 position
 titel
 beschreibung
+
+pw_sitzung_geschaeft                 pw_vorstoesse
+─────────────────────────────        ─────────────────────────
+id                                   id
+sitzung_id -> pw_sitzungen           titel, art
+geschaeft_id -> pw_geschaefte        herkunft (eigene|fremde)
+automatisch (0|1)                    status (neu|entwurf|bereit|
+                                       eingereicht|erledigt|pausiert)
+                                     beschluss, zustaendigkeit
+                                     inhalt, dokument
+                                     geloescht
+                                     erstellt_am, aktualisiert_am
 ```
+
+Zusätzliche Spalten für die Sitzungs-Verknüpfung:
+
+- `pw_sitzungen.verknuepfung_id` – Gruppen-ID verknüpfter Sitzungen.
+- `pw_sitzungstypen.verknuepfen` – beim Anlegen Verknüpfung anbieten.
+- `pw_sitzungstypen.kommissionen` – JSON-Liste der «beratenen» Kommissions-IDs,
+  deren hängige Geschäfte automatisch über `pw_sitzung_geschaeft` verknüpft werden.
+
+Hinweis: `pw_vorstoesse` ist die fraktionsintern gepflegte Vorstoss-Verwaltung
+(Tab «Vorstösse»); davon zu unterscheiden ist `pw_vorstoss_entwuerfe`, das die
+aus der Parlamentsquelle importierten, noch nicht nummerierten Vorstösse hält.
 
 ### Realtime-Collaboration (WebSocket)
 

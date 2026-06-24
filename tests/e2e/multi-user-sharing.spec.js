@@ -347,16 +347,22 @@ test.describe('Fraktion: drei Nutzer arbeiten gleichzeitig zusammen', () => {
 
   // 14: User1 schreibt eine Notiz → User2 und User3 sehen sie sofort ohne Reload.
   test('14: Notiz erscheint bei allen sofort (Echtzeit)', async () => {
-    const notizFeld = 'Kommentar, Beobachtung, Hinweis'
+    // Die Notiz-Eingabe ist ein WYSIWYG-Editor (Tiptap/contenteditable), kein
+    // <textarea>: Tiptap legt den Platzhalter als data-placeholder ab, nicht als
+    // HTML-placeholder. Das Feld wird daher über das ProseMirror-Element der
+    // «Notiz hinzufügen»-Zeile angesprochen, Eingabe per Klick + Tastatur.
+    const notizEditor = (page) =>
+      page.locator('.pw-form-zeile', { hasText: 'Notiz hinzufügen' }).locator('.ProseMirror').first()
     for (const page of [page1, page2, page3]) {
       await openParlwin(page)
       await page.locator('.pw-tabelle-geschaefte tbody tr .pw-col-titel').first().click()
-      await page.getByPlaceholder(notizFeld).first().waitFor({ state: 'visible', timeout: 30_000 })
+      await notizEditor(page).waitFor({ state: 'visible', timeout: 30_000 })
     }
 
     const notizText = `E2E-Echtzeit-Notiz ${stamp}`
-    const eingabe = page1.getByPlaceholder(notizFeld).first()
-    await eingabe.fill(notizText)
+    const eingabe = notizEditor(page1)
+    await eingabe.click()
+    await page1.keyboard.type(notizText)
     await eingabe.blur() // speichert die Notiz (@blur) → löst Echtzeit-Event aus
 
     for (const [page, user] of [[page2, USERS.u2], [page3, USERS.u3]]) {
