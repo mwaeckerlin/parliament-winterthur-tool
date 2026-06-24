@@ -60,6 +60,12 @@ return [
         ['name' => 'traktandum#index', 'url' => '/sitzungen/{sitzungId}/traktanden', 'verb' => 'GET'],
         ['name' => 'traktandum#update', 'url' => '/sitzungen/{sitzungId}/traktanden/{id}', 'verb' => 'PUT'],
 
+        // Vorstösse
+        ['name' => 'vorstoss#index', 'url' => '/vorstoesse', 'verb' => 'GET'],
+        ['name' => 'vorstoss#create', 'url' => '/vorstoesse', 'verb' => 'POST'],
+        ['name' => 'vorstoss#update', 'url' => '/vorstoesse/{id}', 'verb' => 'PUT', 'requirements' => ['id' => '\d+']],
+        ['name' => 'vorstoss#destroy', 'url' => '/vorstoesse/{id}', 'verb' => 'DELETE', 'requirements' => ['id' => '\d+']],
+
         // Mitglieder
         ['name' => 'mitglied#index', 'url' => '/mitglieder', 'verb' => 'GET'],
         ['name' => 'mitglied#show', 'url' => '/mitglieder/{id}', 'verb' => 'GET'],

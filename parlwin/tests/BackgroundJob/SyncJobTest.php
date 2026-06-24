@@ -21,16 +21,18 @@ class SyncJobTest extends TestCase {
         // Sync-Stunden: getAppValue('sync_stunden') liefert den konfigurierten Wert.
         $config = $this->createStub(IConfig::class);
         $config->method('getAppValue')->willReturn($syncStunden);
-        return new class($timeFactory, $syncCommand, $logger, $fraktionsraumService, $config, $stunde) extends SyncJob {
+        $vorstossImport = $this->createStub(\OCA\ParliamentWinterthur\Service\VorstossImportService::class);
+        return new class($timeFactory, $syncCommand, $logger, $fraktionsraumService, $config, $vorstossImport, $stunde) extends SyncJob {
             public function __construct(
                 ITimeFactory $time,
                 SyncCommand $syncCommand,
                 LoggerInterface $logger,
                 FraktionsraumService $fraktionsraumService,
                 IConfig $config,
+                \OCA\ParliamentWinterthur\Service\VorstossImportService $vorstossImport,
                 private readonly int $fakeStunde,
             ) {
-                parent::__construct($time, $syncCommand, $logger, $fraktionsraumService, $config);
+                parent::__construct($time, $syncCommand, $logger, $fraktionsraumService, $config, $vorstossImport);
             }
 
             protected function aktuelleStunde(): int {
