@@ -53,6 +53,7 @@ class SitzungControllerTest extends TestCase
             $this->createStub(IUserSession::class),
             $this->createStub(\OCP\Files\IRootFolder::class),
             $this->createStub(\Psr\Log\LoggerInterface::class),
+            $this->createStub(\OCA\ParliamentWinterthur\Service\SitzungGeschaeftService::class),
         );
     }
 
@@ -137,6 +138,7 @@ class SitzungControllerTest extends TestCase
             $this->createStub(IUserSession::class),
             $this->createStub(\OCP\Files\IRootFolder::class),
             $this->createStub(\Psr\Log\LoggerInterface::class),
+            $this->createStub(\OCA\ParliamentWinterthur\Service\SitzungGeschaeftService::class),
         );
 
         $response = $controller->index();

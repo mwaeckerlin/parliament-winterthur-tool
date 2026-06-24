@@ -40,6 +40,29 @@ class SitzungstypServiceTest extends TestCase
         return $typ;
     }
 
+    public function testSpeichernUebernimmtKommissionen(): void
+    {
+        $gespeichert = null;
+        $typMapper = $this->createStub(SitzungstypMapper::class);
+        $typMapper->method('insert')->willReturnCallback(function ($t) use (&$gespeichert) {
+            $t->setId(1);
+            $gespeichert = $t;
+            return $t;
+        });
+        $typMapper->method('find')->willReturnCallback(function () use (&$gespeichert) {
+            return $gespeichert;
+        });
+        $service = $this->makeService(
+            $typMapper,
+            $this->createStub(SitzungMapper::class),
+            $this->createStub(TraktandumMapper::class),
+        );
+
+        $result = $service->speichern(['name' => 'Test', 'kommissionen' => [3, 7]]);
+
+        $this->assertSame([3, 7], $result['kommissionen']);
+    }
+
     private function makeService(
         SitzungstypMapper $typMapper,
         SitzungMapper $sitzungMapper,

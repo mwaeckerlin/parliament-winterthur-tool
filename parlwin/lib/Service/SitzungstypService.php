@@ -103,6 +103,7 @@ class SitzungstypService
     $typ->setKalenderAnlegen(true);
     $typ->setEinladungVersenden((bool) ($daten['einladungVersenden'] ?? true));
     $typ->setVerknuepfen((bool) ($daten['verknuepfen'] ?? false));
+    $typ->setKommissionen(json_encode(array_values(array_map('intval', (array) ($daten['kommissionen'] ?? [])))));
     $typ->setStandardOrt((string) ($daten['standardOrt'] ?? ''));
     $typ->setStandardZeitVon((string) ($daten['standardZeitVon'] ?? ''));
     $typ->setStandardZeitBis((string) ($daten['standardZeitBis'] ?? ''));

@@ -1,5 +1,8 @@
 # Changelog
 
+- 2026-06-24 **1.7.6**
+    - In einer aufgeklappten Sitzung lassen sich Geschäfte verknüpfen: bereits verknüpfte Geschäfte werden aufgelistet, weitere können über eine Auswahl hinzugefügt und einzeln wieder entfernt werden
+
 - 2026-06-24 **1.7.5**
     - Zu jeder Sitzung lassen sich Dokumente ablegen und öffnen (im Ordner «Fraktion/10_Sitzungen/{Jahr}», nach Sitzungsdatum benannt) – gleiche Bedienung wie die Dokumente bei den Geschäften
 

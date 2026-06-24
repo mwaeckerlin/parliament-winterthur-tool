@@ -7,6 +7,7 @@ namespace OCA\ParliamentWinterthur\Controller;
 use OCA\ParliamentWinterthur\AppInfo\Application;
 use OCA\ParliamentWinterthur\Service\RealtimePublisherService;
 use OCA\ParliamentWinterthur\Service\SitzungService;
+use OCA\ParliamentWinterthur\Service\SitzungGeschaeftService;
 use OCA\ParliamentWinterthur\Service\SitzungstypService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
@@ -31,8 +32,38 @@ class SitzungController extends Controller
         private readonly IUserSession $userSession,
         private readonly IRootFolder $rootFolder,
         private readonly LoggerInterface $logger,
+        private readonly SitzungGeschaeftService $sitzungGeschaeftService,
     ) {
         parent::__construct(Application::APP_ID, $request);
+    }
+
+    /** Verknüpft ein Geschäft mit einer Sitzung. */
+    #[NoAdminRequired]
+    public function geschaeftVerlinken(int $id): DataResponse
+    {
+        $geschaeftId = (int) $this->request->getParam('geschaeftId', 0);
+        if ($geschaeftId <= 0) {
+            return new DataResponse(['fehler' => 'geschaeftId fehlt'], Http::STATUS_BAD_REQUEST);
+        }
+        $this->sitzungGeschaeftService->verlinke($id, $geschaeftId);
+        $this->realtimePublisher->publish('sitzungen.updated', ['id' => $id]);
+        return new DataResponse(['geschaeftIds' => $this->sitzungGeschaeftService->geschaeftIdsFuerSitzung($id)]);
+    }
+
+    /** Löst die Verknüpfung eines Geschäfts von einer Sitzung. */
+    #[NoAdminRequired]
+    public function geschaeftEntlinken(int $id, int $geschaeftId): DataResponse
+    {
+        $this->sitzungGeschaeftService->entlinke($id, $geschaeftId);
+        $this->realtimePublisher->publish('sitzungen.updated', ['id' => $id]);
+        return new DataResponse(['geschaeftIds' => $this->sitzungGeschaeftService->geschaeftIdsFuerSitzung($id)]);
+    }
+
+    /** Gibt die IDs der mit einer Sitzung verknüpften Geschäfte zurück. */
+    #[NoAdminRequired]
+    public function geschaefte(int $id): DataResponse
+    {
+        return new DataResponse(['geschaeftIds' => $this->sitzungGeschaeftService->geschaeftIdsFuerSitzung($id)]);
     }
 
     /** Relativer Ordner für die Dokumente einer Sitzung (im Jahr der Sitzung). */
