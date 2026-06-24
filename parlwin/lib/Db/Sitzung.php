@@ -60,6 +60,9 @@ class Sitzung extends Entity
     /** @var int Optionaler Verweis auf eine Sitzungs-Vorlage (0 = keine) */
     protected int $typId = 0;
 
+    /** @var int|null Verknüpfungs-Gruppe: verknüpfte Sitzungen teilen die Sicht (null = keine) */
+    protected ?int $verknuepfungId = null;
+
     /**
      * @var string Materialisierte Teilnehmerliste (JSON-Array von
      * {mitgliedId,name,email,rolle}). Wird beim Erstellen aus einer
@@ -77,6 +80,13 @@ class Sitzung extends Entity
     {
         $this->addType('geloescht', 'boolean');
         $this->addType('typId', 'integer');
+        $this->addType('verknuepfungId', 'integer');
+    }
+
+    public function setVerknuepfungId(?int $verknuepfungId): void
+    {
+        $this->markFieldUpdated('verknuepfungId');
+        $this->verknuepfungId = $verknuepfungId;
     }
 
     // Explizite Setter für Felder, deren Entity-Default mit dem Leer-Wert übereinstimmt.
@@ -130,6 +140,7 @@ class Sitzung extends Entity
             'bemerkungen' => $this->getBemerkungen(),
             'notizen' => $this->getNotizen(),
             'typId' => $this->getTypId(),
+            'verknuepfungId' => $this->getVerknuepfungId(),
             'teilnehmer' => $this->getTeilnehmerArray(),
             'erstelltAm' => $this->getErstelltAm(),
             'aktualisiertAm' => $this->getAktualisiertAm(),

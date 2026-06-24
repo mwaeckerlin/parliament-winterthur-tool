@@ -130,6 +130,36 @@ class SitzungController extends Controller
         }
     }
 
+    /** Verknüpft die Sitzung mit einer Zielsitzung (gemeinsame, aggregierte Sicht). */
+    #[NoAdminRequired]
+    public function verknuepfen(int $id): DataResponse
+    {
+        $zielId = (int) $this->request->getParam('zielId', 0);
+        if ($zielId <= 0 || $zielId === $id) {
+            return new DataResponse(['fehler' => 'Ungültige Zielsitzung'], Http::STATUS_BAD_REQUEST);
+        }
+        try {
+            $sitzung = $this->service->verknuepfe($id, $zielId);
+            $this->realtimePublisher->publish('sitzungen.updated', ['id' => $id]);
+            return new DataResponse($sitzung->jsonSerialize());
+        } catch (\OCP\AppFramework\Db\DoesNotExistException) {
+            return new DataResponse(['fehler' => 'Nicht gefunden'], Http::STATUS_NOT_FOUND);
+        }
+    }
+
+    /** Löst die Sitzung aus ihrer Verknüpfungs-Gruppe; Daten bleiben erhalten. */
+    #[NoAdminRequired]
+    public function entkoppeln(int $id): DataResponse
+    {
+        try {
+            $sitzung = $this->service->entkopple($id);
+            $this->realtimePublisher->publish('sitzungen.updated', ['id' => $id]);
+            return new DataResponse($sitzung->jsonSerialize());
+        } catch (\OCP\AppFramework\Db\DoesNotExistException) {
+            return new DataResponse(['fehler' => 'Nicht gefunden'], Http::STATUS_NOT_FOUND);
+        }
+    }
+
     /**
      * Stellt sicher, dass jede Notiz `datum`, `uid`, `displayName` und `text`
      * trägt. Fehlende Audit-Felder werden mit der aktuellen Session

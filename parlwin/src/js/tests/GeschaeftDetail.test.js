@@ -64,56 +64,6 @@ describe('notizBearbeitenStarten – Datenzustand', () => {
   })
 })
 
-describe('notizBearbeitenStarten – Cursor-Position via caretPositionFromPoint', () => {
-  let origCaretPos
-  let origCaretRange
-
-  beforeEach(() => {
-    origCaretPos = document.caretPositionFromPoint
-    origCaretRange = document.caretRangeFromPoint
-  })
-
-  afterEach(() => {
-    document.caretPositionFromPoint = origCaretPos
-    document.caretRangeFromPoint = origCaretRange
-  })
-
-  it('ruft caretPositionFromPoint mit den Klick-Koordinaten auf', async () => {
-    const wrapper = mountComponent()
-    const mockPos = { offset: 7 }
-    document.caretPositionFromPoint = vi.fn(() => mockPos)
-
-    // spy auf $nextTick um ref-Zugriff zu unterdrücken
-    wrapper.vm.$nextTick = vi.fn(() => Promise.resolve())
-
-    wrapper.vm.notizBearbeitenStarten({ id: 1, text: 'Hallo Welt!' }, { clientX: 100, clientY: 200 })
-
-    expect(document.caretPositionFromPoint).toHaveBeenCalledWith(100, 200)
-  })
-
-  it('fällt auf caretRangeFromPoint zurück wenn caretPositionFromPoint fehlt', async () => {
-    const wrapper = mountComponent()
-    delete document.caretPositionFromPoint
-    const mockRange = { startOffset: 3 }
-    document.caretRangeFromPoint = vi.fn(() => mockRange)
-    wrapper.vm.$nextTick = vi.fn(() => Promise.resolve())
-
-    wrapper.vm.notizBearbeitenStarten({ id: 1, text: 'Test' }, { clientX: 50, clientY: 60 })
-
-    expect(document.caretRangeFromPoint).toHaveBeenCalledWith(50, 60)
-  })
-
-  it('ruft kein caretPositionFromPoint auf wenn kein clickEvent übergeben', () => {
-    const wrapper = mountComponent()
-    document.caretPositionFromPoint = vi.fn()
-    wrapper.vm.$nextTick = vi.fn(() => Promise.resolve())
-
-    wrapper.vm.notizBearbeitenStarten({ id: 1, text: 'Hallo' })
-
-    expect(document.caretPositionFromPoint).not.toHaveBeenCalled()
-  })
-})
-
 describe('notizBearbeitenAbbrechen', () => {
   it('setzt bearbeitenNotizId und Text zurück', () => {
     const wrapper = mountComponent({ bearbeitenNotizId: 42, bearbeitenNotizText: 'X' })

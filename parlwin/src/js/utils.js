@@ -17,3 +17,16 @@ export function parseNotizen(raw) {
     return []
   }
 }
+
+import MarkdownIt from 'markdown-it'
+import DOMPurify from 'dompurify'
+
+// Notizen werden intern als Markdown gespeichert (siehe PwWysiwyg). Für die
+// Anzeige wird mit demselben Parser (markdown-it) nach HTML gerendert und
+// anschliessend gesäubert (XSS-Schutz vor v-html).
+const markdownRenderer = new MarkdownIt({ html: false, linkify: true, breaks: true })
+
+export function markdownZuHtml(text) {
+  if (!text) return ''
+  return DOMPurify.sanitize(markdownRenderer.render(String(text)))
+}

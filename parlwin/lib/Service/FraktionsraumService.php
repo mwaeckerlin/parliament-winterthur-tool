@@ -37,9 +37,22 @@ class FraktionsraumService
         'Fraktion/30_Kommissionen',
         'Fraktion/30_Kommissionen/Aufsichtskommission',
         'Fraktion/30_Kommissionen/Sachkommission Bildung Sport Kultur',
-        'Fraktion/40_Wahlkampf',
-        'Fraktion/50_Medien',
+        'Fraktion/40_Vorstösse',
+        'Fraktion/40_Vorstösse/10_Eigene',
+        'Fraktion/40_Vorstösse/20_Fremde',
+        'Fraktion/50_Finanzen',
+        'Fraktion/60_Wahlkampf',
+        'Fraktion/70_Medien',
         'Fraktion/90_Archiv',
+    ];
+
+    /**
+     * Umbenennungen bestehender Ordner (Move alter → neuer Name). Wird vor dem
+     * Anlegen der Struktur ausgeführt, damit vorhandene Inhalte erhalten bleiben.
+     */
+    private const ORDNER_UMBENENNUNGEN = [
+        'Fraktion/40_Wahlkampf' => 'Fraktion/60_Wahlkampf',
+        'Fraktion/50_Medien' => 'Fraktion/70_Medien',
     ];
 
     private const ORDNER_PERMISSIONS = Constants::PERMISSION_READ
@@ -58,6 +71,7 @@ class FraktionsraumService
         private readonly KalenderService $kalenderService,
         private readonly IShareManager $shareManager,
         private readonly LoggerInterface $logger,
+        private readonly DeckService $deckService,
     ) {
     }
 
@@ -98,6 +112,9 @@ class FraktionsraumService
 
         // 4. Kalender im Admin-Account anlegen und mit Gruppe teilen.
         $this->kalenderService->sicherstelleKalenderOeffentlich(self::ADMIN_USER, $gruppe);
+
+        // 5. Gemeinsames Deck-Board anlegen und mit Gruppe teilen (falls Deck installiert).
+        $this->deckService->sicherstellenBoard(self::ADMIN_USER, $gruppe);
     }
 
     /** Legt die offizielle Ordnerstruktur im Admin-Account an und liefert den Fraktion-Ordner. */
@@ -105,6 +122,15 @@ class FraktionsraumService
     {
         try {
             $adminFolder = $this->rootFolder->getUserFolder(self::ADMIN_USER);
+
+            // Bestehende Ordner auf neue Namen verschieben (idempotent: nur wenn
+            // der alte Ordner existiert und der neue noch nicht). Erhält Inhalte.
+            foreach (self::ORDNER_UMBENENNUNGEN as $alt => $neu) {
+                if ($adminFolder->nodeExists($alt) && !$adminFolder->nodeExists($neu)) {
+                    $adminFolder->get($alt)->move($adminFolder->getFullPath($neu));
+                    $this->logger->info('parlwin: Ordner verschoben: ' . $alt . ' → ' . $neu);
+                }
+            }
 
             foreach (self::ORDNER_STRUKTUR as $pfad) {
                 if (!$adminFolder->nodeExists($pfad)) {

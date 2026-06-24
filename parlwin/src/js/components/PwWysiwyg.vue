@@ -16,6 +16,8 @@
         <button type="button" class="pw-wysiwyg__btn" :class="{ aktiv: editor.isActive('bulletList') }" title="Aufzählung" @click.prevent="editor.chain().focus().toggleBulletList().run()"><PwWysiwygIcon name="bulletList" /></button>
         <button type="button" class="pw-wysiwyg__btn" :class="{ aktiv: editor.isActive('orderedList') }" title="Nummerierte Liste" @click.prevent="editor.chain().focus().toggleOrderedList().run()"><PwWysiwygIcon name="orderedList" /></button>
         <button type="button" class="pw-wysiwyg__btn" :class="{ aktiv: editor.isActive('blockquote') }" title="Zitat" @click.prevent="editor.chain().focus().toggleBlockquote().run()"><PwWysiwygIcon name="blockquote" /></button>
+        <button type="button" class="pw-wysiwyg__btn" :class="{ aktiv: editor.isActive('code') }" title="Code (verbatim)" @click.prevent="editor.chain().focus().toggleCode().run()"><PwWysiwygIcon name="code" /></button>
+        <button type="button" class="pw-wysiwyg__btn" :class="{ aktiv: editor.isActive('codeBlock') }" title="Code-Block (verbatim)" @click.prevent="editor.chain().focus().toggleCodeBlock().run()"><PwWysiwygIcon name="codeBlock" /></button>
       </div>
       <div class="pw-wysiwyg__gruppe">
         <button type="button" class="pw-wysiwyg__btn" :class="{ aktiv: editor.isActive('link') }" title="Link einfügen / bearbeiten" @click.prevent="linkSetzen"><PwWysiwygIcon name="link" /></button>
@@ -46,6 +48,7 @@ import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
 import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
+import { Markdown } from 'tiptap-markdown'
 import PwWysiwygIcon from './PwWysiwygIcons.vue'
 
 export default {
@@ -66,7 +69,7 @@ export default {
   watch: {
     modelValue(neu) {
       if (!this.editor) return
-      const aktuell = this.editor.getHTML()
+      const aktuell = this.editor.storage.markdown.getMarkdown()
       if (neu === aktuell) return
       this.editor.commands.setContent(neu || '', false)
     },
@@ -83,11 +86,11 @@ export default {
         Underline,
         Link.configure({ openOnClick: false, autolink: true }),
         Placeholder.configure({ placeholder: this.placeholder }),
+        // Notizen werden intern als Markdown gespeichert (nicht als HTML).
+        Markdown.configure({ html: true, transformPastedText: true, transformCopiedText: true }),
       ],
       onUpdate: ({ editor }) => {
-        const html = editor.getHTML()
-        const normalisiert = html === '<p></p>' ? '' : html
-        this.$emit('update:modelValue', normalisiert)
+        this.$emit('update:modelValue', editor.storage.markdown.getMarkdown() || '')
       },
       onBlur: () => {
         this.$emit('blur')

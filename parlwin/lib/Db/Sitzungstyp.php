@@ -31,6 +31,7 @@ class Sitzungstyp extends Entity
   protected string $zweck = '';
   protected bool $kalenderAnlegen = true;
   protected bool $einladungVersenden = true;
+  protected bool $verknuepfen = false;
   protected string $standardOrt = '';
   protected string $standardZeitVon = '';
   protected string $standardZeitBis = '';
@@ -42,6 +43,7 @@ class Sitzungstyp extends Entity
   {
     $this->addType('kalenderAnlegen', 'boolean');
     $this->addType('einladungVersenden', 'boolean');
+    $this->addType('verknuepfen', 'boolean');
     $this->addType('geloescht', 'boolean');
   }
 
@@ -56,6 +58,7 @@ class Sitzungstyp extends Entity
       'zweck' => $this->getZweck(),
       'kalenderAnlegen' => $this->getKalenderAnlegen(),
       'einladungVersenden' => $this->getEinladungVersenden(),
+      'verknuepfen' => $this->getVerknuepfen(),
       'standardOrt' => $this->getStandardOrt(),
       'standardZeitVon' => $this->getStandardZeitVon(),
       'standardZeitBis' => $this->getStandardZeitBis(),

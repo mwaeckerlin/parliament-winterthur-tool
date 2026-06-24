@@ -36,6 +36,7 @@ class FraktionsraumServiceTest extends TestCase {
             $kalenderService,
             $shareManager ?? $this->createStub(IShareManager::class),
             $this->createStub(LoggerInterface::class),
+            $this->createStub(\OCA\ParliamentWinterthur\Service\DeckService::class),
         );
     }
 
@@ -60,7 +61,7 @@ class FraktionsraumServiceTest extends TestCase {
         $folder = $this->createMock(Folder::class);
         // Alle Ordner fehlen → nodeExists liefert false
         $folder->method('nodeExists')->willReturn(false);
-        $folder->expects($this->exactly(11))->method('newFolder');
+        $folder->expects($this->exactly(15))->method('newFolder');
         $fraktionNode = $this->createStub(Folder::class);
         $fraktionNode->method('getId')->willReturn(1);
         $folder->method('get')->with('Fraktion')->willReturn($fraktionNode);
@@ -75,6 +76,50 @@ class FraktionsraumServiceTest extends TestCase {
 
         $kalenderService = $this->createMock(KalenderService::class);
         $kalenderService->expects($this->once())->method('sicherstelleKalenderOeffentlich');
+
+        $service = $this->makeService($config, $rootFolder, $groupManager, $db, $kalenderService);
+        $service->sicherstellen();
+    }
+
+    public function testSicherstellenVerschiebtAlteOrdnerAufNeueNamen(): void {
+        $config = $this->configMit('fraktion-gruppe');
+
+        $wahlkampfNode = $this->createMock(Folder::class);
+        $wahlkampfNode->expects($this->once())
+            ->method('move')
+            ->with('/admin/files/Fraktion/60_Wahlkampf')
+            ->willReturn($wahlkampfNode);
+
+        $folder = $this->createStub(Folder::class);
+        // 40_Wahlkampf existiert (alt) und 60_Wahlkampf noch nicht → Move.
+        // 50_Medien fehlt → kein Move. Alle Struktur-Ordner existieren → kein newFolder.
+        $folder->method('nodeExists')->willReturnCallback(function (string $p): bool {
+            if ($p === 'Fraktion/40_Wahlkampf') {
+                return true;
+            }
+            if ($p === 'Fraktion/60_Wahlkampf' || $p === 'Fraktion/50_Medien') {
+                return false;
+            }
+            return true;
+        });
+        $folder->method('getFullPath')->willReturnCallback(fn (string $p): string => '/admin/files/' . $p);
+        $folder->method('get')->willReturnCallback(function (string $p) use ($wahlkampfNode) {
+            if ($p === 'Fraktion/40_Wahlkampf') {
+                return $wahlkampfNode;
+            }
+            $f = $this->createStub(Folder::class);
+            $f->method('getId')->willReturn(1);
+            return $f;
+        });
+
+        $rootFolder = $this->createStub(IRootFolder::class);
+        $rootFolder->method('getUserFolder')->willReturn($folder);
+
+        $groupManager = $this->createStub(IGroupManager::class);
+        $groupManager->method('groupExists')->willReturn(true);
+
+        $db = $this->dbMitFolderShare();
+        $kalenderService = $this->createStub(KalenderService::class);
 
         $service = $this->makeService($config, $rootFolder, $groupManager, $db, $kalenderService);
         $service->sicherstellen();

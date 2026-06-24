@@ -365,6 +365,53 @@ class SitzungService
     }
 
     /**
+     * Verknüpft eine Sitzung mit einer Zielsitzung: beide teilen fortan eine
+     * Verknüpfungs-Gruppe (gleiche verknuepfung_id) und zeigen eine aggregierte
+     * Sicht. Gruppen-ID ist die bestehende der Zielsitzung oder deren eigene ID.
+     */
+    public function verknuepfe(int $sitzungId, int $zielSitzungId): Sitzung
+    {
+        $ziel = $this->sitzungMapper->find($zielSitzungId);
+        $gruppe = $ziel->getVerknuepfungId() ?? $ziel->getId();
+        if ($ziel->getVerknuepfungId() === null) {
+            $ziel->setVerknuepfungId($gruppe);
+            $this->sitzungMapper->update($ziel);
+        }
+        $sitzung = $this->sitzungMapper->find($sitzungId);
+        $sitzung->setVerknuepfungId($gruppe);
+        $sitzung->setAktualisiertAm((new \DateTime())->format('Y-m-d H:i:s'));
+        return $this->sitzungMapper->update($sitzung);
+    }
+
+    /**
+     * Entkoppelt eine Sitzung aus ihrer Verknüpfungs-Gruppe. Die bei dieser
+     * Sitzung erfassten Daten bleiben erhalten (bleiben an ihrem Platz).
+     */
+    public function entkopple(int $sitzungId): Sitzung
+    {
+        $sitzung = $this->sitzungMapper->find($sitzungId);
+        $sitzung->setVerknuepfungId(null);
+        $sitzung->setAktualisiertAm((new \DateTime())->format('Y-m-d H:i:s'));
+        return $this->sitzungMapper->update($sitzung);
+    }
+
+    /**
+     * Alle Sitzungen der Verknüpfungs-Gruppe einer Sitzung (inkl. ihrer selbst).
+     * Ohne Verknüpfung nur die Sitzung selbst.
+     *
+     * @return Sitzung[]
+     */
+    public function verknuepfteSitzungen(int $sitzungId): array
+    {
+        $sitzung = $this->sitzungMapper->find($sitzungId);
+        $gruppe = $sitzung->getVerknuepfungId();
+        if ($gruppe === null) {
+            return [$sitzung];
+        }
+        return $this->sitzungMapper->findByVerknuepfungId($gruppe);
+    }
+
+    /**
      * Aktualisiert die fraktionsinternen Felder eines Traktandums.
      *
      * Nur `notizen` ist relevant; `bemerkungen` wird nicht mehr von der UI
