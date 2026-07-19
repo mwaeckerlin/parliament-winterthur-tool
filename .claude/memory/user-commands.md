@@ -319,3 +319,31 @@ Das heisst, das Kapitel 'Deployment auf einer Ubuntu-VM' kommt in Punkt 5."
 > "Priorität fehlt! In der offenen Ansicht ist immer alles sichtbar!" (Screenshot Geschäfts-Detail ohne Prioritäts-Feld)
 
 (→ v1.7.28: Vorstoss-Bearbeitung speichert jede Eingabe sofort, Abbrechen/Speichern-Buttons entfernt, ✕ schliesst nur; Neu-Anlegen als Minimal-Dialog Titel+Erstellen → Detail; Notiz speichert bei Blur; Priorität neu auch im Geschäfts-Detail; CONTRIBUTING.md mit verbindlichen globalen Design-Anforderungen, FEATURES.md mit Funktionsliste + README-Link; npnp-Tests vorstoss-sofort-speichern + geschaeft-detail-prioritaet; e2e-Spec auf neuen Flow)
+
+> "Priorität fehlt! In der offenen Ansicht ist immer alles sichtbar!" (Screenshot Geschäfts-Detail)
+
+> "Hast du für die Features und Contributing auch das Changelog und für ältere Changes sogar die Commits einbezogen? Wenn nein, bitte ergänzen."
+
+> "Features sollen viel detaillierter definiert sein. So, dass das ganze Projekt aus der Feature-Liste neu erstellt werden könnte, und dann nichts fehlt."
+
+> "WTF WASRUM FRAGST DU!!!" (abgelehnter Workflow-Tool-Call → Permission-Prompt)
+
+> "Erfülle deinen Auftrag OHNE FRAGEN ausser etwas ist WIRKLICH UNKLAR!!!"
+
+> "WARUM HAST DU GEFRAGT!!! → Analyse + Korrektur für die Zukunft! Das darf nicht wieder passeren!"
+
+> "DDas ist wieder unnützes dummes Geschwätz! Nicht relevant für den User, WOHER du die Infos restauriert hat!!! Weg mit dem Unsinn: — erstellt aus Projektanalyse, [CHANGELOG](CHANGELOG.md) und der Git-History (für Versionen vor 1.2.4). Bei jeder Änderung werden betroffene Einträge hier nachgeführt (siehe [CONTRIBUTING](CONTRIBUTING.md))."
+
+> "So etwas in Contrubuting: [Container-Übersicht nginx/php-fpm/realtime/Begleitdienste] Features immer ausschliesslich aus Nutzersicht!!! → Regel präzisieren! Nutzersicht ist hier z.B. dass parallele Änderungen von anderen Nutzern sofort überal propagiert werden und sofort erscheinen, ohne dass die eigene Ansicht dabei gestört wird (z.B. kein herumspringen des Scrollbars). - oder die Integration von Office-Tools für Dokument, Tabellen, etc. Bearbeitung. → DAS ist die NUTZERSICHT!"
+
+> "Hier hast ddu jetz teine Scheisse duch eine andere Scheisse ersetzt!!! WAS INTERESSIERT DEN **NUTZER** DIESE INFO: — detailliert genug, um das System daraus neu zu erstellen. Verbindliche Bedien-Grundsätze (Sofort-Speichern, Konsistenz, Widgets): siehe [CONTRIBUTING](CONTRIBUTING.md)."
+
+(→ FEATURES.md komplett aus reiner Nutzersicht neu geschrieben (ohne Meta-Intro, ohne Technik); Architektur-Überblick nach CONTRIBUTING; Regel «Features nur Nutzersicht» im feature-Skill und Memory verankert. Zudem: Sitzungstypen auf Sofort-Speichern umgebaut (Klick auf Karte, Minimal-Neu-Dialog), Abbrechen-Buttons app-weit entfernt (Guard-Test), e2e-Runner baut das Playwright-Image jetzt vor jedem Lauf (--build) — vorher lief still der alte Testcode)
+
+> "Status-Kürzel → nicht nur Status, sondern auch für Parteien, Fraktionen und Kommissionen. Erweitern bei allen entsprechenden Formularfeldern. Im Popup auch aktuelle Fraktionsnamen und aktuelle Parteinamen einfügen."
+
+> "Du schreibst: * Automatischer Sync über den Nextcloud-Background-Job (konfigurierbare Sync-Stunden, Standard 03:00 und 15:00 Uhr). Aber ich sehe nicht, wo es konfiguriert werden kann. Hast du die Konfiguration vergessen? Mach eine Konfiguration, wo eingegeben werden kann: Wochentage (Mo-So zum abhaken), Uhrzeit Mit Hinzufügen und löschen, so dass der Admin beliebige Synczeiten eingeben kann nach Wochentag(en) und Uhrzeit."
+
+> "→ Und analysiere auch Tests und Code, um alle Features zu restaurieren!"
+
+(→ Kürzel gelten überall (utils.kuerze, alle Listen/Karten/Auswahlfelder; Admin-Vorschläge inkl. aktiver Fraktions- und Parteinamen) + Sync-Zeitplan (SyncZeitplan-Service mit parse/faellig inkl. Nachholen, SyncJob-Umbau mit Stundenlauf-Marker-Fallback, Settings-API sync-zeitplan, Admin-Karte mit Mo–So-Checkboxen + time + Auto-Save); beide npnp; Test-Sweep über alle describe/it- und PHPUnit-Titel → FEATURES ergänzt (Kürzel überall, Beschluss nur vom Verfasser änderbar, Zeitplan, Fraktionswahl nur aktive); PHPUnit 211, vitest 213 grün)
