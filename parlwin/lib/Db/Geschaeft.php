@@ -26,13 +26,14 @@ use OCP\AppFramework\Db\Entity;
  * @method string getAntragFraktion()
  * @method string getEntscheidFraktion()
  * @method string getNotizen()
+ * @method string getPrioritaet()
  * @method string getQuelleHash()
  * @method string getQuelleAktualisiertAm()
  * @method string getEinreicher()
  * @method string getErstelltAm()
  * @method string getAktualisiertAm()
  */
-class Geschaeft extends Entity {
+class Geschaeft extends Entity implements \JsonSerializable {
     /** @var string ID auf der Parlamentswebseite */
     protected string $externId = '';
 
@@ -74,6 +75,9 @@ class Geschaeft extends Entity {
     /** @var string Weitere interne Notizen (JSON-Array) */
     protected string $notizen = '[]';
 
+    /** @var string Priorität der Fraktion: '' (nicht gesetzt, gilt als mittel), 'hoch', 'mittel', 'tief' */
+    protected string $prioritaet = '';
+
     /** @var string JSON-Array der Einreicher (Erstunterzeichner und Mitunterzeichner) */
     protected string $einreicher = '[]';
 
@@ -114,6 +118,7 @@ class Geschaeft extends Entity {
             'antragFraktion' => $this->getAntragFraktion(),
             'entscheidFraktion' => $this->getEntscheidFraktion(),
             'notizen' => $this->getNotizen(),
+            'prioritaet' => $this->getPrioritaet(),
             'einreicher' => json_decode($this->getEinreicher(), true) ?? [],
             'quelleHash' => $this->getQuelleHash(),
             'quelleAktualisiertAm' => $this->getQuelleAktualisiertAm(),

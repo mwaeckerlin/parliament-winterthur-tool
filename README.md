@@ -42,6 +42,10 @@ Winterthurer Parlament herunter und zeigt sie übersichtlich an. Zusätzlich
 kann die Fraktion eigene Notizen, Zuständigkeiten und Argumente dazu erfassen
 – privat, nur innerhalb der Fraktion sichtbar.
 
+Eine vollständige, laufend nachgeführte Funktionsliste steht in
+[FEATURES.md](FEATURES.md); die dort durchnummerierten Funktionen sind über
+[TESTS.md](TESTS.md) mit allen Tests verknüpft.
+
 ### Funktionen im Überblick
 
 - **Geschäfte-Liste** – alle politischen Geschäfte (Anträge, Motionen,
@@ -78,8 +82,17 @@ kann die Fraktion eigene Notizen, Zuständigkeiten und Argumente dazu erfassen
   direkt als Karte im Fraktions-Board «Fraktion» anlegen.
 - **Vorstösse** – eigene und fremde politische Vorstösse (Motion, Postulat,
   Interpellation …) erfassen und verwalten: Herkunft (eigene/fremde), Status,
-  Zuständigkeit und – bei fremden Vorstössen – die eigene Beschluss-Haltung;
-  Dokumente aus «Fraktion/40_Vorstösse» werden automatisch übernommen.
+  Priorität, Zuständigkeit (Personen-Liste), Notizen und Inhalt im
+  Formatierungs-Editor; bei fremden Vorstössen zusätzlich die eigene
+  Beschluss-Haltung, die Herkunftsfraktion und deren Ansprechpartner. Jede
+  Eingabe speichert sofort. Dokumente lassen sich anlegen, hochladen oder aus
+  «Fraktion/40_Vorstösse» wählen; von dort werden sie auch automatisch
+  übernommen. Ein Vorstoss lässt sich durch Verknüpfung mit einem Geschäft
+  abschliessen (Ähnlichkeitssuche über den Titel; die Priorität wird übernommen).
+- **Priorität pro Geschäft und Vorstoss** – hoch, mittel oder tief (nicht
+  gesetzt wird als «—» angezeigt und wirkt wie mittel); einstellbar in der
+  Übersicht wie in der Detailansicht. In den Übersichten werden hohe Einträge
+  dezent hervorgehoben und tiefe abgeschwächt, mit eigenem Filter.
 - **Änderungsverlauf** – ein eigener Bereich zeigt die Versionshistorie der App
   als aufklappbare, formatierte Liste.
 - **Live-Aktualisierung** – wenn jemand in der Fraktion etwas ändert, sehen
@@ -91,8 +104,9 @@ kann die Fraktion eigene Notizen, Zuständigkeiten und Argumente dazu erfassen
 Aktuell umgesetzt:
 
 1. **Geschäftsübersicht**: Tabellarische Darstellung aller Geschäfte mit
-   Filtermöglichkeiten nach Status, Typ, Datum, Zuständigkeit und letztem gültigen Beschluss
-   (Status/Typ/Zuständige/Beschluss als Mehrfachselektion).
+   Filtermöglichkeiten nach Status, Typ, Datum, Zuständigkeit, Priorität und letztem gültigen Beschluss
+   (Status/Typ/Zuständige/Beschluss/Priorität als Mehrfachselektion). Geschäfte mit
+   hoher Priorität sind dezent hervorgehoben, solche mit tiefer abgeschwächt.
 2. **Sitzungsvorbereitung**: Für jede Sitzung werden die Traktanden angezeigt.
    Pro Traktandum können Bemerkungen und Notizen erfasst werden.
 3. **Zuständigkeiten**: Jedem Geschäft können mehrere Personen zugewiesen werden,
@@ -126,11 +140,43 @@ Aktuell umgesetzt:
     untereinander sowie mit einzelnen Geschäften verknüpfen; pro Sitzung können
     Dokumente abgelegt werden. Sitzungstypen mit «beratenen» Kommissionen
     verknüpfen deren hängige Geschäfte automatisch vor der Sitzung.
-14. **Vorstösse**: Eigene und fremde Vorstösse mit Herkunft, Status,
-    Zuständigkeit, Beschluss-Haltung und Inhalt; Filter nach Herkunft/Status,
-    automatische Übernahme aus «Fraktion/40_Vorstösse».
-15. **Änderungsverlauf**: Eigener Bereich mit der Versionshistorie als
+14. **Vorstösse**: Eigene und fremde Vorstösse mit Herkunft, Status, Priorität,
+    Zuständigkeit (Personen-Liste), Notizen und Inhalt (Formatierungs-Editor wie
+    bei den Notizen); bei fremden Vorstössen zusätzlich Beschluss-Haltung,
+    Herkunftsfraktion und Ansprechpartner der fremden Fraktion. Dokumente
+    anlegen/hochladen/auswählen; Filter nach Herkunft/Status, automatische
+    Übernahme aus «Fraktion/40_Vorstösse». Abschluss durch Verknüpfung mit einem
+    Geschäft (Titel-Ähnlichkeitssuche, Priorität wird übernommen). Löschen über
+    die Karte, mit Rückfrage.
+15. **Anlegen und Bearbeiten überall gleich**: Der Neu-Knopf öffnet dieselbe
+    vollständige Maske wie das Bearbeiten — mit allen Feldern, nie ein
+    reduziertes Formular. Beim Anlegen wird nichts vorab gespeichert: unten
+    stehen «Speichern» und «Abbrechen»; «Speichern» ist gesperrt, solange die
+    Pflichtangabe fehlt, und führt danach direkt in die Bearbeitung. Ein Klick
+    neben die Maske bewirkt dabei nichts, damit keine Eingabe verloren geht —
+    verworfen wird ausschliesslich über «Abbrechen». Beim Bearbeiten speichert
+    jede Eingabe sofort (keine Knöpfe, «✕» schliesst nur). Notizen, Dokumente
+    und der Verlauf beziehen sich auf einen bestehenden Eintrag und erscheinen
+    deshalb erst nach dem Speichern; ein Hinweis in der Maske sagt das. Stehen
+    Vorlagen zur Auswahl (Sitzungstypen), öffnet der Neu-Knopf ein Aktionsmenü
+    mit je einem Eintrag pro Vorlage — der Nextcloud-Standard aus der App
+    «Dateien».
+16. **Keine Änderung ohne Spur**: Jede Änderung wird nachvollziehbar
+    festgehalten — Notizen über ihren Versionsverlauf, alles Übrige (auch
+    geänderte Angaben und Prioritäten, mit Vorher- und Nachher-Wert) als
+    Eintrag in der Aktionszeitleiste.
+17. **Änderungsverlauf**: Eigener Bereich mit der Versionshistorie als
     aufklappbare, formatierte Liste.
+
+### Geplante Funktionen
+
+- **Abstimmung zu Vorlagen und Vorstössen**: Jedes Fraktionsmitglied kann zu
+  jeder Vorlage (Geschäft) und jedem Vorstoss angeben, ob es **dafür, dagegen
+  oder neutral** ist, und die Haltung begründen. Vorteil: Themen, bei denen sich
+  die Fraktion ohnehin einig ist, müssen in der Fraktionssitzung nicht mehr
+  besprochen werden, und kurzfristige Entscheide sind auch ohne Sitzung möglich.
+  So wird die Fraktion effektiver und kann sich in der Sitzung auf die wirklich
+  strittigen Fragen konzentrieren.
 
 ### Wie nutzt die Fraktion das im Alltag?
 
@@ -209,12 +255,20 @@ Fraktion/
 ├── 20_Geschäfte/           ← Hintergrund pro Geschäft (alternativ direkt im Plugin)
 ├── 30_Kommissionen/
 │   ├── Aufsichtskommission/
-│   ├── Sachkommission Bau/
+│   ├── Sachkommission Bildung Sport Kultur/
 │   └── …
-├── 40_Wahlkampf/
-├── 50_Medien/              ← Pressemitteilungen, Communiqués
+├── 40_Vorstösse/
+│   ├── 10_Eigene/          ← Vorstösse werden von hier automatisch übernommen
+│   └── 20_Fremde/
+├── 50_Wahlkampf/
+├── 60_Medien/              ← Pressemitteilungen, Communiqués
 └── 90_Archiv/
 ```
+
+Bestehende Ablagen werden beim Start automatisch auf diese Struktur gebracht:
+`40_Wahlkampf` wird zu `50_Wahlkampf`, `50_Medien` zu `60_Medien` (Inhalte bleiben
+erhalten). Erst danach entsteht `40_Vorstösse`, damit die Nummern nicht
+kollidieren. Die Nummerierung läuft lückenlos in 10er-Schritten.
 
 **Wer darf was?**
 
@@ -224,8 +278,9 @@ Fraktion/
 | `10_Sitzungen/`       | Alle           | Alle (Protokoll: Aktuar)               |
 | `20_Geschäfte/`       | Alle           | Hauptzuständige + Co-Bearbeiter        |
 | `30_Kommissionen/X/`  | Alle           | Mitglieder der Kommission X            |
-| `40_Wahlkampf/`       | Alle           | Wahlkampfleitung                       |
-| `50_Medien/`          | Alle           | Mediensprecher                         |
+| `40_Vorstösse/`       | Alle           | Zuständige des Vorstosses              |
+| `50_Wahlkampf/`       | Alle           | Wahlkampfleitung                       |
+| `60_Medien/`          | Alle           | Mediensprecher                         |
 | `90_Archiv/`          | Alle (nur lesen) | Fraktionspräsidium                  |
 
 > Tipp: Dokumente **nicht per E-Mail-Anhang** verschicken, sondern in Nextcloud
@@ -352,12 +407,24 @@ Die beiden Passwörter werden von `pwgen` als sichere Zufallsstrings erzeugt.
 ```bash
 cd parliament-winterthur-tool/example
 git pull
-docker compose up -d --remove-orphans --force-recreate --pull always
+docker compose up -d --build --remove-orphans --force-recreate --pull always
 ```
 
 Das genügt für den ersten Start und für alle zukünftigen Updates:
-`git pull` holt die aktuellste Version, und `--pull always` lädt die neuen
-Docker-Images automatisch nach.
+`git pull` holt die aktuellste Version, `--pull always` lädt die neuen
+Docker-Images automatisch nach, und `--build` erzeugt den Edge-Proxy neu.
+
+**Warum der Edge-Proxy gebaut wird:** Seine Routing-Konfiguration
+(`example/traefik/dynamic.yml`) wird per `COPY` in sein Abbild aufgenommen,
+statt sie als Verzeichnis des Wirts in den Container einzublenden. Kein
+Container bekommt so ein Host-Verzeichnis zu sehen, und der Docker-Socket bleibt
+ebenfalls draussen — deshalb ist der Docker-Provider von Traefik abgeschaltet
+und das Routing kommt aus dieser Datei. Wer das Routing ändert, baut den Proxy
+neu:
+
+```bash
+docker compose up -d --build traefik
+```
 
 #### Nach dem ersten Start: Konfiguration in Nextcloud
 
@@ -596,9 +663,13 @@ Fortschritt bereit:
 **Automatische Synchronisation (Hintergrund-Job):**
 
 Das Plugin registriert einen Hintergrund-Job, der die Daten automatisch
-synchronisiert – standardmässig um **03:00 und 15:00 Uhr** (Europe/Zurich).
-Die Uhrzeiten sind über die App-Einstellung `sync_stunden` (kommagetrennt, z.B.
-`3,15`) konfigurierbar.
+synchronisiert. Der Zeitplan ist in den Admin-Einstellungen konfigurierbar:
+beliebige Einträge mit Wochentagen (Mo–So) und Uhrzeit (App-Einstellung
+`sync_zeitplan`, JSON `[{"tage":[1,3],"zeit":"06:30"}]`, 1 = Montag …
+7 = Sonntag, Europe/Zurich); verpasste Zeitpunkte werden nachgeholt. Ohne
+konfigurierten Zeitplan gilt der Standard: **zwei Läufe an allen Wochentagen,
+um 10:00 und um 18:00 Uhr**; dieser Standard erscheint im Admin-UI vorbelegt
+und lässt sich dort bearbeiten.
 
 Der mitgelieferte Container bringt den nötigen Cron-Takt selbst mit: der
 parlwin-Watcher setzt `backgroundjobs_mode=cron` und tickt den Nextcloud-Cron
@@ -620,6 +691,10 @@ npm run dev   # Frontend im Watch-Modus
 ```
 
 ### Tests ausführen
+
+Ein vollständiges Verzeichnis aller Tests, nach Testart gruppiert und je Test
+mit der abgedeckten Funktionsnummer aus [FEATURES.md](FEATURES.md), steht in
+[TESTS.md](TESTS.md).
 
 Alle Tests (Unit/Service + Live-Endpoint + E2E) vom Projektroot:
 
@@ -846,6 +921,30 @@ neuen Tab. Diese Route rendert das aktuelle Votum als druckoptimiertes A4-HTML
 letztem gültigen Beschluss) und triggert automatisch `window.print()` —
 moderne Browser bieten dort «Als PDF speichern» an. Dieser Weg vermeidet eine
 zusätzliche PHP-PDF-Bibliothek inkl. Composer-Abhängigkeit.
+
+**Wichtig — CSP-Nonce:** Das Skript der Druckseite MUSS ein
+`nonce="<?php p($votumNonce); ?>"` tragen (gleiche Herleitung wie in
+`main.php`/`admin.php`). Die Content-Security-Policy von Nextcloud blockiert
+Inline-Skripte ohne Nonce ersatzlos und ohne sichtbaren Fehler: ohne ihn öffnet
+sich weder der Druck-Dialog automatisch, noch reagiert der Knopf «Als PDF
+speichern / drucken». Aus demselben Grund darf der Knopf kein Inline-`onclick`
+verwenden, sondern bekommt seinen Listener im nonce-tragenden Skript. Der
+Dialog wird zusätzlich über ein Zeitlimit ausgelöst, damit er auch dann
+erscheint, wenn `document.fonts.ready` nicht auslöst (nicht ladbare Schrift).
+
+**Wichtig — Positivliste statt Negativliste:** Der Wortlaut wird als HTML
+ausgegeben, damit die Formatierung im Ausdruck erhalten bleibt. Dafür ist
+`Service\HtmlSanitizer` zuständig: Er parst den Text und behält ausschliesslich
+die dort aufgezählten Elemente und Attribute; Verweise dürfen nur `http`,
+`https`, `mailto` oder `tel` als Schema tragen. Eine Negativliste («entferne
+`script`, entferne `on…`-Attribute») ist hier untauglich und war der zuvor
+verwendete Ansatz: `<img/onerror=…>` umgeht die Prüfung auf ein Leerzeichen vor
+dem Attribut, und `href="javascript:…"` kommt darin gar nicht vor. Der Text
+stammt zwar aus dem Editor, wird aber über die Schnittstelle gespeichert und ist
+damit frei wählbar — die Positivliste ist die einzige verlässliche Grenze.
+Festgenagelt ist das doppelt: `parlwin/tests/Templates/VotumPdfSicherheitTest.php`
+rendert die ausgelieferte Vorlage, und der e2e-Lauf prüft die Ausgabe des realen
+Endpunkts.
 
 #### Automatische Zuständigkeit über Kommissionsmitgliedschaft
 

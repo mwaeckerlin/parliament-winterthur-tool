@@ -89,6 +89,7 @@
   --pw-col-zustaendig: 4em;
   --pw-col-beschluss: 14em;
   --pw-col-titel: 15em;
+  --pw-col-prio: 6em;
 
   /* Seitenleiste: Nextcloud-Standardbreite und -Layout 1:1 übernehmen (wie die
      Files-App). Keine Überschreibung von --app-navigation-width o.ä. */
@@ -111,6 +112,10 @@
   --pw-muted: var(--color-text-maxcontrast);
   --pw-shadow: 0 var(--pw-space-md-plus) 2.25rem color-mix(in srgb, var(--color-box-shadow, #000) 10%, transparent);
   --pw-focus-ring: 0 0 0 var(--pw-space-2xs) color-mix(in srgb, var(--color-primary-element) 24%, transparent);
+
+  /* Priorität: «hoch» dezent hervorheben, «tief» abschwächen (sichtbar bleiben) */
+  --pw-prio-hoch-bg: color-mix(in srgb, var(--color-warning, var(--color-primary-element)) 12%, var(--pw-surface));
+  --pw-prio-tief-opacity: 0.62;
 }
 
 /* ---- App-Shell wie Files/Photos/Activity (via @nextcloud/vue) ---- */
@@ -379,6 +384,35 @@
     width: auto;
     flex: 0 0 auto;
   }
+}
+
+#pw-zeitplan-liste {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pw-gap-1);
+}
+
+.pw-zeitplan-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--pw-gap-1);
+}
+
+/* Wochentag SENKRECHT zur Checkbox: Häkchen oben, Kürzel direkt darunter. */
+.pw-zeitplan-tag {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+
+  input {
+    margin: 0;
+  }
+}
+
+.pw-zeitplan-zeit {
+  margin: 0;
 }
 
 .pw-app-branding h1,
@@ -650,6 +684,22 @@
 .pw-btn-mini.button {
   min-block-size: var(--pw-click-sm);
   font-size: var(--pw-font-sm);
+}
+
+/* Löschen-Knopf trägt ein Mülleimer-Icon (statt eines Textzeichens) und hebt sich
+   damit klar vom Schliessen-Knopf (✕) ab; Icon mittig ausrichten. */
+.pw-btn-loeschen.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* SVG-Icons in kleinen Aktionsknöpfen an die Schriftgrösse des Knopfes koppeln –
+   sonst blieben sie unabhängig von der Textgrösse zu gross. So wirken sie gleich
+   gross wie die Textzeichen (✕, ↺) der übrigen mini-Knöpfe. */
+.pw-btn-mini.button svg {
+  inline-size: 1.25em;
+  block-size: 1.25em;
 }
 
 .pw-textarea,
@@ -1096,6 +1146,28 @@
   font-size: var(--pw-font-xl);
 }
 
+/* Ein bearbeitbarer Titel sieht genauso aus wie die Überschrift, die er
+   ersetzt — dieselbe Darstellung im Geschäft wie im Sitzungsformular. */
+.pw-detail-titel-input,
+.pw-sitzung-titel-input {
+  font-size: var(--pw-font-xl);
+  font-weight: 600;
+  inline-size: 100%;
+  border: none;
+  border-block-end: var(--pw-border-thin) solid var(--pw-border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-main-text);
+  padding-block: 0.25em;
+  padding-inline: 0;
+  outline: none;
+}
+
+.pw-detail-titel-input:focus,
+.pw-sitzung-titel-input:focus {
+  border-block-end-color: var(--color-primary);
+}
+
 .pw-detail-abschnitt {
   display: grid;
   gap: var(--pw-gap-1);
@@ -1351,8 +1423,8 @@
 
 .pw-wysiwyg-icon {
   display: block;
-  inline-size: 20px;
-  block-size: 20px;
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
   fill: currentColor;
 }
 
@@ -1363,51 +1435,84 @@
   font-size: var(--pw-font-sm, 0.85em);
 }
 
-.pw-wysiwyg__body {
+/* Die Eingabefläche wächst mit dem Inhalt und scrollt erst am Maximum. */
+.pw-wysiwyg__editor {
   display: block;
   inline-size: 100%;
   width: 100%;
   box-sizing: border-box;
-  block-size: clamp(8rem, 60vh, 60em);
-  max-block-size: 60em;
-  overflow: auto;
+  max-block-size: min(60vh, 60em);
+  overflow-y: auto;
   background: var(--color-main-background, #fff);
 }
 
-/* EditorContent rendert ein <div> ohne unsere Klasse zuverlässig.
-   Daher zwingen wir ALLE direkten Kinder + ProseMirror auf 100% Breite. */
-.pw-wysiwyg__body>* {
-  display: block;
+/* Eigene Notizen-Liste (nicht mehr in der Aktionszeitleiste). */
+.pw-notizen-liste {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
   inline-size: 100%;
-  width: 100%;
-  box-sizing: border-box;
-  min-block-size: 100%;
 }
 
-.pw-wysiwyg__editor,
-.pw-wysiwyg__body .ProseMirror {
+.pw-notiz-eintrag {
+  border: var(--pw-border-thin) solid var(--pw-border);
+  border-radius: var(--pw-radius-small);
+  padding: 0.5rem 0.75rem;
+  background: var(--color-main-background, #fff);
+}
+
+.pw-notiz-kopf {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-block-end: 0.25rem;
+
+  .pw-notiz-autor {
+    font-weight: 600;
+  }
+
+  .pw-notiz-datum {
+    color: var(--pw-muted);
+    font-size: var(--pw-font-sm, 0.85em);
+    // Füllt den Raum bis zum rechten Rand — das Lösch-X sitzt dadurch ganz
+    // rechts, bündig zum Restore-Knopf in der Aktionszeitleiste. Das Auto-Margin
+    // liegt bewusst auf dem Datum (nicht auf dem Knopf), da die Nextcloud-Klasse
+    // «.button» das Knopf-Margin überschreibt.
+    margin-inline-end: auto;
+  }
+}
+
+.pw-btn-neue-notiz {
+  align-self: flex-start;
+}
+
+/* Nur die Eingabefläche selbst (Grösse, Rahmen, Cursor). */
+.pw-wysiwyg__editor .ProseMirror {
   display: block;
   inline-size: 100%;
   width: 100%;
   box-sizing: border-box;
-  min-block-size: 100%;
+  min-block-size: 8rem;
   padding: 0.85rem 1rem;
   outline: none;
   cursor: text;
-  line-height: 1.55;
+  // Fliesstext ist normal — sonst erbt der Editor die fette Schrift des
+  // umschliessenden Formular-Labels (PwField <label>). Fett bleibt strong/h*.
+  font-weight: normal;
 }
 
-.pw-wysiwyg__body .ProseMirror {
-  >*+* {
-    margin-block-start: 0.6em;
-  }
+/* Inhaltliche Darstellung einer Notiz — GEMEINSAM für die Vorschau im Editor
+   und die fertig gerenderte Notiz, damit beide exakt gleich aussehen. */
+.pw-notiz-inhalt,
+.pw-wysiwyg__editor .ProseMirror {
+  line-height: 1.55;
 
   >*:first-child {
     margin-block-start: 0;
   }
 
   p {
-    margin: 0;
+    margin-block: 0.6em 0;
   }
 
   h2 {
@@ -1422,10 +1527,16 @@
     margin-block: 0.6em 0.3em;
   }
 
-  ul,
-  ol {
+  ul {
+    list-style: disc;
     padding-inline-start: 1.5rem;
-    margin: 0.3em 0;
+    margin-block: 0.6em;
+  }
+
+  ol {
+    list-style: decimal;
+    padding-inline-start: 1.5rem;
+    margin-block: 0.6em;
   }
 
   li>p {
@@ -1435,7 +1546,7 @@
   blockquote {
     border-inline-start: 3px solid var(--pw-border);
     padding-inline-start: 0.75rem;
-    margin: 0.4em 0;
+    margin-block: 0.6em;
     color: var(--pw-muted);
   }
 
@@ -1456,7 +1567,7 @@
 .pw-wysiwyg.pw-wysiwyg--readonly {
   background: var(--pw-surface-soft, var(--color-main-background, #fff));
 
-  .pw-wysiwyg__body .ProseMirror {
+  .pw-wysiwyg__editor .ProseMirror {
     cursor: default;
   }
 }
@@ -1478,6 +1589,15 @@
 .pw-kommission-karte.ist-inaktiv,
 .pw-geloescht {
   opacity: 0.68;
+}
+
+/* Priorität in den Übersichten: «hoch» dezent hervorheben, «tief» abschwächen. */
+.pw-data-card.pw-prio-hoch,
+.pw-tabelle-geschaefte tr.pw-prio-hoch > td {
+  background: var(--pw-prio-hoch-bg);
+}
+.pw-prio-tief {
+  opacity: var(--pw-prio-tief-opacity);
 }
 
 .pw-sitzung-kopf,
@@ -1979,6 +2099,11 @@
   word-break: normal;
   hyphens: auto;
   -webkit-hyphens: auto;
+}
+
+.pw-tabelle-geschaefte .pw-col-prio {
+  inline-size: var(--pw-col-prio);
+  min-inline-size: var(--pw-col-prio);
 }
 
 .pw-tabelle .pw-col-inline-edit {

@@ -14,15 +14,40 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
+/**
+ * Der automatische Sync läuft nach dem konfigurierbaren Zeitplan; ohne Zeitplan
+ * gilt der Standard (alle Wochentage 10:00 und 18:00 Uhr). Fällig ist ein Lauf,
+ * wenn zwischen zwei Prüfzeitpunkten ein Zeitplan-Punkt liegt (verpasste Punkte
+ * werden nachgeholt, ein Doppellauf wird verhindert).
+ */
 class SyncJobTest extends TestCase {
-    private function makeJob(int $stunde, SyncCommand $syncCommand, LoggerInterface $logger, string $syncStunden = '3,15'): SyncJob {
+    /** Einfacher Config-Fake mit Zustand: getAppValue/setAppValue arbeiten auf einer Map. */
+    private array $appConfig = [];
+
+    private function makeConfig(array $werte): IConfig {
+        $this->appConfig = $werte;
+        $config = $this->createStub(IConfig::class);
+        $config->method('getAppValue')->willReturnCallback(
+            fn (string $app, string $key, string $default = '') => $this->appConfig[$key] ?? $default
+        );
+        $config->method('setAppValue')->willReturnCallback(
+            function (string $app, string $key, string $wert): void {
+                $this->appConfig[$key] = $wert;
+            }
+        );
+        return $config;
+    }
+
+    private function makeJob(
+        SyncCommand $syncCommand,
+        LoggerInterface $logger,
+        IConfig $config,
+        int $jetztTs,
+    ): SyncJob {
         $timeFactory = $this->createStub(ITimeFactory::class);
         $fraktionsraumService = $this->createStub(FraktionsraumService::class);
-        // Sync-Stunden: getAppValue('sync_stunden') liefert den konfigurierten Wert.
-        $config = $this->createStub(IConfig::class);
-        $config->method('getAppValue')->willReturn($syncStunden);
         $vorstossImport = $this->createStub(\OCA\ParliamentWinterthur\Service\VorstossImportService::class);
-        return new class($timeFactory, $syncCommand, $logger, $fraktionsraumService, $config, $vorstossImport, $stunde) extends SyncJob {
+        return new class($timeFactory, $syncCommand, $logger, $fraktionsraumService, $config, $vorstossImport, $jetztTs) extends SyncJob {
             public function __construct(
                 ITimeFactory $time,
                 SyncCommand $syncCommand,
@@ -30,21 +55,24 @@ class SyncJobTest extends TestCase {
                 FraktionsraumService $fraktionsraumService,
                 IConfig $config,
                 \OCA\ParliamentWinterthur\Service\VorstossImportService $vorstossImport,
-                private readonly int $fakeStunde,
+                private readonly int $fakeJetzt,
             ) {
                 parent::__construct($time, $syncCommand, $logger, $fraktionsraumService, $config, $vorstossImport);
             }
 
-            protected function aktuelleStunde(): int {
-                return $this->fakeStunde;
+            protected function jetztTs(): int {
+                return $this->fakeJetzt;
             }
         };
     }
 
-    public function testSyncLaeuftUm3Uhr(): void {
-        $logger = $this->createMock(LoggerInterface::class);
-        $logger->expects(self::exactly(2))->method('info');
+    private static function ts(string $wann): int {
+        return (new \DateTimeImmutable($wann, new \DateTimeZone('Europe/Zurich')))->getTimestamp();
+    }
 
+    /** Ist ein Zeitplan konfiguriert, entscheidet ER — der Punkt im Prüf-Fenster löst den Lauf aus. */
+    public function testZeitplanPfadLaeuftWennPunktImFensterLiegt(): void {
+        $logger = $this->createStub(LoggerInterface::class);
         $syncCommand = $this->createMock(SyncCommand::class);
         $syncCommand->expects(self::once())
             ->method('run')
@@ -57,46 +85,81 @@ class SyncJobTest extends TestCase {
             )
             ->willReturn(0);
 
-        $job = $this->makeJob(3, $syncCommand, $logger);
+        // 2026-07-20 ist ein Montag; letzter Check 06:25, jetzt 06:31 → Punkt Mo 06:30 liegt dazwischen.
+        $config = $this->makeConfig([
+            'sync_zeitplan' => (string) json_encode([['tage' => [1], 'zeit' => '06:30']]),
+            'sync_zeitplan_letzter_check' => (string) self::ts('2026-07-20 06:25'),
+        ]);
+        $job = $this->makeJob($syncCommand, $logger, $config, self::ts('2026-07-20 06:31'));
         (new \ReflectionMethod($job, 'run'))->invoke($job, null);
+
+        self::assertSame((string) self::ts('2026-07-20 06:31'), $this->appConfig['sync_zeitplan_letzter_check']);
     }
 
-    public function testSyncLaeuftUm15Uhr(): void {
-        $logger = $this->createMock(LoggerInterface::class);
-        $logger->expects(self::exactly(2))->method('info');
-
-        $syncCommand = $this->createMock(SyncCommand::class);
-        $syncCommand->expects(self::once())->method('run')->willReturn(0);
-
-        $job = $this->makeJob(15, $syncCommand, $logger);
-        (new \ReflectionMethod($job, 'run'))->invoke($job, null);
-    }
-
-    public function testSyncUebersprochtenAusserhalbSyncStunden(): void {
+    public function testZeitplanPfadLaeuftNichtOhnePunktImFenster(): void {
         $logger = $this->createStub(LoggerInterface::class);
-
         $syncCommand = $this->createMock(SyncCommand::class);
         $syncCommand->expects(self::never())->method('run');
 
-        foreach ([0, 6, 12, 14, 16, 23] as $stunde) {
-            $job = $this->makeJob($stunde, $syncCommand, $logger);
-            (new \ReflectionMethod($job, 'run'))->invoke($job, null);
-        }
+        $config = $this->makeConfig([
+            'sync_zeitplan' => (string) json_encode([['tage' => [1], 'zeit' => '06:30']]),
+            'sync_zeitplan_letzter_check' => (string) self::ts('2026-07-20 06:31'),
+        ]);
+        $job = $this->makeJob($syncCommand, $logger, $config, self::ts('2026-07-20 06:40'));
+        (new \ReflectionMethod($job, 'run'))->invoke($job, null);
     }
 
-    public function testSyncRespektiertKonfigurierteStunden(): void {
+    /** Erste Prüfung nach Aktivierung initialisiert nur — kein Nachhol-Lauf. */
+    public function testZeitplanErstePruefungInitialisiertOhneLauf(): void {
         $logger = $this->createStub(LoggerInterface::class);
+        $syncCommand = $this->createMock(SyncCommand::class);
+        $syncCommand->expects(self::never())->method('run');
 
-        // Auf 9 und 21 Uhr konfiguriert → läuft um 9 Uhr.
-        $laeuft = $this->createMock(SyncCommand::class);
-        $laeuft->expects(self::once())->method('run')->willReturn(0);
-        $job9 = $this->makeJob(9, $laeuft, $logger, '9,21');
-        (new \ReflectionMethod($job9, 'run'))->invoke($job9, null);
+        $config = $this->makeConfig([
+            'sync_zeitplan' => (string) json_encode([['tage' => [1], 'zeit' => '06:30']]),
+        ]);
+        $job = $this->makeJob($syncCommand, $logger, $config, self::ts('2026-07-20 06:31'));
+        (new \ReflectionMethod($job, 'run'))->invoke($job, null);
 
-        // Default-Stunde 3 ist bei dieser Konfiguration NICHT mehr aktiv.
-        $still = $this->createMock(SyncCommand::class);
-        $still->expects(self::never())->method('run');
-        $job3 = $this->makeJob(3, $still, $logger, '9,21');
-        (new \ReflectionMethod($job3, 'run'))->invoke($job3, null);
+        self::assertSame((string) self::ts('2026-07-20 06:31'), $this->appConfig['sync_zeitplan_letzter_check']);
+    }
+
+    /** Ohne konfigurierten Zeitplan gilt der Standard: 10:00 und 18:00 Uhr an allen Tagen. */
+    public function testOhneZeitplanGiltDerStandardUm1000(): void {
+        $logger = $this->createStub(LoggerInterface::class);
+        $syncCommand = $this->createMock(SyncCommand::class);
+        $syncCommand->expects(self::once())->method('run')->willReturn(0);
+
+        // Kein sync_zeitplan gesetzt; letzter Check 09:58, jetzt 10:02 → Standard-Punkt 10:00 liegt dazwischen.
+        $config = $this->makeConfig([
+            'sync_zeitplan_letzter_check' => (string) self::ts('2026-07-20 09:58'),
+        ]);
+        $job = $this->makeJob($syncCommand, $logger, $config, self::ts('2026-07-20 10:02'));
+        (new \ReflectionMethod($job, 'run'))->invoke($job, null);
+    }
+
+    public function testOhneZeitplanKeinLaufAusserhalbDerStandardzeiten(): void {
+        $logger = $this->createStub(LoggerInterface::class);
+        $syncCommand = $this->createMock(SyncCommand::class);
+        $syncCommand->expects(self::never())->method('run');
+
+        // Zwischen 11:00 und 11:05 liegt weder 10:00 noch 18:00.
+        $config = $this->makeConfig([
+            'sync_zeitplan_letzter_check' => (string) self::ts('2026-07-20 11:00'),
+        ]);
+        $job = $this->makeJob($syncCommand, $logger, $config, self::ts('2026-07-20 11:05'));
+        (new \ReflectionMethod($job, 'run'))->invoke($job, null);
+    }
+
+    public function testOhneZeitplanGiltDerStandardUm1800(): void {
+        $logger = $this->createStub(LoggerInterface::class);
+        $syncCommand = $this->createMock(SyncCommand::class);
+        $syncCommand->expects(self::once())->method('run')->willReturn(0);
+
+        $config = $this->makeConfig([
+            'sync_zeitplan_letzter_check' => (string) self::ts('2026-07-20 17:59'),
+        ]);
+        $job = $this->makeJob($syncCommand, $logger, $config, self::ts('2026-07-20 18:01'));
+        (new \ReflectionMethod($job, 'run'))->invoke($job, null);
     }
 }

@@ -1,22 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { shallowMount } from '@vue/test-utils'
 import Sitzungsliste from '../components/Sitzungsliste.vue'
-import NotizenListe from '../components/NotizenListe.vue'
+import SitzungNotizen from '../components/SitzungNotizen.vue'
 import PwWysiwyg from '../components/PwWysiwyg.vue'
 import axios from '@nextcloud/axios'
 
 vi.mock('@nextcloud/auth', () => ({ getCurrentUser: () => ({ uid: 'u', displayName: 'U' }) }))
 
-describe('NotizenListe — readonly', () => {
+describe('SitzungNotizen — readonly', () => {
   it('zeigt im readonly-Modus kein Eingabefeld', () => {
-    const wrapper = shallowMount(NotizenListe, {
+    const wrapper = shallowMount(SitzungNotizen, {
       props: { modelValue: [{ text: 'x', uid: 'a' }], readonly: true },
     })
     expect(wrapper.findComponent(PwWysiwyg).exists()).toBe(false)
   })
 
   it('zeigt ohne readonly ein Eingabefeld', () => {
-    const wrapper = shallowMount(NotizenListe, {
+    const wrapper = shallowMount(SitzungNotizen, {
       props: { modelValue: [], readonly: false },
     })
     expect(wrapper.findComponent(PwWysiwyg).exists()).toBe(true)

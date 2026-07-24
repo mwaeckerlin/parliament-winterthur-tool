@@ -97,28 +97,35 @@ function kuerzleHinzufuegen() {
   if (row) row.querySelector('.pw-kuerzel-suchtext').focus()
 }
 
-function ladeStatusWerte() {
-  axios
-    .get(generateUrl('/apps/parlwin/geschaefte?show_erledigt=1&limit=2000'))
-    .then((response) => {
-      if (response.data && Array.isArray(response.data)) {
-        const datalist = document.getElementById('pw-status-kuerzel-liste')
-        if (!datalist) return
-        datalist.innerHTML = ''
-        const seen = new Set()
-        response.data.forEach((g) => {
-          if (g.status && !seen.has(g.status)) {
-            seen.add(g.status)
-            const option = document.createElement('option')
-            option.value = g.status
-            datalist.appendChild(option)
-          }
-        })
-      }
-    })
-    .catch((err) => {
-      console.error('Fehler beim Laden der Status-Werte:', err)
-    })
+// Füllt die Vorschlagsliste für das Suchtext-Feld: bestehende Status-Werte
+// sowie die aktuellen (aktiven) Fraktions- und Parteinamen — die Kürzel gelten
+// überall, wo diese Namen angezeigt werden.
+export function ladeVorschlagswerte() {
+  const datalist = document.getElementById('pw-status-kuerzel-liste')
+  if (!datalist) return Promise.resolve()
+  datalist.innerHTML = ''
+  const seen = new Set()
+  const hinzufuegen = (wert) => {
+    if (!wert || seen.has(wert)) return
+    seen.add(wert)
+    const option = document.createElement('option')
+    option.value = wert
+    datalist.appendChild(option)
+  }
+  return Promise.all([
+    axios
+      .get(generateUrl('/apps/parlwin/geschaefte?show_erledigt=1&limit=2000'))
+      .then((r) => Array.isArray(r.data) && r.data.forEach((g) => hinzufuegen(g.status)))
+      .catch((err) => console.error('Fehler beim Laden der Status-Werte:', err)),
+    axios
+      .get(generateUrl('/apps/parlwin/fraktionen'))
+      .then((r) => Array.isArray(r.data) && r.data.forEach((f) => { if (f.aktiv !== false) hinzufuegen(f.name) }))
+      .catch((err) => console.error('Fehler beim Laden der Fraktionen:', err)),
+    axios
+      .get(generateUrl('/apps/parlwin/mitglieder?aktiv=1'))
+      .then((r) => Array.isArray(r.data) && r.data.forEach((m) => hinzufuegen(m.partei)))
+      .catch((err) => console.error('Fehler beim Laden der Parteien:', err)),
+  ])
 }
 
 function escapeHtml(text) {
@@ -127,16 +134,107 @@ function escapeHtml(text) {
   return div.innerHTML
 }
 
+// --- Zeitplan der automatischen Synchronisation (Wochentage + Uhrzeit) -------
+
+const WOCHENTAGE = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
+let zeitplanSaveTimer = null
+
+// Erstellt eine Zeitplan-Zeile (7 Wochentag-Checkboxen + Uhrzeit + Löschen).
+function zeitplanZeileErstellen(tage = [], zeit = '') {
+  const liste = document.getElementById('pw-zeitplan-liste')
+  if (!liste) return null
+
+  const row = document.createElement('div')
+  row.className = 'pw-zeitplan-row'
+  row.innerHTML = `
+    ${WOCHENTAGE.map((name, i) => `
+      <label class="pw-zeitplan-tag"><input type="checkbox" data-tag="${i + 1}" ${tage.includes(i + 1) ? 'checked' : ''} /> ${name}</label>
+    `).join('')}
+    <input type="time" class="pw-zeitplan-zeit" value="${escapeHtml(zeit)}" />
+    <button type="button" class="button pw-zeitplan-delete" title="Löschen">×</button>
+  `
+  liste.appendChild(row)
+
+  row.querySelector('.pw-zeitplan-delete').addEventListener('click', (e) => {
+    e.preventDefault()
+    row.remove()
+    zeitplanAutoSpeichern()
+  })
+  row.querySelectorAll('input').forEach((input) => {
+    input.addEventListener('change', zeitplanAutoSpeichern)
+  })
+  return row
+}
+
+// Liest den Zeitplan aus den Eingabezeilen; unvollständige Einträge
+// (keine Tage oder keine Uhrzeit) werden ausgelassen.
+export function sammleZeitplan() {
+  const eintraege = []
+  document.querySelectorAll('#pw-zeitplan-liste .pw-zeitplan-row').forEach((row) => {
+    const tage = [...row.querySelectorAll('input[type="checkbox"]')]
+      .filter((box) => box.checked)
+      .map((box) => Number(box.dataset.tag))
+    const zeit = row.querySelector('.pw-zeitplan-zeit').value
+    if (tage.length && zeit) {
+      eintraege.push({ tage, zeit })
+    }
+  })
+  return eintraege
+}
+
+function zeitplanAutoSpeichern() {
+  clearTimeout(zeitplanSaveTimer)
+  showStatusMessage('pw-zeitplan-status', 'Speichern...', false)
+  zeitplanSaveTimer = setTimeout(() => {
+    axios
+      .post(generateUrl('/apps/parlwin/settings/sync-zeitplan'), { sync_zeitplan: sammleZeitplan() })
+      .then(() => {
+        showStatusMessage('pw-zeitplan-status', 'Gespeichert', false)
+      })
+      .catch((err) => {
+        console.error('Fehler beim Speichern des Zeitplans:', err)
+        showStatusMessage('pw-zeitplan-status', 'Fehler beim Speichern', true)
+      })
+  }, KURZEL_SAVE_DELAY)
+}
+
+// Lädt den gespeicherten Zeitplan und rendert die Eingabezeilen.
+export function ladeZeitplan() {
+  const liste = document.getElementById('pw-zeitplan-liste')
+  if (!liste) return Promise.resolve()
+  return axios
+    .get(generateUrl('/apps/parlwin/settings/sync-zeitplan'))
+    .then((response) => {
+      const eintraege = Array.isArray(response.data) ? response.data : []
+      liste.innerHTML = ''
+      eintraege.forEach((e) => zeitplanZeileErstellen(Array.isArray(e.tage) ? e.tage : [], e.zeit || ''))
+    })
+    .catch((err) => {
+      console.error('Fehler beim Laden des Zeitplans:', err)
+    })
+}
+
 document.addEventListener('DOMContentLoaded', () => {
-  // Status-Kürzel: Initial-Laden und Auto-Save
+  // Kürzel: Initial-Laden und Auto-Save
   kuerzeleRendern()
-  ladeStatusWerte()
+  ladeVorschlagswerte()
 
   const hinzufuegenBtn = document.getElementById('pw-kuerzel-hinzufuegen')
   if (hinzufuegenBtn) {
     hinzufuegenBtn.addEventListener('click', (e) => {
       e.preventDefault()
       kuerzleHinzufuegen()
+    })
+  }
+
+  // Sync-Zeitplan: Initial-Laden und Auto-Save
+  ladeZeitplan()
+  const zeitplanBtn = document.getElementById('pw-zeitplan-hinzufuegen')
+  if (zeitplanBtn) {
+    zeitplanBtn.addEventListener('click', (e) => {
+      e.preventDefault()
+      const row = zeitplanZeileErstellen([], '')
+      if (row) row.querySelector('.pw-zeitplan-zeit').focus()
     })
   }
 })

@@ -21,7 +21,7 @@ use OCP\AppFramework\Db\Entity;
  * @method string getErstelltAm()
  * @method string getAktualisiertAm()
  */
-class Kommission extends Entity
+class Kommission extends Entity implements \JsonSerializable
 {
     /** @var string ID auf der Parlamentswebseite */
     protected string $externId = '';

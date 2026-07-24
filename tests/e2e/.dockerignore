@@ -1,0 +1,9 @@
+# Build-Context des Playwright-Testrunners (tests/e2e). Nur die Testquellen
+# gehören ins Image — Ergebnisse und Abhängigkeiten nicht.
+node_modules
+**/node_modules
+.junit
+test-results
+playwright-report
+Dockerfile.playwright
+docker-compose.e2e.yml

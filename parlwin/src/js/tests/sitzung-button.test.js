@@ -1,22 +1,43 @@
-import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
-import { dirname, resolve } from 'node:path'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { shallowMount, flushPromises } from '@vue/test-utils'
+import Sitzungsliste from '../components/Sitzungsliste.vue'
+import axios from '@nextcloud/axios'
 
-const src = readFileSync(
-  resolve(dirname(fileURLToPath(import.meta.url)), '../components/Sitzungsliste.vue'),
-  'utf8',
-)
+vi.mock('@nextcloud/auth', () => ({ getCurrentUser: () => ({ uid: 'u', displayName: 'U' }) }))
 
-// Regression (nur in Produktion mit EINEM Sitzungstyp reproduzierbar):
-// NcActions rendert bei genau EINER enthaltenen Action diese inline statt als
-// «+»-Menü. Mit nur einem Sitzungstyp («Fraktion») verschwand so der Button zum
-// Anlegen einer neuen Sitzung. `force-menu` erzwingt das Menü unabhängig von der
-// Anzahl Actions, damit das «+» und die Typ-Auswahl immer erscheinen.
-describe('Neue-Sitzung-Button erscheint auch bei nur einem Sitzungstyp', () => {
-  it('NcActions (pw-neue-sitzung-btn) setzt force-menu', () => {
-    const m = src.match(/<NcActions\b[^>]*class="pw-neue-sitzung-btn"[^>]*>/)
-    expect(m, 'NcActions mit Klasse pw-neue-sitzung-btn nicht gefunden').toBeTruthy()
-    expect(m[0], 'force-menu fehlt – bei einem Typ rendert NcActions inline statt als «+»-Menü').toMatch(/force-menu/)
+// Bei mehreren Sitzungstypen bietet das Neu-Menü jeden Typ als eigenen Eintrag
+// an (Nextcloud-Standard, wie «+ Neu» in der Dateien-App). Ein Klick auf einen
+// Eintrag startet unmittelbar das vollständige Formular für genau diesen Typ —
+// ohne Zwischenschritt.
+describe('Neue Sitzung: ein Menüeintrag je Sitzungstyp', () => {
+  beforeEach(() => {
+    axios.get.mockReset().mockResolvedValue({ data: [] })
+    axios.post.mockReset()
+  })
+
+  it('jeder Sitzungstyp erscheint als eigener Menüeintrag', async () => {
+    const wrapper = shallowMount(Sitzungsliste, {
+      props: { mitglieder: [], fraktionen: [], kommissionen: [] },
+      // Der Menüinhalt liegt im Standard-Slot von NcActions; ein durchreichender
+      // Stub macht die Einträge im gerenderten Markup sichtbar.
+      global: { stubs: { NcActions: { template: '<div class="pw-neu-menue"><slot /></div>' } } },
+    })
+    await flushPromises()
+    wrapper.vm.sitzungstypen = [{ id: 1, name: 'Fraktion' }, { id: 2, name: 'Kommission' }]
+    await wrapper.vm.$nextTick()
+
+    const menue = wrapper.find('.pw-neu-menue')
+    expect(menue.exists(), 'Neu-Menü nicht gefunden').toBe(true)
+    expect(menue.element.children.length, 'Nicht jeder Sitzungstyp hat einen Menüeintrag').toBe(2)
+  })
+
+  it('ein Menüeintrag startet direkt das Formular für seinen Typ', async () => {
+    const wrapper = shallowMount(Sitzungsliste, { props: { mitglieder: [], fraktionen: [], kommissionen: [] } })
+    await flushPromises()
+    const typB = { id: 2, name: 'Kommission' }
+    wrapper.vm.sitzungstypen = [{ id: 1, name: 'Fraktion' }, typB]
+
+    wrapper.vm.waehleTypFuerNeueSitzung(typB)
+    expect(wrapper.vm.gewaehlterTyp, 'Formular öffnet nicht für den gewählten Typ').toStrictEqual(typB)
   })
 })

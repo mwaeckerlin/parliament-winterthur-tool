@@ -30,3 +30,24 @@ export function markdownZuHtml(text) {
   if (!text) return ''
   return DOMPurify.sanitize(markdownRenderer.render(String(text)))
 }
+
+// Prioritätsstufen für Geschäfte UND Vorstösse; Default ist nicht gesetzt (leer).
+export const PRIORITAETEN = [
+  { value: 'hoch', label: 'Hoch' },
+  { value: 'mittel', label: 'Mittel' },
+  { value: 'tief', label: 'Tief' },
+]
+
+// Wendet die konfigurierten Kürzel (Suchtext → Kürzel) auf einen Anzeigetext an.
+// Gilt gleichermassen für Status-, Partei-, Fraktions- und Kommissionsnamen.
+// Längere Suchtexte werden zuerst ersetzt, damit ein kürzerer Eintrag einen
+// längeren nicht zerstückelt. Gespeichert wird immer der Originalwert.
+export function kuerze(text, liste) {
+  if (!text) return text
+  const regeln = liste || (typeof window !== 'undefined' && window.PARLWIN_CONFIG?.statusKuerzel) || []
+  let result = String(text)
+  for (const { suche, kuerzel } of [...regeln].sort((a, b) => (b.suche || '').length - (a.suche || '').length)) {
+    if (suche && kuerzel) result = result.split(suche).join(kuerzel)
+  }
+  return result
+}

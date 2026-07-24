@@ -186,7 +186,15 @@ class GeschaeftMapper extends QBMapper
         $result->closeCursor();
 
         $bekanntSet = array_flip(array_map('strval', $bekannteIds));
-        $zuLoeschen = array_values(array_filter($aktive, static fn(string $id): bool => !isset($bekanntSet[$id])));
+        // Eigene Geschäfte (extern_id "eigen:…") und Einträge ohne externe ID nie
+        // löschen: sie stammen nicht von der Parlamentswebseite und bleiben von der
+        // Synchronisation unberührt (Feature «eigene Geschäfte bleiben erhalten»).
+        // Ohne diesen Ausschluss markiert jeder Sync alle eigenen Geschäfte als
+        // gelöscht, weil ihre extern_id nie in der Quellliste vorkommt.
+        $zuLoeschen = array_values(array_filter(
+            $aktive,
+            static fn(string $id): bool => $id !== '' && !str_starts_with($id, 'eigen:') && !isset($bekanntSet[$id]),
+        ));
         if ($zuLoeschen === []) {
             return 0;
         }

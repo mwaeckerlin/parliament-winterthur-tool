@@ -29,7 +29,7 @@
         >
         <div class="pw-kommission-kopf" @click="toggleKommission(k.id)">
           <div>
-            <h3>{{ k.name }}</h3>
+            <h3>{{ kuerze(k.name) }}</h3>
             <p class="pw-kommission-status">{{ istAktiv(k) ? 'Aktiv' : 'Aufgelöst oder inaktiv' }}</p>
           </div>
           <span class="pw-toggle">{{ offene.includes(k.id) ? '▲' : '▼' }}</span>
@@ -68,15 +68,15 @@
                   <strong>{{ mitglied.label }}</strong>
                   <span v-if="mitglied.funktion" class="pw-kommission-mitglied-rolle">{{ mitglied.funktion }}</span>
                 </div>
-                <div v-if="mitglied.partei" class="pw-kommission-mitglied-zeile">{{ mitglied.partei }}</div>
-                <div v-if="mitglied.fraktion" class="pw-kommission-mitglied-zeile">{{ mitglied.fraktion }}</div>
+                <div v-if="mitglied.partei" class="pw-kommission-mitglied-zeile">{{ kuerze(mitglied.partei) }}</div>
+                <div v-if="mitglied.fraktion" class="pw-kommission-mitglied-zeile">{{ kuerze(mitglied.fraktion) }}</div>
                 <a v-if="mitglied.email" :href="'mailto:' + mitglied.email" class="pw-kommission-mitglied-zeile pw-kommission-mitglied-email">{{ mitglied.email }}</a>
               </article>
             </div>
           </div>
           <p v-else class="pw-hinweis">Keine Mitglieder synchronisiert.</p>
           <p v-if="!geschaefteFuer(k).length" class="pw-hinweis">
-            Keine Geschäfte mit Status „Bei Kommission {{ k.name }} pendent“.
+            Keine Geschäfte mit Status „Bei Kommission {{ kuerze(k.name) }} pendent“.
           </p>
           <div v-if="!istAktiv(k)" class="pw-inline-note">
             Diese Kommission erscheint nur, weil historische Daten vorhanden sind.
@@ -91,7 +91,7 @@
       <div v-if="ausgewaehlteGeschaeftId" class="pw-modal-overlay" @click.self="schliesseDetail">
         <div class="pw-modal">
           <div class="pw-modal-kopf pw-modal-kopf-leer">
-            <button type="button" class="button pw-btn-schliessen" aria-label="Dialog schliessen" @click="schliesseDetail">✕</button>
+            <button type="button" class="button pw-btn-schliessen" aria-label="Dialog schliessen" @click.stop="schliesseDetail">✕</button>
           </div>
           <GeschaeftDetail
             :geschaeft-id="ausgewaehlteGeschaeftId"
@@ -107,6 +107,7 @@
 import { generateUrl } from '@nextcloud/router'
 import { getCurrentUser } from '@nextcloud/auth'
 import axios from '@nextcloud/axios'
+import { kuerze } from '../utils'
 import { subscribeRealtime } from '../realtime'
 import GeschaeftDetail from './GeschaeftDetail.vue'
 import NcTextField from '@nextcloud/vue/components/NcTextField'
@@ -211,6 +212,7 @@ export default {
     }
   },
   methods: {
+    kuerze,
     async ladeKommissionen() {
       this.laden = true
       try {

@@ -16,6 +16,7 @@ use OCA\ParliamentWinterthur\Db\GeschaeftZustaendigkeitMapper;
 use OCA\ParliamentWinterthur\Db\Kommission;
 use OCA\ParliamentWinterthur\Db\KommissionMapper;
 use OCA\ParliamentWinterthur\Db\MitgliedMapper;
+use OCA\ParliamentWinterthur\Db\NotizRevisionMapper;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\IConfig;
 use OCP\IGroupManager;
@@ -61,6 +62,9 @@ class FraktionsarbeitService
         'abschreiben' => 'Abschreiben',
     ];
 
+    /** Der geteilte Notiz-Code (identisch bei Geschäft und Vorstoss). */
+    private readonly NotizService $notizService;
+
     public function __construct(
         private readonly GeschaeftMapper $geschaeftMapper,
         private readonly GeschaeftAktionMapper $aktionMapper,
@@ -72,8 +76,12 @@ class FraktionsarbeitService
         private readonly IConfig $config,
         private readonly IUserSession $userSession,
         private readonly IGroupManager $groupManager,
+        private readonly NotizRevisionMapper $notizRevisionMapper,
     ) {
+        $this->notizService = new NotizService($aktionMapper, $notizRevisionMapper, $userSession);
     }
+
+    private const OBJEKT_TYP = 'geschaeft';
 
     /**
      * @param Geschaeft[] $geschaefte
@@ -147,67 +155,74 @@ class FraktionsarbeitService
     }
 
     /**
-     * @return array<string, mixed>
+     * Erlaubte Notiz-Kategorien am Geschäft. «notiz» = die reguläre Notiz;
+     * «sitzungsnotiz» = eine in einer Sitzung erfasste Notiz, die am Geschäft
+     * haftet und darum an ALLEN aktuellen und künftigen mit dem Geschäft
+     * verknüpften Sitzungen erscheint.
      */
-    public function notizHinzufuegen(int $geschaeftId, string $text): array
-    {
-        $text = trim($text);
-        if ($text === '') {
-            throw new \InvalidArgumentException('Notiztext darf nicht leer sein');
-        }
+    private const NOTIZ_KATEGORIEN = ['notiz', 'sitzungsnotiz'];
 
-        $aktion = $this->erstelleAktion($geschaeftId, 'notiz', '', 'Notiz', $text, false);
-        return $this->mapAktion($aktion);
+    private static function pruefeKategorie(string $kategorie): string
+    {
+        return in_array($kategorie, self::NOTIZ_KATEGORIEN, true) ? $kategorie : 'notiz';
+    }
+
+    /**
+     * Notizen einer Kategorie eines Geschäfts (aktive und gelöschte).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function notizen(int $geschaeftId, string $kategorie = 'notiz'): array
+    {
+        return $this->notizService->liste(self::OBJEKT_TYP, $geschaeftId, self::pruefeKategorie($kategorie));
     }
 
     /**
      * @return array<string, mixed>
      */
-    public function notizAktualisieren(int $geschaeftId, int $aktionId, string $text): array
+    public function notizHinzufuegen(int $geschaeftId, string $text, string $kategorie = 'notiz'): array
     {
-        $text = trim($text);
-        if ($text === '') {
-            throw new \InvalidArgumentException('Notiztext darf nicht leer sein');
-        }
-
         try {
-            $aktion = $this->aktionMapper->findById($aktionId);
+            $this->geschaeftMapper->find($geschaeftId);
         } catch (DoesNotExistException) {
-            throw new \InvalidArgumentException('Notiz nicht gefunden');
+            throw new \InvalidArgumentException('Geschäft nicht gefunden');
         }
-
-        if ($aktion->getGeschaeftId() !== $geschaeftId || $aktion->getAktionTyp() !== 'notiz') {
-            throw new \InvalidArgumentException('Notiz gehört nicht zu diesem Geschäft');
-        }
-
-        $uid = $this->userSession->getUser()?->getUID() ?? '';
-        if ($aktion->getAutorUid() !== $uid) {
-            throw new \RuntimeException('Nur der Autor darf eigene Notizen bearbeiten');
-        }
-
-        $aktion->setText($text);
-        $this->aktionMapper->update($aktion);
-        return $this->mapAktion($aktion);
+        return $this->notizService->hinzufuegen(self::OBJEKT_TYP, $geschaeftId, $text, self::pruefeKategorie($kategorie));
     }
 
-    public function notizLoeschen(int $geschaeftId, int $aktionId): void
+    /**
+     * @param bool $revisionArchivieren siehe {@see NotizService::aktualisieren()}
+     * @return array<string, mixed>
+     */
+    public function notizAktualisieren(
+        int $geschaeftId,
+        int $aktionId,
+        string $text,
+        bool $revisionArchivieren = true,
+        string $kategorie = 'notiz'
+    ): array {
+        return $this->notizService->aktualisieren(self::OBJEKT_TYP, $geschaeftId, $aktionId, $text, $revisionArchivieren, self::pruefeKategorie($kategorie));
+    }
+
+    public function notizLoeschen(int $geschaeftId, int $aktionId, string $kategorie = 'notiz'): void
     {
-        try {
-            $aktion = $this->aktionMapper->findById($aktionId);
-        } catch (DoesNotExistException) {
-            throw new \InvalidArgumentException('Notiz nicht gefunden');
-        }
+        $this->notizService->loeschen(self::OBJEKT_TYP, $geschaeftId, $aktionId, self::pruefeKategorie($kategorie));
+    }
 
-        if ($aktion->getGeschaeftId() !== $geschaeftId || $aktion->getAktionTyp() !== 'notiz') {
-            throw new \InvalidArgumentException('Notiz gehört nicht zu diesem Geschäft');
-        }
+    /**
+     * @return array<string, mixed>
+     */
+    public function notizWiederherstellen(int $geschaeftId, int $aktionId, string $kategorie = 'notiz'): array
+    {
+        return $this->notizService->wiederherstellen(self::OBJEKT_TYP, $geschaeftId, $aktionId, self::pruefeKategorie($kategorie));
+    }
 
-        $uid = $this->userSession->getUser()?->getUID() ?? '';
-        if ($aktion->getAutorUid() !== $uid) {
-            throw new \RuntimeException('Nur der Autor darf eigene Notizen löschen');
-        }
-
-        $this->aktionMapper->loeschen($aktion);
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function notizRevisionen(int $geschaeftId, int $aktionId, string $kategorie = 'notiz'): array
+    {
+        return $this->notizService->revisionen(self::OBJEKT_TYP, $geschaeftId, $aktionId, self::pruefeKategorie($kategorie));
     }
 
     /**
@@ -335,6 +350,57 @@ class FraktionsarbeitService
     {
         $this->pruefeBeschlussSchreibrecht();
 
+        $felder = $this->beschlussFelder($geschaeftId, $beschlussCode, $text);
+        $aktion = $this->erstelleAktion($geschaeftId, 'beschluss', $felder['code'], $felder['titel'], $felder['text'], true);
+        return $this->mapAktion($aktion);
+    }
+
+    /**
+     * Aktualisiert einen bestehenden gültigen Beschluss innerhalb derselben
+     * Eingabe-Session (Zwischenspeichern beim Tippen), statt eine neue
+     * Aktion anzulegen. Nur der Autor darf seinen Beschluss aktualisieren.
+     *
+     * @return array<string, mixed>
+     */
+    public function beschlussAktualisieren(int $geschaeftId, int $aktionId, string $beschlussCode, string $text = ''): array
+    {
+        $this->pruefeBeschlussSchreibrecht();
+
+        try {
+            $aktion = $this->aktionMapper->findById($aktionId);
+        } catch (DoesNotExistException) {
+            throw new \InvalidArgumentException('Beschluss nicht gefunden');
+        }
+
+        if (
+            $aktion->getGeschaeftId() !== $geschaeftId
+            || $aktion->getAktionTyp() !== 'beschluss'
+            || !$aktion->getEntscheidGueltig()
+        ) {
+            throw new \InvalidArgumentException('Beschluss gehört nicht zu diesem Geschäft');
+        }
+
+        $uid = $this->userSession->getUser()?->getUID() ?? '';
+        if ($aktion->getAutorUid() !== $uid) {
+            throw new \RuntimeException('Nur der Autor darf seinen Beschluss aktualisieren');
+        }
+
+        $felder = $this->beschlussFelder($geschaeftId, $beschlussCode, $text);
+        $aktion->setAktionCode($felder['code']);
+        $aktion->setTitel($felder['titel']);
+        $aktion->setText($felder['text']);
+        $this->aktionMapper->update($aktion);
+
+        return $this->mapAktion($aktion);
+    }
+
+    /**
+     * Validiert Code/Text eines Beschlusses und leitet den Titel ab.
+     *
+     * @return array{code: string, titel: string, text: string}
+     */
+    private function beschlussFelder(int $geschaeftId, string $beschlussCode, string $text): array
+    {
         $text = trim($text);
 
         // Freitext-Modus: kein Code, aber Text vorhanden → erlaubt ohne Workflow-Prüfung.
@@ -346,8 +412,7 @@ class FraktionsarbeitService
             if (mb_strlen($text, 'UTF-8') > 60) {
                 $kurzTitel .= '…';
             }
-            $aktion = $this->erstelleAktion($geschaeftId, 'beschluss', '', $kurzTitel, $text, true);
-            return $this->mapAktion($aktion);
+            return ['code' => '', 'titel' => $kurzTitel, 'text' => $text];
         }
 
         $geschaeft = $this->geschaeftMapper->find($geschaeftId);
@@ -357,9 +422,7 @@ class FraktionsarbeitService
         }
 
         $label = self::BESCHLUSS_LABELS[$beschlussCode] ?? $beschlussCode;
-        $aktion = $this->erstelleAktion($geschaeftId, 'beschluss', $beschlussCode, $label, $text, true);
-
-        return $this->mapAktion($aktion);
+        return ['code' => $beschlussCode, 'titel' => $label, 'text' => $text];
     }
 
     /**
@@ -493,6 +556,171 @@ class FraktionsarbeitService
      *
      * @return array{gepruet:int, zugewiesen:int, uebersprungen:int, ohne_kommission:int, ohne_passendes_mitglied:int}
      */
+    /**
+     * Weist Geschäfte automatisch den einreichenden Fraktionsmitgliedern zu —
+     * in derselben Reihenfolge, in der sie als Einreicher stehen. Geschäfte mit
+     * bereits gesetzter Zuständigkeit bleiben unberührt.
+     *
+     * @return array<string, int>
+     */
+    public function autoZuweisenEinreicher(): array
+    {
+        $statistik = [
+            'gepruet' => 0,
+            'zugewiesen' => 0,
+            'uebersprungen' => 0,
+            'ohne_einreicher' => 0,
+        ];
+
+        $eigeneFraktion = $this->config->getAppValue(self::APP_ID, 'fraktion', '');
+        if ($eigeneFraktion === '') {
+            return $statistik;
+        }
+
+        $mitgliedByName = $this->fraktionsmitgliederNachName($eigeneFraktion);
+        if ($mitgliedByName === []) {
+            return $statistik;
+        }
+        $mitgliedByExternId = $this->fraktionsmitgliederNachExternId($eigeneFraktion);
+
+        foreach ($this->geschaeftMapper->findAll(10000, 0, false) as $geschaeft) {
+            if ($geschaeft->getGeloescht()) {
+                continue;
+            }
+            $statistik['gepruet']++;
+            $geschaeftId = (int) $geschaeft->getId();
+
+            if ($this->zustaendigkeitMapper->findAktiveByGeschaeft($geschaeftId) !== []) {
+                $statistik['uebersprungen']++;
+                continue;
+            }
+
+            $personen = $this->einreichendeFraktionsmitglieder($geschaeft, $mitgliedByName, $mitgliedByExternId);
+            if ($personen === []) {
+                $statistik['ohne_einreicher']++;
+                continue;
+            }
+
+            if ($this->setzeAutoZustaendigkeit($geschaeftId, $personen)) {
+                $statistik['zugewiesen']++;
+            } else {
+                $statistik['uebersprungen']++;
+            }
+        }
+
+        return $statistik;
+    }
+
+    /**
+     * Index der eigenen Fraktionsmitglieder über den normalisierten vollen Namen.
+     *
+     * @return array<string, \OCA\ParliamentWinterthur\Db\Mitglied>
+     */
+    private function fraktionsmitgliederNachName(string $fraktion): array
+    {
+        $index = [];
+        foreach ($this->mitgliedMapper->findByFraktion($fraktion) as $mitglied) {
+            $vorname = trim((string) $mitglied->getVorname());
+            $nachname = trim((string) $mitglied->getName());
+            // Die Parlamentswebseite nennt Einreicher «Nachname Vorname» —
+            // der Index enthält darum beide Reihenfolgen.
+            foreach ([$vorname . ' ' . $nachname, $nachname . ' ' . $vorname] as $variante) {
+                $name = self::normalisiereEinreicherName($variante);
+                if ($name !== '') {
+                    $index[$name] = $mitglied;
+                }
+            }
+        }
+        return $index;
+    }
+
+    /**
+     * Index der eigenen Fraktionsmitglieder über die Personen-ID der
+     * Parlamentswebseite (extern_id).
+     *
+     * @return array<string, \OCA\ParliamentWinterthur\Db\Mitglied>
+     */
+    private function fraktionsmitgliederNachExternId(string $fraktion): array
+    {
+        $index = [];
+        foreach ($this->mitgliedMapper->findByFraktion($fraktion) as $mitglied) {
+            $extId = (string) $mitglied->getExternId();
+            if ($extId !== '') {
+                $index[$extId] = $mitglied;
+            }
+        }
+        return $index;
+    }
+
+    private static function normalisiereEinreicherName(string $name): string
+    {
+        $name = preg_replace('/\s+/u', ' ', trim($name)) ?? '';
+        return mb_strtolower($name);
+    }
+
+    /**
+     * Einreicher, die zur eigenen Fraktion gehören — in der Reihenfolge der Einreicher.
+     * Gematcht wird primär über die Personen-ID der Webseite (externId),
+     * sonst über den Namen (beide Reihenfolgen, siehe fraktionsmitgliederNachName).
+     *
+     * @param array<string, \OCA\ParliamentWinterthur\Db\Mitglied> $mitgliedByName
+     * @param array<string, \OCA\ParliamentWinterthur\Db\Mitglied> $mitgliedByExternId
+     * @return array<int, array{mitgliedExternId: string, personName: string}>
+     */
+    private function einreichendeFraktionsmitglieder(
+        Geschaeft $geschaeft,
+        array $mitgliedByName,
+        array $mitgliedByExternId
+    ): array {
+        $roh = json_decode((string) $geschaeft->getEinreicher(), true);
+        if (!is_array($roh)) {
+            return [];
+        }
+
+        $personen = [];
+        foreach ($roh as $eintrag) {
+            $name = is_array($eintrag) ? (string) ($eintrag['name'] ?? '') : (string) $eintrag;
+            $einreicherExternId = is_array($eintrag) ? (string) ($eintrag['externId'] ?? '') : '';
+            $mitglied = $einreicherExternId !== '' ? ($mitgliedByExternId[$einreicherExternId] ?? null) : null;
+            if ($mitglied === null) {
+                $schluessel = self::normalisiereEinreicherName($name);
+                if ($schluessel === '' || !isset($mitgliedByName[$schluessel])) {
+                    continue;
+                }
+                $mitglied = $mitgliedByName[$schluessel];
+            }
+            $externId = (string) $mitglied->getExternId();
+            if ($externId === '' || isset($personen[$externId])) {
+                continue;
+            }
+            $personen[$externId] = [
+                'mitgliedExternId' => $externId,
+                'personName' => trim(
+                    trim((string) $mitglied->getVorname()) . ' ' . trim((string) $mitglied->getName())
+                ),
+            ];
+        }
+
+        return array_values($personen);
+    }
+
+    /**
+     * @param array<int, array{mitgliedExternId: string, personName: string}> $personen
+     */
+    private function setzeAutoZustaendigkeit(int $geschaeftId, array $personen): bool
+    {
+        try {
+            $this->zustaendigkeitenSetzen(
+                $geschaeftId,
+                $personen,
+                'mitglied:' . $personen[0]['mitgliedExternId']
+            );
+            return true;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
     public function autoZuweisenKommissionsmitglieder(): array
     {
         $statistik = [
@@ -531,16 +759,13 @@ class FraktionsarbeitService
         }
 
         // Mitglieder der eigenen Fraktion nach extern_id indizieren.
-        $mitgliedByExternId = [];
-        foreach ($this->mitgliedMapper->findByFraktion($eigeneFraktion) as $mitglied) {
-            $extId = (string) $mitglied->getExternId();
-            if ($extId !== '') {
-                $mitgliedByExternId[$extId] = $mitglied;
-            }
-        }
+        $mitgliedByExternId = $this->fraktionsmitgliederNachExternId($eigeneFraktion);
         if ($mitgliedByExternId === []) {
             return $statistik;
         }
+
+        // Für den Vorrang der Einreicher (siehe unten).
+        $mitgliedByName = $this->fraktionsmitgliederNachName($eigeneFraktion);
 
         // Nur Geschäfte mit nicht-finalem Status (= "hängig").
         $geschaefte = $this->geschaeftMapper->findAll(10000, 0, false);
@@ -556,6 +781,18 @@ class FraktionsarbeitService
             $aktiveZust = $this->zustaendigkeitMapper->findAktiveByGeschaeft($geschaeftId);
             if ($aktiveZust !== []) {
                 $statistik['uebersprungen']++;
+                continue;
+            }
+
+            // Einreicher aus der eigenen Fraktion haben Vorrang vor der Kommission:
+            // wer den Vorstoss eingereicht hat, betreut ihn auch.
+            $einreicher = $this->einreichendeFraktionsmitglieder($geschaeft, $mitgliedByName, $mitgliedByExternId);
+            if ($einreicher !== []) {
+                if ($this->setzeAutoZustaendigkeit($geschaeftId, $einreicher)) {
+                    $statistik['zugewiesen']++;
+                } else {
+                    $statistik['uebersprungen']++;
+                }
                 continue;
             }
 
@@ -1022,6 +1259,41 @@ class FraktionsarbeitService
         );
     }
 
+    /**
+     * Hält eine Änderung an den Angaben eines Geschäfts in der Aktionszeitleiste
+     * fest. Grundsatz: keine Änderung ohne Spur — was sich ändert, muss später
+     * nachvollziehbar sein, wer es wann geändert hat.
+     *
+     * @param array<string, array{0: string, 1: string}> $aenderungen Bezeichnung => [vorher, nachher]
+     */
+    public function protokolliereAenderung(int $geschaeftId, array $aenderungen): ?GeschaeftAktion
+    {
+        $teile = [];
+        foreach ($aenderungen as $bezeichnung => [$vorher, $nachher]) {
+            if ((string) $vorher === (string) $nachher) {
+                continue;
+            }
+            $teile[] = sprintf(
+                '%s: «%s» → «%s»',
+                $bezeichnung,
+                $vorher === '' ? '—' : $vorher,
+                $nachher === '' ? '—' : $nachher,
+            );
+        }
+        if ($teile === []) {
+            return null;
+        }
+
+        return $this->erstelleAktion(
+            $geschaeftId,
+            'aenderung',
+            'angaben_geaendert',
+            'Angaben geändert',
+            implode('; ', $teile),
+            false,
+        );
+    }
+
     private function erstelleAktion(
         int $geschaeftId,
         string $aktionTyp,
@@ -1073,6 +1345,7 @@ class FraktionsarbeitService
             'autorUid' => $aktion->getAutorUid(),
             'autorName' => $aktion->getAutorName(),
             'erstelltAm' => $aktion->getErstelltAm(),
+            'geloescht' => $aktion->getGeloescht(),
         ];
     }
 

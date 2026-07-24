@@ -191,4 +191,306 @@ class GeschaeftControllerTest extends TestCase
         $this->assertSame(42, $gespeichert->getId());
         $this->assertSame('Pendent', $response->getData()['status']);
     }
+
+    /**
+     * Baut einen Controller, der ein bestimmtes Geschäft findet, und protokolliert
+     * Aktualisierungen und Löschungen. Für die Stammdaten- und Löschprüfungen.
+     */
+    private function controllerFuerGeschaeft(
+        Geschaeft $geschaeft,
+        array $parameter,
+        ?Geschaeft &$aktualisiert = null,
+        ?Geschaeft &$geloescht = null,
+    ): GeschaeftController {
+        $request = $this->createStub(IRequest::class);
+        $request->method('getParam')
+            ->willReturnCallback(static function (string $key, mixed $default = null) use ($parameter): mixed {
+                return array_key_exists($key, $parameter) ? $parameter[$key] : $default;
+            });
+
+        $mapper = $this->createStub(GeschaeftMapper::class);
+        $mapper->method('find')->willReturn($geschaeft);
+        $mapper->method('update')->willReturnCallback(static function (Geschaeft $g) use (&$aktualisiert): Geschaeft {
+            $aktualisiert = $g;
+            return $g;
+        });
+        $mapper->method('delete')->willReturnCallback(static function (Geschaeft $g) use (&$geloescht): Geschaeft {
+            $geloescht = $g;
+            return $g;
+        });
+
+        $fraktionsarbeit = $this->createStub(FraktionsarbeitService::class);
+        $fraktionsarbeit->method('angereichertesGeschaeft')
+            ->willReturnCallback(static fn(int $id): array => ['id' => $id]);
+
+        return new GeschaeftController(
+            $request,
+            $this->createStub(GeschaeftService::class),
+            $fraktionsarbeit,
+            $this->createStub(RealtimePublisherService::class),
+            $this->createStub(IRootFolder::class),
+            $this->createStub(IUserSession::class),
+            $this->createStub(LoggerInterface::class),
+            $mapper,
+        );
+    }
+
+    private function eigenesGeschaeft(): Geschaeft
+    {
+        $g = new Geschaeft();
+        $g->setId(7);
+        $g->setExternId('eigen:abc123');
+        $g->setTitel('Alt');
+        return $g;
+    }
+
+    private function parlamentsGeschaeft(): Geschaeft
+    {
+        $g = new Geschaeft();
+        $g->setId(8);
+        $g->setExternId('2026.1');
+        $g->setTitel('Von der Webseite');
+        return $g;
+    }
+
+    /**
+     * Feature: Ein selbst angelegtes Geschäft ist in allen Stammdaten bearbeitbar.
+     */
+    public function testStammdatenEinesEigenenGeschaeftsWerdenGespeichert(): void
+    {
+        $aktualisiert = null;
+        $controller = $this->controllerFuerGeschaeft(
+            $this->eigenesGeschaeft(),
+            ['titel' => 'Neuer Titel', 'typ' => 'Kommissionsgeschäft', 'status' => 'Pendent', 'datum' => '2026-03-04'],
+            $aktualisiert,
+        );
+
+        $response = $controller->updateStammdaten(7);
+
+        $this->assertSame(200, $response->getStatus());
+        $this->assertNotNull($aktualisiert);
+        $this->assertSame('Neuer Titel', $aktualisiert->getTitel());
+        $this->assertSame('Kommissionsgeschäft', $aktualisiert->getTyp());
+        $this->assertSame('Pendent', $aktualisiert->getStatus());
+        $this->assertSame('2026-03-04', $aktualisiert->getDatum());
+    }
+
+    /**
+     * Ein Geschäft von der Parlamentswebseite bleibt schreibgeschützt: seine
+     * Angaben stammen aus der Quelle und würden beim Abgleich überschrieben.
+     */
+    public function testStammdatenEinesParlamentsgeschaeftsWerdenAbgelehnt(): void
+    {
+        $aktualisiert = null;
+        $controller = $this->controllerFuerGeschaeft(
+            $this->parlamentsGeschaeft(),
+            ['titel' => 'Darf nicht gehen'],
+            $aktualisiert,
+        );
+
+        $response = $controller->updateStammdaten(8);
+
+        $this->assertSame(403, $response->getStatus());
+        $this->assertNull($aktualisiert, 'Ein Parlamentsgeschäft wurde trotz Schreibschutz verändert');
+    }
+
+    /** Ein unbrauchbares Datum wird abgewiesen statt still übernommen. */
+    public function testStammdatenLehnenUngueltigesDatumAb(): void
+    {
+        $aktualisiert = null;
+        $controller = $this->controllerFuerGeschaeft(
+            $this->eigenesGeschaeft(),
+            ['datum' => '04.03.2026'],
+            $aktualisiert,
+        );
+
+        $response = $controller->updateStammdaten(7);
+
+        $this->assertSame(400, $response->getStatus());
+        $this->assertNull($aktualisiert);
+        $this->assertStringContainsString('JJJJ-MM-TT', (string) $response->getData()['fehler']);
+    }
+
+    /**
+     * Keine Änderung ohne Spur: eine geänderte Angabe landet mit Vorher- und
+     * Nachher-Wert in der Aktionszeitleiste.
+     */
+    public function testStammdatenAenderungWirdProtokolliert(): void
+    {
+        $geschaeft = $this->eigenesGeschaeft();
+
+        $request = $this->createStub(IRequest::class);
+        $request->method('getParam')
+            ->willReturnCallback(static function (string $key, mixed $default = null): mixed {
+                return $key === 'titel' ? 'Neuer Titel' : $default;
+            });
+
+        $mapper = $this->createStub(GeschaeftMapper::class);
+        $mapper->method('find')->willReturn($geschaeft);
+        $mapper->method('update')->willReturnCallback(static fn(Geschaeft $g): Geschaeft => $g);
+
+        $fraktionsarbeit = $this->createMock(FraktionsarbeitService::class);
+        $fraktionsarbeit->method('angereichertesGeschaeft')->willReturn(['id' => 7]);
+        $fraktionsarbeit->expects($this->once())
+            ->method('protokolliereAenderung')
+            ->with(7, ['Titel' => ['Alt', 'Neuer Titel']]);
+
+        $controller = new GeschaeftController(
+            $request,
+            $this->createStub(GeschaeftService::class),
+            $fraktionsarbeit,
+            $this->createStub(RealtimePublisherService::class),
+            $this->createStub(IRootFolder::class),
+            $this->createStub(IUserSession::class),
+            $this->createStub(LoggerInterface::class),
+            $mapper,
+        );
+
+        $this->assertSame(200, $controller->updateStammdaten(7)->getStatus());
+    }
+
+    /** Feature: Ein selbst angelegtes Geschäft lässt sich wieder löschen. */
+    public function testEigenesGeschaeftWirdGeloescht(): void
+    {
+        $aktualisiert = null;
+        $geloescht = null;
+        $controller = $this->controllerFuerGeschaeft($this->eigenesGeschaeft(), [], $aktualisiert, $geloescht);
+
+        $response = $controller->destroy(7);
+
+        $this->assertSame(200, $response->getStatus());
+        $this->assertNotNull($geloescht, 'Das eigene Geschäft wurde nicht gelöscht');
+        $this->assertSame(7, $geloescht->getId());
+    }
+
+    /** Ein Geschäft von der Parlamentswebseite darf nicht gelöscht werden. */
+    public function testParlamentsgeschaeftWirdNichtGeloescht(): void
+    {
+        $aktualisiert = null;
+        $geloescht = null;
+        $controller = $this->controllerFuerGeschaeft($this->parlamentsGeschaeft(), [], $aktualisiert, $geloescht);
+
+        $response = $controller->destroy(8);
+
+        $this->assertSame(403, $response->getStatus());
+        $this->assertNull($geloescht, 'Ein Parlamentsgeschäft wurde trotz Löschschutz entfernt');
+    }
+
+    /**
+     * Feature: Priorität filtert die Liste serverseitig. Nicht gesetzte
+     * Priorität zählt als «mittel», muss also beim Filter «mittel» erscheinen.
+     */
+    public function testIndexFiltertNachPrioritaet(): void
+    {
+        $request = $this->createStub(IRequest::class);
+        $request->method('getParam')
+            ->willReturnCallback(static function (string $key, mixed $default = null): mixed {
+                return match ($key) {
+                    'show_erledigt' => '1',
+                    'prioritaet' => 'mittel',
+                    default => $default,
+                };
+            });
+
+        $hoch = new Geschaeft();
+        $hoch->setPrioritaet('hoch');
+        $hoch->setNummer('2024.1');
+        $ohne = new Geschaeft(); // prioritaet default '' → gilt als «mittel»
+        $ohne->setNummer('2024.2');
+
+        $service = $this->createStub(GeschaeftService::class);
+        $service->method('alle')->willReturn([$hoch, $ohne]);
+
+        $fraktionsarbeit = $this->createStub(FraktionsarbeitService::class);
+        $fraktionsarbeit->method('angereicherteGeschaefte')
+            ->willReturnCallback(static fn(array $g): array => $g);
+
+        $controller = new GeschaeftController(
+            $request,
+            $service,
+            $fraktionsarbeit,
+            $this->createStub(RealtimePublisherService::class),
+            $this->createStub(IRootFolder::class),
+            $this->createStub(IUserSession::class),
+            $this->createStub(LoggerInterface::class),
+            $this->createStub(GeschaeftMapper::class),
+        );
+
+        $daten = $controller->index()->getData();
+        $this->assertCount(1, $daten);
+        $this->assertSame('2024.2', $daten[0]->getNummer());
+    }
+
+    /**
+     * Feature: Priorität setzen speichert genau das erlaubte Feld und meldet
+     * die Änderung per Realtime.
+     */
+    public function testSetPrioritaetSpeichertUndPublished(): void
+    {
+        $request = $this->createStub(IRequest::class);
+        $request->method('getParam')
+            ->willReturnCallback(static function (string $key, mixed $default = null): mixed {
+                return match ($key) {
+                    'prioritaet' => 'hoch',
+                    default => $default,
+                };
+            });
+
+        $service = $this->createMock(GeschaeftService::class);
+        $service->expects($this->once())
+            ->method('aktualisiereInterneFelder')
+            ->with(5, ['prioritaet' => 'hoch'])
+            ->willReturn(new Geschaeft());
+
+        $realtime = $this->createMock(RealtimePublisherService::class);
+        $realtime->expects($this->once())
+            ->method('publish')
+            ->with('geschaefte.updated', ['id' => 5, 'grund' => 'prioritaet']);
+
+        $controller = new GeschaeftController(
+            $request,
+            $service,
+            $this->createStub(FraktionsarbeitService::class),
+            $realtime,
+            $this->createStub(IRootFolder::class),
+            $this->createStub(IUserSession::class),
+            $this->createStub(LoggerInterface::class),
+            $this->createStub(GeschaeftMapper::class),
+        );
+
+        $response = $controller->setPrioritaet(5);
+        $this->assertSame(['prioritaet' => 'hoch'], $response->getData());
+    }
+
+    /**
+     * Feature: eine unbekannte Priorität wird abgewiesen und nicht gespeichert.
+     */
+    public function testSetPrioritaetLehntUngueltigenWertAb(): void
+    {
+        $request = $this->createStub(IRequest::class);
+        $request->method('getParam')
+            ->willReturnCallback(static function (string $key, mixed $default = null): mixed {
+                return match ($key) {
+                    'prioritaet' => 'sofort',
+                    default => $default,
+                };
+            });
+
+        $service = $this->createMock(GeschaeftService::class);
+        $service->expects($this->never())->method('aktualisiereInterneFelder');
+
+        $controller = new GeschaeftController(
+            $request,
+            $service,
+            $this->createStub(FraktionsarbeitService::class),
+            $this->createStub(RealtimePublisherService::class),
+            $this->createStub(IRootFolder::class),
+            $this->createStub(IUserSession::class),
+            $this->createStub(LoggerInterface::class),
+            $this->createStub(GeschaeftMapper::class),
+        );
+
+        $response = $controller->setPrioritaet(5);
+        $this->assertSame(400, $response->getStatus());
+    }
 }

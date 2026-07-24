@@ -57,6 +57,52 @@ class GeschaeftAktionMapper extends QBMapper
         $qb->select('*')
             ->from($this->getTableName())
             ->where($qb->expr()->eq('geschaeft_id', $qb->createNamedParameter($geschaeftId, IQueryBuilder::PARAM_INT)))
+            ->andWhere($qb->expr()->eq('objekt_typ', $qb->createNamedParameter('geschaeft')))
+            ->orderBy('erstellt_am', 'DESC')
+            ->addOrderBy('id', 'DESC');
+
+        return $this->findEntities($qb);
+    }
+
+    /**
+     * Alle Notiz-Aktionen (aktiv und gelöscht) eines Objekts — neueste zuerst,
+     * identisch zur Reihenfolge von findByGeschaeft. Für den geteilten
+     * NotizService (Geschäft wie Vorstoss).
+     *
+     * @return GeschaeftAktion[]
+     */
+    public function findNotizen(string $objektTyp, int $objektId, string $kategorie = 'notiz'): array
+    {
+        $qb = $this->db->getQueryBuilder();
+        $qb->select('*')
+            ->from($this->getTableName())
+            ->where($qb->expr()->eq('objekt_typ', $qb->createNamedParameter($objektTyp)))
+            ->andWhere($qb->expr()->eq('geschaeft_id', $qb->createNamedParameter($objektId, IQueryBuilder::PARAM_INT)))
+            ->andWhere($qb->expr()->eq('aktion_typ', $qb->createNamedParameter($kategorie)))
+            ->orderBy('erstellt_am', 'DESC')
+            ->addOrderBy('id', 'DESC');
+
+        return $this->findEntities($qb);
+    }
+
+    /**
+     * Notiz-Aktionen für mehrere Objekte in EINER Abfrage (kein N+1), neueste
+     * zuerst. Leere ID-Liste ⇒ leeres Ergebnis.
+     *
+     * @param int[] $objektIds
+     * @return GeschaeftAktion[]
+     */
+    public function findNotizenFuerObjekte(string $objektTyp, array $objektIds, string $kategorie = 'notiz'): array
+    {
+        if ($objektIds === []) {
+            return [];
+        }
+        $qb = $this->db->getQueryBuilder();
+        $qb->select('*')
+            ->from($this->getTableName())
+            ->where($qb->expr()->eq('objekt_typ', $qb->createNamedParameter($objektTyp)))
+            ->andWhere($qb->expr()->eq('aktion_typ', $qb->createNamedParameter($kategorie)))
+            ->andWhere($qb->expr()->in('geschaeft_id', $qb->createNamedParameter($objektIds, IQueryBuilder::PARAM_INT_ARRAY)))
             ->orderBy('erstellt_am', 'DESC')
             ->addOrderBy('id', 'DESC');
 
@@ -83,6 +129,7 @@ class GeschaeftAktionMapper extends QBMapper
         $qb->select('*')
             ->from($this->getTableName())
             ->where($qb->expr()->eq('geschaeft_id', $qb->createNamedParameter($geschaeftId, IQueryBuilder::PARAM_INT)))
+            ->andWhere($qb->expr()->eq('objekt_typ', $qb->createNamedParameter('geschaeft')))
             ->andWhere($qb->expr()->eq('aktion_typ', $qb->createNamedParameter($aktionTyp)))
             ->andWhere($qb->expr()->eq('entscheid_gueltig', $qb->createNamedParameter(true, IQueryBuilder::PARAM_BOOL)))
             ->orderBy('erstellt_am', 'DESC')

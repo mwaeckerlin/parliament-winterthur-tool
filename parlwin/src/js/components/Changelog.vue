@@ -56,13 +56,24 @@ function parseChangelog(text) {
   }))
 }
 
+/** «1.7.12» → «1.7» — Einträge derselben Minor-Version gehören zusammen. */
+function minorVon(version) {
+  const treffer = String(version).match(/^(\d+)\.(\d+)/)
+  return treffer ? `${treffer[1]}.${treffer[2]}` : ''
+}
+
 export default {
   name: 'Changelog',
   data() {
     const versionen = parseChangelog(changelogText)
+    // Alle Einträge der aktuellen Minor-Version sind aufgeklappt (z.B. 1.7.0 …
+    // 1.7.12); ältere Versionen bleiben zugeklappt.
+    const aktuelleMinor = versionen.length ? minorVon(versionen[0].version) : ''
     return {
       versionen,
-      offen: versionen.length ? [versionen[0].version] : [],
+      offen: versionen
+        .filter(v => minorVon(v.version) === aktuelleMinor)
+        .map(v => v.version),
     }
   },
   methods: {

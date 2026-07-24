@@ -40,19 +40,20 @@ class FraktionsraumService
         'Fraktion/40_Vorstösse',
         'Fraktion/40_Vorstösse/10_Eigene',
         'Fraktion/40_Vorstösse/20_Fremde',
-        'Fraktion/50_Finanzen',
-        'Fraktion/60_Wahlkampf',
-        'Fraktion/70_Medien',
+        'Fraktion/50_Wahlkampf',
+        'Fraktion/60_Medien',
         'Fraktion/90_Archiv',
     ];
 
     /**
      * Umbenennungen bestehender Ordner (Move alter → neuer Name). Wird vor dem
      * Anlegen der Struktur ausgeführt, damit vorhandene Inhalte erhalten bleiben.
+     * Die neue Nummer 40_Vorstösse schiebt Wahlkampf/Medien um eine Stufe nach
+     * unten; die Nummerierung bleibt lückenlos in 10er-Schritten.
      */
     private const ORDNER_UMBENENNUNGEN = [
-        'Fraktion/40_Wahlkampf' => 'Fraktion/60_Wahlkampf',
-        'Fraktion/50_Medien' => 'Fraktion/70_Medien',
+        'Fraktion/40_Wahlkampf' => 'Fraktion/50_Wahlkampf',
+        'Fraktion/50_Medien' => 'Fraktion/60_Medien',
     ];
 
     private const ORDNER_PERMISSIONS = Constants::PERMISSION_READ
@@ -123,13 +124,24 @@ class FraktionsraumService
         try {
             $adminFolder = $this->rootFolder->getUserFolder(self::ADMIN_USER);
 
-            // Bestehende Ordner auf neue Namen verschieben (idempotent: nur wenn
-            // der alte Ordner existiert und der neue noch nicht). Erhält Inhalte.
+            // Bestehende Ordner auf neue Namen bringen — VOR dem Anlegen der neuen
+            // Struktur, sonst kollidiert die neu vergebene Nummer 40_Vorstösse mit
+            // dem alten 40_Wahlkampf. Inhalte bleiben erhalten; ein abgebrochener
+            // Lauf darf keine Altlast hinterlassen.
             foreach (self::ORDNER_UMBENENNUNGEN as $alt => $neu) {
-                if ($adminFolder->nodeExists($alt) && !$adminFolder->nodeExists($neu)) {
+                if (!$adminFolder->nodeExists($alt)) {
+                    continue;
+                }
+
+                if (!$adminFolder->nodeExists($neu)) {
                     $adminFolder->get($alt)->move($adminFolder->getFullPath($neu));
                     $this->logger->info('parlwin: Ordner verschoben: ' . $alt . ' → ' . $neu);
+                    continue;
                 }
+
+                // Beide existieren (z.B. nach einem abgebrochenen Lauf): Inhalt des
+                // alten Ordners in den neuen übernehmen, dann den alten entfernen.
+                $this->fuehreOrdnerZusammen($adminFolder, $alt, $neu);
             }
 
             foreach (self::ORDNER_STRUKTUR as $pfad) {
@@ -150,6 +162,52 @@ class FraktionsraumService
             $this->bericht['ordner_struktur'] = 'FEHLER [' . get_class($e) . ']: ' . $e->getMessage();
             $this->logger->warning('parlwin: Admin-Ordnerstruktur fehlgeschlagen: ' . $e->getMessage());
             return null;
+        }
+    }
+
+    /**
+     * Übernimmt den Inhalt eines alten Ordners in den neuen und entfernt den alten.
+     *
+     * Nötig, wenn ein früherer Lauf die Umbenennung nur halb geschafft hat und beide
+     * Ordner nebeneinander liegen — sonst bleibt der alte Name mit doppelter Nummer
+     * (z.B. 40_Wahlkampf neben 60_Wahlkampf) für immer stehen. Dateien, die im Ziel
+     * bereits existieren, bleiben unangetastet; der alte Ordner wird dann nicht
+     * entfernt, damit nichts verloren geht.
+     */
+    private function fuehreOrdnerZusammen(Folder $adminFolder, string $alt, string $neu): void
+    {
+        try {
+            $altOrdner = $adminFolder->get($alt);
+            if (!$altOrdner instanceof Folder) {
+                return;
+            }
+
+            $konflikt = false;
+            foreach ($altOrdner->getDirectoryListing() as $kind) {
+                $name = $kind->getName();
+                $ziel = $neu . '/' . $name;
+                if ($adminFolder->nodeExists($ziel)) {
+                    // Gleichnamiges Element im Ziel: nichts überschreiben.
+                    $konflikt = true;
+                    $this->logger->warning(
+                        'parlwin: Zusammenführen übersprungen (Ziel existiert): ' . $alt . '/' . $name
+                    );
+                    continue;
+                }
+                $kind->move($adminFolder->getFullPath($ziel));
+                $this->logger->info('parlwin: Inhalt verschoben: ' . $alt . '/' . $name . ' → ' . $ziel);
+            }
+
+            if ($konflikt) {
+                return;
+            }
+
+            $altOrdner->delete();
+            $this->logger->info('parlwin: Altlast entfernt: ' . $alt . ' (Inhalt liegt in ' . $neu . ')');
+        } catch (\Throwable $e) {
+            $this->logger->warning(
+                'parlwin: Zusammenführen von ' . $alt . ' nach ' . $neu . ' fehlgeschlagen: ' . $e->getMessage()
+            );
         }
     }
 

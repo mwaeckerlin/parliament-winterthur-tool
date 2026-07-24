@@ -116,6 +116,30 @@ describe('BeschlussWidget — Debounce (5s)', () => {
   })
 })
 
+// ── Session-Signale (Eingabe-Session endet mit Fokus-Verlust) ─────────────────
+
+describe('BeschlussWidget — Session-Signale', () => {
+  it('emittiert blur-Ereignis beim Verlassen des Feldes', async () => {
+    const wrapper = mount()
+    const input = wrapper.find('input')
+    await input.setValue('Abschreiben')
+    await input.trigger('blur')
+    expect(wrapper.emitted('blur')).toBeTruthy()
+  })
+
+  it('speichert ausstehende Eingabe beim Entfernen der Komponente (Seite verlassen)', async () => {
+    vi.useFakeTimers()
+    const wrapper = mount()
+    const input = wrapper.find('input')
+    input.element.value = 'Halbfertig'
+    await input.trigger('input')
+    wrapper.unmount()
+    const emits = wrapper.emitted('update:modelValue') || []
+    expect(emits.at(-1)?.[0]).toMatchObject({ label: 'Halbfertig' })
+    vi.useRealTimers()
+  })
+})
+
 // ── currentText zeigt Wert aus modelValue ─────────────────────────────────────
 
 describe('BeschlussWidget — Anzeige', () => {

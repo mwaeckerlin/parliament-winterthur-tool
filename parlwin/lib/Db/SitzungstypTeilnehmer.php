@@ -20,7 +20,7 @@ use OCP\AppFramework\Db\Entity;
  * @method int    getReferenzId()
  * @method string getReferenzName()
  */
-class SitzungstypTeilnehmer extends Entity
+class SitzungstypTeilnehmer extends Entity implements \JsonSerializable
 {
   protected int $typId = 0;
   protected string $art = 'mitglied';

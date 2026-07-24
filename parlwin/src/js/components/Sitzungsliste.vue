@@ -21,6 +21,9 @@
     <header class="pw-view-header">
       <h2 class="pw-view-title">Sitzungen</h2>
       <span class="pw-view-count">{{ gefilterteSitzungen.length }}</span>
+      <!-- «+ Neue Sitzung» folgt dem Nextcloud-Standard für Neu-Aktionen: ein
+           Aktionsmenü mit je einem Eintrag pro Sitzungstyp — genau wie «+ Neu»
+           in der Dateien-App. Kein eigener Auswahl-Dialog. -->
       <NcActions :aria-label="'Neue Sitzung aus Vorlage erstellen'" type="primary" menu-name="+ Neue Sitzung" :force-menu="true" class="pw-neue-sitzung-btn">
         <NcActionButton v-if="sitzungstypen.length === 0" :disabled="true">Kein Sitzungstyp definiert</NcActionButton>
         <NcActionButton
@@ -37,6 +40,9 @@
   <Teleport to="body">
     <div v-if="gewaehlterTyp" class="pw-neue-sitzung-overlay" @click.self="gewaehlterTyp = null">
       <div class="pw-neue-sitzung-form pw-neue-sitzung-form-gross">
+        <div class="pw-modal-kopf pw-modal-kopf-leer">
+          <button type="button" class="button pw-btn-schliessen" aria-label="Dialog schliessen" @click.stop="gewaehlterTyp = null">✕</button>
+        </div>
         <!-- Titel – prominent oben -->
         <input
           v-model="neueSitzungTitel"
@@ -156,12 +162,12 @@
               </select>
               <select v-else-if="p.art === 'fraktion'" v-model="p.referenzName" class="pw-form-feld pw-form-feld-flex">
                 <option value="">— Fraktion wählen —</option>
-                <option v-for="f in aktiveFraktionen" :key="f.kuerzel || f.name" :value="f.name">{{ f.name }}</option>
+                <option v-for="f in aktiveFraktionen" :key="f.kuerzel || f.name" :value="f.name">{{ kuerze(f.name) }}</option>
               </select>
               <span v-else-if="p.art === 'eigeneFraktion'" class="pw-form-teilnehmer-hinweis">→ {{ konfigurierteGruppe || '(keine Gruppe konfiguriert)' }}</span>
               <select v-else-if="p.art === 'kommission'" v-model.number="p.referenzId" class="pw-form-feld pw-form-feld-flex">
                 <option :value="0">— Kommission wählen —</option>
-                <option v-for="k in aktiveKommissionen" :key="k.id" :value="k.id">{{ k.name }}</option>
+                <option v-for="k in aktiveKommissionen" :key="k.id" :value="k.id">{{ kuerze(k.name) }}</option>
               </select>
               <select v-else-if="p.art === 'ncGruppe'" v-model="p.referenzName" class="pw-form-feld pw-form-feld-flex">
                 <option value="">{{ ncGruppenLaden ? '— Lade … —' : '— Nextcloud-Gruppe —' }}</option>
@@ -229,7 +235,7 @@
           <!-- Notizen zur Sitzung (ersetzt frühere „Bemerkungen zur Sitzung“). -->
           <div class="pw-sitzung-notizen">
             <h4>Notizen zur Sitzung</h4>
-            <NotizenListe
+            <SitzungNotizen
               :model-value="sitzungNotizen[sitzung.id] || []"
               placeholder="Notiz zur Sitzung hinzufügen…"
               @update:model-value="speichereSitzungNotizen(sitzung, $event)"
@@ -290,7 +296,7 @@
             </div>
             <div v-for="vs in (verknuepfteSitzungen[sitzung.id] || [])" :key="vs.id" class="pw-verknuepfte-sitzung">
               <h5>{{ formatieredatum(vs.datum) }} – {{ vs.titel }}</h5>
-              <NotizenListe :model-value="parseNotizen(vs.notizen)" :readonly="true" />
+              <SitzungNotizen :model-value="parseNotizen(vs.notizen)" :readonly="true" />
             </div>
           </div>
 
@@ -320,7 +326,18 @@
                       <tr class="pw-traktandum-notizen-zeile" @click.stop>
                         <td></td>
                         <td>
-                          <NotizenListe
+                          <template v-if="geschaeftIdVon(t) > 0">
+                            <div class="pw-sitzungsnotiz-hinweis">Sitzungsnotiz zum Geschäft</div>
+                            <NotizenListe
+                              :basis-url="'geschaefte/' + geschaeftIdVon(t)"
+                              :notizen="sitzungsnotizen[geschaeftIdVon(t)] || []"
+                              :aktuelle-uid="aktuelleUid"
+                              kategorie="sitzungsnotiz"
+                              @geaendert="v => sitzungsnotizen = { ...sitzungsnotizen, [geschaeftIdVon(t)]: v }"
+                            />
+                          </template>
+                          <SitzungNotizen
+                            v-else
                             :model-value="parseTraktandumNotizen(t.id)"
                             placeholder="Notiz zum Traktandum hinzufügen…"
                             @update:model-value="speichereTraktandumNotizen(t, $event)"
@@ -420,7 +437,18 @@
                         <tr class="pw-traktandum-notizen-zeile" @click.stop>
                           <td></td>
                           <td colspan="4">
-                            <NotizenListe
+                            <template v-if="geschaeftIdVon(t) > 0">
+                              <div class="pw-sitzungsnotiz-hinweis">Sitzungsnotiz zum Geschäft</div>
+                              <NotizenListe
+                                :basis-url="'geschaefte/' + geschaeftIdVon(t)"
+                                :notizen="sitzungsnotizen[geschaeftIdVon(t)] || []"
+                                :aktuelle-uid="aktuelleUid"
+                                kategorie="sitzungsnotiz"
+                                @geaendert="v => sitzungsnotizen = { ...sitzungsnotizen, [geschaeftIdVon(t)]: v }"
+                              />
+                            </template>
+                            <SitzungNotizen
+                              v-else
                               :model-value="parseTraktandumNotizen(t.id)"
                               placeholder="Notiz zum Traktandum hinzufügen…"
                               @update:model-value="speichereTraktandumNotizen(t, $event)"
@@ -511,7 +539,18 @@
                       />
                     </div>
                     <div @click.stop>
-                      <NotizenListe
+                      <template v-if="geschaeftIdVon(t) > 0">
+                        <div class="pw-sitzungsnotiz-hinweis">Sitzungsnotiz zum Geschäft</div>
+                        <NotizenListe
+                          :basis-url="'geschaefte/' + geschaeftIdVon(t)"
+                          :notizen="sitzungsnotizen[geschaeftIdVon(t)] || []"
+                          :aktuelle-uid="aktuelleUid"
+                          kategorie="sitzungsnotiz"
+                          @geaendert="v => sitzungsnotizen = { ...sitzungsnotizen, [geschaeftIdVon(t)]: v }"
+                        />
+                      </template>
+                      <SitzungNotizen
+                        v-else
                         :model-value="parseTraktandumNotizen(t.id)"
                         placeholder="Notiz zum Traktandum hinzufügen…"
                         @update:model-value="speichereTraktandumNotizen(t, $event)"
@@ -535,7 +574,7 @@
     <div v-if="ausgewaehlteGeschaeftId" class="pw-modal-overlay" @click.self="schliesseGeschaeft">
       <div class="pw-modal">
         <div class="pw-modal-kopf pw-modal-kopf-leer">
-          <button type="button" class="button pw-btn-schliessen" aria-label="Dialog schliessen" @click="schliesseGeschaeft">✕</button>
+          <button type="button" class="button pw-btn-schliessen" aria-label="Dialog schliessen" @click.stop="schliesseGeschaeft">✕</button>
         </div>
         <GeschaeftDetail
           :geschaeft-id="ausgewaehlteGeschaeftId"
@@ -551,16 +590,17 @@
 <script>
 import { generateUrl } from '@nextcloud/router'
 import axios from '@nextcloud/axios'
-import { vollerName, personKey, parseNotizen } from '../utils'
+import { getCurrentUser } from '@nextcloud/auth'
+import { vollerName, personKey, parseNotizen, kuerze } from '../utils'
 import { showError } from '@nextcloud/dialogs'
 import '@nextcloud/dialogs/style.css'
 import { subscribeRealtime } from '../realtime'
 import GeschaeftDetail from './GeschaeftDetail.vue'
+import SitzungNotizen from './SitzungNotizen.vue'
 import NotizenListe from './NotizenListe.vue'
 import GeschaeftDokumente from './GeschaeftDokumente.vue'
 import NcActions from '@nextcloud/vue/components/NcActions'
 import NcActionButton from '@nextcloud/vue/components/NcActionButton'
-import NcActionCaption from '@nextcloud/vue/components/NcActionCaption'
 import NcButton from '@nextcloud/vue/components/NcButton'
 import NcCheckboxRadioSwitch from '@nextcloud/vue/components/NcCheckboxRadioSwitch'
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
@@ -571,7 +611,7 @@ import PwField from './PwField.vue'
 
 export default {
   name: 'Sitzungsliste',
-  components: { GeschaeftDetail, NotizenListe, GeschaeftDokumente, NcActions, NcActionButton, NcActionCaption, NcButton, NcCheckboxRadioSwitch, NcLoadingIcon, NcSelect, NcTextField, PwMultiSelect, PwField },
+  components: { GeschaeftDetail, SitzungNotizen, NotizenListe, GeschaeftDokumente, NcActions, NcActionButton, NcButton, NcCheckboxRadioSwitch, NcLoadingIcon, NcSelect, NcTextField, PwMultiSelect, PwField },
   props: {
     mitglieder:   { type: Array, default: () => [] },
     fraktionen:   { type: Array, default: () => [] },
@@ -589,6 +629,9 @@ export default {
       ladenTraktanden: {},
       sitzungNotizen: {},
       traktandumNotizen: {},
+      // Sitzungsnotizen: geschaeftId -> Array von Notiz-Aktionen. Am Geschäft
+      // haftende, in einer Sitzung erfasste Notizen (kategorie «sitzungsnotiz»).
+      sitzungsnotizen: {},
       verknuepfteSitzungen: {},
       verknuepfteGeschaeftIds: {},
       geschaefteAlle: [],
@@ -599,6 +642,7 @@ export default {
       // Neue Sitzung aus Vorlage
       sitzungstypen: [],
       gewaehlterTyp: null,
+      // Zwischendialog zur Typ-Auswahl (nur bei mehreren Sitzungstypen)
       neueSitzungDatum: '',
       neueSitzungTitel: '',
       neueSitzungOrt: '',
@@ -628,6 +672,10 @@ export default {
     }
   },
   computed: {
+    // UID des angemeldeten Nutzers — für «nur der Autor darf» in der Notizen-Liste.
+    aktuelleUid() {
+      return getCurrentUser()?.uid || ''
+    },
     heuteDatum() {
       return new Date().toISOString().slice(0, 10)
     },
@@ -741,6 +789,7 @@ export default {
     }
   },
   methods: {
+    kuerze,
     async ladeSitzungstypen() {
       try {
         const { data } = await axios.get(generateUrl('/apps/parlwin/sitzungstypen'))
@@ -1006,6 +1055,9 @@ export default {
         const notizen = { ...this.traktandumNotizen }
         data.forEach(t => {
           notizen[t.id] = this.parseNotizen(t.notizen)
+          // Für verknüpfte Geschäfte die am Geschäft haftenden Sitzungsnotizen laden.
+          const gid = this.geschaeftIdVon(t)
+          if (gid > 0) this.ladeSitzungsnotizen(gid)
         })
         this.traktandumNotizen = notizen
         // Wenn aktive Suche Treffer ergibt, Sitzung automatisch aufklappen.
@@ -1043,6 +1095,25 @@ export default {
     parseNotizen,
     parseTraktandumNotizen(tId) {
       return this.traktandumNotizen[tId] || []
+    },
+    // Geschäft-ID eines Traktandums (0, wenn kein Geschäft verknüpft ist).
+    geschaeftIdVon(t) {
+      return Number(t?.geschaeftId || t?.geschaeft?.id || 0)
+    },
+    // Lädt die am Geschäft haftenden Sitzungsnotizen (kategorie «sitzungsnotiz»).
+    // Sie erscheinen so an jeder Sitzung, an der das Geschäft als Traktandum hängt.
+    async ladeSitzungsnotizen(geschaeftId) {
+      const gid = Number(geschaeftId || 0)
+      if (gid <= 0) return
+      try {
+        const { data } = await axios.get(
+          generateUrl(`/apps/parlwin/geschaefte/${gid}/notizen`),
+          { params: { kategorie: 'sitzungsnotiz' } }
+        )
+        this.sitzungsnotizen = { ...this.sitzungsnotizen, [gid]: Array.isArray(data) ? data : [] }
+      } catch (e) {
+        this.sitzungsnotizen = { ...this.sitzungsnotizen, [gid]: [] }
+      }
     },
     gefilterteTraktanden(sitzungId) {
       const liste = this.traktanden[sitzungId] || []
@@ -1199,10 +1270,6 @@ export default {
 </script>
 
 <style scoped>
-.pw-neue-sitzung-btn {
-  margin-left: auto;
-}
-
 .pw-neue-sitzung-overlay {
   position: fixed;
   inset: 0;
@@ -1232,22 +1299,8 @@ export default {
 }
 
 /* Titelfeld – prominent wie NC Calendar */
-.pw-sitzung-titel-input {
-  font-size: 1.25em;
-  font-weight: 600;
-  border: none;
-  border-bottom: 2px solid var(--color-border);
-  border-radius: 0;
-  background: transparent;
-  color: var(--color-main-text);
-  padding: 0.25em 0;
-  width: 100%;
-  outline: none;
-}
-
-.pw-sitzung-titel-input:focus {
-  border-bottom-color: var(--color-primary);
-}
+/* Die Darstellung des Titel-Eingabefelds steht global in style.scss —
+   dasselbe Aussehen wie beim bearbeitbaren Geschäftstitel. */
 
 .pw-form-divider {
   border: none;
@@ -1457,5 +1510,16 @@ export default {
   font-size: 0.85em;
   color: var(--color-text-lighter);
   margin-top: 0.15em;
+}
+
+/* Hinweis, dass diese Notiz am Geschäft haftet (nicht an der Sitzung) und daher
+   an jeder Sitzung erscheint, an der das Geschäft als Traktandum hängt. */
+.pw-sitzungsnotiz-hinweis {
+  font-size: 0.8em;
+  font-weight: 600;
+  color: var(--color-text-lighter);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.3em;
 }
 </style>

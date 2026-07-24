@@ -53,6 +53,8 @@
       />
       <Vorstoesseliste
         v-else-if="aktiveAnsicht === 'vorstoesse'"
+        :mitglieder="mitglieder"
+        :fraktionen="fraktionen"
       />
       <Sitzungstypenliste
         v-else-if="aktiveAnsicht === 'sitzungstypen'"

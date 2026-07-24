@@ -31,7 +31,9 @@ class Version000009Date20260520120000 extends SimpleMigrationStep
     if (!$schema->hasTable('pw_sitzungstypen')) {
       $tabelle = $schema->createTable('pw_sitzungstypen');
       $tabelle->addColumn('id', Types::BIGINT, ['autoincrement' => true, 'notnull' => true, 'unsigned' => true]);
-      $tabelle->addColumn('name', Types::STRING, ['notnull' => true, 'length' => 255, 'default' => '']);
+      // notnull=false: Nextcloud (ab NC 34) verbietet eine NOT-NULL-Spalte mit
+      // leerem String als Default und bricht das occ upgrade sonst ab.
+      $tabelle->addColumn('name', Types::STRING, ['notnull' => false, 'length' => 255, 'default' => '']);
       $tabelle->addColumn('zweck', Types::TEXT, ['notnull' => false, 'default' => '']);
       $tabelle->addColumn('kalender_anlegen', Types::BOOLEAN, ['notnull' => true, 'default' => true]);
       $tabelle->addColumn('einladung_versenden', Types::BOOLEAN, ['notnull' => true, 'default' => false]);

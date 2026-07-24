@@ -27,6 +27,12 @@
         v-for="typ in gefiltert"
         :key="typ.id"
         class="pw-sitzungstyp-karte"
+        role="button"
+        tabindex="0"
+        :aria-label="`Sitzungstyp ${typ.name} bearbeiten`"
+        @click="bearbeiten(typ)"
+        @keydown.enter.prevent="bearbeiten(typ)"
+        @keydown.space.prevent="bearbeiten(typ)"
       >
         <div class="pw-sitzungstyp-kopf">
           <div>
@@ -34,8 +40,7 @@
             <p v-if="typ.zweck" class="pw-sitzungstyp-zweck">{{ typ.zweck }}</p>
           </div>
           <div class="pw-sitzungstyp-aktionen">
-            <NcButton type="secondary" @click="bearbeiten(typ)">Bearbeiten</NcButton>
-            <NcButton type="error" @click="loeschen(typ)">Löschen</NcButton>
+            <NcButton type="error" @click.stop="loeschen(typ)">Löschen</NcButton>
           </div>
         </div>
         <div class="pw-sitzungstyp-meta">
@@ -47,30 +52,34 @@
       </div>
     </div>
 
-    <!-- Bearbeitungs-Dialog -->
+    <!-- EIN Formular für Erstellen UND Bearbeiten: beide zeigen exakt dieselben
+         Felder. Beim Bearbeiten speichert jede Eingabe sofort — ✕ schliesst nur.
+         Beim Anlegen sammelt die Maske die Eingaben und legt erst «Speichern»
+         sie an; verworfen wird nur über «Abbrechen», ein Klick daneben tut
+         nichts. -->
     <Teleport to="body">
-    <div v-if="bearbeitung" class="pw-modal-overlay" @click.self="abbrechen">
+    <div v-if="bearbeitung" class="pw-modal-overlay" @click.self="overlayKlick">
       <div class="pw-modal">
-        <header class="pw-modal-header">
-          <h3>{{ bearbeitung.id ? 'Sitzungstyp bearbeiten' : 'Neuer Sitzungstyp' }}</h3>
-          <button type="button" class="pw-modal-close" @click="abbrechen">×</button>
-        </header>
+        <div class="pw-modal-kopf">
+          <h3>{{ istEntwurf ? 'Neuer Sitzungstyp' : 'Sitzungstyp bearbeiten' }}</h3>
+          <button v-if="!istEntwurf" type="button" class="button pw-btn-schliessen" aria-label="Dialog schliessen" @click.stop="schliessen">✕</button>
+        </div>
         <div class="pw-modal-body">
           <PwField label="Name *">
-            <input v-model="bearbeitung.name" type="text" class="pw-input" />
+            <input v-model="bearbeitung.name" type="text" class="pw-input" @change="feldSpeichern" />
           </PwField>
           <PwField label="Zweck">
-            <textarea v-model="bearbeitung.zweck" class="pw-textarea" rows="2" />
+            <textarea v-model="bearbeitung.zweck" class="pw-textarea" rows="2" @change="feldSpeichern" />
           </PwField>
           <PwField label="Standard-Ort">
-            <input v-model="bearbeitung.standardOrt" type="text" class="pw-input" />
+            <input v-model="bearbeitung.standardOrt" type="text" class="pw-input" @change="feldSpeichern" />
           </PwField>
           <div class="pw-von-bis">
             <PwField label="Von">
-              <input v-model="bearbeitung.standardZeitVon" type="time" class="pw-input" />
+              <input v-model="bearbeitung.standardZeitVon" type="time" class="pw-input" @change="feldSpeichern" />
             </PwField>
             <PwField label="Bis">
-              <input v-model="bearbeitung.standardZeitBis" type="time" class="pw-input" />
+              <input v-model="bearbeitung.standardZeitBis" type="time" class="pw-input" @change="feldSpeichern" />
             </PwField>
           </div>
           <fieldset class="pw-fieldset">
@@ -91,9 +100,9 @@
                 draggable="true"
                 @dragstart="typDragSrc = i"
               >⠿</span>
-              <input v-model="t.titel" placeholder="Titel" class="pw-input" />
-              <input v-model="t.beschreibung" placeholder="Beschreibung" class="pw-input" />
-              <button type="button" class="pw-btn-klein" @click="bearbeitung.traktanden.splice(i, 1)">✕</button>
+              <input v-model="t.titel" placeholder="Titel" class="pw-input" @change="feldSpeichern" />
+              <input v-model="t.beschreibung" placeholder="Beschreibung" class="pw-input" @change="feldSpeichern" />
+              <button type="button" class="pw-btn-klein" @click="entferneTraktandum(i)">✕</button>
             </div>
             <NcButton type="secondary" @click="bearbeitung.traktanden.push({ titel: '', beschreibung: '' })">+ Traktandum</NcButton>
           </fieldset>
@@ -101,8 +110,8 @@
           <fieldset class="pw-fieldset">
             <legend>Teilnehmer</legend>
             <NcCheckboxRadioSwitch
-              :checked="hatEigeneFraktion"
-              @update:checked="toggleEigeneFraktion"
+              :model-value="hatEigeneFraktion"
+              @update:model-value="toggleEigeneFraktion"
             >Eigene Fraktion<span v-if="konfigurierteGruppe" class="pw-hinweis pw-hinweis-inline"> → {{ konfigurierteGruppe }}</span></NcCheckboxRadioSwitch>
             <PwField label="Einzelne Mitglieder">
               <PwMultiSelect
@@ -118,8 +127,8 @@
           <fieldset class="pw-fieldset">
             <legend>Optionen</legend>
             <NcCheckboxRadioSwitch
-              :checked="bearbeitung.verknuepfen"
-              @update:checked="v => bearbeitung.verknuepfen = v"
+              :model-value="bearbeitung.verknuepfen"
+              @update:model-value="v => { bearbeitung.verknuepfen = v; feldSpeichern() }"
             >Beim Anlegen Verknüpfung mit anderen Sitzungen anbieten</NcCheckboxRadioSwitch>
             <PwField label="Kommissionen beraten (hängige Geschäfte automatisch verknüpfen)">
               <PwMultiSelect
@@ -132,10 +141,10 @@
             </PwField>
           </fieldset>
         </div>
-        <footer class="pw-modal-footer">
-          <NcButton type="tertiary" @click="abbrechen">Abbrechen</NcButton>
-          <NcButton type="primary" :disabled="!bearbeitung.name || speichernLaeuft" @click="speichern">Speichern</NcButton>
-        </footer>
+        <div v-if="istEntwurf" class="pw-modal-footer">
+          <NcButton type="primary" :disabled="!bearbeitung.name.trim() || erstellenLaeuft" @click="speichern">Speichern</NcButton>
+          <NcButton @click="abbrechen">Abbrechen</NcButton>
+        </div>
       </div>
     </div>
     </Teleport>
@@ -145,6 +154,9 @@
 <script>
 import { generateUrl } from '@nextcloud/router'
 import axios from '@nextcloud/axios'
+import { showError, showSuccess } from '@nextcloud/dialogs'
+import '@nextcloud/dialogs/style.css'
+import { kuerze } from '../utils'
 import NcTextField from '@nextcloud/vue/components/NcTextField'
 import NcButton from '@nextcloud/vue/components/NcButton'
 import NcCheckboxRadioSwitch from '@nextcloud/vue/components/NcCheckboxRadioSwitch'
@@ -167,7 +179,10 @@ export default {
       filterReady: false,
       suche: '',
       bearbeitung: null,
-      speichernLaeuft: false,
+      erstellenLaeuft: false,
+      // Ein frisch angelegter, noch unbenannter Sitzungstyp: der Dialog heisst
+      // dann «Neuer Sitzungstyp» und wird beim Schliessen ohne Namen verworfen.
+      istEntwurf: false,
       ncGruppen: [],
       ncUser: [],
       ncGruppenLaden: false,
@@ -216,7 +231,7 @@ export default {
         .map(p => ({ value: p.referenzId, label: p.referenzName || this.mitgliedLabel(this.aktiveMitglieder.find(m => m.id === p.referenzId) || {}) }))
     },
     kommissionenOptionen() {
-      return (this.kommissionen || []).map(k => ({ id: k.id, label: k.name }))
+      return (this.kommissionen || []).map(k => ({ id: k.id, label: kuerze(k.name) }))
     },
     kommissionenAuswahl() {
       const ids = new Set(this.bearbeitung?.kommissionen || [])
@@ -245,7 +260,7 @@ export default {
     mitgliedLabel(m) {
       const v = m.vorname || ''
       const n = m.name || ''
-      return `${v} ${n}`.trim() + (m.fraktion ? ` (${m.fraktion})` : '')
+      return `${v} ${n}`.trim() + (m.fraktion ? ` (${kuerze(m.fraktion)})` : '')
     },
     toggleEigeneFraktion(checked) {
       if (!this.bearbeitung) return
@@ -256,6 +271,7 @@ export default {
       } else {
         this.bearbeitung.teilnehmer = this.bearbeitung.teilnehmer.filter(p => p.art !== 'eigeneFraktion')
       }
+      this.feldSpeichern()
     },
     updateMitglieder(optionen) {
       if (!this.bearbeitung) return
@@ -265,10 +281,16 @@ export default {
         return { art: 'mitglied', referenzId: o.value, referenzName: m ? this.mitgliedLabel(m) : (o.label || '') }
       })
       this.bearbeitung.teilnehmer = [...andere, ...mitglieder]
+      this.feldSpeichern()
     },
     updateKommissionen(optionen) {
       if (!this.bearbeitung) return
       this.bearbeitung.kommissionen = (optionen || []).map(o => o.id)
+      this.feldSpeichern()
+    },
+    entferneTraktandum(i) {
+      this.bearbeitung.traktanden.splice(i, 1)
+      this.feldSpeichern()
     },
     async ladeNcGruppen(search = '') {
       this.ncGruppenLaden = true
@@ -301,24 +323,48 @@ export default {
       arr.splice(targetIdx, 0, moved)
       this.typDragSrc = null
       this.typDragOverIdx = null
+      this.feldSpeichern()
     },
+    // Minimaler Neu-Dialog: nur der Name — danach öffnet die Bearbeitung,
+    // in der jede Eingabe sofort gespeichert wird.
+    // «+ Neuer Typ» öffnet dieselbe Maske wie das Bearbeiten (geteilter Code).
+    // Es wird noch nichts angelegt — erst «Speichern» erzeugt den Sitzungstyp.
     neuerTyp() {
-      this.bearbeitung = {
-        id: 0,
-        name: '',
-        zweck: '',
-        kalenderAnlegen: true,
-        einladungVersenden: true,
-        verknuepfen: false,
-        kommissionen: [],
-        standardOrt: '',
-        standardZeitVon: '',
-        standardZeitBis: '',
-        traktanden: [],
-        teilnehmer: [],
+      this.bearbeiten({})
+      this.istEntwurf = true
+    },
+    // Legt den in der Maske erfassten Sitzungstyp an und geht unmittelbar in
+    // die Bearbeitung über.
+    async speichern() {
+      const name = (this.bearbeitung?.name || '').trim()
+      if (!name || this.erstellenLaeuft) return
+      this.erstellenLaeuft = true
+      try {
+        const { data } = await axios.post(generateUrl('/apps/parlwin/sitzungstypen'), {
+          ...this.bearbeitung,
+          name,
+          zweck: '',
+        })
+        await this.lade()
+        this.bearbeiten(data || {})
+        showSuccess('Gespeichert')
+      } catch (e) {
+        showError('Sitzungstyp konnte nicht erstellt werden: ' + (e?.response?.data?.fehler || e?.message || ''))
+      } finally {
+        this.erstellenLaeuft = false
       }
     },
+    // Nur der ausdrückliche Abbruch verwirft die Eingaben.
+    abbrechen() {
+      this.bearbeitung = null
+      this.istEntwurf = false
+    },
+    // Ein Klick neben die Maske darf beim Erfassen nichts verwerfen.
+    overlayKlick() {
+      if (!this.istEntwurf) this.schliessen()
+    },
     bearbeiten(typ) {
+      this.istEntwurf = false
       this.bearbeitung = JSON.parse(JSON.stringify({
         id: typ.id || 0,
         name: typ.name || '',
@@ -341,11 +387,15 @@ export default {
         })),
       }))
     },
-    abbrechen() {
+    schliessen() {
       this.bearbeitung = null
+      this.istEntwurf = false
     },
-    async speichern() {
-      if (!this.bearbeitung || !this.bearbeitung.name) return
+    // Speichert den aktuellen Bearbeitungsstand SOFORT (bei jeder Eingabe).
+    // Ein leerer Name wird nie weggespeichert.
+    async feldSpeichern() {
+      if (!this.bearbeitung?.id) return
+      if (!(this.bearbeitung.name || '').trim()) return
       // Unvollstaendige Teilnehmer-Regeln (z.B. "— wählen —" stehen geblieben)
       // werden stillschweigend verworfen, damit der Benutzer nicht durch eine
       // Validierungs-Meldung blockiert wird.
@@ -356,23 +406,22 @@ export default {
         return !!p.referenzName
       }
       const teilnehmerSauber = (this.bearbeitung.teilnehmer || []).filter(istVollstaendig)
-      this.speichernLaeuft = true
       try {
-        const payload = { ...this.bearbeitung, teilnehmer: teilnehmerSauber }
-        if (payload.id) {
-          await axios.put(generateUrl(`/apps/parlwin/sitzungstypen/${payload.id}`), payload)
-        } else {
-          await axios.post(generateUrl('/apps/parlwin/sitzungstypen'), payload)
+        const { data } = await axios.put(
+          generateUrl(`/apps/parlwin/sitzungstypen/${this.bearbeitung.id}`),
+          { ...this.bearbeitung, teilnehmer: teilnehmerSauber }
+        )
+        // Karte in der Übersicht direkt aktualisieren — kein Neuladen der Liste.
+        if (data?.id) {
+          const i = this.typen.findIndex(t => t.id === data.id)
+          if (i >= 0) this.typen.splice(i, 1, data)
         }
-        this.bearbeitung = null
-        await this.lade()
+        // Ein benannter Sitzungstyp ist kein Entwurf mehr und bleibt beim
+        // Schliessen bestehen.
+        this.istEntwurf = false
+        showSuccess('Gespeichert')
       } catch (e) {
-        const status = e?.response?.status
-        const serverMsg = e?.response?.data?.fehler || e?.response?.data?.message || ''
-        console.error('Fehler beim Speichern des Sitzungstyps:', status, e?.response?.data || e.message)
-        alert(`Fehler beim Speichern (HTTP ${status || '?'}): ${serverMsg || e.message}`)
-      } finally {
-        this.speichernLaeuft = false
+        showError('Sitzungstyp konnte nicht gespeichert werden: ' + (e?.response?.data?.fehler || e?.message || ''))
       }
     },
     async loeschen(typ) {
@@ -423,15 +472,6 @@ export default {
   width: min(720px, 95vw);
   max-height: 90vh;
   display: flex; flex-direction: column;
-}
-.pw-modal-header {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 12px 16px; border-bottom: 1px solid var(--color-border, #ddd);
-}
-.pw-modal-header h3 { margin: 0; }
-.pw-modal-close {
-  background: none; border: none; font-size: 1.6em; cursor: pointer;
-  color: var(--color-text-maxcontrast, #666);
 }
 .pw-modal-body {
   padding: 16px; overflow-y: auto; flex: 1;

@@ -25,15 +25,20 @@ use OCP\AppFramework\Db\Entity;
  * @method string getErstelltAm()
  * @method string getAktualisiertAm()
  */
-class Sitzungstyp extends Entity
+class Sitzungstyp extends Entity implements \JsonSerializable
 {
   protected string $name = '';
   protected string $zweck = '';
   protected bool $kalenderAnlegen = true;
   protected bool $einladungVersenden = true;
   protected bool $verknuepfen = false;
-  /** @var string JSON-Array von Kommissions-IDs, deren hängige Geschäfte automatisch verknüpft werden. */
-  protected string $kommissionen = '[]';
+  /**
+   * @var ?string JSON-Array von Kommissions-IDs, deren hängige Geschäfte
+   * automatisch verknüpft werden. Nullable, weil die Spalte per Migration
+   * nullable ergänzt wurde — eine non-nullable Property würde beim Laden einer
+   * NULL-Zeile einen TypeError werfen (500 beim Anlegen/Laden von Sitzungstypen).
+   */
+  protected ?string $kommissionen = '[]';
   protected string $standardOrt = '';
   protected string $standardZeitVon = '';
   protected string $standardZeitBis = '';
@@ -61,7 +66,7 @@ class Sitzungstyp extends Entity
       'kalenderAnlegen' => $this->getKalenderAnlegen(),
       'einladungVersenden' => $this->getEinladungVersenden(),
       'verknuepfen' => $this->getVerknuepfen(),
-      'kommissionen' => json_decode($this->getKommissionen() ?: '[]', true) ?: [],
+      'kommissionen' => json_decode($this->getKommissionen() ?? '[]', true) ?: [],
       'standardOrt' => $this->getStandardOrt(),
       'standardZeitVon' => $this->getStandardZeitVon(),
       'standardZeitBis' => $this->getStandardZeitBis(),

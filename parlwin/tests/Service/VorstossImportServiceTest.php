@@ -68,6 +68,40 @@ class VorstossImportServiceTest extends TestCase
         $this->assertSame(1, $anzahl);
     }
 
+    /**
+     * Regression: Der Import muss ALLE Felder setzen — der Mapper schreibt
+     * beim INSERT nur die «dirty» Felder; nicht gesetzte Textspalten blieben
+     * NULL und brachen später das Laden der ganzen Liste.
+     */
+    public function testImportiereSetztAlleSpaltenDirty(): void
+    {
+        $mapper = $this->createMock(VorstossMapper::class);
+        $mapper->method('findByDokument')->willReturn(null);
+        $mapper->expects($this->once())
+            ->method('insert')
+            ->with($this->callback(static function (Vorstoss $v): bool {
+                $dirty = array_keys($v->getUpdatedFields());
+                foreach ([
+                    'titel', 'art', 'herkunft', 'status', 'prioritaet', 'beschluss',
+                    'zustaendigkeit', 'herkunftFraktion', 'ansprechpartner', 'inhalt',
+                    'dokument', 'notizen', 'geschaeftId', 'geloescht',
+                    'erstelltAm', 'aktualisiertAm',
+                ] as $feld) {
+                    if (!in_array($feld, $dirty, true)) {
+                        return false;
+                    }
+                }
+                return true;
+            }))
+            ->willReturnArgument(0);
+
+        (new VorstossImportService(
+            $this->rootMitDatei('Postulat X.pdf'),
+            $mapper,
+            $this->createStub(LoggerInterface::class),
+        ))->importiere();
+    }
+
     public function testImportiereUeberspringtBereitsImportierte(): void
     {
         $mapper = $this->createMock(VorstossMapper::class);

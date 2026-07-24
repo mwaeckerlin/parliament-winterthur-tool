@@ -9,6 +9,7 @@
       <PwMultiSelect :model-value="filterTyp" :options="alleTypen" input-label="Typ" placeholder="Alle" @update:model-value="filterTyp = $event || []" />
       <PwMultiSelect :model-value="filterZustaendige" :options="zustaendigeLabels" input-label="Zuständigkeit" placeholder="Alle" @update:model-value="filterZustaendige = $event || []" />
       <PwMultiSelect :model-value="filterBeschlussOptions" :options="beschlussOptionsList" input-label="Beschluss" placeholder="Alle" @update:model-value="filterBeschluss = ($event || []).map(o => o.value)" />
+      <PwMultiSelect :model-value="filterPrioritaetOptions" :options="prioritaetOptionen" input-label="Priorität" placeholder="Alle" @update:model-value="filterPrioritaet = ($event || []).map(o => o.value)" />
       <NcCheckboxRadioSwitch v-model="zeigeErledigte" type="switch">
         Erledigte anzeigen
       </NcCheckboxRadioSwitch>
@@ -23,30 +24,6 @@
         <NcButton type="primary" @click="neuesGeschaeftOeffnen">+ Eigenes Geschäft</NcButton>
       </header>
 
-      <Teleport to="body">
-        <div v-if="neuesGeschaeftDialog" class="pw-modal-overlay" @click.self="neuesGeschaeftDialog = false">
-          <div class="pw-modal">
-            <div class="pw-modal-kopf">
-              <h3>Eigenes Geschäft erstellen</h3>
-              <button type="button" class="button pw-btn-schliessen" @click="neuesGeschaeftDialog = false">✕</button>
-            </div>
-            <div class="pw-modal-body">
-              <div class="pw-form-zeile">
-                <label>Titel</label>
-                <input v-model="neuesGeschaeftTitel" type="text" class="pw-input" placeholder="Titel des Geschäfts" @keyup.enter="neuesGeschaeftErstellen" />
-              </div>
-              <div class="pw-form-zeile">
-                <label>Typ</label>
-                <input v-model="neuesGeschaeftTyp" type="text" class="pw-input" placeholder="z.B. Kommissionsgeschäft" />
-              </div>
-            </div>
-            <div class="pw-modal-footer">
-              <button type="button" class="button" @click="neuesGeschaeftDialog = false">Abbrechen</button>
-              <button type="button" class="button primary" :disabled="!neuesGeschaeftTitel.trim() || neuesGeschaeftLaeuft" @click="neuesGeschaeftErstellen">Erstellen</button>
-            </div>
-          </div>
-        </div>
-      </Teleport>
       <div v-if="laden" class="pw-laden"><NcLoadingIcon :size="32" /></div>
 
       <template v-else>
@@ -56,6 +33,7 @@
           <tr>
             <th @click="sortiereNach('nummer')" class="pw-sortierbar pw-col-nr">Nr.</th>
             <th @click="sortiereNach('titel')" class="pw-sortierbar pw-col-titel">Titel</th>
+            <th class="pw-col-prio">Prio</th>
             <th v-if="statusSpalteAnzeigen" @click="sortiereNach('status')" class="pw-sortierbar pw-col-status">Status</th>
             <th class="pw-col-zustaendig">Zuständig</th>
             <th class="pw-col-beschluss">Beschluss</th>
@@ -65,7 +43,7 @@
             <tr
               v-for="g in gefilterteGeschaefte"
               :key="g.id"
-              :class="['pw-table-row-clickable', { 'pw-geloescht': g.geloescht }]"
+              :class="['pw-table-row-clickable', { 'pw-geloescht': g.geloescht, 'pw-prio-hoch': prioritaetEffektiv(g) === 'hoch', 'pw-prio-tief': prioritaetEffektiv(g) === 'tief' }]"
               tabindex="0"
               role="button"
               :aria-label="`Geschäft ${g.nummer || ''} öffnen`"
@@ -81,6 +59,16 @@
                 <a v-if="g.url" :href="g.url" target="_blank" @click.stop class="pw-inline-link" title="Extern öffnen">↗</a>
                 {{ g.titel }}
                 <span v-if="erstunterzeichner(g)" class="pw-col-einreicher">{{ erstunterzeichner(g) }}</span>
+              </td>
+              <td data-label="Prio" class="pw-col-inline-edit pw-col-prio" @click.stop>
+                <NcSelect
+                  class="pw-inline-select"
+                  :model-value="prioritaetOptionFuer(g)"
+                  :options="prioritaetOptionen"
+                  :clearable="true"
+                  placeholder="—"
+                  @update:model-value="aenderungPrioritaet(g, $event ? $event.value : '')"
+                />
               </td>
               <td v-if="statusSpalteAnzeigen" data-label="Status" class="pw-col-status">
                 <span :class="['pw-status-' + statusKlasse(g.status), 'pw-status-text']" :title="g.status">{{ statusKuerzen(g.status) }}</span>
@@ -115,7 +103,7 @@
             v-for="g in gefilterteGeschaefte"
             :key="`card-${g.id}`"
             class="pw-data-card pw-geschaeft-card"
-            :class="{ 'pw-geloescht': g.geloescht }"
+            :class="{ 'pw-geloescht': g.geloescht, 'pw-prio-hoch': prioritaetEffektiv(g) === 'hoch', 'pw-prio-tief': prioritaetEffektiv(g) === 'tief' }"
             tabindex="0"
             role="button"
             @click="oeffneDetail(g.id)"
@@ -147,6 +135,18 @@
               </div>
             </div>
 
+            <div class="pw-card-prio" @click.stop>
+              <NcSelect
+                class="pw-inline-select"
+                :model-value="prioritaetOptionFuer(g)"
+                :options="prioritaetOptionen"
+                :clearable="true"
+                input-label="Priorität"
+                placeholder="—"
+                @update:model-value="aenderungPrioritaet(g, $event ? $event.value : '')"
+              />
+            </div>
+
             <div class="pw-card-beschluss" @click.stop>
               <BeschlussWidget
                 :model-value="beschlussOptionFuer(g)"
@@ -163,15 +163,20 @@
     </section>
 
     <Teleport to="body">
-      <div v-if="ausgewaehlteGeschaeftId" class="pw-modal-overlay" @click.self="schliesseDetail">
+      <!-- Dieselbe Maske für Anlegen und Bearbeiten: beim Anlegen ist die ID 0,
+           die Maske sammelt dann nur die Eingaben und bietet Speichern/Abbrechen.
+           Ein Klick daneben verwirft dabei nichts. -->
+      <div v-if="detailOffen" class="pw-modal-overlay" @click.self="overlayKlick">
         <div class="pw-modal">
-          <div class="pw-modal-kopf pw-modal-kopf-leer">
-            <button type="button" class="button pw-btn-schliessen" aria-label="Dialog schliessen" @click="schliesseDetail">✕</button>
+          <div v-if="!neuesGeschaeft" class="pw-modal-kopf pw-modal-kopf-leer">
+            <button type="button" class="button pw-btn-schliessen" aria-label="Dialog schliessen" @click.stop="schliesseDetail">✕</button>
           </div>
           <GeschaeftDetail
             :geschaeft-id="ausgewaehlteGeschaeftId"
             :mitglieder="mitglieder"
             @gespeichert="nachSpeichern"
+            @erstellt="nachErstellen"
+            @abbrechen="neuAbbrechen"
           />
         </div>
       </div>
@@ -181,8 +186,10 @@
 <script>
 import { generateUrl } from '@nextcloud/router'
 import axios from '@nextcloud/axios'
+import { showError } from '@nextcloud/dialogs'
+import '@nextcloud/dialogs/style.css'
 import { subscribeRealtime } from '../realtime'
-import { vollerName, personKey } from '../utils'
+import { vollerName, personKey, PRIORITAETEN, kuerze } from '../utils'
 import GeschaeftDetail from './GeschaeftDetail.vue'
 import NcTextField from '@nextcloud/vue/components/NcTextField'
 import NcSelect from '@nextcloud/vue/components/NcSelect'
@@ -208,10 +215,9 @@ export default {
       statusKuerzelListe: window.PARLWIN_CONFIG?.statusKuerzel || [],
       suche: '',
       filterStatus: [],
-      neuesGeschaeftDialog: false,
-      neuesGeschaeftTitel: '',
-      neuesGeschaeftTyp: 'Eigenes Geschäft',
-      neuesGeschaeftLaeuft: false,
+      filterPrioritaet: [],
+      // Die Maske ist im Anlege-Modus: es existiert noch kein Geschäft.
+      neuesGeschaeft: false,
       filterTyp: [],
       filterZustaendige: [],
       filterBeschluss: [],
@@ -246,6 +252,12 @@ export default {
     },
     alleTypen() {
       return [...new Set(this.geschaefte.map(g => g.typ).filter(Boolean))].sort()
+    },
+    prioritaetOptionen() {
+      return PRIORITAETEN
+    },
+    filterPrioritaetOptions() {
+      return PRIORITAETEN.filter(o => this.filterPrioritaet.includes(o.value))
     },
     alleBeschluesse() {
       const seen = new Map()
@@ -323,6 +335,11 @@ export default {
     ausgewaehltesGeschaeft() {
       return this.geschaefte.find((geschaeft) => geschaeft.id === this.ausgewaehlteGeschaeftId) || null
     },
+    // Die Maske ist offen, wenn ein Geschäft gewählt ist ODER ein neues erfasst
+    // wird (dort ist die ID noch 0).
+    detailOffen() {
+      return this.neuesGeschaeft || !!this.ausgewaehlteGeschaeftId
+    },
     gefilterteGeschaefte() {
       let liste = [...this.geschaefte]
 
@@ -349,6 +366,9 @@ export default {
       }
       if (this.filterBeschluss.length > 0) {
         liste = liste.filter(g => this.filterBeschluss.includes(g.letzterBeschluss?.aktionCode || ''))
+      }
+      if (this.filterPrioritaet.length > 0) {
+        liste = liste.filter(g => this.filterPrioritaet.includes(this.prioritaetEffektiv(g)))
       }
 
       liste.sort((a, b) => {
@@ -441,6 +461,25 @@ export default {
         this.$emit('aktualisiert')
       } catch (fehler) {
         console.error('Fehler beim Speichern der Zuständigkeit:', fehler)
+      }
+    },
+    prioritaetEffektiv(geschaeft) {
+      return geschaeft.prioritaet || 'mittel'
+    },
+    prioritaetOptionFuer(geschaeft) {
+      // Den ECHTEN Wert anzeigen (nicht den fürs Highlight «effektiven»): nicht
+      // gesetzt ⇒ keine Auswahl (Placeholder «—»), nicht «Mittel».
+      const p = geschaeft.prioritaet || ''
+      return PRIORITAETEN.find(o => o.value === p) || null
+    },
+    async aenderungPrioritaet(geschaeft, wert) {
+      const prioritaet = ['hoch', 'mittel', 'tief'].includes(wert) ? wert : ''
+      try {
+        await axios.put(generateUrl(`/apps/parlwin/geschaefte/${geschaeft.id}/prioritaet`), { prioritaet })
+        await this.ladeGeschaefte()
+        this.$emit('aktualisiert')
+      } catch (fehler) {
+        console.error('Fehler beim Speichern der Priorität:', fehler)
       }
     },
     async aenderungBeschluss(geschaeft, option) {
@@ -538,39 +577,35 @@ export default {
       this.ausgewaehlteGeschaeftId = geschaeftId
     },
     statusKuerzen(text) {
-      if (!text) return text
-      let result = String(text)
-      for (const { suche, kuerzel } of (this.statusKuerzelListe || [])) {
-        if (suche && kuerzel) result = result.split(suche).join(kuerzel)
-      }
-      return result
+      return kuerze(text, this.statusKuerzelListe)
     },
+    // «+ Eigenes Geschäft» öffnet dieselbe Maske wie das Bearbeiten (geteilter
+    // Code). Angelegt wird noch nichts — erst «Speichern» erzeugt das Geschäft.
     neuesGeschaeftOeffnen() {
-      this.neuesGeschaeftTitel = ''
-      this.neuesGeschaeftTyp = 'Eigenes Geschäft'
-      this.neuesGeschaeftDialog = true
+      this.neuesGeschaeft = true
+      this.ausgewaehlteGeschaeftId = 0
     },
-    async neuesGeschaeftErstellen() {
-      const titel = (this.neuesGeschaeftTitel || '').trim()
-      if (!titel) return
-      this.neuesGeschaeftLaeuft = true
-      try {
-        const { data } = await axios.post(generateUrl('/apps/parlwin/geschaefte'), {
-          titel,
-          typ: this.neuesGeschaeftTyp || 'Eigenes Geschäft',
-        })
-        this.neuesGeschaeftDialog = false
-        await this.ladeGeschaefte()
-        this.ausgewaehlteGeschaeftId = data.id
-      } catch (e) {
-        console.error('parlwin: Eigenes Geschäft erstellen fehlgeschlagen', e)
-      } finally {
-        this.neuesGeschaeftLaeuft = false
-      }
+    // Nach dem Anlegen geht dieselbe Maske in die Bearbeitung über, sodass sich
+    // Dokumente und Notizen unmittelbar anschliessen lassen.
+    async nachErstellen(id) {
+      this.neuesGeschaeft = false
+      await this.ladeGeschaefte()
+      this.ausgewaehlteGeschaeftId = id || null
+      this.$emit('aktualisiert')
+    },
+    // Nur der ausdrückliche Abbruch verwirft die Eingaben.
+    neuAbbrechen() {
+      this.neuesGeschaeft = false
+      this.ausgewaehlteGeschaeftId = null
+    },
+    // Ein Klick neben die Maske darf beim Erfassen nichts verwerfen.
+    overlayKlick() {
+      if (!this.neuesGeschaeft) this.schliesseDetail()
     },
     resetFilter() {
       this.suche = ''
       this.filterStatus = []
+      this.filterPrioritaet = []
       this.filterTyp = []
       this.filterZustaendige = []
       this.filterBeschluss = []
@@ -580,6 +615,7 @@ export default {
     },
     schliesseDetail() {
       this.ausgewaehlteGeschaeftId = null
+      this.neuesGeschaeft = false
     },
     async nachSpeichern() {
       await this.ladeGeschaefte()

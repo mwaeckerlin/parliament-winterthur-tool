@@ -19,6 +19,7 @@ $parlwinNonce = \OCP\Server::get(\OC\Security\CSP\ContentSecurityPolicyNonceMana
             'webroot' => rtrim((string) \OC::$WEBROOT, '/'),
             'nextcloudGruppe' => (string) ($_['nextcloud_gruppe'] ?? ''),
             'version' => (string) ($_['version'] ?? ''),
+            'fraktion' => (string) ($_['fraktion'] ?? ''),
             'statusKuerzel' => is_array($kuerzelArr) ? $kuerzelArr : [],
         ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT)); ?>;
 </script>

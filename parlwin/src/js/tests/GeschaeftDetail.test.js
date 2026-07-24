@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { shallowMount } from '@vue/test-utils'
 import GeschaeftDetail from '../components/GeschaeftDetail.vue'
 
@@ -41,75 +41,12 @@ function mountComponent(extraData = {}) {
       stubs: {
         NcSelect: true,
         PwMultiSelect: true,
-        PwWysiwyg: true,
         GeschaeftDokumente: true,
+        NotizenListe: true,
       },
     },
   })
 }
-
-
-describe('notizBearbeitenStarten – Datenzustand', () => {
-  it('setzt bearbeitenNotizId und bearbeitenNotizText', () => {
-    const wrapper = mountComponent()
-    wrapper.vm.notizBearbeitenStarten({ id: 42, text: 'Testnotiz' })
-    expect(wrapper.vm.bearbeitenNotizId).toBe(42)
-    expect(wrapper.vm.bearbeitenNotizText).toBe('Testnotiz')
-  })
-
-  it('setzt bearbeitenNotizText auf leer wenn aktion.text fehlt', () => {
-    const wrapper = mountComponent()
-    wrapper.vm.notizBearbeitenStarten({ id: 5, text: '' })
-    expect(wrapper.vm.bearbeitenNotizText).toBe('')
-  })
-})
-
-describe('notizBearbeitenAbbrechen', () => {
-  it('setzt bearbeitenNotizId und Text zurück', () => {
-    const wrapper = mountComponent({ bearbeitenNotizId: 42, bearbeitenNotizText: 'X' })
-    wrapper.vm.notizBearbeitenAbbrechen()
-    expect(wrapper.vm.bearbeitenNotizId).toBeNull()
-    expect(wrapper.vm.bearbeitenNotizText).toBe('')
-  })
-})
-
-describe('notizDebounce', () => {
-  beforeEach(() => { vi.useFakeTimers() })
-  afterEach(() => { vi.useRealTimers() })
-
-  it('speichert Notiz nach 5 Sekunden', async () => {
-    const wrapper = mountComponent({ neueNotiz: 'Test' })
-    const spy = vi.spyOn(wrapper.vm, 'notizSpeichern').mockResolvedValue()
-    wrapper.vm.notizDebounce()
-    expect(spy).not.toHaveBeenCalled()
-    vi.advanceTimersByTime(5000)
-    expect(spy).toHaveBeenCalledOnce()
-  })
-
-  it('setzt vorherigen Timer zurück', () => {
-    const wrapper = mountComponent({ neueNotiz: 'A' })
-    const spy = vi.spyOn(wrapper.vm, 'notizSpeichern').mockResolvedValue()
-    wrapper.vm.notizDebounce()
-    wrapper.vm.notizDebounce()
-    vi.advanceTimersByTime(5000)
-    expect(spy).toHaveBeenCalledOnce()
-  })
-})
-
-describe('notizSpeichernBeiBlur', () => {
-  beforeEach(() => { vi.useFakeTimers() })
-  afterEach(() => { vi.useRealTimers() })
-
-  it('bricht Timer ab und speichert sofort', async () => {
-    const wrapper = mountComponent({ neueNotiz: 'Sofort' })
-    const spy = vi.spyOn(wrapper.vm, 'notizSpeichern').mockResolvedValue()
-    wrapper.vm.notizDebounce()
-    await wrapper.vm.notizSpeichernBeiBlur()
-    expect(spy).toHaveBeenCalledOnce()
-    vi.advanceTimersByTime(5000)
-    expect(spy).toHaveBeenCalledOnce()
-  })
-})
 
 describe('beschlussNachWahl', () => {
   it('speichert sofort bei normaler Auswahl', async () => {
@@ -141,51 +78,63 @@ describe('beschlussNachWahl', () => {
   })
 })
 
-
-describe('notizSpeichern – chirurgisches Update', () => {
+describe('beschlussSpeichern – Eingabe-Session merged in EINE Aktion', () => {
   beforeEach(() => { vi.clearAllMocks() })
 
-  it('legt beim ersten Aufruf eine neue Aktion an (POST)', async () => {
-    const wrapper = mountComponent({ neueNotiz: 'Hallo' })
-    await wrapper.vm.notizSpeichern()
+  const beschlussAntwort = { id: 77, aktionTyp: 'beschluss', aktionCode: '', titel: 'Abschr', text: 'Abschr', entscheidGueltig: true }
+
+  it('legt beim ersten Speichern eine Aktion an (POST) und merkt sich deren Id', async () => {
+    axios.post.mockResolvedValueOnce({ data: beschlussAntwort })
+    const wrapper = mountComponent()
+    await wrapper.vm.beschlussNachWahl({ label: 'Abschr', value: '', freitext: true })
+    expect(axios.post).toHaveBeenCalledOnce()
+    expect(wrapper.vm.beschlussAktionId).toBe(77)
+  })
+
+  it('aktualisiert bei weiterem Tippen dieselbe Aktion (PUT), kein zweiter POST', async () => {
+    axios.post.mockResolvedValueOnce({ data: beschlussAntwort })
+    axios.put.mockResolvedValue({ data: { ...beschlussAntwort, text: 'Abschreiben' } })
+    const wrapper = mountComponent()
+    await wrapper.vm.beschlussNachWahl({ label: 'Abschr', value: '', freitext: true })
+    await wrapper.vm.beschlussNachWahl({ label: 'Abschreiben', value: '', freitext: true })
+    await wrapper.vm.beschlussNachWahl({ label: 'Abschreiben', value: 'abschreiben' })
+    expect(axios.post).toHaveBeenCalledOnce()
+    const puts = axios.put.mock.calls.filter(c => String(c[0]).includes('/beschluesse/77'))
+    expect(puts).toHaveLength(2)
+  })
+
+  it('speichert unveränderten Wert nicht erneut (blur nach Debounce-Save)', async () => {
+    axios.post.mockResolvedValueOnce({ data: beschlussAntwort })
+    const wrapper = mountComponent()
+    await wrapper.vm.beschlussNachWahl({ label: 'Abschreiben', value: 'abschreiben' })
+    await wrapper.vm.beschlussNachWahl({ label: 'Abschreiben', value: 'abschreiben' })
     expect(axios.post).toHaveBeenCalledOnce()
     expect(axios.put).not.toHaveBeenCalled()
   })
 
-  it('aktualisiert beim zweiten Aufruf dieselbe Aktion (PUT)', async () => {
-    const wrapper = mountComponent({ neueNotiz: 'Hallo', notizAktionId: 42 })
-    await wrapper.vm.notizSpeichern()
-    expect(axios.put).toHaveBeenCalledOnce()
-    expect(axios.post).not.toHaveBeenCalled()
+  it('nach Fokus-Verlust (Session-Ende) erzeugt eine erneute Änderung eine neue Aktion', async () => {
+    axios.post.mockResolvedValue({ data: beschlussAntwort })
+    const wrapper = mountComponent()
+    await wrapper.vm.beschlussNachWahl({ label: 'Ablehnen', value: 'ablehnen' })
+    await wrapper.vm.beschlussSessionBeenden()
+    expect(wrapper.vm.beschlussAktionId).toBeNull()
+    await wrapper.vm.beschlussNachWahl({ label: 'Zustimmen', value: 'zustimmen' })
+    expect(axios.post).toHaveBeenCalledTimes(2)
   })
 
-  it('speichert keine leere Notiz', async () => {
-    const wrapper = mountComponent({ neueNotiz: '' })
-    await wrapper.vm.notizSpeichern()
-    expect(axios.post).not.toHaveBeenCalled()
-    expect(axios.put).not.toHaveBeenCalled()
-  })
-
-  it('löscht das Feld NICHT (nur blur darf löschen)', async () => {
-    const wrapper = mountComponent({ neueNotiz: 'Inhalt bleibt' })
-    await wrapper.vm.notizSpeichern()
-    expect(wrapper.vm.neueNotiz).toBe('Inhalt bleibt')
-  })
-})
-
-describe('notizSpeichernBeiBlur – Feld löschen nach blur', () => {
-  beforeEach(() => { vi.clearAllMocks() })
-
-  it('löscht das Feld nach blur', async () => {
-    const wrapper = mountComponent({ neueNotiz: 'Wird gelöscht' })
-    await wrapper.vm.notizSpeichernBeiBlur()
-    expect(wrapper.vm.neueNotiz).toBe('')
-  })
-
-  it('setzt notizAktionId zurück nach blur', async () => {
-    const wrapper = mountComponent({ neueNotiz: 'Test', notizAktionId: 42 })
-    await wrapper.vm.notizSpeichernBeiBlur()
-    expect(wrapper.vm.notizAktionId).toBeNull()
+  it('parallel angestossene Speicherungen erzeugen keine zweite Aktion (Blur während laufendem Debounce-POST)', async () => {
+    let ersteAntwortAusloesen
+    axios.post.mockImplementationOnce(() => new Promise(resolve => {
+      ersteAntwortAusloesen = () => resolve({ data: beschlussAntwort })
+    }))
+    const wrapper = mountComponent()
+    const erste = wrapper.vm.beschlussNachWahl({ label: 'Abschr', value: '', freitext: true })
+    const zweite = wrapper.vm.beschlussNachWahl({ label: 'Abschreiben', value: '', freitext: true })
+    await vi.waitFor(() => { if (typeof ersteAntwortAusloesen !== 'function') throw new Error('POST noch nicht gestartet') })
+    ersteAntwortAusloesen()
+    await erste
+    await zweite
+    expect(axios.post).toHaveBeenCalledOnce()
   })
 })
 

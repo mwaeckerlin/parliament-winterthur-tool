@@ -27,7 +27,7 @@ export default {
     disabled: { type: Boolean, default: false },
     placeholder: { type: String, default: 'Beschluss eingeben oder aus Liste wählen…' },
   },
-  emits: ['update:modelValue'],
+  emits: ['update:modelValue', 'blur'],
   data() {
     return {
       listId: 'pw-beschluss-' + Math.random().toString(36).slice(2),
@@ -46,7 +46,11 @@ export default {
     },
   },
   beforeUnmount() {
-    if (this.timer) clearTimeout(this.timer)
+    if (this.timer) {
+      clearTimeout(this.timer)
+      this.timer = null
+      this.emitValue(this.localText)
+    }
   },
   methods: {
     handleInput(event) {
@@ -66,6 +70,7 @@ export default {
     handleBlur(event) {
       if (this.timer) { clearTimeout(this.timer); this.timer = null }
       this.emitValue(event.target.value)
+      this.$emit('blur')
     },
     handleChange(event) {
       // Change fires when user picks from datalist — emit immediately.

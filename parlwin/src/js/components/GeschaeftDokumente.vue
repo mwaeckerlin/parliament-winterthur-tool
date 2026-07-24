@@ -42,27 +42,27 @@
         <div class="pw-modal pw-modal-dokument">
           <div class="pw-modal-kopf">
             <h3>Neues Dokument: {{ aktiveVorlage?.label }}</h3>
-            <button type="button" class="button pw-btn-schliessen" @click="dialogSchliessen">✕</button>
+            <button type="button" class="button pw-btn-schliessen" @click.stop="dialogSchliessen">✕</button>
           </div>
           <div class="pw-modal-body">
             <label>
               Dateiname (ohne Präfix und Endung)
               <div class="pw-dokument-name-vorschau">
                 <span class="pw-dokument-praefix">{{ praefixWert }}-</span>
-                <input v-model="neuerName" type="text" class="pw-input" placeholder="z. B. Überweisung Rede" @keyup.enter="dokumentErstellen" />
+                <input ref="nameInput" v-model="neuerName" type="text" class="pw-input" placeholder="z. B. Überweisung Rede" @keyup.enter="dokumentErstellen" />
                 <span class="pw-dokument-suffix">.{{ aktiveVorlage?.extension }}</span>
               </div>
             </label>
             <small class="pw-hinweis">Leerzeichen werden zu Unterstrichen.</small>
           </div>
           <div class="pw-modal-footer">
-            <button type="button" class="button" @click="dialogSchliessen">Abbrechen</button>
             <button
               type="button"
               class="button primary"
               :disabled="!neuerName.trim() || laeuft"
               @click="dokumentErstellen"
             >Erstellen</button>
+            <button type="button" class="button" @click="dialogOffen = false">Abbrechen</button>
           </div>
         </div>
       </div>
@@ -102,6 +102,9 @@ export default {
     praefix: { type: String, default: '' },
     jahrText: { type: String, default: '' },
     ordnerHinweis: { type: String, default: '' },
+    // Vorschlag für den Dateinamen (Geschäfts-/Vorstoss-Titel); wird beim
+    // Erstellen normalisiert vorbelegt.
+    titel: { type: String, default: '' },
   },
   data() {
     return {
@@ -133,6 +136,10 @@ export default {
     },
     bereit() {
       return !!(this.apiBasis ? this.praefixWert : (this.geschaeftId && this.geschaeftNummer))
+    },
+    // Titel als Dateiname-Vorschlag: Leerzeichen und Pfadtrenner → «_».
+    standardName() {
+      return (this.titel || '').trim().replace(/[ /\\]+/g, '_')
     },
   },
   watch: {
@@ -173,8 +180,18 @@ export default {
       // verschwindet und der Dialog frei steht.
       this.menuOffen = false
       this.aktiveVorlage = t
-      this.neuerName = ''
+      this.neuerName = this.standardName
       this.dialogOffen = true
+      // Fokus + Cursor ans Ende, damit der Nutzer den vorbelegten Titel nur
+      // noch ergänzen muss (z.B. «-rede»).
+      this.$nextTick(() => {
+        const el = this.$refs.nameInput
+        if (el) {
+          el.focus()
+          const len = el.value.length
+          el.setSelectionRange(len, len)
+        }
+      })
     },
     dialogSchliessen() {
       this.dialogOffen = false

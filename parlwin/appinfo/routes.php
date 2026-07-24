@@ -11,10 +11,15 @@ return [
         ['name' => 'geschaeft#index', 'url' => '/geschaefte', 'verb' => 'GET'],
         ['name' => 'geschaeft#show', 'url' => '/geschaefte/{id}', 'verb' => 'GET'],
         ['name' => 'geschaeft#update', 'url' => '/geschaefte/{id}', 'verb' => 'PUT'],
+        ['name' => 'geschaeft#setPrioritaet', 'url' => '/geschaefte/{id}/prioritaet', 'verb' => 'PUT'],
+        ['name' => 'geschaeft#notizen', 'url' => '/geschaefte/{id}/notizen', 'verb' => 'GET'],
         ['name' => 'geschaeft#addNotiz', 'url' => '/geschaefte/{id}/notizen', 'verb' => 'POST'],
         ['name' => 'geschaeft#updateNotiz', 'url' => '/geschaefte/{id}/notizen/{aktionId}', 'verb' => 'PUT'],
         ['name' => 'geschaeft#deleteNotiz', 'url' => '/geschaefte/{id}/notizen/{aktionId}', 'verb' => 'DELETE'],
+        ['name' => 'geschaeft#restoreNotiz', 'url' => '/geschaefte/{id}/notizen/{aktionId}/wiederherstellen', 'verb' => 'POST'],
+        ['name' => 'geschaeft#notizRevisionen', 'url' => '/geschaefte/{id}/notizen/{aktionId}/revisionen', 'verb' => 'GET'],
         ['name' => 'geschaeft#addBeschluss', 'url' => '/geschaefte/{id}/beschluesse', 'verb' => 'POST'],
+        ['name' => 'geschaeft#updateBeschluss', 'url' => '/geschaefte/{id}/beschluesse/{aktionId}', 'verb' => 'PUT'],
         ['name' => 'geschaeft#removeBeschluss', 'url' => '/geschaefte/{id}/beschluesse', 'verb' => 'DELETE'],
         ['name' => 'geschaeft#addVotum', 'url' => '/geschaefte/{id}/voten', 'verb' => 'POST'],
         ['name' => 'geschaeft#updateVotum', 'url' => '/geschaefte/{id}/votum', 'verb' => 'PUT'],
@@ -24,6 +29,8 @@ return [
         ['name' => 'geschaeft#dokumentErstellen', 'url' => '/geschaefte/{id}/dokumente', 'verb' => 'POST'],
         ['name' => 'geschaeft#dokumentHochladen', 'url' => '/geschaefte/{id}/dokumente/upload', 'verb' => 'POST'],
         ['name' => 'geschaeft#create', 'url' => '/geschaefte', 'verb' => 'POST'],
+        ['name' => 'geschaeft#destroy', 'url' => '/geschaefte/{id}', 'verb' => 'DELETE', 'requirements' => ['id' => '\d+']],
+        ['name' => 'geschaeft#updateStammdaten', 'url' => '/geschaefte/{id}/stammdaten', 'verb' => 'PUT', 'requirements' => ['id' => '\d+']],
 
         // Sitzungen
         ['name' => 'sitzung#index', 'url' => '/sitzungen', 'verb' => 'GET'],
@@ -62,9 +69,21 @@ return [
 
         // Vorstösse
         ['name' => 'vorstoss#index', 'url' => '/vorstoesse', 'verb' => 'GET'],
+        ['name' => 'vorstoss#fuerGeschaeft', 'url' => '/vorstoesse/geschaeft/{geschaeftId}', 'verb' => 'GET', 'requirements' => ['geschaeftId' => '\d+']],
         ['name' => 'vorstoss#create', 'url' => '/vorstoesse', 'verb' => 'POST'],
         ['name' => 'vorstoss#update', 'url' => '/vorstoesse/{id}', 'verb' => 'PUT', 'requirements' => ['id' => '\d+']],
         ['name' => 'vorstoss#destroy', 'url' => '/vorstoesse/{id}', 'verb' => 'DELETE', 'requirements' => ['id' => '\d+']],
+        // Vorstoss-Notizen — GLEICHE Endpunkte wie beim Geschäft (geteilter Notiz-Code)
+        ['name' => 'vorstoss#notizen', 'url' => '/vorstoesse/{id}/notizen', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
+        ['name' => 'vorstoss#addNotiz', 'url' => '/vorstoesse/{id}/notizen', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
+        ['name' => 'vorstoss#updateNotiz', 'url' => '/vorstoesse/{id}/notizen/{aktionId}', 'verb' => 'PUT', 'requirements' => ['id' => '\d+', 'aktionId' => '\d+']],
+        ['name' => 'vorstoss#deleteNotiz', 'url' => '/vorstoesse/{id}/notizen/{aktionId}', 'verb' => 'DELETE', 'requirements' => ['id' => '\d+', 'aktionId' => '\d+']],
+        ['name' => 'vorstoss#restoreNotiz', 'url' => '/vorstoesse/{id}/notizen/{aktionId}/wiederherstellen', 'verb' => 'POST', 'requirements' => ['id' => '\d+', 'aktionId' => '\d+']],
+        ['name' => 'vorstoss#notizRevisionen', 'url' => '/vorstoesse/{id}/notizen/{aktionId}/revisionen', 'verb' => 'GET', 'requirements' => ['id' => '\d+', 'aktionId' => '\d+']],
+        ['name' => 'vorstoss#verknuepfen', 'url' => '/vorstoesse/{id}/verknuepfen', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
+        ['name' => 'vorstoss#dokumente', 'url' => '/vorstoesse/{id}/dokumente', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
+        ['name' => 'vorstoss#dokumentErstellen', 'url' => '/vorstoesse/{id}/dokumente', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
+        ['name' => 'vorstoss#dokumentHochladen', 'url' => '/vorstoesse/{id}/dokumente/upload', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
 
         // Mitglieder
         ['name' => 'mitglied#index', 'url' => '/mitglieder', 'verb' => 'GET'],
@@ -94,6 +113,9 @@ return [
 
         ['name' => 'settings#getStatusKuerzel', 'url' => '/settings/status-kuerzel', 'verb' => 'GET'],
         ['name' => 'settings#setStatusKuerzel', 'url' => '/settings/status-kuerzel', 'verb' => 'POST'],
+
+        ['name' => 'settings#getSyncZeitplan', 'url' => '/settings/sync-zeitplan', 'verb' => 'GET'],
+        ['name' => 'settings#setSyncZeitplan', 'url' => '/settings/sync-zeitplan', 'verb' => 'POST'],
 
         // Manuelle Synchronisation auslösen (SettingsController::run)
         ['name' => 'settings#syncStatus', 'url' => '/sync/status', 'verb' => 'GET'],

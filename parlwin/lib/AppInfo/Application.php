@@ -15,6 +15,7 @@ use OCA\ParliamentWinterthur\Db\GeschaeftMapper;
 use OCA\ParliamentWinterthur\Db\GeschaeftZustaendigkeitMapper;
 use OCA\ParliamentWinterthur\Db\KommissionMapper;
 use OCA\ParliamentWinterthur\Db\MitgliedMapper;
+use OCA\ParliamentWinterthur\Db\NotizRevisionMapper;
 use OCA\ParliamentWinterthur\Db\SitzungMapper;
 use OCA\ParliamentWinterthur\Db\SitzungstypMapper;
 use OCA\ParliamentWinterthur\Db\SitzungstypTeilnehmerMapper;
@@ -123,6 +124,7 @@ class Application extends App implements IBootstrap
                 $c->get(\OCP\IConfig::class),
                 $c->get(\OCP\IUserSession::class),
                 $c->get(\OCP\IGroupManager::class),
+                $c->get(NotizRevisionMapper::class),
             );
         });
         $context->registerService(SitzungService::class, function ($c) {

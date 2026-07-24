@@ -1,0 +1,584 @@
+# Tests
+
+Dieses Verzeichnis listet **alle** Tests des Projekts, gruppiert nach Testart
+und innerhalb jeder Art nach Funktionsnummer sortiert. Die Funktionen sind in
+[FEATURES.md](FEATURES.md) durchnummeriert (`**F1**`, `**F2**`, …); jeder Test
+verweist über sein `**F<nr>**`-Token auf die Funktion(en), die er abdeckt. Deckt
+ein Test mehrere Funktionen ab, sind alle genannt (z.B. `**F3, F7**`); er kann
+dann unter mehreren Funktionsnummern erscheinen.
+
+«Fertig» heisst immer: ein vollständiger, grüner Regressionslauf über **alle**
+hier gelisteten Tests, 0 Fehler und 0 Warnungen (der Lauf ist strikt — `skip`,
+`warning`, `deprecation`, `notice`, `risky`, `incomplete` gelten als Fehler).
+Gestartet wird die Gesamtsuite vom Projektroot mit `npm run test`.
+
+## E2E — Frontend (Playwright, echter Browser)
+
+Vollständige Nutzerpfade im echten Browser (Chromium/Firefox) gegen den realen
+Compose-Stack; ausgeführt aus `tests/e2e/run-compose-e2e.sh` heraus.
+
+- **F1, F14** `tests/e2e/multi-user-sharing.spec.js` › 0: Geschäfteliste zeigt die synchronisierten Geschäfte — prüft, dass die real synchronisierten Geschäfte in der Liste erscheinen (Gutfall).
+- **F4, F5** `tests/e2e/layout-consistency.spec.js` › jede Ansicht nutzt dieselbe pw-view-Struktur mit eigenem Titel — jede Ansicht rendert die gemeinsame `pw-view`-Struktur mit eigenem Titel (Konsistenz).
+- **F4** `tests/e2e/navigation-kuerzel-layout.spec.js` › genau ein Navigationseintrag ist aktiv; Footer zeigt «v<semver>» — je Ansicht ist genau ein Navigationseintrag aktiv und der Footer zeigt die App-Version.
+- **F4, F8** `tests/e2e/navigation-kuerzel-layout.spec.js` › jede Ansicht: Zähler == gerenderte Einträge und die richtige (bzw. keine) Aktion — der Kopf-Zähler stimmt mit den gerenderten Einträgen überein und zeigt die passende Aktion.
+- **F4** `tests/e2e/navigation-kuerzel-layout.spec.js` › Suchbegriff wird bei Ansichtswechsel zurückgesetzt (Ansichten sind v-if-Remounts) — beim Ansichtswechsel wird der Suchbegriff zurückgesetzt.
+- **F7, F19, F20** `tests/e2e/navigation-kuerzel-layout.spec.js` › Geschäft-Detail: keine Abbrechen/Speichern-Knöpfe, ✕ schliesst ohne Zeile neu zu öffnen, Priorität bleibt nach Reload — das Geschäfts-Detail hat keine Abbrechen-/Speichern-Knöpfe, ✕ schliesst ohne die Zeile neu zu öffnen, die Priorität bleibt nach Reload erhalten.
+- **F8, F18** `tests/e2e/navigation-kuerzel-layout.spec.js` › Eigenes Geschäft: «+ Eigenes Geschäft» öffnet direkt die vollständige Detailmaske — ein Klick auf «+ Eigenes Geschäft» öffnet ohne Zwischendialog die vollständige Detailmaske; angelegt wird erst beim Speichern, danach stehen Notizen und Dokumente bereit.
+- **F8, F42** `tests/e2e/navigation-kuerzel-layout.spec.js` › Sitzungstyp: Neu öffnet die volle Maske mit Speichern/Abbrechen, danach speichert jede Eingabe sofort und bleibt nach Reload — die Neu-Maske eines Sitzungstyps bietet «Speichern» (ohne Namen gesperrt) und «Abbrechen» statt ✕; nach dem Speichern speichert jede Eingabe sofort und bleibt nach Reload erhalten.
+- **F11** `tests/e2e/navigation-kuerzel-layout.spec.js` › Status: Kurzform in der Status-Zelle (title = voller Status) und in den Filter-Optionen (Wert bleibt voll) — Status erscheint gekürzt, der volle Wert bleibt in `title` und Filter erhalten.
+- **F11** `tests/e2e/navigation-kuerzel-layout.spec.js` › Partei/Fraktion/Kommission: Kurzform in den Karten; Fraktion-Filter beweist vollen Wert — Kürzel erscheinen in den Karten, der Filter belegt den vollen gespeicherten Wert.
+- **F12** `tests/e2e/navigation-kuerzel-layout.spec.js` › Geschäfte: breit zeigt Tabelle (Karten verborgen), schmal zeigt Karten (Tabelle verborgen) — breiter Viewport zeigt die Tabelle, schmaler die Karten.
+- **F13** `tests/e2e/navigation-kuerzel-layout.spec.js` › findet ein Geschäft und verlinkt in /apps/parlwin — die zentrale Nextcloud-Suche findet ein Geschäft und verlinkt in die App.
+- **F16** `tests/e2e/navigation-kuerzel-layout.spec.js` › Geschäfte: Titel-Token filtert, Gibberish zeigt «Keine Geschäfte gefunden», ✕ stellt her — die Geschäftssuche filtert über einen Titel-Token, Unsinn zeigt «Keine Geschäfte gefunden», ✕ stellt die Liste wieder her (Gut-/Leerfall).
+- **F30** `tests/e2e/navigation-kuerzel-layout.spec.js` › Vorstösse: Titel-Token filtert, Gibberish zeigt «Keine Vorstösse vorhanden», ✕ stellt her — die Vorstoss-Suche filtert über einen Titel-Token, Unsinn zeigt «Keine Vorstösse vorhanden», ✕ stellt wieder her (Gut-/Leerfall).
+- **F36** `tests/e2e/navigation-kuerzel-layout.spec.js` › Sitzungen: Titel-Token filtert, Gibberish zeigt «Keine Sitzungen gefunden.», ✕ stellt her — die Sitzungssuche filtert über einen Titel-Token, Unsinn zeigt «Keine Sitzungen gefunden.», ✕ stellt wieder her (Gut-/Leerfall).
+- **F42** `tests/e2e/navigation-kuerzel-layout.spec.js` › Sitzungstypen: Namens-Token filtert, Gibberish zeigt «Keine Sitzungstypen vorhanden…», ✕ stellt her — die Sitzungstyp-Suche filtert über einen Namens-Token, Unsinn zeigt «Keine Sitzungstypen vorhanden…», ✕ stellt wieder her (Gut-/Leerfall).
+- **F45** `tests/e2e/navigation-kuerzel-layout.spec.js` › Mitglieder: Namens-Token filtert, Gibberish zeigt «Keine Mitglieder gefunden», ✕ stellt her — die Mitgliedersuche filtert über einen Namens-Token, Unsinn zeigt «Keine Mitglieder gefunden», ✕ stellt wieder her (Gut-/Leerfall).
+- **F47** `tests/e2e/navigation-kuerzel-layout.spec.js` › Kommissionen: Namens-Token klappt Treffer auf, Gibberish zeigt «Keine Kommissionen gefunden», ✕ stellt her — die Kommissionssuche klappt Treffer auf, Unsinn zeigt «Keine Kommissionen gefunden», ✕ stellt wieder her (Gut-/Leerfall).
+- **F14** `tests/e2e/geschaefte-datenfluss.spec.js` › Spalten rendern, Standardsortierung nach Datum absteigend, externer ↗-Link mit @click.stop — Spalten rendern, Standardsortierung Datum absteigend, der Extern-Link öffnet ohne das Detail.
+- **F14** `tests/e2e/geschaefte-datenfluss.spec.js` › Spaltensortierung Nr./Titel/Status schaltet auf- und absteigend um — Klick auf Nr./Titel/Status sortiert auf- und wieder absteigend.
+- **F11, F14** `tests/e2e/geschaefte-datenfluss.spec.js` › Status-Kürzel in der Zelle: title zeigt den vollen Status — Status wird gekürzt gezeigt, `title` trägt den vollen Status.
+- **F14** `tests/e2e/geschaefte-datenfluss.spec.js` › Status-Spalte ist ausgeblendet, wenn genau ein Status gefiltert ist — bei genau einem gefilterten Status ist die Status-Spalte ausgeblendet.
+- **F12** `tests/e2e/geschaefte-datenfluss.spec.js` › Schmaler Viewport zeigt Karten statt Tabelle — schmaler Viewport zeigt Karten statt der Tabelle.
+- **F15, F17** `tests/e2e/geschaefte-datenfluss.spec.js` › Priorität inline: «—» ohne Wert, kein Detail-Öffnen, Highlight, bleibt nach Reload — Inline-Priorität zeigt «—», öffnet das Detail nicht, hebt hervor und bleibt nach Reload.
+- **F15** `tests/e2e/geschaefte-datenfluss.spec.js` › Beschluss inline als Freitext: kein Detail-Öffnen, bleibt nach Reload — Inline-Freitext-Beschluss speichert ohne Detail-Öffnen und bleibt nach Reload.
+- **F16** `tests/e2e/geschaefte-datenfluss.spec.js` › Suche nach Titel und Nummer, ✕ setzt zurück, ohne Treffer erscheint die Leermeldung — Suche über Titel/Nummer, ✕ setzt zurück, ohne Treffer die Leermeldung (Gut-/Leerfall).
+- **F16** `tests/e2e/geschaefte-datenfluss.spec.js` › «Erledigte anzeigen» ist standardmässig aus und blendet erledigte Geschäfte ein — der Schalter ist standardmässig aus und blendet erledigte ein.
+- **F16** `tests/e2e/geschaefte-datenfluss.spec.js` › «Filter zurücksetzen» leert Suche und Erledigte-Schalter — «Filter zurücksetzen» leert Suche und Schalter.
+- **F16, F23** `tests/e2e/geschaefte-datenfluss.spec.js` › Entscheidungsbedarf-Auswahl lädt die Liste neu und behält Geschäfte — der Entscheidungsbedarf-Filter lädt neu und behält Geschäfte.
+- **F8, F18, F65** `tests/e2e/geschaefte-datenfluss.spec.js` › «+ Eigenes Geschäft» öffnet die volle Maske; Stammdaten sind bearbeitbar und bleiben erhalten — «+ Eigenes Geschäft» öffnet sofort die vollständige Maske; ohne Titel ist «Speichern» gesperrt und Notizen/Dokumente/Beschluss fehlen mit Hinweis, nach dem Speichern sind sie da und Titel/Typ/Status/Datum lassen sich ändern und bleiben nach dem erneuten Öffnen erhalten (Datenfluss).
+- **F19** `tests/e2e/geschaefte-datenfluss.spec.js` › Detail zeigt öffentliche und fraktionsinterne Abschnitte — das Detail zeigt öffentliche und fraktionsinterne Abschnitte.
+- **F20** `tests/e2e/geschaefte-datenfluss.spec.js` › Priorität im Detail setzen und wieder zurücksetzen — Priorität im Detail setzen und wieder abwählen.
+- **F21** `tests/e2e/geschaefte-datenfluss.spec.js` › Zuständigkeit: NC-Mitglieder wählbar, inaktive mit «(inaktiv)», erste Auswahl ist Hauptzuständigkeit — Mitglieder wählbar (inaktive mit «(inaktiv)» markiert), die erste Auswahl ist Hauptzuständigkeit.
+- **F23** `tests/e2e/geschaefte-datenfluss.spec.js` › Fraktionsstatus wechselt nach einem Beschluss auf «Entschieden» — nach einem Beschluss wechselt der Fraktionsstatus auf «Entschieden».
+- **F22** `tests/e2e/geschaefte-datenfluss.spec.js` › Typabhängige Datalist-Optionen, Freitext-Beschluss und Zurücknehmen — typabhängige Optionen, Freitext-Beschluss und Zurücknehmen am Geschäft.
+- **F57** `tests/e2e/geschaefte-datenfluss.spec.js` › Fraktionssitzungsmodus: Beschluss-Widget für Nicht-Protokollführer deaktiviert mit Hinweis — im Sitzungsmodus ist das Beschluss-Widget für Nicht-Protokollführer gesperrt (Schlechtfall).
+- **F24** `tests/e2e/geschaefte-datenfluss.spec.js` › Hinzufügen bei Blur, leerer Editor erzeugt nichts, Bearbeiten (Version), Löschen und Wiederherstellen — Notiz-Lebenszyklus am Geschäft inkl. Version, Soft-Delete und Wiederherstellen (Gut-/Leerfall).
+- **F24** `tests/e2e/geschaefte-datenfluss.spec.js` › Nicht-Autor sieht keine Bearbeiten-/Löschen-Möglichkeit — ein Nicht-Autor sieht keine Bearbeiten-/Löschen-Aktion (Schlechtfall).
+- **F25** `tests/e2e/geschaefte-datenfluss.spec.js` › separat, standardmässig eingeklappt, Zahl in der Summary, nicht in der oberen Notizliste, aufklappbar — Sitzungsnotizen stehen separat, eingeklappt mit Zähler, nicht in der normalen Notizliste.
+- **F28** `tests/e2e/geschaefte-datenfluss.spec.js` › Beschlüsse mit Autor/Datum/Zeit, Notizen/Sitzungsnotizen ausgeblendet, Umsortieren per Griff — die Zeitleiste zeigt Beschlüsse mit Metadaten, blendet Notizen aus, umsortierbar per Griff.
+- **F29** `tests/e2e/geschaefte-datenfluss.spec.js` › Block zeigt Haltung, Zuständigkeit und Notizen des verknüpften Vorstosses — verknüpfte Vorstösse erscheinen mit Haltung, Zuständigkeit und Notizen.
+- **F8, F30, F32** `tests/e2e/neu-dialoge-vollstaendig.spec.js` › Neuer Vorstoss: jedes Feld der Bearbeitung ist vorhanden, ID-gebundene Bereiche nach dem Speichern — der Einstieg «+ Neuer Vorstoss» zeigt in derselben Reihenfolge alle Erfassungsfelder der Bearbeitung sowie «Speichern»/«Abbrechen» statt ✕; Notizen, Dokumente, Zeitleiste und «Mit Geschäft verknüpfen» stehen mit Hinweis erst nach dem Speichern bereit (Feld-Inventar).
+- **F10, F32** `tests/e2e/neu-dialoge-vollstaendig.spec.js` › Neuer Vorstoss: Herkunft «Fremde» ergänzt Beschluss, Fraktion und Ansprechpartner — bei Herkunft «Eigene» fehlen die drei Zusatzfelder, «Fremde» ergänzt sie; der Ansprechpartner ist erst nach der Fraktionswahl bedienbar (Gut-/Schlechtfall).
+- **F8, F31, F32** `tests/e2e/neu-dialoge-vollstaendig.spec.js` › Neuer Vorstoss: Eingaben werden gespeichert und die Bearbeitung zeigt dieselben Felder — Titel, Status und Priorität aus der Neu-Maske bleiben erhalten, die Karte zeigt die Priorität und das erneute Öffnen zeigt dieselben Felder (Datenfluss).
+- **F8, F31** `tests/e2e/neu-dialoge-vollstaendig.spec.js` › Neuer Vorstoss: ein Klick neben die Maske verwirft nichts und schliesst nicht — ein Klick neben die Neu-Maske lässt sie offen und behält die erfassten Eingaben (Schlechtfall).
+- **F8, F31** `tests/e2e/neu-dialoge-vollstaendig.spec.js` › Neuer Vorstoss: «Abbrechen» verwirft die Eingaben restlos — «Abbrechen» schliesst die Neu-Maske, ohne einen Vorstoss anzulegen (Schlechtfall).
+- **F9, F30, F67** `tests/e2e/neu-dialoge-vollstaendig.spec.js` › Vorstoss lässt sich über die Karte löschen — die Karte bietet «Löschen» mit Rückfrage, danach ist der Vorstoss verschwunden.
+- **F8, F18, F19** `tests/e2e/neu-dialoge-vollstaendig.spec.js` › Eigenes Geschäft: «+ Eigenes Geschäft» öffnet die vollständige Detailmaske; ID-gebundene Bereiche nach dem Speichern — die Maske enthält alle öffentlichen Informationszeilen und die Erfassungsfelder samt Zuständigkeit; Beschluss, Votum, Notizen, Dokumente und Aktionszeitleiste stehen mit Hinweis erst nach dem Speichern bereit (Feld-Inventar).
+- **F8, F18** `tests/e2e/neu-dialoge-vollstaendig.spec.js` › Eigenes Geschäft: ein Klick neben die Maske verwirft nichts, «Abbrechen» schliesst ohne anzulegen — der Klick daneben lässt die Neu-Maske offen und behält den erfassten Titel, «Abbrechen» schliesst sie ohne zusätzliche Zeile in der Liste (Schlechtfall).
+- **F8, F37** `tests/e2e/neu-dialoge-vollstaendig.spec.js` › Neue Sitzung: «+ Neue Sitzung» ist ein Aktionsmenü mit den Sitzungstypen — «+ Neue Sitzung» öffnet ein Menü mit den Sitzungstypen statt eines eigenen Auswahl-Dialogs; der gewählte Eintrag öffnet direkt das vollständige Formular (Feld-Inventar).
+- **F16, F19, F20** `tests/e2e/feld-inventar-filter-und-dialoge.spec.js` › Geschäfte: alle Filter vorhanden, Suche und Zurücksetzen wirken — der Filterbereich führt Entscheidungsbedarf, Status, Typ, Zuständigkeit, Beschluss und Priorität sowie den Schalter für erledigte Geschäfte; die Suche grenzt ein und «Filter zurücksetzen» stellt die Liste wieder her (Feld-Inventar, Gut-/Leerfall).
+- **F30** `tests/e2e/feld-inventar-filter-und-dialoge.spec.js` › Vorstösse: Herkunft- und Status-Filter vorhanden und wirksam — beide Filter sind vorhanden und stehen beim Öffnen auf «Alle» (Feld-Inventar).
+- **F10, F45** `tests/e2e/feld-inventar-filter-und-dialoge.spec.js` › Mitglieder: Sortierung, vier Filter und der Aktiv-Schalter sind vorhanden — Sortierung sowie die Filter Fraktion, Partei, Kommission und Funktion sind vorhanden; das Ausschalten von «Nur aktive Mitglieder» zeigt zusätzliche Personen (Feld-Inventar).
+- **F46** `tests/e2e/feld-inventar-filter-und-dialoge.spec.js` › Kommissionen: beide Schalter sind vorhanden und standardmässig an — der Filterbereich führt genau die zwei Schalter für aktive Kommissionen und aktive Mitglieder (Feld-Inventar).
+- **F64** `tests/e2e/feld-inventar-filter-und-dialoge.spec.js` › Änderungsverlauf: Such- und Filterbereich bleiben leer — in dieser Ansicht sind Suche und Filter bewusst leer, die Versionskarten sind sichtbar (Randfall).
+- **F42** `tests/e2e/feld-inventar-filter-und-dialoge.spec.js` › Der Bearbeiten-Dialog zeigt alle Felder, Traktanden, Teilnehmer und Optionen — Name, Zweck, Standard-Ort, Von und Bis sowie die Gruppen Vorlage-Traktanden, Teilnehmer und Optionen sind vollständig vorhanden; eine Eingabe speichert sofort und überlebt das Neuladen (Feld-Inventar, Datenfluss).
+- **F8, F30, F31** `tests/e2e/vorstoss-datenfluss.spec.js` › Neuer Vorstoss: die volle Maske öffnet sofort, Titel bleibt nach Schliessen und erneutem Öffnen erhalten — «+ Neuer Vorstoss» öffnet ohne Zwischendialog die vollständige Maske mit «Speichern»/«Abbrechen» statt ✕; nach dem Speichern geht sie in die Bearbeitung über und der Titel überlebt Schliessen und erneutes Öffnen (Datenfluss).
+- **F32** `tests/e2e/vorstoss-datenfluss.spec.js` › Notiz speichert beim Verlassen des Editors und erscheint im Vorstoss — die Notiz speichert bei Blur und erscheint im Vorstoss.
+- **F32** `tests/e2e/vorstoss-datenfluss.spec.js` › Notiz bearbeiten, löschen und wiederherstellen — identisch zum Geschäft — Notiz-Lebenszyklus am Vorstoss, identisch zum Geschäft.
+- **F33** `tests/e2e/vorstoss-datenfluss.spec.js` › Vorstoss mit einem Geschäft verknüpfen schliesst ihn ab — das Verknüpfen mit einem Geschäft schliesst den Vorstoss ab.
+- **F30** `tests/e2e/vorstoesse-vollstaendig.spec.js` › Karte zeigt Kicker (Herkunft·Art), Titel, Status-Badge und Zuständigkeit — die Karte zeigt Herkunft·Art, Titel, Status-Badge und Zuständigkeit.
+- **F30** `tests/e2e/vorstoesse-vollstaendig.spec.js` › Fremde Karte zeigt Herkunftsfraktion und Beschluss-Paar — fremde Karten zeigen Herkunftsfraktion und Beschluss-Paar.
+- **F30** `tests/e2e/vorstoesse-vollstaendig.spec.js` › Nur mit Titel angelegter Vorstoss erscheint als Karte — ein nur mit Titel angelegter Vorstoss erscheint trotzdem als Karte (Randfall).
+- **F30** `tests/e2e/vorstoesse-vollstaendig.spec.js` › Suche findet über Titel, Art und Zuständigkeit; ohne Treffer «Keine Vorstösse vorhanden» — Suche über Titel/Art/Zuständigkeit, ohne Treffer die Leermeldung (Gut-/Leerfall).
+- **F30** `tests/e2e/vorstoesse-vollstaendig.spec.js` › Herkunft-Filter (Alle/Eigene/Fremde) blendet Karten passend ein und aus — der Herkunft-Filter blendet Karten passend ein und aus.
+- **F30** `tests/e2e/vorstoesse-vollstaendig.spec.js` › Status-Filter zeigt nur Vorstösse des gewählten Status — der Status-Filter zeigt nur Vorstösse des gewählten Status.
+- **F17, F30** `tests/e2e/vorstoesse-vollstaendig.spec.js` › Prioritäts-Hervorhebung: hoch/tief markiert, mittel und «nicht gesetzt» neutral — hohe/tiefe Priorität markiert, mittel/nicht gesetzt neutral.
+- **F8, F31** `tests/e2e/vorstoesse-vollstaendig.spec.js` › Ein Vorstoss ohne echten Titel lässt sich nicht speichern und wird nicht angelegt — bei leerem Titel oder nur Leerzeichen bleibt «Speichern» gesperrt, es gibt kein ✕ und «Abbrechen» hinterlässt keinen Vorstoss (Schlechtfall).
+- **F31** `tests/e2e/vorstoesse-vollstaendig.spec.js` › Nach Erstellen: Herkunft «Eigene», Status «Neu» und der Ersteller als Zuständigkeit — die Vorbelegung nach Erstellen ist Eigene/Neu/Ersteller.
+- **F32** `tests/e2e/vorstoesse-vollstaendig.spec.js` › Art: bekannte Auswahl und freie Überschreibung landen auf der Karte — bekannte und frei überschriebene Art landen auf der Karte.
+- **F7, F32** `tests/e2e/vorstoesse-vollstaendig.spec.js` › Statuswechsel spiegelt sich sofort im Karten-Badge — ein Statuswechsel spiegelt sich sofort im Karten-Badge.
+- **F32** `tests/e2e/vorstoesse-vollstaendig.spec.js` › Herkunft Eigene↔Fremde blendet die fremde-Felder ein und wieder aus — der Herkunftswechsel blendet die Fremd-Felder ein und aus.
+- **F10, F32** `tests/e2e/vorstoesse-vollstaendig.spec.js` › Zuständigkeit bietet nur aktive Mitglieder mit Nextcloud-User an — die Zuständigkeit bietet nur aktive Mitglieder mit NC-User an.
+- **F32** `tests/e2e/vorstoesse-vollstaendig.spec.js` › Inhalt speichert beim Verlassen und wird für einfachen Text nicht durchgehend fett — der Inhalt speichert bei Blur und bleibt für Fliesstext normal.
+- **F32** `tests/e2e/vorstoesse-vollstaendig.spec.js` › Haltung via BeschlussWidget: bekannte Option und freie Eingabe — die Haltung fremder Vorstösse akzeptiert bekannte Option und Freitext.
+- **F10, F32** `tests/e2e/vorstoesse-vollstaendig.spec.js` › Herkunftsfraktion ohne die eigene Fraktion; Ansprechpartner erst nach Fraktionswahl, Wechsel leert sie — Herkunftsfraktion ohne die eigene, Ansprechpartner erst nach Fraktionswahl.
+- **F32** `tests/e2e/vorstoesse-vollstaendig.spec.js` › Notiz-Versionsverlauf: ältere Fassung anzeigen und übernehmen — eine ältere Notiz-Fassung lässt sich anzeigen und übernehmen.
+- **F32** `tests/e2e/vorstoesse-vollstaendig.spec.js` › Fremder Nutzer kann eine Notiz nicht bearbeiten oder löschen — ein Fremder kann eine Notiz nicht bearbeiten/löschen (Schlechtfall).
+- **F33** `tests/e2e/vorstoesse-vollstaendig.spec.js` › Ohne Titelähnlichkeit steht das neueste Geschäft zuoberst — ohne Titelähnlichkeit steht das neueste Geschäft zuoberst.
+- **F33** `tests/e2e/vorstoesse-vollstaendig.spec.js` › Ein zum Titel ähnliches Geschäft steht zuoberst — ein titelähnliches Geschäft steht zuoberst.
+- **F33** `tests/e2e/vorstoesse-vollstaendig.spec.js` › Verknüpfen-Suche filtert über Nr./Titel; ohne Treffer «Keine Geschäfte gefunden.» — die Verknüpfen-Suche filtert über Nr./Titel, ohne Treffer die Leermeldung.
+- **F33** `tests/e2e/vorstoesse-vollstaendig.spec.js` › Nach dem Verknüpfen übernimmt das Geschäft die Priorität des Vorstosses — nach dem Verknüpfen übernimmt das Geschäft die Priorität.
+- **F29, F33** `tests/e2e/vorstoesse-vollstaendig.spec.js` › Im Geschäft erscheinen verknüpfte Vorstösse mit Titel/Art, Haltung, Zuständigkeit und Notizen — im Geschäft erscheinen die verknüpften Vorstösse vollständig.
+- **F35** `tests/e2e/vorstoesse-vollstaendig.spec.js` › Leerer Hinweis; hinzugefügte Notizen erscheinen nicht in der Zeitleiste — die Vorstoss-Zeitleiste zeigt den Leer-Hinweis und keine Notizen (Leerfall).
+- **F8, F42** `tests/e2e/sitzungen-sitzungstypen.spec.js` › «+ Neuer Typ» öffnet sofort die vollständige Maske mit allen Feldern — die Neu-Maske zeigt alle Felder und bietet «Speichern» (ohne Namen gesperrt) und «Abbrechen» statt ✕; erst «Speichern» legt an und öffnet die Bearbeitung (Gut-/Schlechtfall).
+- **F8, F42** `tests/e2e/sitzungen-sitzungstypen.spec.js` › Ein Sitzungstyp ohne Namen wird nicht angelegt: Klick daneben verwirft nichts, «Abbrechen» schliesst — ein Klick neben die Neu-Maske lässt sie offen, «Abbrechen» schliesst sie ohne einen Sitzungstyp anzulegen (Schlechtfall).
+- **F42, F43** `tests/e2e/sitzungen-sitzungstypen.spec.js` › Schalter «Eigene Fraktion» und «Verknüpfung anbieten» lassen sich umschalten und bleiben nach erneutem Öffnen erhalten — beide Schalter schalten um und bleiben erhalten.
+- **F7, F42** `tests/e2e/sitzungen-sitzungstypen.spec.js` › Bearbeiten pro Feld speichert sofort (Gespeichert-Toast) und aktualisiert die Karten-Meta — jede Feldänderung speichert sofort und aktualisiert die Karte.
+- **F42** `tests/e2e/sitzungen-sitzungstypen.spec.js` › Löschen mit Bestätigung: Abbrechen behält die Karte, Bestätigen entfernt sie — Löschen mit Rückfrage: Abbrechen behält, Bestätigen entfernt (Gut-/Schlechtfall).
+- **F42** `tests/e2e/sitzungen-sitzungstypen.spec.js` › Vorlage-Traktanden hinzufügen, entfernen und umsortieren bleibt erhalten — Vorlage-Traktanden hinzufügen/entfernen/umsortieren bleibt erhalten.
+- **F43** `tests/e2e/sitzungen-sitzungstypen.spec.js` › Kommissionen-beraten Auswahl bleibt erhalten — die «beratene Kommissionen»-Auswahl bleibt erhalten.
+- **F42** `tests/e2e/sitzungen-sitzungstypen.spec.js` › Leere Typen-Ansicht Hinweis, Suche nach Name/Zweck, leerer Name wird nicht gespeichert — Leer-Hinweis, Suche über Name/Zweck, leerer Name wird nicht gespeichert.
+- **F37** `tests/e2e/sitzungen-sitzungstypen.spec.js` › «+ Neue Sitzung» ist ein beschrifteter Knopf im pw-view-header — «+ Neue Sitzung» ist ein beschrifteter Kopf-Knopf.
+- **F37** `tests/e2e/sitzungen-sitzungstypen.spec.js` › Ohne Sitzungstyp: das Menü weist gesperrt darauf hin und öffnet kein Formular — ohne angelegten Sitzungstyp enthält das Menü nur einen gesperrten Hinweis, es öffnet kein Formular (Schlechtfall).
+- **F37** `tests/e2e/sitzungen-sitzungstypen.spec.js` › Mit genau einem Typ: das Menü bietet genau diesen Typ und öffnet das Formular — bei genau einem Sitzungstyp bietet das Menü diesen einen Eintrag, der das Formular öffnet.
+- **F37** `tests/e2e/sitzungen-sitzungstypen.spec.js` › Mit mehreren Typen: je ein Menüeintrag, der gewählte startet sein Formular — bei mehreren Sitzungstypen gibt es je einen Menüeintrag, der gewählte startet direkt sein Formular.
+- **F37** `tests/e2e/sitzungen-sitzungstypen.spec.js` › Formular übernimmt Titel/Ort/Zeit/Zweck aus dem Typ; Datum heute+7 mit min=heute; ohne Datum kein Absenden — Vorlagenwerte übernommen, Datum heute+7, ohne Datum kein Absenden.
+- **F37** `tests/e2e/sitzungen-sitzungstypen.spec.js` › Teilnehmer-Arten wählbar, das abhängige Feld wechselt, eigene Fraktion zeigt den Gruppen-Hinweis — Teilnehmer-Arten wählbar, das abhängige Feld wechselt korrekt.
+- **F36, F37** `tests/e2e/sitzungen-sitzungstypen.spec.js` › Traktanden hinzufügen/entfernen; erfolgreiches Erstellen schliesst das Formular und die interne Sitzung erscheint mit «intern»-Badge — Erstellen schliesst das Formular, die interne Sitzung erscheint mit «intern»-Badge.
+- **F36** `tests/e2e/sitzungen-sitzungstypen.spec.js` › «Nur zukünftige» ist standardmässig aktiv; Ausschalten zeigt vergangene, nach den künftigen — der Schalter ist standardmässig aktiv, Ausschalten zeigt vergangene danach.
+- **F36** `tests/e2e/sitzungen-sitzungstypen.spec.js` › Suche findet eine Sitzung und klappt die Trefferkarte auf; ohne Treffer «Keine Sitzungen gefunden»; Leeren stellt wieder her — Suche klappt den Treffer auf, ohne Treffer die Leermeldung (Gut-/Leerfall).
+- **F36** `tests/e2e/sitzungen-sitzungstypen.spec.js` › Der Extern-Link klappt die Karte nicht auf (click.stop) — der Extern-Link öffnet die Karte nicht (click.stop).
+- **F38** `tests/e2e/sitzungen-sitzungstypen.spec.js` › Interne Sitzung zeigt die vereinfachte Traktandentabelle; leere Sitzung zeigt den Hinweis — interne Sitzung zeigt die einfache Traktandentabelle, leere den Hinweis (Leerfall).
+- **F38** `tests/e2e/sitzungen-sitzungstypen.spec.js` › Parlamentssitzung zeigt die volle Traktandentabelle; Klick auf eine Titel-Zeile öffnet das Geschäft — Parlamentssitzung zeigt die volle Tabelle, ein Titel-Klick öffnet das Geschäft.
+- **F38** `tests/e2e/sitzungen-sitzungstypen.spec.js` › Verknüpfte Geschäfte hinzufügen und wieder lösen — verknüpfte Geschäfte hinzufügen und wieder lösen.
+- **F38, F50** `tests/e2e/sitzungen-sitzungstypen.spec.js` › To-do zu Deck: nach dem Hinzufügen ist das Eingabefeld leer bzw. es erscheint ein Fehler-Toast — ein To-do landet im Deck-Board, das Feld leert sich bzw. es kommt ein Fehler-Toast.
+- **F40** `tests/e2e/sitzungen-sitzungstypen.spec.js` › Verknüpfte Sitzungen zeigen fremde Notizen nur lesend; Entkoppeln entfernt den Block — verknüpfte Sitzungen zeigen fremde Notizen nur lesend, Entkoppeln entfernt den Block.
+- **F39** `tests/e2e/sitzungen-sitzungstypen.spec.js` › Traktandum ohne Geschäft nutzt die Inline-SitzungNotizen; leerer Blur erzeugt nichts — Traktandum ohne Geschäftsbezug nutzt die Inline-Notiz, leerer Blur erzeugt nichts (Leerfall).
+- **F25, F39** `tests/e2e/sitzungen-sitzungstypen.spec.js` › Traktandum mit Geschäft: NotizenListe «Sitzungsnotiz zum Geschäft», persistiert, erscheint im Geschäft (ausklappbar) und nicht in den normalen Notizen; folgt dem Geschäft — Traktandum-Notiz mit Geschäftsbezug wird zur Sitzungsnotiz am Geschäft und folgt ihm über Sitzungen hinweg (Datenfluss).
+- **F25, F39** `tests/e2e/sitzungen-sitzungstypen.spec.js` › Sitzungsnotiz löschen (Soft-Delete) und wiederherstellen — die Sitzungsnotiz lässt sich per Soft-Delete löschen und wiederherstellen.
+- **F44** `tests/e2e/mitglieder-kommissionen.spec.js` › Karten zeigen Name, Partei, Fraktion, Fraktionsrolle, Kommission und E-Mail; Zähler = Kartenzahl — die Karten zeigen alle Felder, der Zähler stimmt.
+- **F45** `tests/e2e/mitglieder-kommissionen.spec.js` › «Nur aktive Mitglieder» ist Standard an; Ausschalten zeigt ehemalige und erhöht den Zähler — der Schalter ist Standard an, Ausschalten zeigt ehemalige.
+- **F45** `tests/e2e/mitglieder-kommissionen.spec.js` › Sortierung: Standard Funktion (Präsidium zuerst), dann Name, Fraktion, Partei — die Sortiermodi Funktion/Name/Fraktion/Partei wirken korrekt.
+- **F10, F45** `tests/e2e/mitglieder-kommissionen.spec.js` › Filter Fraktion und Partei grenzen ein; Optionsliste enthält nur aktive Werte — Fraktion-/Partei-Filter grenzen ein, die Optionen sind nur aktive Werte.
+- **F45** `tests/e2e/mitglieder-kommissionen.spec.js` › Filter Kommission, Funktion=Fraktionspräsident (ohne Vize) und Funktion=Kommissionspräsident — die Kommissions- und Funktions-Filter grenzen korrekt ein.
+- **F45** `tests/e2e/mitglieder-kommissionen.spec.js` › Suche über Name/Partei/Fraktion/E-Mail grenzt ein; ohne Treffer Leermeldung; ✕ setzt zurück — Suche grenzt ein, ohne Treffer die Leermeldung, ✕ setzt zurück (Gut-/Leerfall).
+- **F44** `tests/e2e/mitglieder-kommissionen.spec.js` › Randfälle: ohne Fraktion «—», ohne Partei «Ohne Partei», ohne Kommission kein Block (kein JS-Fehler) — Mitglieder ohne Fraktion/Partei/Kommission werden fehlerfrei dargestellt (Randfall).
+- **F11, F44** `tests/e2e/mitglieder-kommissionen.spec.js` › Kürzel: konfigurierte Partei- und Fraktions-Kürzel erscheinen in Karten und Fraktion-Filter — konfigurierte Kürzel erscheinen in Karten und Filter.
+- **F46** `tests/e2e/mitglieder-kommissionen.spec.js` › Karten laden mit Name und Status; Zähler = Kartenzahl; mindestens fünf Kommissionen — die Kommissionskarten laden mit Name/Status, mindestens fünf.
+- **F46** `tests/e2e/mitglieder-kommissionen.spec.js` › Aufklappen zeigt Mitglieder mit Funktion/Partei/Fraktion/E-Mail; Toggle-Glyph kippt; Zuklappen — das Aufklappen zeigt die Mitglieder, der Toggle-Glyph kippt.
+- **F46** `tests/e2e/mitglieder-kommissionen.spec.js` › Eigene Fraktion ist hervorgehoben und konsistent zur Fraktion des angemeldeten Nutzers — die eigene Fraktion ist hervorgehoben, konsistent zum Nutzer.
+- **F46** `tests/e2e/mitglieder-kommissionen.spec.js` › Pendentes Geschäft öffnet die Detailansicht; der externe ↗-Link öffnet sie NICHT — ein pendentes Geschäft öffnet das Detail, der Extern-Link nicht.
+- **F47** `tests/e2e/mitglieder-kommissionen.spec.js` › Zwei Schalter Standard an; «Nur aktive Kommissionen» aus zeigt inaktive; «Nur aktive Mitglieder» aus zeigt «/ N aktiv» — beide Schalter Standard an, Ausschalten wirkt wie erwartet.
+- **F47** `tests/e2e/mitglieder-kommissionen.spec.js` › Suche klappt Treffer-Karten automatisch auf; ohne Treffer Leermeldung; ✕ setzt zurück — Suche klappt Treffer auf, ohne Treffer Leermeldung, ✕ setzt zurück.
+- **F46** `tests/e2e/mitglieder-kommissionen.spec.js` › Hinweise: ohne Mitglieder «Keine Mitglieder synchronisiert», ohne pendente Geschäfte der Geschäfte-Hinweis — die Leer-Hinweise erscheinen ohne Mitglieder bzw. ohne pendente Geschäfte (Leerfall).
+- **F58** `tests/e2e/multi-user-sharing.spec.js` › 0b: Admin-Seite lädt ohne JavaScript-Fehler (OC is not defined) — die Admin-Seite lädt ohne den «OC is not defined»-Fehler (Schlechtfall-Guard).
+- **F48, F49** `tests/e2e/multi-user-sharing.spec.js` › 1–3: Alle drei Nutzer sehen Fraktionsordner und Fraktionskalender — alle drei Nutzer sehen den geteilten Ordner und Kalender.
+- **F49** `tests/e2e/multi-user-sharing.spec.js` › 4: User1 legt einen Termin im geteilten Kalender an (CalDAV) — User1 legt einen Kalendertermin an (CalDAV).
+- **F49** `tests/e2e/multi-user-sharing.spec.js` › 5: User2 sieht den Termin und bearbeitet ihn — User2 sieht und bearbeitet den Termin.
+- **F49** `tests/e2e/multi-user-sharing.spec.js` › 6+7: User3 und User1 sehen den bearbeiteten Termin — User3 und User1 sehen den bearbeiteten Termin.
+- **F48** `tests/e2e/multi-user-sharing.spec.js` › 8: User1 legt ein Dokument im geteilten Fraktionsordner an — User1 legt ein Dokument im Fraktionsordner an.
+- **F48, F52** `tests/e2e/multi-user-sharing.spec.js` › 9: User2 sieht den geteilten Ordner und bearbeitet das Dokument — User2 sieht den Ordner und bearbeitet das Dokument.
+- **F48, F52** `tests/e2e/multi-user-sharing.spec.js` › 10+11: User3 und User1 sehen den bearbeiteten Dokumentinhalt — User3 und User1 sehen den bearbeiteten Inhalt.
+- **F53, F54** `tests/e2e/multi-user-sharing.spec.js` › 12+13: Beschluss-Änderung erscheint bei allen sofort (Echtzeit) — eine Beschluss-Änderung erscheint bei allen sofort ohne Reload.
+- **F53, F54** `tests/e2e/multi-user-sharing.spec.js` › 14: Notiz erscheint bei allen sofort (Echtzeit) — eine Notiz erscheint bei allen sofort ohne Reload.
+- **F63** `tests/e2e/multi-user-sharing.spec.js` › Status-Kürzel werden in der Admin-Verwaltung angezeigt — die Status-Kürzel erscheinen in der Admin-Verwaltung.
+- **F3, F59** `tests/e2e/admin-sync-echtzeit.spec.js` › Manuell starten: Live-Fortschritt und «läuft bereits»; danach Abbruch und Idle — manueller Start zeigt Live-Fortschritt und meldet «läuft bereits», danach folgen Abbruch und Idle.
+- **F3, F59** `tests/e2e/admin-sync-echtzeit.spec.js` › Laufenden Sync abbrechen: UI meldet Abbruch, Status-API bestätigt den Stopp — der Abbruch wird in der UI gemeldet und über die Status-API als gestoppt bestätigt.
+- **F58** `tests/e2e/admin-sync-echtzeit.spec.js` › Optionen sind aktive Fraktionen; Auswahl speichert automatisch und bleibt; Gruppen-Status wechselt — nur aktive Fraktionen wählbar, die Auswahl speichert automatisch.
+- **F60** `tests/e2e/admin-sync-echtzeit.spec.js` › Standard-Zeitplan ist vorbelegt: zwei Einträge 10:00 und 18:00 an allen Wochentagen — der Standard-Zeitplan ist mit 10:00/18:00 an allen Tagen vorbelegt.
+- **F60** `tests/e2e/admin-sync-echtzeit.spec.js` › Zeitplan hinzufügen speichert und bleibt; löschen entfernt; unvollständige Zeile wird nicht gespeichert — Zeitplan hinzufügen/löschen; unvollständige Zeilen werden nicht gespeichert (Schlechtfall).
+- **F61** `tests/e2e/admin-sync-echtzeit.spec.js` › Provision ohne Fraktion warnt; mit Fraktion rendern Zeilen; Username-Änderung speichert automatisch — ohne Fraktion Warnung, mit Fraktion Zeilen, Username speichert automatisch.
+- **F63** `tests/e2e/admin-sync-echtzeit.spec.js` › Kürzel über die UI hinzufügen/löschen; Datalist schlägt Status-, Fraktions- und Parteinamen vor — Kürzel per UI verwalten, die Datalist schlägt bestehende Werte vor.
+- **F64** `tests/e2e/admin-sync-echtzeit.spec.js` › Karten sichtbar; neueste offen (Einträge, ▲), ältere zugeklappt (▼); Toggle klappt auf und zu — der Änderungsverlauf zeigt die neueste Version offen, ältere zugeklappt.
+- **F53, F54** `tests/e2e/admin-sync-echtzeit.spec.js` › Ein aus Kontext B gestarteter Sync erscheint in Kontext A ohne Reload — ein in Kontext B gestarteter Sync erscheint in Kontext A ohne Reload.
+- **F3, F59** `tests/e2e/feld-inventar-verwaltung-und-bausteine.spec.js` › Karte Synchronisation: alle Bedienelemente vorhanden und am Live-Status gekoppelt — die Verwaltung führt Starten, Abbrechen, Statustext, Fortschrittsbalken, Prozentanzeige, Detailzeile und den Hinweis auf die automatische Speicherung; Starten und Abbrechen sind je nach tatsächlich laufender Aktualisierung freigegeben oder gesperrt (Feld-Inventar, Gut-/Schlechtfall).
+- **F24** `tests/e2e/feld-inventar-verwaltung-und-bausteine.spec.js` › «+ Neue Notiz», Editor mit Bestätigen/Abbrechen, Kopfzeile und Löschknopf der eigenen Notiz — die Notizenliste bietet den Neu-Knopf und einen Editor mit Bestätigen und Abbrechen; Abbrechen legt nichts an, die fertige Notiz trägt Verfasser und Zeitpunkt, und der Löschknopf erscheint nur bei der eigenen Notiz (Feld-Inventar, Gut-/Schlechtfall).
+- **F24, F32** `tests/e2e/feld-inventar-verwaltung-und-bausteine.spec.js` › Alle Knöpfe der Werkzeugleiste sind vorhanden und formatieren wirklich — die Werkzeugleiste des formatierten Textbereichs führt alle Formatier-Knöpfe in fester Reihenfolge; Auszeichnen, Aufzählung, Rückgängig und «Formatierung entfernen» wirken tatsächlich, «Link entfernen» bleibt ohne Link gesperrt (Feld-Inventar, Gut-/Schlechtfall).
+- **F27, F32** `tests/e2e/feld-inventar-verwaltung-und-bausteine.spec.js` › Überschrift, Pfadhinweis, alle acht Vorlagen, Hochladen und der Dialog «Neues Dokument» — der Dokumentenbereich zeigt Überschrift, Zielordner, alle acht Vorlagen in fester Reihenfolge und den Hochladen-Knopf; der Erstellen-Dialog nennt Präfix und Endung, sperrt ohne Dateinamen und legt beim Abbrechen nichts an (Feld-Inventar, Gut-/Schlechtfall).
+- **F33** `tests/e2e/feld-inventar-verwaltung-und-bausteine.spec.js` › Suchfeld, Hinweistext, Trefferliste und Leermeldung sind vorhanden und wirken — der Dialog zum Verknüpfen mit einem Geschäft führt Suchfeld, Hinweis auf die Sortierung, Trefferliste und Schliessen-Knopf; die Suche grenzt die Treffer ein, ohne Treffer erscheint die Leermeldung (Feld-Inventar, Gut-/Leerfall).
+- **F37** `tests/e2e/feld-inventar-verwaltung-und-bausteine.spec.js` › Traktandenzeile: Ziehgriff, Nummer, Titel, Beschreibung und Löschknopf wirken — eine Traktandenzeile des Sitzungsformulars führt Ziehgriff, laufende Nummer, Titel, Beschreibung und Löschknopf; Eingaben werden übernommen und nach dem Löschen ist die Nummerierung wieder lückenlos (Feld-Inventar).
+- **F37** `tests/e2e/feld-inventar-verwaltung-und-bausteine.spec.js` › Teilnehmerzeile: Art-Auswahl mit allen sieben Arten, Löschknopf und Hinzufügen wirken — eine Teilnehmerzeile bietet alle sieben Teilnehmer-Arten in fester Reihenfolge, ist auf die eigene Fraktion vorbelegt, wechselt je nach Art das danebenliegende Auswahlfeld und lässt sich wieder entfernen (Feld-Inventar).
+- **F51, F61** `tests/e2e/feld-inventar-verwaltung-und-bausteine.spec.js` › Karte E-Mail-Einladungen: beide Felder vorhanden und speichern automatisch — Absender-Adresse und Absendername der Einladungen sind vorhanden, die Adresse nimmt nur E-Mail-Adressen entgegen und eine Änderung wird ohne Speichern-Knopf übernommen und überlebt das Neuladen (Feld-Inventar, Datenfluss).
+- **F58** `tests/e2e/feld-inventar-verwaltung-und-bausteine.spec.js` › Karte Fraktionskonfiguration: Auswahlliste, Gruppenfeld mit Vorschlägen und Zustandstext wirken — Fraktionsauswahl, Gruppenfeld samt Vorschlagsliste der bestehenden Gruppen und Zustandstext sind vorhanden; der Zustandstext unterscheidet zwischen einer bestehenden und einer neu anzulegenden Gruppe (Feld-Inventar, Gut-/Schlechtfall).
+- **F60** `tests/e2e/feld-inventar-verwaltung-und-bausteine.spec.js` › Karte Automatische Synchronisation: Zeile mit sieben Wochentagen, Zeitfeld und Löschknopf speichert — eine Zeitplan-Zeile führt die sieben Wochentage von Montag bis Sonntag, ein Zeitfeld und einen Löschknopf; der Eintrag speichert von selbst, überlebt das Neuladen und lässt sich wieder entfernen (Feld-Inventar, Datenfluss).
+- **F61** `tests/e2e/feld-inventar-verwaltung-und-bausteine.spec.js` › Karte Mitglieder-Zuordnung: Knopf, Statustext, alle fünf Spalten und die Kopf-Auswahlbox wirken — die Zuordnungstabelle führt die Auswahlspalte sowie Mitglied, E-Mail, Username und Gruppen; die Auswahlbox im Tabellenkopf wählt alle Zeilen an und ab, und ohne ausgewählte Zeile nennt der Abgleich den Grund statt still nichts zu tun (Feld-Inventar, Gut-/Schlechtfall).
+- **F63** `tests/e2e/feld-inventar-verwaltung-und-bausteine.spec.js` › Karte Kürzel: Zeile mit Suchtext, Kürzel und Löschknopf speichert und lässt sich entfernen — eine Kürzel-Zeile führt den Suchtext mit Vorschlagsliste, das Kürzel und einen Löschknopf; der Eintrag speichert von selbst, überlebt das Neuladen und lässt sich wieder entfernen (Feld-Inventar, Datenfluss).
+- **F26** `tests/e2e/restliche-features-e2e.spec.js` › Druckansicht: ohne Votum der Leer-Hinweis, mit Votum Kopf, Metadaten, Wortlaut und automatischer Drucken-Dialog — die Druckseite des Votums zeigt ohne erfassten Text den Leer-Hinweis und mit Text den Kopf mit Geschäftstitel, die Zuständigen mit Hauptverantwortung, den letzten Fraktionsbeschluss, Erfasser und Stand, den Wortlaut sowie die Fusszeile; der Drucken-Dialog öffnet von selbst (Gut-/Leerfall).
+- **F26, F28** `tests/e2e/restliche-features-e2e.spec.js` › Nur die zuständige Person darf ein Votum erfassen; archiviert erscheint es in der Aktionszeitleiste — eine nicht zuständige Person wird mit Begründung abgewiesen, die zuständige erfasst das Votum; solange es aktiv ist, steht es nicht in der Zeitleiste, nach dem Archivieren bleibt es dort als historischer Eintrag und die Druckseite ist für ein neues Votum wieder leer (Gut-/Schlechtfall).
+- **F27** `tests/e2e/restliche-features-e2e.spec.js` › Aus einer Vorlage erstellen: Dateiname aus dem Titel vorbelegt, leerer Name gesperrt, Dokument erscheint in der Liste — das Vorlagen-Menü öffnet den Erstellen-Dialog mit dem aus dem Geschäftstitel vorbelegten Dateinamen; ein leerer Name oder nur Leerzeichen sperren das Erstellen, mit Namen erscheint das Dokument in der Dokumentenliste (Gut-/Schlechtfall).
+- **F27** `tests/e2e/restliche-features-e2e.spec.js` › Datei hochladen: Bestätigung und Eintrag in der Dokumentenliste — eine über den Hochladen-Knopf gewählte Datei wird bestätigt, erscheint mit dem Präfix der Geschäftsnummer in der Liste und lässt sich von dort öffnen und herunterladen (Gutfall).
+- **F37, F41** `tests/e2e/restliche-features-e2e.spec.js` › Eine neue interne Sitzung erscheint mit Zweck und Traktandenliste im Fraktionskalender — eine über das Formular angelegte interne Sitzung erzeugt im gemeinsamen Fraktionskalender einen Eintrag mit Titel, Ort, Zweck, Traktandenliste und Teilnehmern; für eine nicht existierende Sitzung liefert der Kalender nichts (Gut-/Schlechtfall).
+- **F51, F61** `tests/e2e/restliche-features-e2e.spec.js` › «Ausgewählte abgleichen» legt den fehlenden Benutzer an und führt die Zeile danach als vorhanden — ohne ausgewählte Zeile weist die Verwaltung darauf hin; mit ausgewählter Zeile wird der fehlende Benutzer wirklich angelegt und die Zeile führt ihn danach als vorhanden, mit gesperrtem Namensfeld und der Fraktionsgruppe (Gut-/Schlechtfall).
+- **F56, F57, F62** `tests/e2e/restliche-features-e2e.spec.js` › Eine abgelaufene Stellvertretung wirkt nicht, eine gültige schaltet den Sitzungsmodus frei — ein einfaches Mitglied darf den Sitzungsmodus nicht schalten, eine Gültigkeit mit «bis» vor «von» wird abgewiesen, eine abgelaufene Stellvertretung bleibt wirkungslos, und eine gültige schaltet den Modus frei, worauf die Geschäfteliste automatisch auf «Nur Entscheid nötig» umstellt (Gut-/Schlechtfall).
+- **F56, F57, F62** `tests/e2e/restliche-features-e2e.spec.js` › Im Sitzungsmodus ist das Beschluss-Feld für das Präsidium gesperrt, für die Protokoll-Stellvertretung frei — im Sitzungsmodus ist das Beschluss-Feld für das Präsidium mit Hinweis gesperrt, während die gültige Protokoll-Stellvertretung den Beschluss erfasst, der Fraktionsstatus auf «Entschieden» wechselt und der Beschluss in der Zeitleiste erscheint (Gut-/Schlechtfall).
+
+## E2E — Backend/API (Integration gegen das reale System)
+
+Bash-Integrationsprüfungen aus `tests/e2e/run-compose-e2e.sh`: echter Compose-Stack,
+echte DB, echter Sync gegen `parlament.winterthur.ch`, API-Aufrufe über denselben
+Endpoint wie das Frontend, jeweils validiert über HTTP-Antwort und direkt per SQL.
+
+- **F1** `tests/e2e/run-compose-e2e.sh` › Prüfe parlwin-Datenbanktabellen — alle App-Tabellen existieren nach den Migrationen, sonst Abbruch (Schlechtfall-Guard).
+- **F1** `tests/e2e/run-compose-e2e.sh` › Plausibilitätschecks nach Sync (Fraktionen) — nach dem Sync liefert `/fraktionen` mindestens drei Einträge.
+- **F1** `tests/e2e/run-compose-e2e.sh` › DB-Tabellen prüfen — Geschäfte/Sitzungen/Mitglieder/Ereignisse/Rollen persistiert, Titel-Spalten als TEXT-Typ.
+- **F1, F14, F16** `tests/e2e/run-compose-e2e.sh` › Plausibilitätschecks nach Sync (Geschäfte) — mindestens 20 Geschäfte, plausible IDs/URLs, Default-Filter ≤ inkl. erledigte.
+- **F1, F36** `tests/e2e/run-compose-e2e.sh` › Plausibilitätschecks nach Sync (Sitzungen) — `/sitzungen` liefert mindestens zehn Sitzungen.
+- **F1, F44, F45** `tests/e2e/run-compose-e2e.sh` › Plausibilitätschecks nach Sync (Mitglieder) — `/mitglieder?aktiv=1` ≥ 10 und aktive ≤ Total.
+- **F1, F46** `tests/e2e/run-compose-e2e.sh` › Plausibilitätschecks nach Sync (Kommissionen) — `/kommissionen` liefert mindestens fünf Einträge.
+- **F3, F59** `tests/e2e/run-compose-e2e.sh` › Starte frischen Stack (Admin-Sync-Guards) — npm-Scripts, aussagekräftige 412-Fehlermeldung und getokente Header werden erzwungen.
+- **F3, F59** `tests/e2e/run-compose-e2e.sh` › Führe Sync über den gleichen Endpoint wie im Frontend aus — `POST /sync` startet asynchron mit 202/Erfolg/Zeitstempel.
+- **F3** `tests/e2e/run-compose-e2e.sh` › Zweiter Sync-Start wird an laufenden angehängt — der zweite `POST /sync` meldet `bereits_laufend` statt Doppellauf.
+- **F3** `tests/e2e/run-compose-e2e.sh` › Sync-Fortschritt und Abschluss — es wird laufender Fortschritt (`processed/total`) beobachtet und der Abschluss-Status mit Statistik geprüft.
+- **F2** `tests/e2e/run-compose-e2e.sh` › Eigenes Geschäft überlebt den Sync — ein vor dem Sync angelegtes eigenes Geschäft (extern_id «eigen:…») ist nach dem Sync noch vorhanden; der Cleanup löscht nur nicht mehr in der Quelle vorhandene Parlamentsgeschäfte (Regressionstest zum behobenen Bug «eigene Geschäfte verschwanden bei der Synchronisation»).
+- **F4** `tests/e2e/run-compose-e2e.sh` › Prüfe Frontend-Startseite — `/` liefert `parlwin-root`, Realtime-Config und das App-Bundle.
+- **F5** `tests/e2e/run-compose-e2e.sh` › Prüfe automatische App-Aktivierung — parlwin ist nach `docker compose up` automatisch aktiv, die Legacy-App nicht.
+- **F6** `tests/e2e/run-compose-e2e.sh` › Prüfung 4/4: Alle Mitglieder sehen dieselbe Geschäftsliste — Admin, Präsidium und Mitglied sehen dieselbe Anzahl Geschäfte.
+- **F12** `tests/e2e/run-compose-e2e.sh` › Prüfe Responsive-CSS (Desktop + Mobile) — die ausgelieferte CSS enthält die Breakpoints 80rem/54rem, die mobile Tabellen-Karte und das Admin-Card-Layout.
+- **F14, F16** `tests/e2e/run-compose-e2e.sh` › Prüfung 1/4: Geschäftsliste (inkl. erledigte) stimmt mit Datenbank überein — die API-Gesamtliste entspricht exakt der DB.
+- **F14, F19** `tests/e2e/run-compose-e2e.sh` › Prüfung 3/4: Pflichtfelder vorhanden und Detailabruf möglich — jedes Geschäft hat id/titel/status und der Detailabruf liefert Felder.
+- **F16, F23** `tests/e2e/run-compose-e2e.sh` › Reproduktion: pendentes Geschäft mit NULL-Quelldatum — ein pendentes Geschäft mit NULL in `quelle_aktualisiert_am` bricht die Liste nicht (Randfall/NULL).
+- **F16** `tests/e2e/run-compose-e2e.sh` › Prüfung 2/4: Standardfilter zeigt genau die pendenten Geschäfte — die Standardansicht entspricht exakt den pendenten (nicht erledigt/abgeschlossen/aufgehoben).
+- **F16** `tests/e2e/run-compose-e2e.sh` › API-Filter prüfen (letzter_beschluss) — der Filter nach letztem Beschluss liefert das Testgeschäft.
+- **F18** `tests/e2e/run-compose-e2e.sh` › Stammdaten eines eigenen Geschäfts ändern — Titel, Typ, Status und Datum eines selbst angelegten Geschäfts lassen sich ändern und werden gespeichert (Gutfall).
+- **F18** `tests/e2e/run-compose-e2e.sh` › Ungültiges Datum wird abgewiesen — ein Datum in falschem Format wird nicht still übernommen, sondern mit einer verständlichen Meldung («JJJJ-MM-TT») zurückgewiesen (Schlechtfall).
+- **F2, F18** `tests/e2e/run-compose-e2e.sh` › Parlamentsgeschäft ist schreib- und löschgeschützt — Stammdaten-Änderung und Löschen eines von der Parlamentswebseite stammenden Geschäfts werden mit 403 und dem Hinweis auf «selbst angelegte» Geschäfte abgelehnt (Schlechtfall).
+- **F18** `tests/e2e/run-compose-e2e.sh` › Nicht vorhandenes Geschäft — das Löschen einer unbekannten Geschäfts-Id meldet «nicht gefunden» statt eines Fehlers (Randfall).
+- **F9, F18** `tests/e2e/run-compose-e2e.sh` › Eigenes Geschäft löschen — ein selbst angelegtes Geschäft lässt sich über den echten Lösch-Weg entfernen und verschwindet danach aus der Liste (Gutfall).
+- **F19, F22** `tests/e2e/run-compose-e2e.sh` › Geschäft-Detail + Aktionen — das Detail passt zur ID und liefert erlaubte Beschlusscodes.
+- **F21** `tests/e2e/run-compose-e2e.sh` › Zuständigkeiten setzen und prüfen — zwei Zuständigkeiten werden gespeichert, die zweite als Hauptzuständigkeit (auch per SQL bestätigt).
+- **F22** `tests/e2e/run-compose-e2e.sh` › Beschluss im Normalmodus — ein Beschluss mit Code wird als `beschluss`-Aktion gespeichert.
+- **F24** `tests/e2e/run-compose-e2e.sh` › Notiz via API + Soft-Delete/Undo — eine Notiz wird angelegt, per Soft-Delete gelöscht und wiederhergestellt.
+- **F25** `tests/e2e/run-compose-e2e.sh` › Sitzungsnotiz mit eigener Kategorie — Sitzungsnotizen laufen getrennt von normalen Notizen (`kategorie=sitzungsnotiz`), inkl. Soft-Delete/Undo über den Kategorie-Pfad.
+- **F26** `tests/e2e/run-compose-e2e.sh` › Votum via API — ein Votum wird als `votum`-Aktion gespeichert.
+- **F26** `tests/e2e/run-compose-e2e.sh` › Votum bearbeiten ohne Zuständigkeit → 403 — ein Nicht-Zuständiger erhält beim Votum-Bearbeiten 403 mit «zuständige»-Meldung (Schlechtfall).
+- **F26** `tests/e2e/run-compose-e2e.sh` › Positiver Votum-Pfad (zuständig) — die zuständige Person bearbeitet das Votum, ruft das PDF ab und archiviert (Gutfall über den realen Auslieferungspfad).
+- **F26** `tests/e2e/run-compose-e2e.sh` › Die Druckansicht des Votums gibt nichts Ausführbares aus — ein Wortlaut mit Ereignis-Handler und Verweis mit javascript-Schema wird gespeichert; die ausgelieferte Druckansicht enthält den formatierten Text, aber weder Handler noch ausführbaren Verweis (Schlechtfall über den realen Auslieferungspfad).
+- **F8, F31** `tests/e2e/run-compose-e2e.sh` › Anlegen ohne Titel — angelegt wird erst beim Speichern: ohne Titel weist der Server Vorstoss («Titel fehlt») und eigenes Geschäft («Titel erforderlich») mit 400 ab (Schlechtfall).
+- **F30, F31** `tests/e2e/run-compose-e2e.sh` › Vorstoss-API: anlegen, laden — ein Vorstoss wird mit 201 angelegt und erscheint in der Liste.
+- **F32** `tests/e2e/run-compose-e2e.sh` › Vorstoss-API: Notiz — Vorstoss-Notiz anlegen (geteilter Code), bearbeiten (Revision), Soft-Delete und Wiederherstellen.
+- **F33** `tests/e2e/run-compose-e2e.sh` › Vorstoss-API: verknüpfen — das Verknüpfen mit einem Geschäft setzt den Vorstoss auf erledigt und speichert die geschaeftId.
+- **F37** `tests/e2e/run-compose-e2e.sh` › Sitzungstyp anlegen mit nur dem Namen — der Endpoint liefert 201 und `kommissionen` als leere Liste (Randfall NULL-Spalte, kein 500).
+- **F38** `tests/e2e/run-compose-e2e.sh` › Sitzung/Traktandum-Updates testen — Sitzungs-Bemerkung sowie Traktandum-Bemerkung/-Notizen werden gespeichert und per SQL bestätigt.
+- **F44, F45, F46, F47** `tests/e2e/run-compose-e2e.sh` › Deterministische Testdaten für Browser-Randfälle seeden — seedet ein ehemaliges und ein fraktionsloses Mitglied sowie eine inaktive und eine gemischt aktiv/inaktive Kommission mit kommissions-pendentem Geschäft und stellt per API sicher, dass die Seed-Kommission in `/kommissionen` und ein Geschäft mit passendem Kommissions-Status geladen werden (deterministische Randfälle statt datenbedingter Skips).
+- **F48, F49** `tests/e2e/run-compose-e2e.sh` › Fraktionsraum einrichten (Gruppe + Ordner + Kalender) — das Sicherstellen legt Gruppe, geteilten Ordner und Kalender an.
+- **F48** `tests/e2e/run-compose-e2e.sh` › Migrations-Erwartungen prüfen — ein vorbestehender Mitglied-Ordner wird verlustfrei in den offiziellen übernommen: `Fraktion.bak` beim Besitzer, alle Dateien für alle lesbar (Migration/Datenfluss).
+- **F52** `tests/e2e/run-compose-e2e.sh` › Prüfe Collabora-Integration (richdocuments + WOPI) — richdocuments aktiv, WOPI-URLs korrekt, Discovery bietet edit für odt/docx, Testdokument im Editor referenziert.
+- **F53** `tests/e2e/run-compose-e2e.sh` › Prüfe Realtime-Broker — der Broker antwortet auf `/health`, läuft nicht als root und die Build-Artefakte sind nicht schreibbar (Runtime-Sicherheit).
+- **F55** `tests/e2e/run-compose-e2e.sh` › Prüfe WebSocket-Authentisierung — ohne Login wird die WS-Verbindung abgewiesen, mit gültigem Login akzeptiert (Gut-/Schlechtfall).
+- **F56, F57** `tests/e2e/run-compose-e2e.sh` › Rechte- und Fraktionssitzungsmodus testen — im Sitzungsmodus wird der Mitglied-Beschluss mit 403 gesperrt, Protokollführung und aktive Stellvertretung dürfen; Rollen werden gesetzt.
+- **F56** `tests/e2e/run-compose-e2e.sh` › Rollen-Negativfälle — fehlende uid → 400, ungültige Gültigkeit (bis vor von) → 400, Protokollführer setzt keinen Präsidenten → 403 (Schlechtfälle).
+- **F60** `tests/e2e/run-compose-e2e.sh` › Cron-Job-Test: automatischer Cron-Tick löst die Synchronisation aus — der Watcher-Tick startet den SyncJob deterministisch mit Quelle `background-job` (kein manueller Trigger).
+- **F34** `tests/e2e/run-compose-e2e.sh` › F34: Vorstoss-Import aus «40_Vorstösse/10_Eigene» — ein per WebDAV im Ordner des Administrators abgelegtes Dokument wird beim (deterministisch ausgelösten) Hintergrund-Lauf genau einmal zum eigenen Vorstoss mit Herkunft «eigene»; der Import hat keine Oberfläche und läuft im Job vor der Datensynchronisation (Datenfluss, Gutfall). Vorbedingung hart geprüft: der Vorstoss existiert vorher nicht.
+- **F60** `tests/e2e/run-compose-e2e.sh` › Standard-Sync-Zeitplan prüfen — bei leerer Konfiguration liefert die API genau zwei Vorgaben (10:00/18:00, alle Wochentage).
+
+## Contract-/Datenfluss-Tests
+
+Tests, die einen Übergang zwischen Erzeuger und Konsument bzw. das Auslieferungs-
+Artefakt festnageln — dort, wo isoliert grüne Einheiten trotzdem falsch
+zusammenspielen können.
+
+- **F1** `tests/image-contract.sh` › headless-Image-Contract — die ausgelieferten Images enthalten keine Shell/busybox/perl (kein Angriffs-Pivot); Abwesenheit des Interpreters ist die Bestehensbedingung.
+- **F1, F19, F30** `parlwin/tests/Db/EntityJsonSerializableTest.php` › testEntitiesMitJsonSerializeImplementierenDasInterface — jede Entity mit `jsonSerialize()` implementiert `JsonSerializable`, damit `json_encode` sie auf dem realen REST-Pfad tatsächlich aufruft (Datenverlust-Guard).
+- **F1, F22** `parlwin/tests/AppInfo/DiRegistrierungTest.php` › testRegistrierungUebergibtAlleKonstruktorParameter — die DI-Registrierung von `FraktionsarbeitService`/`GeschaeftService` übergibt exakt so viele Abhängigkeiten wie der Konstruktor erwartet (sonst HTTP 500).
+- **F5** `parlwin/src/js/tests/docker-keine-bind-mounts.test.js` › der Browser-Testlauf bringt seine Tests im Abbild mit und läuft ohne besondere Rechte — die Compose-Dateien mounten keine Host-Verzeichnisse in die Container.
+- **F5** `parlwin/src/js/tests/docker-keine-bind-mounts.test.js` › `example/docker-compose.yml` bindet kein Verzeichnis des Rechners ein — auch das Auslieferungs-Beispiel kommt ohne Host-Pfade aus (Schlechtfall-Guard).
+- **F5** `parlwin/src/js/tests/docker-keine-bind-mounts.test.js` › die Routing-Konfiguration des Edge-Proxy steckt im Abbild statt im Mount — sie wird per `COPY` (nie `ADD`) ins Abbild aufgenommen.
+- **F6** `parlwin/src/js/tests/e2e-report-frisches-verzeichnis.test.js` › PW_REPORT zeigt ins TEMP_DIR, nicht in die Arbeitskopie — der Browser-Testlauf legt seinen Bericht in ein frisches temporäres Verzeichnis.
+- **F6** `parlwin/src/js/tests/e2e-report-frisches-verzeichnis.test.js` › kein rm auf ein Repo-Verzeichnis für den Report — der Testlauf löscht nie ein Verzeichnis der Arbeitskopie (Schlechtfall-Guard).
+- **F6** `parlwin/src/js/tests/e2e-report-frisches-verzeichnis.test.js` › baut das Playwright-Image vor dem Lauf (aktuelle Testdateien) — der Browser-Testlauf baut sein Abbild vorher neu, damit die aktuellen Tests laufen (Integritäts-Guard).
+- **F6** `parlwin/src/js/tests/e2e-report-frisches-verzeichnis.test.js` › reicht den Report dieses Laufs an den Aufrufer weiter — der Browser-Testlauf legt seinen Bericht dorthin, wo der Gesamtlauf ihn erwartet (Integritäts-Guard).
+- **F6** `parlwin/src/js/tests/e2e-report-frisches-verzeichnis.test.js` › Gesamtlauf greift nicht mehr auf den Repo-Pfad `tests/e2e/.junit` zu und bezieht den Bericht direkt aus dem laufenden Test — verhindert, dass ein alter Bericht aus der Arbeitskopie als Ergebnis des aktuellen Laufs gezählt wird (Schlechtfall-Guard).
+- **F21** `parlwin/tests/Service/AutoZustaendigEinreicherTest.php` › einreichende Fraktionsmitglieder / Webseiten-Form «Nachname Vorname» / extern_id-Match / Fremde ignoriert / echte Webseiten-Einreicher / Einreicher vor Kommission — der reale Pfad Scraper → Einreicher-Matching (Fixture aus echtem Sample) weist die richtigen Personen zu (Gut-/Schlecht-/Randfall, Namensform-Contract).
+- **F24, F32** `parlwin/tests/Service/NotizGeteilterCodeTest.php` › Geschäft und Vorstoss nutzen denselben NotizService / kein eigener Vorstoss-Notiz-Code / NotizService ist einzige Revisionsquelle — Geschäfts- und Vorstoss-Notizen teilen denselben Code (KISS/DRY-Contract).
+- **F48** `parlwin/tests/AppInfo/ApplicationDiTest.php` › testFraktionsraumServiceRegistrierungPasstZumKonstruktor — die Registrierung des `FraktionsraumService` passt zum Konstruktor.
+
+## Migrations-/Schema-Tests
+
+- **F1** `parlwin/tests/Migration/MigrationSchemaTest.php` › testKeineNotNullSpalteMitLeeremOderNullDefault — keine NOT-NULL-Spalte hat einen leeren oder NULL-Default (Schema-Integritäts-Guard über alle Migrationen).
+- **F1** `parlwin/tests/Migration/Version000016Test.php` › testPostSchemaChangeNutztKonfiguriertesPrefixOhneGetTablePrefix — die Migration nutzt das konfigurierte Tabellen-Prefix ohne `getTablePrefix()`.
+
+## Modul-/Komponententests — Frontend (vitest)
+
+Vue-Komponenten und Frontend-Logik unter jsdom mit `@testing-library`/`@vue/test-utils`.
+Sie ergänzen die Playwright-e2e-Tests, ersetzen sie aber nicht.
+
+**Abdeckungs-Guard** (ohne Funktionsnummer, weil er die Liste selbst prüft):
+
+- **Konsistenz** `parlwin/src/js/tests/keine-uebersprungenen-tests.test.js` › ‹Datei› enthält kein skip/only/fixme — je Test-/Spec-Datei ein Test: kein Test darf übersprungen, isoliert oder ausgesetzt sein; die Voraussetzung wird hergestellt oder hart geprüft, nie umgangen.
+- **Konsistenz** `parlwin/src/js/tests/komponenten-registrierung.test.js` › ‹Datei› verwendet nur registrierte Komponenten — je Oberflächen-Datei ein Test: eine verwendete, aber nicht registrierte Komponente rendert im Browser nichts und lässt Bedienelemente still verschwinden.
+- **Konsistenz** `parlwin/src/js/tests/features-tests-abdeckung.test.js` › die Feature-Liste ist lückenlos und ohne doppelte Nummern — keine Funktionsnummer ist doppelt vergeben.
+- **Konsistenz** `parlwin/src/js/tests/features-tests-abdeckung.test.js` › zu JEDER Funktion gibt es mindestens einen Test — schlägt fehl und benennt jede Funktion, die noch keinen Test hat.
+- **Konsistenz** `parlwin/src/js/tests/features-tests-abdeckung.test.js` › jeder Test verweist auf eine existierende Funktion — schlägt fehl, wenn ein Test eine Funktionsnummer nennt, die es nicht gibt.
+
+- **F4, F30** `parlwin/src/js/tests/vorstoesse.test.js` › nutzt dieselbe View-Struktur wie alle anderen Seiten — die Vorstösse-Ansicht nutzt die gemeinsame View-Struktur.
+- **F4** `parlwin/src/js/tests/vorstoesse.test.js` › App bietet ein Vorstösse-Tab zwischen Kommissionen und Sitzungstypen — die App zeigt das Vorstösse-Tab an der richtigen Stelle.
+- **F4, F64** `parlwin/src/js/tests/changelog.test.js` › nutzt dieselbe View-Struktur wie alle anderen Seiten — die Changelog-Ansicht nutzt die gemeinsame View-Struktur.
+- **F4, F64** `parlwin/src/js/tests/changelog.test.js` › App bietet ein Changelog-Tab als unterstes Navigations-Element — die App zeigt das Changelog-Tab zuunterst.
+- **F5** `parlwin/src/js/tests/app-icon.test.js` › app.svg ist NC-konform und weiss (fill #fff) — das App-Icon entspricht dem NC-Standardformat.
+- **F5** `parlwin/src/js/tests/app-icon.test.js` › app-dark.svg ist NC-konform — das Dark-Icon entspricht dem NC-Standardformat.
+- **F7, F8** `parlwin/src/js/tests/geschaeft-neu-dialog-kein-abbrechen.test.js` › jedes Formular mit «Erstellen»-Knopf hat einen Abbruchweg — wo erst ein Knopf absendet, kommt man auch ohne Wirkung wieder heraus (Abbrechen oder Schliesskreuz).
+- **F8, F37** `parlwin/src/js/tests/geschaeft-neu-dialog-kein-abbrechen.test.js` › das Formular für eine neue Sitzung bietet «Erstellen» und «Abbrechen» — das Sitzungsformular lässt sich abbrechen, ohne eine Sitzung anzulegen.
+- **F8, F27** `parlwin/src/js/tests/geschaeft-neu-dialog-kein-abbrechen.test.js` › der Dialog für ein neues Dokument bietet «Erstellen» und «Abbrechen» — der Dokument-Dialog lässt sich abbrechen, ohne ein Dokument anzulegen.
+- **F7, F24** `parlwin/src/js/tests/geschaeft-detail-meldung.test.js` › meldet gespeicherte Notiz über die Nextcloud-Benachrichtigung — das Speichern meldet über die NC-Benachrichtigung.
+- **F7, F24** `parlwin/src/js/tests/geschaeft-detail-meldung.test.js` › meldet einen Speicherfehler über die Nextcloud-Benachrichtigung — ein Speicherfehler wird über die NC-Benachrichtigung gemeldet (Schlechtfall).
+- **F7** `parlwin/src/js/tests/geschaeft-detail-meldung.test.js` › rendert im Geschäfts-Detail keine eigene Meldungs-Zeile mehr — das Detail rendert keine eigene Meldungs-Zeile.
+- **F9, F30** `parlwin/src/js/tests/vorstoss-uebersicht.test.js` › bietet auf der Karte einen Löschen-Weg an — jede Vorstoss-Karte bietet einen Löschen-Knopf.
+- **F11** `parlwin/src/js/tests/kuerzel-ueberall.test.js` › utils.kuerze ersetzt alle konfigurierten Suchtexte; ohne Treffer bleibt der Text — `kuerze` ersetzt alle Suchtexte, ohne Treffer bleibt der Text (Gut-/Randfall).
+- **F11, F44** `parlwin/src/js/tests/kuerzel-ueberall.test.js` › Mitgliederliste zeigt Partei, Fraktion und Kommission gekürzt — die Mitgliederliste zeigt die Felder gekürzt.
+- **F11, F32** `parlwin/src/js/tests/kuerzel-ueberall.test.js` › Vorstoss-Herkunftsfraktion wird in Auswahl und Karte gekürzt angezeigt, gespeichert wird der volle Name — die Herkunftsfraktion erscheint gekürzt, gespeichert bleibt der volle Name.
+- **F11, F19** `parlwin/src/js/tests/kuerzel-ueberall.test.js` › Geschäfts-Detail zeigt den Status gekürzt — das Geschäfts-Detail zeigt den Status gekürzt.
+- **F11, F46** `parlwin/src/js/tests/kuerzel-ueberall.test.js` › Kommissionsliste zeigt den Kommissionsnamen gekürzt — die Kommissionsliste zeigt den Namen gekürzt.
+- **F14** `parlwin/src/js/tests/geschaeftsliste-filter.test.js` › sortiert Nummern natürlich: 2026.9 vor 2026.10 — die Geschäftsnummern werden natürlich sortiert.
+- **F14** `parlwin/src/js/tests/beschluss-spalte.test.js` › --pw-col-beschluss ist breit genug (>= 13em) für längere Beschlüsse wie «Stimmfreigabe» — die Beschluss-Spalte ist breit genug für lange Beschlüsse.
+- **F15** `parlwin/src/js/tests/prioritaet-uebersicht.test.js` › speichert eine geänderte Priorität über den Prioritäts-Endpunkt — die Inline-Priorität speichert über den Prioritäts-Endpunkt.
+- **F16** `parlwin/src/js/tests/geschaeftsliste-filter.test.js` › blendet erledigte Geschäfte standardmässig aus (auch «abgeschlossen»/«aufgehoben») — erledigte werden standardmässig ausgeblendet.
+- **F16** `parlwin/src/js/tests/geschaeftsliste-filter.test.js` › filtert nach Status, Typ, Zuständigkeit und Beschluss (Mehrfachauswahl) — die Mehrfachfilter grenzen die Liste ein.
+- **F16** `parlwin/src/js/tests/geschaeftsliste-filter.test.js` › sucht über Nummer und Titel — die Suche greift über Nummer und Titel.
+- **F16, F17** `parlwin/src/js/tests/prioritaet-uebersicht.test.js` › filtert nach Priorität; nicht gesetzt zählt als «mittel» — der Prioritätsfilter zählt «nicht gesetzt» wie mittel (Randfall).
+- **F17** `parlwin/src/js/tests/prioritaet-uebersicht.test.js` › markiert hohe Priorität mit pw-prio-hoch und tiefe mit pw-prio-tief; mittel/nicht gesetzt ohne Prio-Klasse — hohe/tiefe Priorität wird markiert, mittel/nicht gesetzt nicht.
+- **F17** `parlwin/src/js/tests/prioritaet-uebersicht.test.js` › zeigt bei nicht gesetzter Priorität KEINE Auswahl (Default undefiniert, nicht «Mittel») — ohne gesetzte Priorität ist keine Auswahl vorbelegt (Randfall).
+- **F17** `parlwin/src/js/tests/prioritaet-uebersicht.test.js` › definiert die Prioritäts-Stile (Hervorhebung hoch, Abschwächung tief) — die Prioritäts-Stile sind definiert.
+- **F8, F18** `parlwin/src/js/tests/geschaeftsliste-filter.test.js` › «+ Eigenes Geschäft» öffnet dieselbe Maske und legt noch nichts an — der Neu-Knopf öffnet die vollständige Detailmaske, ohne etwas anzulegen.
+- **F8, F18** `parlwin/src/js/tests/geschaeftsliste-filter.test.js` › nach dem Speichern geht dieselbe Maske in die Bearbeitung über — erst «Speichern» legt das Geschäft an, danach zeigt dieselbe Maske die Bearbeitung mit der neuen ID.
+- **F8, F18** `parlwin/src/js/tests/geschaeftsliste-filter.test.js` › «Abbrechen» schliesst die Neu-Maske, ein Klick daneben nicht — nur «Abbrechen» verwirft, ein Klick neben die Maske tut nichts (Schlechtfall).
+- **F12, F19** `parlwin/src/js/tests/info-tabelle.test.js` › .pw-info-tabelle nutzt table-layout: fixed — die Info-Tabelle im Detail bricht um statt zu breit zu werden.
+- **F12, F19** `parlwin/src/js/tests/info-tabelle.test.js` › .pw-info-tabelle-Zellen brechen um (overflow-wrap) — die Info-Tabellen-Zellen brechen lange Werte um.
+- **F20** `parlwin/src/js/tests/geschaeft-detail-prioritaet.test.js` › zeigt das Prioritäts-Feld in der Detailansicht — das Detail zeigt das Prioritäts-Feld.
+- **F20** `parlwin/src/js/tests/geschaeft-detail-prioritaet.test.js` › eine Prioritätswahl speichert sofort über den Prioritäts-Endpunkt — eine Prioritätswahl speichert sofort.
+- **F20** `parlwin/src/js/tests/geschaeft-detail-prioritaet.test.js` › Abwählen speichert die Priorität als «nicht gesetzt» (leer) — das Abwählen speichert leer (Randfall).
+- **F22** `parlwin/src/js/tests/GeschaeftDetail.test.js` › speichert sofort bei normaler Auswahl — eine normale Beschlusswahl speichert sofort.
+- **F22** `parlwin/src/js/tests/GeschaeftDetail.test.js` › nimmt Beschluss zurück bei null (wenn vorher ein Wert da war) — null nimmt einen vorhandenen Beschluss zurück.
+- **F22** `parlwin/src/js/tests/GeschaeftDetail.test.js` › ruft beschlussZuruecknehmen NICHT auf wenn vorher kein Wert — ohne vorherigen Wert wird nichts zurückgenommen (Randfall).
+- **F22** `parlwin/src/js/tests/GeschaeftDetail.test.js` › speichert sofort bei freitext (BeschlussWidget managed blur/debounce intern) — Freitext speichert sofort.
+- **F22** `parlwin/src/js/tests/GeschaeftDetail.test.js` › legt beim ersten Speichern eine Aktion an (POST) und merkt sich deren Id — die erste Speicherung legt eine Aktion an.
+- **F22** `parlwin/src/js/tests/GeschaeftDetail.test.js` › aktualisiert bei weiterem Tippen dieselbe Aktion (PUT), kein zweiter POST — weiteres Tippen aktualisiert dieselbe Aktion.
+- **F22** `parlwin/src/js/tests/GeschaeftDetail.test.js` › speichert unveränderten Wert nicht erneut (blur nach Debounce-Save) — ein unveränderter Wert wird nicht erneut gespeichert.
+- **F22** `parlwin/src/js/tests/GeschaeftDetail.test.js` › nach Fokus-Verlust (Session-Ende) erzeugt eine erneute Änderung eine neue Aktion — nach Session-Ende erzeugt eine Änderung eine neue Aktion.
+- **F22** `parlwin/src/js/tests/GeschaeftDetail.test.js` › parallel angestossene Speicherungen erzeugen keine zweite Aktion (Blur während laufendem Debounce-POST) — parallele Speicherungen erzeugen keine Duplikate (Randfall).
+- **F22** `parlwin/src/js/tests/BeschlussWidget.test.js` › rendert ein input[list] und eine datalist — das Widget rendert Input mit Datalist.
+- **F22** `parlwin/src/js/tests/BeschlussWidget.test.js` › rendert alle Optionen als datalist-Einträge — alle Optionen erscheinen als Datalist-Einträge.
+- **F22** `parlwin/src/js/tests/BeschlussWidget.test.js` › emittiert passendes Objekt wenn Label aus Optionen gewählt wird — ein gewähltes Label emittiert das passende Objekt.
+- **F22** `parlwin/src/js/tests/BeschlussWidget.test.js` › emittiert freitext-Objekt bei unbekanntem Text — unbekannter Text emittiert ein Freitext-Objekt.
+- **F22** `parlwin/src/js/tests/BeschlussWidget.test.js` › emittiert null wenn Feld geleert wird — ein geleertes Feld emittiert null (Randfall).
+- **F22** `parlwin/src/js/tests/BeschlussWidget.test.js` › emittiert bei blur mit bekanntem Wert passendes Objekt — Blur mit bekanntem Wert emittiert das passende Objekt.
+- **F22** `parlwin/src/js/tests/BeschlussWidget.test.js` › emittiert bei blur mit Freitext freitext-Objekt — Blur mit Freitext emittiert ein Freitext-Objekt.
+- **F22** `parlwin/src/js/tests/BeschlussWidget.test.js` › emittiert nach 5s ohne weiteren Input — nach 5s Debounce wird gespeichert.
+- **F22** `parlwin/src/js/tests/BeschlussWidget.test.js` › blur bricht Timer ab und speichert sofort — Blur bricht den Debounce ab und speichert sofort.
+- **F22** `parlwin/src/js/tests/BeschlussWidget.test.js` › emittiert blur-Ereignis beim Verlassen des Feldes — beim Verlassen wird ein Blur-Signal emittiert.
+- **F22** `parlwin/src/js/tests/BeschlussWidget.test.js` › speichert ausstehende Eingabe beim Entfernen der Komponente (Seite verlassen) — ausstehende Eingaben werden beim Unmount gesichert.
+- **F22** `parlwin/src/js/tests/BeschlussWidget.test.js` › zeigt Label aus modelValue im Input-Feld — das Label aus `modelValue` erscheint im Feld.
+- **F22** `parlwin/src/js/tests/BeschlussWidget.test.js` › zeigt leer wenn modelValue null — `modelValue` null zeigt ein leeres Feld (Randfall).
+- **F24** `parlwin/src/js/tests/NotizenListe.test.js` › lädt die Notiz in den gemeinsamen Editor-Zustand — Bearbeiten lädt die Notiz in den geteilten Editor-Zustand.
+- **F24** `parlwin/src/js/tests/NotizenListe.test.js` › setzt aktiveNotizText auf leer wenn aktion.text fehlt — fehlender Text ergibt einen leeren Editor (Randfall).
+- **F24** `parlwin/src/js/tests/NotizenListe.test.js` › räumt den Editor weg, ohne zu speichern — Verwerfen räumt den Editor ohne Speichern weg.
+- **F24** `parlwin/src/js/tests/NotizenListe.test.js` › persistiert als Zwischenspeicher (final=false) nach 5 Sekunden — der Autosave persistiert nach 5s als Zwischenspeicher.
+- **F24** `parlwin/src/js/tests/NotizenListe.test.js` › setzt vorherigen Timer zurück — der Autosave-Timer wird bei neuer Eingabe zurückgesetzt.
+- **F24** `parlwin/src/js/tests/NotizenListe.test.js` › bricht den Autosave-Timer ab und speichert final (final=true) — Abschliessen bricht den Timer ab und speichert final.
+- **F24** `parlwin/src/js/tests/NotizenListe.test.js` › legt für eine neue Notiz (aktiveNotizId=null) eine Aktion an (POST) — eine neue Notiz wird per POST angelegt.
+- **F24** `parlwin/src/js/tests/NotizenListe.test.js` › aktualisiert eine bestehende Notiz (PUT), kein POST — eine bestehende Notiz wird per PUT aktualisiert.
+- **F24** `parlwin/src/js/tests/NotizenListe.test.js` › speichert keine leere Notiz — eine leere Notiz wird nicht gespeichert (Schlechtfall).
+- **F24** `parlwin/src/js/tests/NotizenListe.test.js` › legt beim Zwischenspeichern KEINE Revision an (zwischenspeichern=true) — der Zwischenspeicher legt keine Revision an.
+- **F24** `parlwin/src/js/tests/NotizenListe.test.js` › archiviert beim finalen Abschluss eine Revision (zwischenspeichern=false) — der finale Abschluss archiviert eine Revision.
+- **F24, F32** `parlwin/src/js/tests/NotizenListe.test.js` › richtet die Requests an die basisUrl (Geschäft oder Vorstoss) — die Requests gehen an die jeweilige basisUrl (Geschäft oder Vorstoss).
+- **F24** `parlwin/src/js/tests/NotizenListe.test.js` › schliesst den Editor nach dem Speichern — der Editor schliesst nach dem Speichern.
+- **F24** `parlwin/src/js/tests/NotizenListe.test.js` › räumt einen leeren neuen Editor weg, ohne etwas anzulegen — ein leerer neuer Editor wird ohne Anlegen weggeräumt.
+- **F24** `parlwin/src/js/tests/NotizenListe.test.js` › markiert die Notiz als gelöscht und meldet die neue Liste über geaendert — Löschen ist Soft-Delete und meldet die aktualisierte Liste.
+- **F24** `parlwin/src/js/tests/NotizenListe.test.js` › Blur während laufendem Debounce-POST erzeugt keine zweite Notiz — paralleles Speichern erzeugt keine Doppel-Notiz (Randfall).
+- **F24** `parlwin/src/js/tests/notiz-editor-einheitlich.test.js` › erzeugt beim Autosave einer neuen Notiz genau EINE Notiz (kein Doppel) — der Autosave einer neuen Notiz erzeugt genau eine Notiz.
+- **F24** `parlwin/src/js/tests/notiz-editor-einheitlich.test.js` › zeigt die im Editor aktive Notiz NICHT zusätzlich als statischen Eintrag (keine Doppelung) — die im Editor aktive Notiz erscheint nicht doppelt.
+- **F24** `parlwin/src/js/tests/notiz-editor-einheitlich.test.js` › lässt den «Neue Notiz»-Knopf sichtbar, während der Editor offen ist — der «Neue Notiz»-Knopf bleibt bei offenem Editor sichtbar.
+- **F24** `parlwin/src/js/tests/notiz-editor-einheitlich.test.js` › räumt einen leeren neuen Editor bei Fokus-Verlust weg, ohne etwas zu erzeugen — ein leerer Editor wird bei Fokus-Verlust weggeräumt (Leerfall).
+- **F24** `parlwin/src/js/tests/notiz-editor-einheitlich.test.js` › nutzt für neue Notiz und Bearbeiten denselben Editor-Zustand — Neu und Bearbeiten teilen denselben Editor-Zustand.
+- **F24** `parlwin/src/js/tests/notiz-editor-einheitlich.test.js` › reicht die geladenen Revisionen an den Editor durch (Versions-Pfeile) — die geladenen Revisionen erreichen den Editor.
+- **F24** `parlwin/src/js/tests/notiz-editor-einheitlich.test.js` › Ok auf einer alten Version stellt sie wieder her: Arbeitstext final, dann alte Version als Kopie — Ok auf einer alten Version stellt sie als Kopie wieder her.
+- **F24** `parlwin/src/js/tests/notiz-editor-einheitlich.test.js` › Ok ausserhalb des Blätterns schliesst normal ab (kein Restore) — Ok ausserhalb des Blätterns schliesst normal ab.
+- **F24** `parlwin/src/js/tests/notiz-editor-einheitlich.test.js` › Abbrechen im Blättern verwirft alles – kein Restore, kein Speichern — Abbrechen im Blättern verwirft alles (Schlechtfall).
+- **F24** `parlwin/src/js/tests/notiz-editor-einheitlich.test.js` › rendert die Versions-Pfeile im echten Editor beim Bearbeiten — der echte Editor rendert die Versions-Pfeile.
+- **F24** `parlwin/src/js/tests/notiz-editor-einheitlich.test.js` › Restore speichert den bearbeiteten Arbeitsstand als Zwischenversion (echtes Blättern) — ein Restore sichert den Arbeitsstand als Zwischenversion.
+- **F24** `parlwin/src/js/tests/notiz-revisionen-ui.test.js` › zeigt keine Navigation, wenn es keine älteren Versionen gibt — ohne ältere Versionen erscheint keine Navigation (Leerfall).
+- **F24** `parlwin/src/js/tests/notiz-revisionen-ui.test.js` › zeigt den Zurück-Pfeil, sobald ältere Versionen existieren — mit älteren Versionen erscheint der Zurück-Pfeil.
+- **F24** `parlwin/src/js/tests/notiz-revisionen-ui.test.js` › blättert mit ← eine Version zurück und zeigt deren Text — ← blättert eine Version zurück.
+- **F24** `parlwin/src/js/tests/notiz-revisionen-ui.test.js` › blättert mit → wieder vorwärts — → blättert wieder vorwärts.
+- **F24** `parlwin/src/js/tests/notiz-revisionen-ui.test.js` › springt mit dem Doppelpfeil zur neuesten Fassung zurück — der Doppelpfeil springt zur neuesten Fassung.
+- **F24** `parlwin/src/js/tests/notiz-revisionen-ui.test.js` › zeigt auf der neuesten Fassung weder Vorwärts- noch Doppelpfeil — auf der neuesten Fassung fehlen Vorwärts- und Doppelpfeil (Randfall).
+- **F24** `parlwin/src/js/tests/notiz-revisionen-ui.test.js` › ist beim Blättern in alten Versionen nicht bearbeitbar — beim Blättern ist der Editor nicht bearbeitbar.
+- **F24** `parlwin/src/js/tests/notiz-revisionen-ui.test.js` › kehrt mit » zum bearbeiteten Arbeitsstand zurück, nicht zur gespeicherten Fassung — » kehrt zum bearbeiteten Arbeitsstand zurück.
+- **F24** `parlwin/src/js/tests/notiz-revisionen-ui.test.js` › löst beim Blättern keinen Blur (kein Speichern) aus — Blättern löst keinen Blur/kein Speichern aus.
+- **F24** `parlwin/src/js/tests/notiz-revisionen-ui.test.js` › löst ausserhalb des Blätterns bei echtem Fokus-Verlust einen Blur aus — echter Fokus-Verlust löst einen Blur aus.
+- **F24** `parlwin/src/js/tests/notiz-revisionen-ui.test.js` › meldet über «versionAngezeigt» den angezeigten Verlaufsstand — der angezeigte Verlaufsstand wird gemeldet.
+- **F24** `parlwin/src/js/tests/notiz-darstellung.test.js` › bietet einen Absatz-Knopf zum Zurücksetzen der Formatierung — die Toolbar bietet einen Absatz-Knopf, mit dem sich eine Formatierung wieder zurücknehmen lässt.
+- **F24** `parlwin/src/js/tests/notiz-darstellung.test.js` › behält die übrigen Formatier-Knöpfe — die übrigen Formatier-Knöpfe bleiben erhalten.
+- **F24** `parlwin/src/js/tests/notiz-darstellung.test.js` › nutzt einen gemeinsamen Selektor für Editor-Inhalt und gerenderte Notiz — Vorschau und fertige Notiz teilen dasselbe CSS.
+- **F24** `parlwin/src/js/tests/notiz-darstellung.test.js` › zeigt Aufzählungen mit Punkten und nummerierte Listen mit Zahlen — Listen werden mit Punkten bzw. Zahlen dargestellt.
+- **F24** `parlwin/src/js/tests/notiz-darstellung.test.js` › gibt Absätzen einen sichtbaren Abstand (nicht margin 0) — Absätze erhalten sichtbaren Abstand.
+- **F24** `parlwin/src/js/tests/notizen-markdown.test.js` › rendert Markdown nach HTML — `markdownZuHtml` rendert Markdown nach HTML.
+- **F24** `parlwin/src/js/tests/notizen-markdown.test.js` › säubert gefährliches HTML (XSS-Schutz) — gefährliches HTML wird gesäubert (Schlechtfall/Security).
+- **F24** `parlwin/src/js/tests/notizen-markdown.test.js` › liefert leeren String für leere Eingabe — leere Eingabe ergibt leeren String (Leerfall).
+- **F24, F38** `parlwin/src/js/tests/notizen-markdown.test.js` › rendert eine Markdown-Notiz formatiert (nicht als Rohtext) — SitzungNotizen rendert Markdown-Notizen formatiert.
+- **F24** `parlwin/src/js/tests/pw-wysiwyg-md.test.js` › rendert Markdown-Eingabe als formatiertes HTML — der Editor rendert Markdown-Eingabe als HTML.
+- **F24** `parlwin/src/js/tests/pw-wysiwyg-md.test.js` › emittiert Markdown statt HTML beim Setzen von formatiertem Inhalt — der Editor emittiert Markdown, nicht HTML.
+- **F24** `parlwin/src/js/tests/pw-wysiwyg-eingabe.test.js` › rendert die Eingabefläche ohne zusätzlichen Container — die Eingabefläche kommt ohne zusätzlichen Wrapper (minimale Struktur).
+- **F24** `parlwin/src/js/tests/pw-wysiwyg-eingabe.test.js` › hängt die Eingabefläche direkt unter die Wurzel — die Eingabefläche hängt direkt unter der Wurzel.
+- **F7, F24** `parlwin/src/js/tests/pw-wysiwyg-eingabe.test.js` › verhindert den Fokus-Verlust beim Klick auf jeden Toolbar-Knopf — ein Toolbar-Klick löst keinen Fokus-Verlust aus (kein Datenverlust).
+- **F7, F24** `parlwin/src/js/tests/pw-wysiwyg-eingabe.test.js` › emittiert kein blur, wenn der Fokus in die eigene Toolbar wandert — Fokus in die eigene Toolbar emittiert keinen Blur.
+- **F24** `parlwin/src/js/tests/pw-wysiwyg-eingabe.test.js` › emittiert blur, wenn der Fokus die Komponente wirklich verlässt — echter Fokus-Austritt emittiert einen Blur.
+- **F24** `parlwin/src/js/tests/wysiwyg-fliesstext-normal.test.js` › setzt für die Editor-Eingabefläche font-weight normal — Fliesstext im Editor ist nicht fett.
+- **F24** `parlwin/src/js/tests/notizen-geteilte-komponente.test.js` › GeschaeftDetail importiert und verwendet NotizenListe — das Geschäfts-Detail nutzt die geteilte NotizenListe.
+- **F24** `parlwin/src/js/tests/notizen-geteilte-komponente.test.js` › GeschaeftDetail enthält keinen eigenen Notiz-Editor mehr — das Geschäfts-Detail hat keinen eigenen Notiz-Editor.
+- **F24** `parlwin/src/js/tests/notizen-geteilte-komponente.test.js` › rendert eine gelöschte Notiz als Vermerk mit Wiederherstellen nur für den Autor — eine gelöschte Notiz erscheint als Vermerk mit Undo nur für den Autor.
+- **F24** `parlwin/src/js/tests/notizen-liste-umbau.test.js` › reicht alle Notiz-Aktionen (aktiv + gelöscht) über notizAktionen an die Liste — alle Notiz-Aktionen erreichen die Liste über `notizAktionen`.
+- **F24** `parlwin/src/js/tests/notizen-liste-umbau.test.js` › führt eine aktive Notiz in der aktiven Liste — eine aktive Notiz erscheint in der aktiven Liste.
+- **F24** `parlwin/src/js/tests/notizen-liste-umbau.test.js` › blendet gelöschte Notizen aus der aktiven Liste aus — gelöschte Notizen werden aus der aktiven Liste ausgeblendet.
+- **F24** `parlwin/src/js/tests/notizen-liste-umbau.test.js` › rendert den Hinweis «hat seine Notiz gelöscht» statt des Notiztextes — statt des Textes erscheint der Lösch-Hinweis.
+- **F24** `parlwin/src/js/tests/notizen-liste-umbau.test.js` › bietet dem Autor einen Undo-Knopf, anderen nicht — nur der Autor sieht den Undo-Knopf (Schlechtfall für andere).
+- **F24** `parlwin/src/js/tests/notizen-liste-umbau.test.js` › unterscheidet Löschen (Mülleimer-Icon) optisch vom Schliessen (✕) — Löschen und Schliessen sind optisch unterscheidbar.
+- **F24** `parlwin/src/js/tests/notizen-liste-umbau.test.js` › stellt die Notiz per Undo wieder her — Undo stellt die Notiz wieder her.
+- **F24** `parlwin/src/js/tests/notizen-liste-umbau.test.js` › zeigt zunächst keinen Editor, sondern einen «Neue Notiz»-Knopf — anfangs erscheint nur der «Neue Notiz»-Knopf.
+- **F24** `parlwin/src/js/tests/notizen-liste-umbau.test.js` › öffnet den Editor erst nach Klick — der Editor öffnet erst nach Klick.
+- **F25** `parlwin/src/js/tests/sitzungsnotiz-am-geschaeft.test.js` › importiert und verwendet die geteilte NotizenListe — die Sitzungsnotiz nutzt die geteilte NotizenListe.
+- **F25** `parlwin/src/js/tests/sitzungsnotiz-am-geschaeft.test.js` › verwendet NotizenListe mit kategorie="sitzungsnotiz" und einer geschaefte/-basisUrl — sie nutzt Kategorie und Geschäfts-basisUrl.
+- **F25** `parlwin/src/js/tests/sitzungsnotiz-am-geschaeft.test.js` › lädt die Sitzungsnotizen eines Geschäfts mit ?kategorie=sitzungsnotiz und legt sie in sitzungsnotizen[gid] ab — die Sitzungsnotizen werden je Geschäft geladen.
+- **F39** `parlwin/src/js/tests/sitzungsnotiz-am-geschaeft.test.js` › ignoriert Traktanden ohne Geschäft (gid <= 0) — Traktanden ohne Geschäft werden ignoriert (Randfall).
+- **F26** `parlwin/src/js/tests/geschaeft-detail-votum.test.js` › die Maske zeigt ein Feld «Votum im Rat» mit Editor und Archivieren-Knopf — das Votum ist in der Geschäftsmaske überhaupt bedienbar; ohne Zuständigkeit bleibt es lesbar mit Hinweis und ohne Archivieren-Knopf (Feld-Inventar, Schlechtfall).
+- **F26** `parlwin/src/js/tests/geschaeft-detail-votum.test.js` › die zuständige Person kann das Votum erfassen und archivieren — für die zuständige Person ist das Feld beschreibbar, der Archivieren-Knopf und der PDF-Verweis sind vorhanden (Gutfall).
+- **F26** `parlwin/src/js/tests/geschaeft-detail-votum.test.js` › speichert das Votum kurz nach der Eingabe automatisch (PUT auf den Votum-Endpunkt) — das Votum speichert kurz nach dem Tippen von selbst und meldet «Gespeichert».
+- **F26** `parlwin/src/js/tests/geschaeft-detail-votum.test.js` › ein unverändertes Votum wird nicht erneut gespeichert — ohne Änderung wird nicht noch einmal gespeichert (Randfall).
+- **F26** `parlwin/src/js/tests/geschaeft-detail-votum.test.js` › Archivieren sichert ausstehende Eingaben, ruft den Archiv-Endpunkt und leert das Votum — beim Archivieren geht keine offene Eingabe verloren, danach ist das Feld leer.
+- **F27** `parlwin/src/js/tests/geschaeft-dokumente-name.test.js` › füllt den Dateinamen mit dem normalisierten Titel vor — der Dateiname wird mit dem normalisierten Titel vorbelegt.
+- **F27** `parlwin/src/js/tests/geschaeft-dokumente-name.test.js` › normalisiert auch mehrfache Leerzeichen und Slashes zu einem Unterstrich — Mehrfach-Leerzeichen/Slashes werden zu einem Unterstrich.
+- **F27** `parlwin/src/js/tests/geschaeft-dokumente-name.test.js` › ohne Titel bleibt der Dateiname leer — ohne Titel bleibt der Dateiname leer (Randfall).
+- **F27** `parlwin/src/js/tests/dokumente-generisch.test.js` › lädt im Geschäfts-Modus weiterhin von der Geschäfts-URL — im Geschäfts-Modus lädt die Dokumente-Komponente von der Geschäfts-URL.
+- **F27, F38** `parlwin/src/js/tests/dokumente-generisch.test.js` › lädt im generischen Modus (Sitzung) von der apiBasis-URL — im generischen Modus lädt sie von der apiBasis-URL (Sitzung).
+- **F28** `parlwin/src/js/tests/GeschaeftDetail.test.js` › fügt Aktion zur lokalen Liste hinzu — eine Aktion wird lokal hinzugefügt.
+- **F28** `parlwin/src/js/tests/GeschaeftDetail.test.js` › aktualisiert bestehende Aktion in-place — eine bestehende Aktion wird in-place aktualisiert.
+- **F28** `parlwin/src/js/tests/GeschaeftDetail.test.js` › entfernt Aktion aus der Liste — eine Aktion wird aus der Liste entfernt.
+- **F28** `parlwin/src/js/tests/aktionszeitleiste-geteilt.test.js` › GeschaeftDetail importiert und verwendet Aktionszeitleiste — das Geschäfts-Detail nutzt die geteilte Aktionszeitleiste.
+- **F28** `parlwin/src/js/tests/aktionszeitleiste-geteilt.test.js` › GeschaeftDetail enthält keinen eigenen Zeitleisten-Code mehr — das Geschäfts-Detail hat keinen eigenen Zeitleisten-Code.
+- **F28** `parlwin/src/js/tests/aktionszeitleiste-geteilt.test.js` › rendert den Text einer Beschluss-Aktion — die Zeitleiste rendert den Text einer Beschluss-Aktion.
+- **F28, F35** `parlwin/src/js/tests/aktionszeitleiste-geteilt.test.js` › zeigt bei leeren Aktionen den Hinweis «Noch keine Aktionen vorhanden.» — bei leeren Aktionen erscheint der Hinweis (Leerfall).
+- **F28** `parlwin/src/js/tests/notizen-liste-umbau.test.js` › zeigt eine aktive Notiz NICHT in der Aktionszeitleiste — aktive Notizen erscheinen nicht in der Zeitleiste.
+- **F28** `parlwin/src/js/tests/notizen-liste-umbau.test.js` › zeigt auch eine gelöschte Notiz NICHT in der Aktionszeitleiste — auch gelöschte Notizen erscheinen nicht in der Zeitleiste.
+- **F28** `parlwin/src/js/tests/notizen-liste-umbau.test.js` › lässt andere Aktionen (Beschluss) in der Zeitleiste — andere Aktionen (Beschluss) bleiben in der Zeitleiste.
+- **F30** `parlwin/src/js/tests/vorstoss-uebersicht.test.js` › rendert Vorstösse als klickbare Datenkarten (pw-data-card) — Vorstösse rendern als klickbare Datenkarten.
+- **F30** `parlwin/src/js/tests/vorstoss-uebersicht.test.js` › Klick auf die Karte öffnet die Bearbeitung — ein Kartenklick öffnet die Bearbeitung.
+- **F17, F30** `parlwin/src/js/tests/vorstoss-uebersicht.test.js` › hebt hohe Priorität in der Karte hervor, tiefe schwächt sie ab — hohe Priorität wird hervorgehoben, tiefe abgeschwächt.
+- **F30, F32** `parlwin/src/js/tests/vorstoss-uebersicht.test.js` › lädt die Priorität beim Bearbeiten (Default undefiniert) — beim Bearbeiten wird die Priorität geladen (Default undefiniert).
+- **F30** `parlwin/src/js/tests/vorstoesse.test.js` › lädt die Vorstösse beim Mount — die Vorstösse laden beim Mount.
+- **F30** `parlwin/src/js/tests/vorstoesse.test.js` › filtert nach Herkunft und Status — die Liste filtert nach Herkunft und Status.
+- **F8, F30** `parlwin/src/js/tests/vorstoesse.test.js` › das Neu-Anlegen öffnet die Maske, legt aber noch nichts an — «+ Neuer Vorstoss» öffnet die vollständige Maske, ohne etwas anzulegen.
+- **F8, F30** `parlwin/src/js/tests/vorstoss-sofort-speichern.test.js` › Neu-Anlegen öffnet dieselbe Maske und legt noch nichts an — die Neu-Maske sammelt nur die Eingaben, ID-gebundene Bereiche fehlen mit Hinweis.
+- **F8, F31** `parlwin/src/js/tests/vorstoss-sofort-speichern.test.js` › erst «Speichern» legt den Vorstoss an und öffnet die Bearbeitung — erst der Speichern-Klick legt an, danach zeigt dieselbe Maske die Bearbeitung (Gutfall).
+- **F8, F31** `parlwin/src/js/tests/vorstoss-sofort-speichern.test.js` › «Abbrechen» verwirft, ein Klick daneben nicht — nur «Abbrechen» verwirft die Eingaben, ein Klick neben die Maske tut nichts (Schlechtfall).
+- **F31** `parlwin/src/js/tests/vorstoss-defaults.test.js` › neuer Vorstoss: Zuständigkeit ist standardmässig der angemeldete Benutzer — der Ersteller ist als Zuständigkeit vorbelegt.
+- **F31, F32** `parlwin/src/js/tests/vorstoss-defaults.test.js` › Bearbeiten eines bestehenden Vorstosses überschreibt die Zuständigkeit nicht mit dem User — beim Bearbeiten bleibt die Zuständigkeit erhalten (Randfall).
+- **F7, F32** `parlwin/src/js/tests/vorstoss-sofort-speichern.test.js` › Bearbeitungs-Dialog hat KEINE Abbrechen/Speichern-Buttons (kein Modal-Footer) — der Dialog hat keinen Modal-Footer.
+- **F7, F32** `parlwin/src/js/tests/vorstoss-sofort-speichern.test.js` › eine Feldänderung (Art, Priorität, Zuständigkeit) speichert sofort per PUT — jede Feldänderung speichert sofort per PUT.
+- **F7, F32** `parlwin/src/js/tests/vorstoss-sofort-speichern.test.js` › der Inhalt speichert beim Verlassen des Editors (Blur), nicht erst über einen Knopf — der Inhalt speichert bei Blur.
+- **F32** `parlwin/src/js/tests/vorstoss-sofort-speichern.test.js` › ein leerer Titel wird nie weggespeichert — ein leerer Titel wird nie gespeichert (Schlechtfall).
+- **F32** `parlwin/src/js/tests/vorstoss-dialog-widgets.test.js` › eigener Vorstoss: Art über BeschlussWidget, Zuständigkeit über PwMultiSelect, Inhalt über PwWysiwyg — der eigene Vorstoss nutzt die gemeinsamen Widgets.
+- **F32** `parlwin/src/js/tests/vorstoss-dialog-widgets.test.js` › fremder Vorstoss: zusätzlich Fremd-Beschluss (BeschlussWidget) und Ansprechpartner (PwMultiSelect) — der fremde Vorstoss zeigt zusätzlich Haltung und Ansprechpartner.
+- **F10, F32** `parlwin/src/js/tests/vorstoss-dialog-widgets.test.js` › Herkunftsfraktion schliesst die eigene Fraktion aus — die Herkunftsfraktion schliesst die eigene aus.
+- **F10, F32** `parlwin/src/js/tests/vorstoss-dialog-widgets.test.js` › Ansprechpartner-Optionen sind die Mitglieder der gewählten fremden Fraktion — die Ansprechpartner sind Mitglieder der gewählten Fraktion.
+- **F10, F32** `parlwin/src/js/tests/vorstoss-defaults.test.js` › Herkunft listet nur aktive Fraktionen (ohne die eigene) — die Herkunft listet nur aktive Fraktionen ohne die eigene.
+- **F10, F32** `parlwin/src/js/tests/vorstoss-defaults.test.js` › Ansprechpartner listet nur aktive Mitglieder der gewählten Fraktion — der Ansprechpartner listet nur aktive Mitglieder der gewählten Fraktion.
+- **F32** `parlwin/src/js/tests/vorstoss-notizen-verknuepfung.test.js` › bindet die geteilte NotizenListe mit der Vorstoss-basisUrl und den Aktionen ein — der Vorstoss bindet die geteilte NotizenListe mit seiner basisUrl ein.
+- **F32** `parlwin/src/js/tests/vorstoss-notizen-verknuepfung.test.js` › rendert die reale NotizenListe mit «+ Neue Notiz» im geöffneten Vorstoss-Dialog — der Dialog rendert die reale NotizenListe.
+- **F32** `parlwin/src/js/tests/vorstoss-notizen-verknuepfung.test.js` › übernimmt die von NotizenListe gemeldete Liste in bearbeitung.aktionen — die gemeldete Notiz-Liste landet in `bearbeitung.aktionen`.
+- **F32** `parlwin/src/js/tests/notizen-geteilte-komponente.test.js` › Vorstoesseliste importiert und verwendet NotizenListe — der Vorstoss nutzt die geteilte NotizenListe.
+- **F32** `parlwin/src/js/tests/notizen-geteilte-komponente.test.js` › Vorstoesseliste enthält keinen eigenen Notiz-Editor mehr — der Vorstoss hat keinen eigenen Notiz-Editor.
+- **F33** `parlwin/src/js/tests/vorstoss-notizen-verknuepfung.test.js` › verknüpft den Vorstoss mit einem gewählten Geschäft — das Verknüpfen wählt ein Geschäft aus.
+- **F33** `parlwin/src/js/tests/vorstoss-notizen-verknuepfung.test.js` › sortiert Geschäfte nach Titel-Ähnlichkeit, bei Gleichstand neueste zuerst — die Geschäftsliste sortiert nach Titel-Ähnlichkeit, bei Gleichstand neueste zuerst.
+- **F35** `parlwin/src/js/tests/aktionszeitleiste-geteilt.test.js` › Vorstoesseliste importiert und verwendet Aktionszeitleiste — der Vorstoss nutzt die geteilte Aktionszeitleiste.
+- **F36** `parlwin/src/js/tests/sitzung-verknuepfen.test.js` › listet zukünftige Sitzungen zuerst (aufsteigend), dann vergangene (absteigend) — die Reihenfolge ist zukünftige aufsteigend, dann vergangene absteigend.
+- **F37** `parlwin/src/js/tests/sitzung-datum.test.js` › setzt beim Öffnen das Datum auf heute + 1 Woche — das neue Sitzungsdatum ist heute + 1 Woche vorbelegt.
+- **F37** `parlwin/src/js/tests/neue-sitzung-button.test.js` › Header enthält ein NcActions-Menü «+ Neue Sitzung» — der Kopf zeigt «+ Neue Sitzung» als Aktionsmenü im Nextcloud-Standard.
+- **F37** `parlwin/src/js/tests/neue-sitzung-button.test.js` › bietet je einen Menüeintrag pro Sitzungstyp — jeder Sitzungstyp erscheint als eigener Eintrag im Menü.
+- **F37** `parlwin/src/js/tests/neue-sitzung-button.test.js` › weist ohne Sitzungstyp im Menü darauf hin, statt es leer zu lassen — ohne angelegten Sitzungstyp zeigt das Menü einen Hinweis statt einer leeren Liste (Leerfall).
+- **F37** `parlwin/src/js/tests/neue-sitzung-button.test.js` › hat keinen eigenen Auswahl-Dialog vor dem Formular — vor dem Formular erscheint kein zusätzlicher Auswahl-Dialog.
+- **F37** `parlwin/src/js/tests/neue-sitzung-button.test.js` › ein Menüeintrag öffnet direkt das Formular für genau diesen Typ — der gewählte Menüeintrag startet unmittelbar das Formular seines Typs.
+- **F37** `parlwin/src/js/tests/neue-sitzung-button.test.js` › das Formular übernimmt die Vorgaben des gewählten Sitzungstyps — Titel, Ort, Zeit und Zweck werden aus dem gewählten Typ vorbelegt.
+- **F37** `parlwin/src/js/tests/sitzung-button.test.js` › jeder Sitzungstyp erscheint als eigener Menüeintrag — bei mehreren Sitzungstypen erhält jeder einen eigenen Menüeintrag.
+- **F37** `parlwin/src/js/tests/sitzung-button.test.js` › ein Menüeintrag startet direkt das Formular für seinen Typ — ein Klick auf einen Menüeintrag startet direkt das Formular für diesen Typ.
+- **F38** `parlwin/src/js/tests/SitzungNotizen.test.js` › nutzt einen PwWysiwyg-Editor (kein einfaches input) für neue Notizen — neue Traktandum-Notizen nutzen den WYSIWYG-Editor.
+- **F38** `parlwin/src/js/tests/SitzungNotizen.test.js` › hat keinen + Button im Template — die Komponente hat keinen +-Knopf.
+- **F38** `parlwin/src/js/tests/SitzungNotizen.test.js` › emittiert update:modelValue bei blur mit Text — Blur mit Text emittiert das Update.
+- **F38** `parlwin/src/js/tests/SitzungNotizen.test.js` › emittiert nichts bei blur mit leerem Feld — Blur mit leerem Feld emittiert nichts (Leerfall).
+- **F38** `parlwin/src/js/tests/SitzungNotizen.test.js` › leert das Eingabefeld nach Blur-Speicherung — nach der Blur-Speicherung leert das Feld.
+- **F38** `parlwin/src/js/tests/SitzungNotizen.test.js` › speichert nach 5 Sekunden ohne weiteren Input — der Debounce speichert nach 5s.
+- **F38** `parlwin/src/js/tests/SitzungNotizen.test.js` › bricht den Timer ab wenn Blur früher kommt — ein früher Blur bricht den Timer ab.
+- **F38** `parlwin/src/js/tests/SitzungNotizen.test.js` › öffnet Bearbeitungsmodus bei Klick auf eigene Notiz — ein Klick auf die eigene Notiz öffnet den Bearbeitungsmodus.
+- **F38** `parlwin/src/js/tests/SitzungNotizen.test.js` › emittiert geänderten Text bei ✓ — ✓ emittiert den geänderten Text.
+- **F38** `parlwin/src/js/tests/SitzungNotizen.test.js` › emittiert Liste ohne Eintrag bei Löschen — Löschen emittiert die Liste ohne den Eintrag.
+- **F38** `parlwin/src/js/tests/geschaeft-verlink.test.js` › lädt die verknüpften Geschäft-IDs — die verknüpften Geschäft-IDs werden geladen.
+- **F38** `parlwin/src/js/tests/geschaeft-verlink.test.js` › verlinkt ein Geschäft und übernimmt die neue Liste — ein Geschäft wird verlinkt, die Liste übernommen.
+- **F38** `parlwin/src/js/tests/geschaeft-verlink.test.js` › blendet bereits verknüpfte Geschäfte aus den Auswahl-Optionen aus — bereits verknüpfte Geschäfte fehlen in den Optionen.
+- **F38, F50** `parlwin/src/js/tests/sitzung-todo.test.js` › sendet das To-do an den Deck-Endpunkt der Sitzung — das To-do geht an den Deck-Endpunkt.
+- **F38** `parlwin/src/js/tests/sitzung-todo.test.js` › sendet nichts bei leerem To-do-Text — leerer Text sendet nichts (Schlechtfall).
+- **F38** `parlwin/src/js/tests/sitzung-todo.test.js` › leert das Eingabefeld nach erfolgreichem Senden — nach dem Senden leert das Feld.
+- **F40** `parlwin/src/js/tests/sitzung-verknuepfen.test.js` › verknüpft nach dem Erstellen, wenn eine Zielsitzung gewählt ist — bei gewählter Zielsitzung wird nach dem Erstellen verknüpft.
+- **F40** `parlwin/src/js/tests/sitzung-verknuepfen.test.js` › verknüpft NICHT, wenn keine Zielsitzung gewählt ist — ohne Zielsitzung wird nicht verknüpft (Schlechtfall).
+- **F40** `parlwin/src/js/tests/sitzung-aggregiert.test.js` › zeigt im readonly-Modus kein Eingabefeld — readonly-Notizen zeigen kein Eingabefeld.
+- **F40** `parlwin/src/js/tests/sitzung-aggregiert.test.js` › zeigt ohne readonly ein Eingabefeld — ohne readonly erscheint ein Eingabefeld.
+- **F40** `parlwin/src/js/tests/sitzung-aggregiert.test.js` › lädt die verknüpften Sitzungen und filtert die Sitzung selbst heraus — die verknüpften Sitzungen werden geladen, die eigene herausgefiltert.
+- **F40** `parlwin/src/js/tests/sitzung-aggregiert.test.js` › lädt nichts, wenn die Sitzung nicht verknüpft ist — ohne Verknüpfung wird nichts geladen (Leerfall).
+- **F7, F42** `parlwin/src/js/tests/sitzungstyp-sofort-speichern.test.js` › Bearbeitungs-Dialog hat KEINE Abbrechen/Speichern-Buttons (kein Modal-Footer) — der Sitzungstyp-Dialog hat keinen Modal-Footer.
+- **F7, F42** `parlwin/src/js/tests/sitzungstyp-sofort-speichern.test.js` › eine Feldänderung speichert sofort per PUT — jede Feldänderung speichert sofort.
+- **F42** `parlwin/src/js/tests/sitzungstyp-sofort-speichern.test.js` › ein leerer Name wird nie weggespeichert — ein leerer Name wird nie gespeichert (Schlechtfall).
+- **F43** `parlwin/src/js/tests/sitzungstyp-sofort-speichern.test.js` › die Optionen-Checkbox «Verknüpfung» ist über update:model-value wählbar — die Verknüpfungs-Checkbox ist über `update:model-value` wählbar.
+- **F42, F43** `parlwin/src/js/tests/sitzungstyp-sofort-speichern.test.js` › beide Checkboxen binden über model-value (nicht die tote :checked-API) — beide Checkboxen binden über `model-value`.
+- **F37, F42** `parlwin/src/js/tests/sitzungstyp-sofort-speichern.test.js` › toggleEigeneFraktion ergänzt bzw. entfernt die Eigene-Fraktion-Regel — der Schalter ergänzt/entfernt die Eigene-Fraktion-Regel.
+- **F8, F42** `parlwin/src/js/tests/sitzungstyp-sofort-speichern.test.js` › Neu-Anlegen öffnet dieselbe Maske und legt noch nichts an — der Neu-Knopf öffnet die vollständige Maske, ohne etwas anzulegen.
+- **F8, F42** `parlwin/src/js/tests/sitzungstyp-sofort-speichern.test.js` › erst «Speichern» legt den Sitzungstyp an und öffnet die Bearbeitung — erst der Speichern-Klick legt an, danach zeigt dieselbe Maske die Bearbeitung (Gutfall).
+- **F8, F42** `parlwin/src/js/tests/sitzungstyp-sofort-speichern.test.js` › «Abbrechen» verwirft, ein Klick daneben nicht — nur «Abbrechen» verwirft die Eingaben, ein Klick neben die Maske tut nichts (Schlechtfall).
+- **F45** `parlwin/src/js/tests/Mitgliederliste.test.js` › sortiert standardmässig: Fraktionspräsident, Stellvertreter, Kommissionspräsident, Kommissionsmitglied, Rest — die Standard-Sortierung folgt der Funktionsrangfolge.
+- **F45** `parlwin/src/js/tests/Mitgliederliste.test.js` › sortiert den Rest (gleiche Funktionsstufe) nach Partei, dann Name — gleiche Funktionsstufe wird nach Partei, dann Name sortiert.
+- **F45** `parlwin/src/js/tests/Mitgliederliste.test.js` › sortiert nach Name, wenn sortierModus = name — der Name-Modus sortiert nach Name.
+- **F45** `parlwin/src/js/tests/Mitgliederliste.test.js` › sortiert nach Familienname (name), nicht nach Vorname — der Name-Modus sortiert nach Familienname.
+- **F45** `parlwin/src/js/tests/Mitgliederliste.test.js` › sortiert nach Partei, wenn sortierModus = partei — der Partei-Modus sortiert nach Partei.
+- **F45** `parlwin/src/js/tests/Mitgliederliste.test.js` › bietet die Sortier-Optionen Funktion, Fraktion, Partei, Name — die Sortier-Optionen sind vollständig.
+- **F45** `parlwin/src/js/tests/Mitgliederliste.test.js` › bietet die Optionen Alle, Fraktionspräsident, Kommissionspräsident — die Funktions-Filter-Optionen sind vollständig.
+- **F45** `parlwin/src/js/tests/Mitgliederliste.test.js` › zeigt mit Funktion=Fraktionspräsident nur Fraktionspräsidenten (nicht Stellvertreter) — der Filter zeigt nur Fraktionspräsidenten.
+- **F45** `parlwin/src/js/tests/Mitgliederliste.test.js` › zeigt mit Funktion=Kommissionspräsident nur Kommissionspräsidenten — der Filter zeigt nur Kommissionspräsidenten.
+- **F45** `parlwin/src/js/tests/Mitgliederliste.test.js` › zeigt mit Kommissions-Filter nur Mitglieder dieser Kommission — der Kommissions-Filter grenzt auf deren Mitglieder ein.
+- **F46** `parlwin/src/js/tests/Kommissionsliste.test.js` › schliesst das Popup NICHT nach dem Speichern — das Geschäfts-Popup bleibt nach dem Speichern offen.
+- **F46** `parlwin/src/js/tests/Kommissionsliste.test.js` › ruft ladeGeschaefte auf — das Speichern lädt die Geschäfte neu.
+- **F46** `parlwin/src/js/tests/Kommissionsliste.test.js` › emittiert aktualisiert — die Komponente emittiert das Aktualisiert-Ereignis.
+- **F46** `parlwin/src/js/tests/Kommissionsliste.test.js` › setzt ausgewaehlteGeschaeftId auf null — das Schliessen setzt die Auswahl zurück.
+- **F53** `parlwin/src/js/tests/geschaeft-realtime.test.js` › behält die Objekt-Referenz bestehender Geschäfte beim Neuladen — das In-place-Update behält bestehende Objekt-Referenzen (kein DOM-Rebuild).
+- **F53** `parlwin/src/js/tests/geschaeft-realtime.test.js` › ergänzt neue und entfernt verschwundene Geschäfte — neue Geschäfte werden ergänzt, verschwundene entfernt.
+- **F53** `parlwin/src/js/tests/sitzung-realtime.test.js` › behält die Objekt-Referenz bestehender Sitzungen beim Neuladen — das In-place-Update behält bestehende Sitzungs-Referenzen.
+- **F53** `parlwin/src/js/tests/sitzung-realtime.test.js` › ergänzt neue und entfernt verschwundene Sitzungen — neue Sitzungen werden ergänzt, verschwundene entfernt.
+- **F53** `parlwin/src/js/tests/realtime.test.js` › connects to /ws/parlwin/ — nginx generic convention — die WS-Bridge verbindet auf den korrekten Pfad.
+- **F53** `parlwin/src/js/tests/realtime.test.js` › does NOT connect to /parlwin/ws (old wrong path) — der alte falsche Pfad wird nicht verwendet (Schlechtfall).
+- **F53** `parlwin/src/js/tests/realtime.test.js` › uses wss:// on https pages — auf HTTPS-Seiten wird `wss://` genutzt.
+- **F53** `parlwin/src/js/tests/realtime.test.js` › uses configured realtimeWsUrl when set — eine konfigurierte WS-URL wird verwendet.
+- **F53** `parlwin/src/js/tests/realtime.test.js` › includes webroot in default URL — die Default-URL enthält den Webroot.
+- **F53, F54** `parlwin/src/js/tests/realtime.test.js` › calls handler when parlwin:realtime-event fires — der Handler wird bei einem Realtime-Event aufgerufen.
+- **F53** `parlwin/src/js/tests/realtime.test.js` › returns unsubscribe function that removes listener — die Abmelde-Funktion entfernt den Listener.
+- **F53** `parlwin/src/js/tests/realtime.test.js` › passes empty object when event has no detail — ohne Detail wird ein leeres Objekt übergeben (Randfall).
+- **F60** `parlwin/src/js/tests/sync-zeitplan-admin.test.js` › die Admin-Seite enthält den Zeitplan-Bereich (Liste + Hinzufügen) — die Admin-Seite zeigt den Zeitplan-Bereich.
+- **F60** `parlwin/src/js/tests/sync-zeitplan-admin.test.js` › lädt den gespeicherten Zeitplan und rendert Wochentage als Checkboxen und die Uhrzeit — der gespeicherte Zeitplan wird als Checkboxen und Uhrzeit gerendert.
+- **F60** `parlwin/src/js/tests/sync-zeitplan-admin.test.js` › der Wochentag steht senkrecht zur Checkbox (Spalten-Layout, nicht daneben) — Wochentag und Checkbox stehen im Spalten-Layout.
+- **F60** `parlwin/src/js/tests/sync-zeitplan-admin.test.js` › liest den Zeitplan aus den Eingabezeilen (nur vollständige Einträge) — nur vollständige Zeilen werden gelesen (Schlechtfall unvollständig).
+- **F63** `parlwin/src/js/tests/kuerzel-ueberall.test.js` › Kürzel-Verwaltung schlägt Status, aktuelle Fraktions- und Parteinamen vor — die Kürzel-Verwaltung schlägt bestehende Werte vor.
+- **F64** `parlwin/src/js/tests/changelog.test.js` › parst Version und Einträge aus dem Changelog — der Changelog wird in Version und Einträge geparst.
+- **F64** `parlwin/src/js/tests/changelog.test.js` › rendert die Einträge als formatiertes Markdown (Liste + fett) — die Einträge rendern als formatiertes Markdown.
+- **F64** `parlwin/src/js/tests/changelog.test.js` › klappt Versionen wie eine Handorgel auf und zu — Versionen klappen wie eine Handorgel auf und zu.
+- **F64** `parlwin/src/js/tests/changelog-minor-offen.test.js` › klappt jeden Eintrag der aktuellen Minor-Version auf — die aktuelle Minor-Version ist aufgeklappt.
+- **F64** `parlwin/src/js/tests/changelog-minor-offen.test.js` › lässt ältere Minor-Versionen zugeklappt — ältere Minor-Versionen bleiben zugeklappt.
+
+## Modul-/Unit-Tests — Backend (PHPUnit)
+
+PHP-AppFramework-Services, Mapper, Controller und Commands (ein Eintrag je Testklasse,
+mit den wesentlichen Methoden). Die Live-Gruppe läuft gegen echte Endpunkte.
+
+- **F1, F2** `parlwin/tests/Service/GeschaeftServiceTest.php` — Sync-Verhalten: meldet Fortschritt beim Laden der Detailseiten, speichert unnummerierten Vorstoss als Entwurf, harmonisiert DB-Id mit extern_id, überspringt bereits erledigte, stellt gelöschtes/abgeschlossenes Geschäft wieder her (Gut-/Randfälle).
+- **F1, F44** `parlwin/tests/Service/MitgliedServiceTest.php` — übernimmt den Aktivstatus aus den Importdaten und stellt ein gelöschtes Mitglied wieder her.
+- **F1** `parlwin/tests/Service/ScraperHtmlSyncTest.php` — lädt Geschäfte/Sitzungen/Traktanden/Mitglieder/Kommissionen/Fraktionen aus lokalen HTML-Fixtures und extrahiert mehrstufige Motion-/Postulat-Details; HTTP-Fehler → leeres Array (Schlechtfall).
+- **F1** `parlwin/tests/Service/ScraperLiveEndpointTest.php` — Live-Gruppe: die realen Endpunkte für Geschäfte/Sitzungen/Mitglieder/Kommissionen/Fraktionen liefern parsebares `data-entities`; Geschäfts-Link führt zu Detailwerten, Sitzungs-Detail zu Traktanden.
+- **F1** `parlwin/tests/Service/ScraperServiceTest.php` — Extraktion aus `data-entities` (einfach/mehrere/leer/ungültig), Link-/Detail-Extraktion, Einreicher HTML-dekodiert, zweiphasiger Fortschritt, Traktanden aus der Tabelle, Entgenderung.
+- **F2, F37** `parlwin/tests/Db/SitzungMapperInternSchutzTest.php` — die Sync-Abfragen schützen interne Sitzungen vor Überschreiben.
+- **F26** `parlwin/tests/Templates/VotumPdfSicherheitTest.php` — die ausgelieferte Druckansicht wird gerendert und geprüft: Ereignis-Handler (auch mit Schrägstrich statt Leerzeichen davor), Skript-Inhalte und Verweise mit javascript-Schema verschwinden, während Fett-/Kursivschrift, Aufzählungen, Umlaute, zulässige Verweise und der Hinweis auf ein leeres Votum erhalten bleiben (Gut-/Schlecht-/Leerfall).
+- **F3, F58, F61, F63** `parlwin/tests/Controller/SettingsControllerTest.php` — `run` hängt bei aktivem Lock an den laufenden Sync an; Status zeigt «läuft» auch bei Idle-Status; lehnt unbekannte/inaktive Fraktion ab (Schlechtfälle); Mitglieder-Mapping mit Username/lokalen Gruppen; Provision legt User an und verarbeitet nur selektierte Orphans; verwaiste NC-User; Status-Kürzel-Roundtrip und Migration der alten Map-Form.
+- **F3** `parlwin/tests/Command/SyncCancelCommandTest.php` — setzt das Cancel-Flag bei laufendem Sync und setzt es ohne laufenden Sync zurück (Gut-/Leerfall).
+- **F3** `parlwin/tests/Command/SyncCommandTest.php` — der zweite Start wird angehängt, Fortschrittsevents werden publiziert, ein Abbruchsignal beendet sauber, Worker-PID wird gesetzt und gelöscht.
+- **F3** `parlwin/tests/Service/SyncLockServiceTest.php` — acquire/release/probe und dass ein zweiter Lock nicht parallel erworben werden kann (Schlechtfall).
+- **F3** `parlwin/tests/Service/SyncProcessServiceTest.php` — `ensureStopped` ist ohne Lock sofort fertig, stoppt graceful ohne Signal, signalisiert TERM und fällt auf KILL zurück.
+- **F3** `parlwin/tests/Docker/WatcherAbortTest.php` — das Signal-Ziel fällt auf PID 1 zurück, bevorzugt den echten Parent und nutzt numerische POSIX-Werte.
+- **F13** `parlwin/tests/Search/GeschaeftSearchProviderTest.php` — Suche liefert Treffer mit Nummer/Titel/App-Link; leerer Suchbegriff liefert keine Treffer (Leerfall); ein Datenbankfehler liefert ein leeres Resultat statt Absturz (Schlechtfall).
+- **F14** `parlwin/tests/Db/GeschaeftMapperTest.php` — `mapRowToEntity` toleriert NULL-Spalten aus der Datenbank (Randfall/NULL).
+- **F16, F18, F20, F65, F66, F68** `parlwin/tests/Controller/GeschaeftControllerTest.php` — blendet erledigte standardmässig aus, zeigt sie bei `show_erledigt`, filtert nach Status/Priorität, `create` vergibt eine explizite Id, `setPrioritaet` speichert und publiziert bzw. lehnt ungültige Werte ab; die Stammdaten eines eigenen Geschäfts werden gespeichert, bei einem Geschäft von der Webseite dagegen abgelehnt, ein ungültiges Datum wird zurückgewiesen, ein eigenes Geschäft lässt sich löschen und ein Geschäft von der Webseite nicht (Gut- und Schlechtfälle).
+- **F17, F20** `parlwin/tests/Db/GeschaeftPrioritaetTest.php` — `jsonSerialize` enthält die gesetzte Priorität, der Default ist leer.
+- **F22, F56** `parlwin/tests/Service/FraktionsarbeitServiceTest.php` — Gültigkeit normalisiert Tagesgrenzen und lehnt Ende-vor-Beginn/Unlesbares ab (Schlechtfälle); Zuständigkeiten-Text «Von→Nach»; Beschluss-Aktualisieren ersetzt Freitext, setzt Code/Label und verweigert fremden Autor/falschen Typ.
+- **F22** `parlwin/tests/Service/GeschaeftWorkflowTest.php` — bekannte Kategorien werden kanonisch gemappt, unbekannte fallen auf den Default zurück; Motion mehrstufig, Postulat mit Nachbericht, erledigt ergänzt Kenntnisnahme.
+- **F23** `parlwin/tests/Service/FraktionsstatusTest.php` — ohne Beschluss «offen», nach externer Aktualisierung «neu zu entscheiden», sonst «entschieden».
+- **F24** `parlwin/tests/Service/NotizRevisionenTest.php` — Bearbeiten archiviert den bisherigen Text, Zwischenspeichern erzeugt keine Revision, Tippen+Abschliessen genau eine; Löschen setzt nur das Flag, Wiederherstellen nur durch den Autor (Schlechtfall).
+- **F25** `parlwin/tests/Service/SitzungsnotizTest.php` — eine Sitzungsnotiz wird mit eigener Kategorie am Geschäft gespeichert, bleibt von den normalen Notizen getrennt und trägt den Titel «Sitzungsnotiz».
+- **F30, F32, F33** `parlwin/tests/Controller/VorstossControllerTest.php` — `create` weist einen leeren Titel mit 400 ab und liefert sonst 201 mit dem Vorstoss, `update` 404 wenn nicht gefunden, `addNotiz` 400 ohne Text, `verknuepfen` 400 ohne Geschäft bzw. schliesst ab (Gut-/Schlechtfälle).
+- **F30, F32, F33** `parlwin/tests/Service/VorstossServiceTest.php` — `erstelle` übernimmt Felder und setzt die Zeit, nur-Titel setzt alle Spalten dirty, normalisiert ungültige Werte, löschen setzt geloescht; Notiz delegiert an den geteilten Service; verknüpfen schliesst ab und übernimmt die Priorität.
+- **F30, F32** `parlwin/tests/Db/VorstossTest.php` — `jsonSerialize` liefert Listen/Herkunftsfraktion, Legacy-String-Zuständigkeit wird zur Liste, ist `JsonSerializable`, `json_encode` liefert alle Felder; NULL-Notizen/-Listenfelder/-Textfelder aus der DB brechen nicht (Randfall/NULL).
+- **F32** `parlwin/tests/Service/VorstossNotizenTest.php` — Notiz als Vorstoss-Aktion; Bearbeiten archiviert eine Version wie beim Geschäft; Zwischenspeichern erzeugt keine Version; Löschen ist Soft-Delete mit Undo; nur der Autor darf bearbeiten (Schlechtfall); Liste liefert aktive und gelöschte.
+- **F34** `parlwin/tests/Service/VorstossImportServiceTest.php` — Titel aus dem Dateinamen (Endung entfernt); Import legt ein neues Dokument als eigenen Vorstoss an, setzt alle Spalten dirty und überspringt bereits Importierte (keine Duplikate).
+- **F37, F38** `parlwin/tests/Controller/SitzungControllerTest.php` — To-do 201 bzw. 400 ohne Titel / ohne Deck (Schlechtfälle); `create` 201, 400 ohne TypId/Datum, 404 wenn Typ nicht gefunden; `index` liest Limit/Offset.
+- **F37, F42** `parlwin/tests/Service/SitzungstypServiceTest.php` — Speichern übernimmt Kommissionen; `erstelleAusTyp` speichert korrekte Felder, nutzt Vorlagenwerte als Fallback, speichert Traktanden und ruft den KalenderService je nach Konfiguration.
+- **F38** `parlwin/tests/Controller/TraktandumControllerTest.php` — `update` speichert Bemerkungen, Notizen ohne Bemerkungen und beides gleichzeitig.
+- **F40** `parlwin/tests/Service/SitzungVerknuepfungTest.php` — Verknüpfen setzt eine gemeinsame Gruppe bzw. nutzt die der Zielsitzung; Entkoppeln setzt die Gruppe auf null; verknüpfte Sitzungen liefern ihre Gruppe bzw. nur sich selbst (Leerfall).
+- **F42** `parlwin/tests/Db/SitzungstypNullToleranzTest.php` — NULL-Kommissionen aus der Datenbank werfen keinen Fehler, gültige Kommissionen bleiben erhalten (Randfall/NULL).
+- **F43** `parlwin/tests/Service/KommissionsVerknuepfungServiceTest.php` — Geschäfte einer Kommission matchen über Status und Tokens; ein Status ohne Kommission wird ignoriert (Randfall).
+- **F48** `parlwin/tests/Service/FraktionsraumMigrationTest.php` — die Live-Struktur wird vollständig migriert; eine abgebrochene Migration hinterlässt keine Altlast (Schlechtfall).
+- **F48, F49** `parlwin/tests/Service/FraktionsraumServiceTest.php` — `sicherstellen` legt die Ordnerstruktur an, verschiebt alte Ordner auf neue Namen, legt nicht doppelt an, teilt mit der Gruppe; tut nichts ohne Gruppe bzw. wenn die Gruppe nicht existiert (Schlechtfälle).
+- **F50** `parlwin/tests/Service/DeckServiceTest.php` — erstellt die To-do-Karte im ersten Stack (keine ohne Titel), erstellt und teilt das Board mit der Gruppe, nutzt ein vorhandenes Board, teilt nicht doppelt; inaktiv ohne Deck-App bzw. ohne Gruppe (Schlechtfälle).
+- **F53, F54** `parlwin/tests/Service/RealtimePublisherServiceTest.php` — `publish` mit AppConfig-URL und Secret, Umgebungsvariablen haben Vorrang, Default-Publish-URL wenn nichts konfiguriert ist.
+- **F60** `parlwin/tests/BackgroundJob/SyncJobTest.php` — der Zeitplan-Pfad läuft im Fenster und nicht ausserhalb; die erste Prüfung initialisiert ohne Lauf; ohne Zeitplan gilt der Standard 10:00/18:00.
+- **F60** `parlwin/tests/Service/SyncZeitplanTest.php` — `parse` normalisiert Gültiges und verwirft Ungültiges; fällig im Fenster und über Mitternacht; leerer Plan ist nie fällig (Leerfall); Standard sind zwei Einträge 10:00/18:00, `mitStandard` greift nur bei leerem Plan.

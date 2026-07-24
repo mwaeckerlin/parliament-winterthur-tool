@@ -1355,14 +1355,32 @@ class SettingsController extends Controller
 
     private function starteSyncImHintergrund(): bool
     {
-        // Der Sync läuft im aktuellen FPM-Worker weiter, NACHDEM die HTTP-Antwort an
-        // den Browser geschickt wurde (fastcgi_finish_request). Damit erbt der Sync
-        // automatisch fd1/fd2 des FPM-Workers; in Kombination mit
-        // `catch_workers_output=yes` in der Pool-Config landen alle Ausgaben (stdout
-        // und stderr, inkl. error_log()) im docker-logs-Stream. Ein separat per
-        // proc_open gestarteter Child-Prozess würde demgegenüber stdout/stderr auf
-        // /dev/null abgleiten lassen, weil PHP-FPM die Worker-Pipes nicht an Kinder
-        // weiterreicht. Singleton wird über SyncLockService garantiert.
+        // Der Sync MUSS in einem eigenständigen Prozess laufen: Ein im FPM-Worker
+        // weiterlaufender Sync (fastcgi_finish_request + Shutdown-Handler) gilt für
+        // PHP-FPM als *idle*, obwohl er noch arbeitet. Beim Abräumen überzähliger
+        // Idle-Worker (pm=dynamic, pm.max_spare_servers) killt FPM ihn mitten im
+        // Lauf — der Sync bricht dann ohne Status-Update ab ("Synchronisationsprozess
+        // nicht mehr aktiv"). Der occ-Prozess wird von init adoptiert und ist von
+        // FPMs Worker-Verwaltung unabhängig; seine Ausgaben gehen über php://fd/{1,2}
+        // trotzdem in den docker-logs-Stream. Singleton garantiert der SyncLockService.
+        if ($this->starteSyncUeberOccProzess()) {
+            return true;
+        }
+
+        error_log(
+            '[parlwin] sync-worker: eigenständiger Prozess nicht startbar (proc_open gesperrt?) — '
+            . 'Rückfall auf den FPM-Worker; lange Synchronisationen können dort von PHP-FPM abgebrochen werden'
+        );
+
+        return $this->starteSyncImFpmWorker();
+    }
+
+    /**
+     * Notnagel, falls kein eigener Prozess gestartet werden kann (z.B. proc_open gesperrt).
+     * Unzuverlässig für lange Läufe — siehe starteSyncImHintergrund().
+     */
+    private function starteSyncImFpmWorker(): bool
+    {
         @ignore_user_abort(true);
         @set_time_limit(0);
 
@@ -2032,6 +2050,35 @@ class SettingsController extends Controller
         }
         $bereinigt = self::normalisiereStatusKuerzel($body);
         $this->config->setAppValue(Application::APP_ID, 'status_kuerzel', json_encode($bereinigt));
+        return new DataResponse($bereinigt);
+    }
+
+    /**
+     * Gibt den Zeitplan der automatischen Synchronisation zurück.
+     * Format: [{tage: [1..7], zeit: "HH:MM"}] (1 = Montag … 7 = Sonntag).
+     */
+    #[AuthorizedAdminSetting(settings: \OCA\ParliamentWinterthur\Settings\AdminSettings::class)]
+    public function getSyncZeitplan(): DataResponse
+    {
+        $raw = $this->config->getAppValue(Application::APP_ID, 'sync_zeitplan', '[]');
+        // Ohne gespeicherten Zeitplan die beiden Standard-Einträge zeigen
+        // (alle Wochentage, 10:00 und 18:00) — der Admin kann sie bearbeiten.
+        return new DataResponse(\OCA\ParliamentWinterthur\Service\SyncZeitplan::mitStandard($raw));
+    }
+
+    /**
+     * Speichert den Zeitplan der automatischen Synchronisation (komplette
+     * Liste ersetzen). Body: { "sync_zeitplan": [ { "tage": [1,3], "zeit": "06:30" }, ... ] }
+     */
+    #[AuthorizedAdminSetting(settings: \OCA\ParliamentWinterthur\Settings\AdminSettings::class)]
+    public function setSyncZeitplan(): DataResponse
+    {
+        $body = $this->request->getParam('sync_zeitplan', []);
+        if (!is_array($body)) {
+            return new DataResponse(['fehler' => 'Ungültiges Format'], Http::STATUS_BAD_REQUEST);
+        }
+        $bereinigt = \OCA\ParliamentWinterthur\Service\SyncZeitplan::parse((string) json_encode($body));
+        $this->config->setAppValue(Application::APP_ID, 'sync_zeitplan', (string) json_encode($bereinigt));
         return new DataResponse($bereinigt);
     }
 

@@ -37,4 +37,20 @@ module.exports = {
     ...(webpackConfig.optimization || {}),
     minimizer: [new TerserPlugin({ extractComments: false })],
   },
+  // WARNING-BEGRUENDUNG (bei jedem Lauf neu pruefen, Review: 2026-10-23):
+  // webpacks Standardbudget von 244 KiB zielt auf Seiten, die ueber langsame
+  // Mobilnetze ausgeliefert werden. Diese App ist eine Nextcloud-Erweiterung:
+  // sie wird aus derselben Instanz geladen wie Nextcloud selbst und bringt
+  // zwingend Vue 3, die Nextcloud-Komponentenbibliothek und den Editor mit —
+  // allein diese Abhaengigkeiten liegen weit ueber 244 KiB. Das Budget ist
+  // deshalb nicht erreichbar, ein Nachladen einzelner Teile wuerde es ebenfalls
+  // nicht unterschreiten. Statt die Warnung abzuschalten (das wuerde jede echte
+  // Regression verbergen) steht hier ein realistisches Budget mit gut 10 %
+  // Luft: waechst ein Bundle deutlich, warnt der Build wieder.
+  // Entfernen bzw. senken, sobald die Abhaengigkeiten kleiner werden.
+  performance: {
+    hints: 'warning',
+    maxAssetSize: 2_300_000,
+    maxEntrypointSize: 2_300_000,
+  },
 }

@@ -48,6 +48,20 @@ class VorstossMapper extends QBMapper
      * Findet einen Vorstoss anhand des Dokument-Pfads (für die automatische
      * Übernahme aus dem Ordner «40_Vorstösse» – verhindert Duplikate).
      */
+    /**
+     * @return Vorstoss[] Die mit einem Geschäft verknüpften Vorstösse (neueste zuerst).
+     */
+    public function findByGeschaeft(int $geschaeftId): array
+    {
+        $qb = $this->db->getQueryBuilder();
+        $qb->select('*')
+            ->from($this->getTableName())
+            ->where($qb->expr()->eq('geschaeft_id', $qb->createNamedParameter($geschaeftId, IQueryBuilder::PARAM_INT)))
+            ->andWhere($qb->expr()->eq('geloescht', $qb->createNamedParameter(false, IQueryBuilder::PARAM_BOOL)))
+            ->orderBy('aktualisiert_am', 'DESC');
+        return $this->findEntities($qb);
+    }
+
     public function findByDokument(string $dokument): ?Vorstoss
     {
         $qb = $this->db->getQueryBuilder();

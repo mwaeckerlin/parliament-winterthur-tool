@@ -36,14 +36,14 @@
         <div class="pw-mitglied-kopf">
           <div class="pw-mitglied-kopftext">
             <strong>{{ m.vorname }} {{ m.name }}</strong>
-            <span class="pw-mitglied-partei">{{ m.partei || 'Ohne Partei' }}</span>
+            <span class="pw-mitglied-partei">{{ kuerze(m.partei) || 'Ohne Partei' }}</span>
             <span v-if="fraktionsRolle(m)" class="pw-mitglied-fraktionsrolle">{{ fraktionsRolle(m) }}</span>
           </div>
         </div>
         <div class="pw-mitglied-info">
           <div class="pw-data-pair">
             <span>Fraktion</span>
-            <strong>{{ m.fraktion || '—' }}</strong>
+            <strong>{{ kuerze(m.fraktion) || '—' }}</strong>
           </div>
           <div v-if="kommissionenVon(m).length" class="pw-data-pair pw-mitglied-kommissionen">
             <span>Kommission</span>
@@ -53,7 +53,7 @@
                 :key="idx"
                 class="pw-mitglied-kommission-eintrag"
               >
-                <span class="pw-mitglied-kommission-name">{{ k.name }}</span>
+                <span class="pw-mitglied-kommission-name">{{ kuerze(k.name) }}</span>
                 <span v-if="k.rolle" class="pw-mitglied-kommission-rolle">{{ k.rolle }}</span>
               </span>
             </strong>
@@ -73,6 +73,7 @@ import NcTextField from '@nextcloud/vue/components/NcTextField'
 import NcSelect from '@nextcloud/vue/components/NcSelect'
 import NcCheckboxRadioSwitch from '@nextcloud/vue/components/NcCheckboxRadioSwitch'
 import NcEmptyContent from '@nextcloud/vue/components/NcEmptyContent'
+import { kuerze } from '../utils'
 
 export default {
   name: 'Mitgliederliste',
@@ -102,10 +103,10 @@ export default {
       return [...new Set(this.basisMitglieder.map(m => m.partei).filter(Boolean))].sort()
     },
     fraktionOptions() {
-      return [{ label: 'Alle Fraktionen', value: '' }, ...this.alleFraktionen.map(f => ({ label: f, value: f }))]
+      return [{ label: 'Alle Fraktionen', value: '' }, ...this.alleFraktionen.map(f => ({ label: kuerze(f), value: f }))]
     },
     parteiOptions() {
-      return [{ label: 'Alle Parteien', value: '' }, ...this.alleParteien.map(p => ({ label: p, value: p }))]
+      return [{ label: 'Alle Parteien', value: '' }, ...this.alleParteien.map(p => ({ label: kuerze(p), value: p }))]
     },
     filterFraktionOption: {
       get() { return this.fraktionOptions.find(o => o.value === this.filterFraktion) || this.fraktionOptions[0] },
@@ -135,7 +136,7 @@ export default {
       return [...new Set(namen)].sort((a, b) => a.localeCompare(b, 'de'))
     },
     kommissionOptions() {
-      return [{ label: 'Alle Kommissionen', value: '' }, ...this.alleKommissionen.map(k => ({ label: k, value: k }))]
+      return [{ label: 'Alle Kommissionen', value: '' }, ...this.alleKommissionen.map(k => ({ label: kuerze(k), value: k }))]
     },
     filterKommissionOption: {
       get() { return this.kommissionOptions.find(o => o.value === this.filterKommission) || this.kommissionOptions[0] },
@@ -244,6 +245,7 @@ export default {
     },
   },
   methods: {
+    kuerze,
     parseBehoerdenMitglieder(raw) {
       if (!raw) return []
       let arr

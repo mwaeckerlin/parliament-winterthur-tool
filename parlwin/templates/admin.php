@@ -128,13 +128,26 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
                 </section>
 
                 <section class="pw-admin-card">
-                    <h3><?php p($l->t('Status-Kürzel')); ?></h3>
+                    <h3><?php p($l->t('Automatische Synchronisation')); ?></h3>
                     <p class="settings-hint">
-                        <?php p($l->t('Texte im Status-Pulldown kürzen: Suchtext eingeben (Vorschläge aus bestehenden Status-Werten) und gewünschtes Kürzel definieren. Beide Mapping-Typen möglich:')); ?>
+                        <?php p($l->t('Zeitplan der automatischen Synchronisation: beliebige Einträge mit Wochentagen und Uhrzeit. Ohne Eintrag wird an allen Wochentagen um 10:00 und 18:00 Uhr synchronisiert.')); ?>
+                    </p>
+                    <div id="pw-zeitplan-liste"></div>
+                    <button type="button" id="pw-zeitplan-hinzufuegen" class="button">
+                        <?php p($l->t('+ Zeit hinzufügen')); ?>
+                    </button>
+                    <span id="pw-zeitplan-status" class="pw-sync-status"></span>
+                </section>
+
+                <section class="pw-admin-card">
+                    <h3><?php p($l->t('Kürzel')); ?></h3>
+                    <p class="settings-hint">
+                        <?php p($l->t('Lange Bezeichnungen überall in der App kürzen — gilt für Status, Parteien, Fraktionen und Kommissionen: Suchtext eingeben (Vorschläge aus bestehenden Status-Werten sowie den aktuellen Fraktions- und Parteinamen) und gewünschtes Kürzel definieren. Beispiele:')); ?>
                     </p>
                     <ul class="settings-hint" style="margin-left:1.5rem;list-style:disc">
                         <li><?php p($l->t('Kommissionsname → Kürzel: «Kommission Bildung, Sport und Kultur» → «BSKK»')); ?></li>
                         <li><?php p($l->t('Status-Text → Kurzform: «Bei der Kommission Bildung, Sport und Kultur pendent» → «Pendent: BSKK»')); ?></li>
+                        <li><?php p($l->t('Fraktions- oder Parteiname → Abkürzung: «Sozialdemokratische Partei» → «SP»')); ?></li>
                     </ul>
                     <div id="pw-kuerzel-liste"></div>
                     <datalist id="pw-status-kuerzel-liste"></datalist>

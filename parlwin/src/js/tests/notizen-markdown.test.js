@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { markdownZuHtml } from '../utils'
-import NotizenListe from '../components/NotizenListe.vue'
+import SitzungNotizen from '../components/SitzungNotizen.vue'
 
 describe('markdownZuHtml', () => {
   it('rendert Markdown nach HTML', () => {
@@ -21,9 +21,9 @@ describe('markdownZuHtml', () => {
   })
 })
 
-describe('NotizenListe zeigt Notizen als gerendertes Markdown', () => {
+describe('SitzungNotizen zeigt Notizen als gerendertes Markdown', () => {
   it('rendert eine Markdown-Notiz formatiert (nicht als Rohtext)', () => {
-    const wrapper = mount(NotizenListe, {
+    const wrapper = mount(SitzungNotizen, {
       props: { modelValue: [{ text: '**wichtig**', uid: 'other', displayName: 'Andere' }] },
     })
     const html = wrapper.find('.pw-notiz-text').html()

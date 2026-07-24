@@ -36,11 +36,12 @@ describe('Changelog-Ansicht', () => {
 
   it('klappt Versionen wie eine Handorgel auf und zu', async () => {
     const wrapper = mount(Changelog)
-    // Neueste Version ist standardmässig offen → Eintragsliste sichtbar
-    expect(wrapper.find('.pw-data-card ul').exists()).toBe(true)
-    await wrapper.find('.pw-data-card-header').trigger('click')
-    // Zugeklappt → keine Eintragsliste mehr
-    expect(wrapper.find('.pw-data-card ul').exists()).toBe(false)
+    // Die Karten der aktuellen Minor-Version sind offen; geprüft wird die
+    // angeklickte Karte (andere Karten bleiben unberührt).
+    const karte = wrapper.findAll('.pw-data-card')[0]
+    expect(karte.find('ul').exists()).toBe(true)
+    await karte.find('.pw-data-card-header').trigger('click')
+    expect(karte.find('ul').exists()).toBe(false)
   })
 
   it('App bietet ein Changelog-Tab als unterstes Navigations-Element', () => {

@@ -25,7 +25,7 @@ use OCP\AppFramework\Db\Entity;
  * @method string getErstelltAm()
  * @method string getAktualisiertAm()
  */
-class Sitzung extends Entity
+class Sitzung extends Entity implements \JsonSerializable
 {
     /** @var ?string ID auf der Parlamentswebseite (NULL für interne Sitzungen) */
     protected ?string $externId = null;

@@ -9,6 +9,35 @@ export COMPOSE_FILE="${ROOT_DIR}/docker-compose.yml:${ROOT_DIR}/tests/e2e/docker
 export NEXTCLOUD_DB_PASSWORD="${NEXTCLOUD_DB_PASSWORD:-parlwin_db_local_ChangeMe_2026}"
 export NEXTCLOUD_ADMIN_PASSWORD="${NEXTCLOUD_ADMIN_PASSWORD:-parlwin_admin_local_ChangeMe_2026}"
 export NEXTCLOUD_HTTP_PORT="${NEXTCLOUD_HTTP_PORT:-29824}"
+
+# Der Testlauf darf nie an einem belegten Host-Port scheitern und nie eine
+# laufende Entwicklungs- oder Testinstanz verdrängen: ist der gewünschte Port
+# belegt, wird der nächste freie genommen. Der Stack spricht intern ohnehin über
+# Container-Namen, der Host-Port dient nur dem Blick von aussen.
+port_belegt() {
+  (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null || return 1
+  exec 3<&-
+  return 0
+}
+if port_belegt "$NEXTCLOUD_HTTP_PORT"; then
+  urspruenglicher_port="$NEXTCLOUD_HTTP_PORT"
+  freier_port=""
+  kandidat=$((urspruenglicher_port + 1))
+  grenze=$((urspruenglicher_port + 50))
+  while [ "$kandidat" -le "$grenze" ]; do
+    if ! port_belegt "$kandidat"; then
+      freier_port="$kandidat"
+      break
+    fi
+    kandidat=$((kandidat + 1))
+  done
+  [ -n "$freier_port" ] || {
+    echo "[E2E] Kein freier Host-Port zwischen ${urspruenglicher_port} und ${grenze} gefunden" >&2
+    exit 1
+  }
+  export NEXTCLOUD_HTTP_PORT="$freier_port"
+  echo "[E2E] Host-Port ${urspruenglicher_port} ist belegt — der Testlauf nutzt ${NEXTCLOUD_HTTP_PORT}"
+fi
 export HOST="${HOST:-nextcloud-nginx:8080}"
 export PROTOCOL="${PROTOCOL:-http}"
 # Frontend-WS-URL: muss vom BROWSER erreichbar sein, nicht der interne Broker-Host.
@@ -39,6 +68,9 @@ trap cleanup EXIT
 
 fail() {
   echo "E2E FEHLER: $1" >&2
+  # Server-Log zur Ursache mitliefern (z.B. die Exception hinter einem 500).
+  echo "[E2E] Diagnose: php-fpm-Log (letzte 60 Zeilen)" >&2
+  docker compose logs --tail 60 nextcloud-php-fpm >&2 || true
   exit 1
 }
 
@@ -73,6 +105,23 @@ assert_json() {
   local msg="$2"
   if ! jq -e "$jq_expr" <<<"$LAST_BODY" >/dev/null 2>&1; then
     fail "$msg; Antwort: $LAST_BODY"
+  fi
+}
+
+# Für Antworten, die kein JSON sind (z.B. die Druckansicht des Votums).
+assert_body_contains() {
+  local needle="$1"
+  local msg="$2"
+  if [[ "$LAST_BODY" != *"$needle"* ]]; then
+    fail "$msg (erwartet: «$needle»)"
+  fi
+}
+
+assert_body_not_contains() {
+  local needle="$1"
+  local msg="$2"
+  if [[ "$LAST_BODY" == *"$needle"* ]]; then
+    fail "$msg (gefunden: «$needle»)"
   fi
 }
 
@@ -405,6 +454,18 @@ if grep -q '^parliamentwinterthur$' <<<"$CUSTOM_APP_IDS"; then
   fail "Legacy-App-Verzeichnis custom_apps/parliamentwinterthur darf nicht mehr vorhanden sein"
 fi
 
+# Alle App-Tabellen müssen nach den Migrationen existieren — eine still
+# übersprungene Migration führt sonst erst viel später zu irreführenden 500ern.
+echo "[E2E] Prüfe parlwin-Datenbanktabellen"
+for T in pw_geschaefte pw_sitzungen pw_sitzungstypen pw_vorstoesse pw_vorstoss_entwuerfe pw_fraktionsrollen pw_notiz_revisionen pw_sitzung_geschaeft pw_traktanden pw_mitglieder pw_kommissionen pw_fraktionen; do
+  CNT="$(docker compose exec -T nextcloud-db mariadb -N -B -unextcloud "-p${NEXTCLOUD_DB_PASSWORD}" nextcloud -e "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME LIKE '%${T}';")"
+  if [[ "${CNT}" == "0" ]]; then
+    echo "[E2E] Diagnose: parlwin-Migrationsmeldungen" >&2
+    docker compose logs nextcloud-php-fpm 2>&1 | grep -i "parlwin\|migrat" >&2 || true
+    fail "Tabelle ${T} fehlt nach den Migrationen"
+  fi
+done
+
 create_user_if_missing "parlwin_praesidium" "PwtP4ss!Praesidium"
 create_user_if_missing "parlwin_protokoll" "PwtP4ss!Protokoll"
 create_user_if_missing "parlwin_mitglied" "PwtP4ss!Mitglied"
@@ -420,12 +481,13 @@ assert_non_empty "$PROTOKOLL_TOKEN" "Protokoll-App-Passwort konnte nicht erzeugt
 assert_non_empty "$MITGLIED_TOKEN" "Mitglied-App-Passwort konnte nicht erzeugt werden"
 
 # Automatischen Cron-Sync während der Tests verhindern: Der parlwin-Watcher tickt
-# den Nextcloud-Cron; fällt ein Tick auf eine Sync-Stunde (Standard 03/15 Uhr),
-# würde ein echter Sync die reproduzierten Testdaten überschreiben. Daher
-# sync_stunden auf eine Stunde setzen, die garantiert NICHT die aktuelle ist.
-# Der dedizierte Cron-Job-Test am Ende setzt sync_stunden explizit auf "alle".
-SAFE_SYNC_HOUR=$(( ($(TZ=Europe/Zurich date +%-H) + 6) % 24 ))
-occ config:app:set parlwin sync_stunden --value="$SAFE_SYNC_HOUR" >/dev/null 2>&1 || true
+# den Nextcloud-Cron; fällt ein Tick auf einen Sync-Zeitpunkt (Standard 10/18 Uhr),
+# würde ein echter Sync die reproduzierten Testdaten überschreiben. Daher einen
+# sync_zeitplan mit EINER Uhrzeit setzen, die garantiert NICHT die aktuelle ist
+# (alle Wochentage). Der dedizierte Cron-Job-Test am Ende setzt einen Zeitplan-
+# Punkt auf JETZT und macht den Job so gezielt fällig.
+SAFE_SYNC_HOUR=$(printf '%02d' "$(( ($(TZ=Europe/Zurich date +%-H) + 6) % 24 ))")
+occ config:app:set parlwin sync_zeitplan --value="[{\"tage\":[1,2,3,4,5,6,7],\"zeit\":\"${SAFE_SYNC_HOUR}:00\"}]" >/dev/null 2>&1 || true
 
 # Admin-Sprache auf Deutsch: Nextcloud lädt die App-Übersetzung l10n/de.js
 # (OC.L10N.register) nur bei deutscher Sprache. Genau diese Datei löst
@@ -437,6 +499,14 @@ echo "[E2E] Prüfe WebSocket-Authentisierung"
 websocket_expect_denied || fail "WebSocket ohne Login wurde nicht blockiert"
 ADMIN_AUTH_B64="$(printf '%s' "admin:${ADMIN_TOKEN}" | base64 | tr -d '\n')"
 websocket_expect_authorized "$ADMIN_AUTH_B64" || fail "WebSocket mit gültigem Login wurde nicht akzeptiert"
+
+# Feature «eigene Geschäfte bleiben von der Synchronisation unberührt»: ein VOR
+# dem Sync angelegtes eigenes Geschäft (extern_id "eigen:…") muss den Sync
+# überleben. Ohne den Ausschluss im Sync-Cleanup markierte jeder Sync alle
+# eigenen Geschäfte als gelöscht, weil ihre extern_id nie in der Quellliste steht.
+api_expect_status POST "admin" "$ADMIN_TOKEN" "/geschaefte" "201" \
+  --data-urlencode "titel=E2E Eigenes vor Sync $(date +%s)"
+EIGEN_VOR_SYNC_GID="$(jq -r '.id' <<<"$LAST_BODY")"
 
 echo "[E2E] Führe Sync über den gleichen Endpoint wie im Frontend aus"
 api_expect_status POST "admin" "$ADMIN_TOKEN" "/sync" "202"
@@ -474,8 +544,65 @@ assert_json '.statistik.mitglieder.mitglieder.neu >= 0' "Mitglieder-Statistik fe
 assert_json '.statistik.geschaefte.neu >= 0' "Geschäfte-Statistik fehlt im finalen Status"
 assert_json '.statistik.sitzungen.neu >= 0' "Sitzungs-Statistik fehlt im finalen Status"
 
+# Das vor dem Sync angelegte eigene Geschäft muss den Sync überlebt haben.
+api_expect_status GET "admin" "$ADMIN_TOKEN" "/geschaefte?show_erledigt=1&limit=1000" "200"
+assert_json "any(.[]; .id == ${EIGEN_VOR_SYNC_GID})" "Eigenes Geschäft wurde vom Sync gelöscht (Feature «eigene Geschäfte bleiben unberührt» verletzt)"
+
 TABLE_PREFIX="$(sql "SELECT configvalue FROM oc_appconfig WHERE appid='core' AND configkey='dbtableprefix' LIMIT 1;")"
 TABLE_PREFIX="${TABLE_PREFIX:-oc_}"
+
+echo "[E2E] Prüfe Stammdaten und Löschen eigener Geschäfte"
+
+# Ein eigenes Geschäft darf in allen Stammdaten bearbeitet werden — bei
+# Geschäften von der Parlamentswebseite stammen sie aus der Quelle und würden
+# beim nächsten Abgleich überschrieben.
+api_expect_status PUT "admin" "$ADMIN_TOKEN" "/geschaefte/${EIGEN_VOR_SYNC_GID}/stammdaten" "200" \
+  --data-urlencode "titel=E2E Stammdaten geändert" \
+  --data-urlencode "typ=E2E-Typ" \
+  --data-urlencode "status=E2E-Status" \
+  --data-urlencode "datum=2026-03-04"
+assert_json '.titel == "E2E Stammdaten geändert"' "Titel des eigenen Geschäfts wurde nicht gespeichert"
+assert_json '.typ == "E2E-Typ"' "Typ des eigenen Geschäfts wurde nicht gespeichert"
+assert_json '.status == "E2E-Status"' "Status des eigenen Geschäfts wurde nicht gespeichert"
+
+# Ein unsinniges Datum wird abgewiesen statt still übernommen.
+api_expect_status PUT "admin" "$ADMIN_TOKEN" "/geschaefte/${EIGEN_VOR_SYNC_GID}/stammdaten" "400" \
+  --data-urlencode "datum=04.03.2026"
+assert_json '.fehler | test("JJJJ-MM-TT")' "Ungültiges Datum wird nicht mit klarer Meldung abgewiesen"
+
+# Ein Geschäft von der Parlamentswebseite darf weder bearbeitet noch gelöscht
+# werden. Die Liste MUSS erledigte Geschäfte einschliessen: der Standardfilter
+# blendet sie aus, und je nach Quelldaten sind alle synchronisierten Geschäfte
+# erledigt — sonst bliebe diese Schutzprüfung stillschweigend ungeprüft.
+api_expect_status GET "admin" "$ADMIN_TOKEN" "/geschaefte?show_erledigt=1&limit=1000" "200"
+FREMD_GID="$(jq -r '[.[] | select((.externId|tostring) | startswith("eigen:") | not)][0].id // empty' <<<"$LAST_BODY")"
+[ -n "$FREMD_GID" ] || fail "Kein Parlamentsgeschäft gefunden — der Schreib-/Löschschutz konnte nicht geprüft werden"
+api_expect_status PUT "admin" "$ADMIN_TOKEN" "/geschaefte/${FREMD_GID}/stammdaten" "403" \
+  --data-urlencode "titel=Darf nicht gehen"
+assert_json '.fehler | test("selbst angelegte")' "Schreibschutz meldet keinen verständlichen Grund"
+api_expect_status DELETE "admin" "$ADMIN_TOKEN" "/geschaefte/${FREMD_GID}" "403"
+assert_json '.fehler | test("selbst angelegte")' "Löschschutz meldet keinen verständlichen Grund"
+
+# Ein nicht vorhandenes Geschäft meldet «nicht gefunden».
+api_expect_status DELETE "admin" "$ADMIN_TOKEN" "/geschaefte/99999999" "404"
+
+# Das F2-Test-Geschäft wird über den echten Lösch-Weg entfernt: damit ist der
+# Lösch-Endpunkt geprüft und die Aufräumarbeit zugleich erledigt.
+api_expect_status DELETE "admin" "$ADMIN_TOKEN" "/geschaefte/${EIGEN_VOR_SYNC_GID}" "200"
+api_expect_status GET "admin" "$ADMIN_TOKEN" "/geschaefte?show_erledigt=1&limit=1000" "200"
+assert_json "all(.[]; .id != ${EIGEN_VOR_SYNC_GID})" "Gelöschtes eigenes Geschäft erscheint weiterhin in der Liste"
+
+echo "[E2E] Prüfe Anlegen ohne Titel"
+# «+ Neuer Vorstoss» legt NICHTS mehr sofort an: die Maske sammelt nur die
+# Eingaben, angelegt wird erst beim Speichern. Ohne Titel weist der Server das
+# Anlegen deshalb mit einer klaren Meldung ab.
+api_expect_status POST "admin" "$ADMIN_TOKEN" "/vorstoesse" "400" \
+  --data-urlencode "titel="
+assert_json '.fehler == "Titel fehlt"' "Vorstoss ohne Titel wird nicht mit klarer Meldung abgewiesen"
+# Dasselbe beim eigenen Geschäft.
+api_expect_status POST "admin" "$ADMIN_TOKEN" "/geschaefte" "400" \
+  --data-urlencode "titel="
+assert_json '.fehler == "Titel erforderlich"' "Geschäft ohne Titel wird nicht mit klarer Meldung abgewiesen"
 
 echo "[E2E] Prüfe Frontend-Startseite"
 api_expect_status GET "admin" "$ADMIN_TOKEN" "/" "200"
@@ -492,12 +619,21 @@ grep -q '.pw-members-table td::before' <<<"$FRONTEND_CSS" || fail "Mobile Tabell
 grep -q '.pw-admin-card' <<<"$FRONTEND_CSS" || fail "Admin-Card-Layout fehlt"
 
 echo "[E2E] Prüfe Collabora-Integration (richdocuments + WOPI)"
-RICH_ENABLED="$(docker compose exec -T nextcloud-php-fpm php occ --no-ansi --no-warnings config:app:get richdocuments enabled 2>/dev/null | tr -d '\r' | tail -n1)"
-[[ "$RICH_ENABLED" == "yes" ]] || fail "richdocuments-App ist nicht aktiviert (Status='${RICH_ENABLED}')"
+# `|| true`: occ liefert Exit != 0, wenn der Config-Key fehlt (App nicht
+# installiert). Ohne Guard stirbt das Skript unter `set -euo pipefail`
+# LAUTLOS — die Diagnose unten und fail() würden nie erreicht.
+RICH_ENABLED="$(docker compose exec -T nextcloud-php-fpm php occ --no-ansi --no-warnings config:app:get richdocuments enabled 2>/dev/null | tr -d '\r' | tail -n1 || true)"
+if [[ "$RICH_ENABLED" != "yes" ]]; then
+  echo "[E2E] Diagnose: installierte Apps (occ app:list)" >&2
+  docker compose exec -T nextcloud-php-fpm php occ --no-ansi app:list >&2 || true
+  echo "[E2E] Diagnose: php-fpm-Log (letzte 200 Zeilen, Bootstrap/Office)" >&2
+  docker compose logs --tail 200 nextcloud-php-fpm >&2 || true
+  fail "richdocuments-App ist nicht aktiviert (Status='${RICH_ENABLED}')"
+fi
 
-WOPI_INTERNAL="$(docker compose exec -T nextcloud-php-fpm php occ --no-ansi --no-warnings config:app:get richdocuments wopi_url 2>/dev/null | tr -d '\r' | tail -n1)"
-WOPI_PUBLIC="$(docker compose exec -T nextcloud-php-fpm php occ --no-ansi --no-warnings config:app:get richdocuments public_wopi_url 2>/dev/null | tr -d '\r' | tail -n1)"
-WOPI_CALLBACK="$(docker compose exec -T nextcloud-php-fpm php occ --no-ansi --no-warnings config:app:get richdocuments wopi_callback_url 2>/dev/null | tr -d '\r' | tail -n1)"
+WOPI_INTERNAL="$(docker compose exec -T nextcloud-php-fpm php occ --no-ansi --no-warnings config:app:get richdocuments wopi_url 2>/dev/null | tr -d '\r' | tail -n1 || true)"
+WOPI_PUBLIC="$(docker compose exec -T nextcloud-php-fpm php occ --no-ansi --no-warnings config:app:get richdocuments public_wopi_url 2>/dev/null | tr -d '\r' | tail -n1 || true)"
+WOPI_CALLBACK="$(docker compose exec -T nextcloud-php-fpm php occ --no-ansi --no-warnings config:app:get richdocuments wopi_callback_url 2>/dev/null | tr -d '\r' | tail -n1 || true)"
 [[ "$WOPI_INTERNAL" == http://collabora:9980* ]] || fail "wopi_url falsch konfiguriert: '${WOPI_INTERNAL}'"
 [[ "$WOPI_PUBLIC" == ${PROTOCOL}://${HOST}* ]] || fail "public_wopi_url falsch konfiguriert: '${WOPI_PUBLIC}' (erwartet Prefix ${PROTOCOL}://${HOST})"
 [[ "$WOPI_CALLBACK" == http://nextcloud-nginx:8080* ]] || fail "wopi_callback_url falsch konfiguriert: '${WOPI_CALLBACK}'"
@@ -567,7 +703,9 @@ assert_int_ge "$GESCHAEFTE_COUNT" 20 "Zu wenige Geschäfte nach Sync"
 if (( GESCHAEFTE_COUNT_DEFAULT > GESCHAEFTE_COUNT )); then
   fail "Default-Filter zeigt mehr Geschäfte als inkl. erledigte (default=${GESCHAEFTE_COUNT_DEFAULT}, inkl=${GESCHAEFTE_COUNT})"
 fi
-jq -e 'all(.[]; (.id|type=="number") and .id>0 and ((.externId|tostring) == (.id|tostring)) and ((.url|tostring|contains("/_rte/information/"))))' <<<"$LAST_BODY" >/dev/null \
+# Nur synchronisierte Parlamentsgeschäfte prüfen; eigene Geschäfte (externId
+# "eigen:…") haben bewusst keine Parlaments-ID/-URL und sind ausgenommen.
+jq -e 'all(.[] | select((.externId|tostring) | startswith("eigen:") | not); (.id|type=="number") and .id>0 and ((.externId|tostring) == (.id|tostring)) and ((.url|tostring|contains("/_rte/information/"))))' <<<"$LAST_BODY" >/dev/null \
   || fail "Geschäftsliste hat unplausible IDs/URLs"
 FIRST_G_ID="$(jq -r '.[0].id' <<<"$LAST_BODY")"
 SECOND_G_ID="$(jq -r '.[1].id' <<<"$LAST_BODY")"
@@ -607,10 +745,47 @@ assert_non_empty "$ERSTER_BESCHLUSS_CODE" "Kein erlaubter Beschlusscode gefunden
 api_expect_status POST "parlwin_mitglied" "$MITGLIED_TOKEN" "/geschaefte/${FIRST_G_ID}/notizen" "200" \
   --data-urlencode "text=E2E Notiz via API $(date +%s)"
 assert_json '.aktionTyp == "notiz"' "Notiz-Aktion wurde nicht gespeichert"
+GESCHAEFT_NOTIZ_ID="$(jq -r '.id' <<<"$LAST_BODY")"
+# Soft-Delete + Undo einer Geschäfts-Notiz (nagelt die geloescht-Spalte fest —
+# fehlte sie in frischen Installationen, warf das Löschen HTTP 500).
+api_expect_status DELETE "parlwin_mitglied" "$MITGLIED_TOKEN" "/geschaefte/${FIRST_G_ID}/notizen/${GESCHAEFT_NOTIZ_ID}" "200"
+api_expect_status POST "parlwin_mitglied" "$MITGLIED_TOKEN" "/geschaefte/${FIRST_G_ID}/notizen/${GESCHAEFT_NOTIZ_ID}/wiederherstellen" "200"
+assert_json '.geloescht == false' "Geschäfts-Notiz-Wiederherstellen (Undo) funktioniert nicht"
+
+# Sitzungsnotizen: derselbe geteilte Notiz-Code, nur Kategorie sitzungsnotiz.
+# Sie werden getrennt von den normalen Notizen geführt (nagelt die Kategorie-
+# Trennung über den echten HTTP-Pfad fest).
+api_expect_status POST "parlwin_mitglied" "$MITGLIED_TOKEN" "/geschaefte/${FIRST_G_ID}/notizen" "200" \
+  --data-urlencode "kategorie=sitzungsnotiz" \
+  --data-urlencode "text=E2E Sitzungsnotiz via API $(date +%s)"
+assert_json '.aktionTyp == "sitzungsnotiz"' "Sitzungsnotiz wurde nicht mit eigener Kategorie gespeichert"
+SITZUNGSNOTIZ_ID="$(jq -r '.id' <<<"$LAST_BODY")"
+api_expect_status GET "parlwin_mitglied" "$MITGLIED_TOKEN" "/geschaefte/${FIRST_G_ID}/notizen" "200"
+assert_json "all(.[]; .aktionTyp == \"notiz\")" "Sitzungsnotiz taucht faelschlich in der normalen Notizliste auf"
+assert_json "any(.[]; .id == ${SITZUNGSNOTIZ_ID}) | not" "Sitzungsnotiz darf nicht unter den normalen Notizen erscheinen"
+api_expect_status GET "parlwin_mitglied" "$MITGLIED_TOKEN" "/geschaefte/${FIRST_G_ID}/notizen?kategorie=sitzungsnotiz" "200"
+assert_json "any(.[]; .id == ${SITZUNGSNOTIZ_ID} and .aktionTyp == \"sitzungsnotiz\")" "Sitzungsnotiz fehlt in der Sitzungsnotiz-Liste"
+# Soft-Delete + Undo einer Sitzungsnotiz über den Kategorie-Pfad (bisher nur für
+# die normale Notiz-Kategorie geprüft — nagelt den geteilten geloescht/undo-Pfad
+# auch für kategorie=sitzungsnotiz fest).
+api_expect_status DELETE "parlwin_mitglied" "$MITGLIED_TOKEN" "/geschaefte/${FIRST_G_ID}/notizen/${SITZUNGSNOTIZ_ID}?kategorie=sitzungsnotiz" "200"
+api_expect_status GET "parlwin_mitglied" "$MITGLIED_TOKEN" "/geschaefte/${FIRST_G_ID}/notizen?kategorie=sitzungsnotiz" "200"
+assert_json "any(.[]; .id == ${SITZUNGSNOTIZ_ID} and .geloescht == true)" "Sitzungsnotiz-Löschen ist kein Soft-Delete"
+api_expect_status POST "parlwin_mitglied" "$MITGLIED_TOKEN" "/geschaefte/${FIRST_G_ID}/notizen/${SITZUNGSNOTIZ_ID}/wiederherstellen?kategorie=sitzungsnotiz" "200"
+assert_json '.geloescht == false' "Sitzungsnotiz-Wiederherstellen (Undo) funktioniert nicht"
 
 api_expect_status POST "parlwin_mitglied" "$MITGLIED_TOKEN" "/geschaefte/${FIRST_G_ID}/voten" "200" \
   --data-urlencode "text=E2E Votum via API $(date +%s)"
 assert_json '.aktionTyp == "votum"' "Votum-Aktion wurde nicht gespeichert"
+
+# Votum bearbeiten ist nur der zuständigen Person erlaubt (Guard). Ein
+# nicht-zuständiger Nutzer erhält 403. Der positive Bearbeiten-/PDF-/Archivieren-
+# Pfad wird weiter unten mit einer eigens zuständig gemachten Person geprüft.
+# (Das Votum-Feature ist im GeschaeftDetail-Template NICHT verdrahtet — kein UI —,
+# daher ist die API der e2e-Layer für dieses Backend-Feature.)
+api_expect_status PUT "parlwin_mitglied" "$MITGLIED_TOKEN" "/geschaefte/${FIRST_G_ID}/votum" "403" \
+  --data-urlencode "text=<p>Darf nicht</p>"
+assert_json '.fehler | contains("zuständige")' "Votum-Bearbeiten ohne Zuständigkeit liefert nicht die erwartete 403-Meldung"
 
 api_expect_status POST "parlwin_mitglied" "$MITGLIED_TOKEN" "/geschaefte/${FIRST_G_ID}/beschluesse" "200" \
   --data-urlencode "code=${ERSTER_BESCHLUSS_CODE}" \
@@ -627,6 +802,40 @@ api_expect_status PUT "admin" "$ADMIN_TOKEN" "/geschaefte/${SECOND_G_ID}" "200" 
   --data-urlencode "haupt_person_key=mitglied:${MITGLIED_EXTERN_2}"
 assert_json '.zustaendigkeiten | length == 2' "Zuständigkeiten wurden nicht gespeichert"
 assert_json '.zustaendigkeiten[] | select(.mitgliedExternId == "'"${MITGLIED_EXTERN_2}"'") | .istHaupt == true' "Hauptzuständigkeit fehlt"
+
+echo "[E2E] Vorstoss-API: anlegen, laden, Notiz, verknüpfen"
+api_expect_status POST "parlwin_praesidium" "$PRAESIDIUM_TOKEN" "/vorstoesse" "201" \
+  --data-urlencode "titel=E2E API Vorstoss $(date +%s)"
+assert_json '.id > 0' "Vorstoss-Anlage liefert keine ID"
+assert_json '.titel | startswith("E2E API Vorstoss")' "Vorstoss-Anlage liefert den Titel nicht zurück"
+VORSTOSS_ID="$(jq -r '.id' <<<"$LAST_BODY")"
+api_expect_status GET "parlwin_praesidium" "$PRAESIDIUM_TOKEN" "/vorstoesse" "200"
+assert_json "any(.[]; .id == ${VORSTOSS_ID})" "Neuer Vorstoss fehlt in der Liste"
+# Notizen laufen über den GETEILTEN Code (wie beim Geschäft): POST liefert die
+# Notiz-Aktion zurück (nicht mehr den Vorstoss mit .notizen-Array).
+api_expect_status POST "parlwin_praesidium" "$PRAESIDIUM_TOKEN" "/vorstoesse/${VORSTOSS_ID}/notizen" "200" \
+  --data-urlencode "text=E2E API Notiz"
+assert_json '.aktionTyp == "notiz"' "Vorstoss-Notiz wurde nicht als Aktion gespeichert"
+assert_json '.text == "E2E API Notiz"' "Vorstoss-Notiz hat den falschen Text"
+VORSTOSS_NOTIZ_ID="$(jq -r '.id' <<<"$LAST_BODY")"
+# GET der Notizliste enthält die neue Notiz (gemeinsamer Speicher, aktionen).
+api_expect_status GET "parlwin_praesidium" "$PRAESIDIUM_TOKEN" "/vorstoesse/${VORSTOSS_ID}/notizen" "200"
+assert_json "any(.[]; .id == ${VORSTOSS_NOTIZ_ID} and .aktionTyp == \"notiz\")" "Vorstoss-Notiz fehlt in der Notizliste"
+# Bearbeiten archiviert eine Version (revisionen); Löschen ist Soft-Delete mit Undo.
+api_expect_status PUT "parlwin_praesidium" "$PRAESIDIUM_TOKEN" "/vorstoesse/${VORSTOSS_ID}/notizen/${VORSTOSS_NOTIZ_ID}" "200" \
+  --data-urlencode "text=E2E API Notiz bearbeitet"
+assert_json '.text == "E2E API Notiz bearbeitet"' "Vorstoss-Notiz-Bearbeitung nicht gespeichert"
+api_expect_status GET "parlwin_praesidium" "$PRAESIDIUM_TOKEN" "/vorstoesse/${VORSTOSS_ID}/notizen/${VORSTOSS_NOTIZ_ID}/revisionen" "200"
+assert_json 'length >= 1' "Vorstoss-Notiz-Bearbeitung hat keine Version archiviert"
+api_expect_status DELETE "parlwin_praesidium" "$PRAESIDIUM_TOKEN" "/vorstoesse/${VORSTOSS_ID}/notizen/${VORSTOSS_NOTIZ_ID}" "200"
+api_expect_status GET "parlwin_praesidium" "$PRAESIDIUM_TOKEN" "/vorstoesse/${VORSTOSS_ID}/notizen" "200"
+assert_json "any(.[]; .id == ${VORSTOSS_NOTIZ_ID} and .geloescht == true)" "Vorstoss-Notiz-Löschen ist kein Soft-Delete"
+api_expect_status POST "parlwin_praesidium" "$PRAESIDIUM_TOKEN" "/vorstoesse/${VORSTOSS_ID}/notizen/${VORSTOSS_NOTIZ_ID}/wiederherstellen" "200"
+assert_json '.geloescht == false' "Vorstoss-Notiz-Wiederherstellen (Undo) funktioniert nicht"
+api_expect_status POST "parlwin_praesidium" "$PRAESIDIUM_TOKEN" "/vorstoesse/${VORSTOSS_ID}/verknuepfen" "200" \
+  --data-urlencode "geschaeftId=${SECOND_G_ID}"
+assert_json '.status == "erledigt"' "Verknüpfen setzt den Vorstoss nicht auf erledigt"
+assert_json ".geschaeftId == ${SECOND_G_ID}" "Verknüpfen speichert das Geschäft nicht"
 
 echo "[E2E] Rechte- und Fraktionssitzungsmodus testen"
 api_expect_status POST "admin" "$ADMIN_TOKEN" "/settings/fraktionspraesident" "200" \
@@ -671,6 +880,24 @@ api_expect_status POST "parlwin_praesidium" "$PRAESIDIUM_TOKEN" "/settings/kommi
   --data-urlencode "name=Mitglied E2E" \
   --data-urlencode "gueltig_von=${STV_VON}" \
   --data-urlencode "gueltig_bis=${STV_BIS}"
+
+# Rollen-Negativfälle (Backend hat KEIN UI dafür — die API ist hier der e2e-Layer).
+# Fehlende uid → 400.
+api_expect_status POST "parlwin_praesidium" "$PRAESIDIUM_TOKEN" "/settings/protokollfuehrer" "400" \
+  --data-urlencode "uid="
+assert_json '.fehler | contains("uid")' "Fehlende uid liefert nicht die erwartete 400-Meldung"
+# Ungültige Gültigkeit (gueltig_bis vor gueltig_von) → 400.
+api_expect_status POST "parlwin_praesidium" "$PRAESIDIUM_TOKEN" "/settings/protokollfuehrer-stellvertretung" "400" \
+  --data-urlencode "uid=parlwin_protokoll" \
+  --data-urlencode "name=Protokoll E2E" \
+  --data-urlencode "gueltig_von=${STV_BIS}" \
+  --data-urlencode "gueltig_bis=${STV_VON}"
+assert_json '.fehler | contains("gueltig_bis")' "Ungültige Gültigkeit liefert nicht die erwartete 400-Meldung"
+# Fehlende Gruppen-Admin-Berechtigung: Protokollführer darf keinen Fraktionspräsidenten setzen → 403.
+api_expect_status POST "parlwin_protokoll" "$PROTOKOLL_TOKEN" "/settings/fraktionspraesident" "403" \
+  --data-urlencode "uid=parlwin_protokoll" \
+  --data-urlencode "name=Protokoll E2E"
+assert_json '.fehler | contains("Gruppen-Admin")' "Fehlende Gruppen-Admin-Berechtigung liefert nicht die erwartete 403-Meldung"
 
 echo "[E2E] Sitzung/Traktandum-Updates testen"
 api_expect_status PUT "admin" "$ADMIN_TOKEN" "/sitzungen/${FIRST_S_ID}" "200" \
@@ -816,6 +1043,19 @@ api_expect_status POST "admin" "$ADMIN_TOKEN" "/sitzungstypen/fraktionsraum-sich
 echo "[E2E] Fraktionsraum-Bericht: ${LAST_BODY}"
 assert_json '.erfolg == true' "Fraktionsraum konnte nicht eingerichtet werden"
 
+# Sitzungstyp anlegen mit nur dem Namen (nagelt den 500-Fix fest — die Spalte
+# kommissionen fehlte in frischen Installationen und die Entity warf beim Laden
+# «Cannot assign null to property Sitzungstyp::$kommissionen»). Der Endpoint muss
+# 201 liefern und kommissionen als leere Liste zurückgeben.
+api_expect_status POST "admin" "$ADMIN_TOKEN" "/sitzungstypen" "201" \
+  --data-urlencode "name=E2E-Sitzungstyp $(date +%s)"
+assert_json '.id > 0' "Sitzungstyp-Anlage liefert keine ID"
+assert_json '.name | startswith("E2E-Sitzungstyp")' "Sitzungstyp-Anlage liefert den Namen nicht zurück"
+assert_json '.kommissionen | type == "array"' "Sitzungstyp liefert kommissionen nicht als Liste"
+SITZUNGSTYP_ID="$(jq -r '.id' <<<"$LAST_BODY")"
+api_expect_status GET "admin" "$ADMIN_TOKEN" "/sitzungstypen/${SITZUNGSTYP_ID}" "200"
+assert_json '.kommissionen | type == "array"' "Sitzungstyp-Detail liefert kommissionen nicht als Liste"
+
 echo "[E2E] Migrations-Erwartungen prüfen (Übernahme des Mitglied-Ordners in den offiziellen)"
 # 1. a hat den offiziellen Fraktion-Ordner UND die Sicherung Fraktion.bak.
 S=$(http_status_as PROPFIND "$MIG_A" "$PRAESIDIUM_TOKEN" "$DAV/$MIG_A/Fraktion" "" "application/xml" "Depth: 0")
@@ -873,6 +1113,85 @@ api_expect_status POST "parlwin_praesidium" "$PRAESIDIUM_TOKEN" "/settings/frakt
 echo "[E2E] Reproduktion: pendentes Geschäft mit NULL-Quelldatum erzeugen"
 sql "UPDATE ${TABLE_PREFIX}pw_geschaefte SET status='Pendent', quelle_aktualisiert_am=NULL WHERE id=(SELECT id FROM (SELECT id FROM ${TABLE_PREFIX}pw_geschaefte WHERE geloescht=0 ORDER BY datum DESC LIMIT 1) AS x);"
 
+# Deterministische Testdaten für die Browser-e2e-Randfälle, damit jede Assertion
+# IMMER läuft (keine datenbedingten Skips): ein inaktives (mit Nextcloud
+# verknüpftes) Mitglied, ein aktives Mitglied ohne Fraktion/Partei, eine inaktive
+# Kommission, eine aktive Kommission mit gemischt aktiv/inaktiven Mitgliedern, und
+# ein bestehendes Geschäft zusätzlich als Traktandum einer zweiten Sitzung.
+echo "[E2E] Deterministische Testdaten für Browser-Randfälle seeden"
+sql "INSERT INTO ${TABLE_PREFIX}pw_mitglieder (extern_id,name,vorname,partei,fraktion,email,nextcloud_uid,aktiv,geloescht,erstellt_am,aktualisiert_am) VALUES ('e2e-ex-1','Ehemalig','Erika','E2E-Partei','E2E-Fraktion','erika.ehemalig@example.org','e2e-exuser',0,0,'2026-07-20 00:00:00','2026-07-20 00:00:00');"
+sql "INSERT INTO ${TABLE_PREFIX}pw_mitglieder (extern_id,name,vorname,partei,fraktion,email,aktiv,geloescht,erstellt_am,aktualisiert_am) VALUES ('e2e-nofrak','Ohnefraktion','Nora','','','nora.ohnefraktion@example.org',1,0,'2026-07-20 00:00:00','2026-07-20 00:00:00');"
+# Präsidium als synchronisiertes Mitglied → beim Anlegen eines Vorstosses ist der
+# angemeldete Nutzer als Zuständigkeit vorbelegt (Standard-Zuständigkeit).
+sql "INSERT INTO ${TABLE_PREFIX}pw_mitglieder (extern_id,name,vorname,partei,fraktion,email,nextcloud_uid,aktiv,geloescht,erstellt_am,aktualisiert_am) VALUES ('e2e-praesidium-mit','Präsidium','Paula','E2E-Partei','E2E-Fraktion','paula.praesidium@example.org','parlwin_praesidium',1,0,'2026-07-20 00:00:00','2026-07-20 00:00:00');"
+sql "INSERT INTO ${TABLE_PREFIX}pw_kommissionen (extern_id,name,beschreibung,mitglieder,aktiv,geloescht,erstellt_am,aktualisiert_am) VALUES ('e2e-inaktiv-komm','E2E Inaktive Kommission','Von E2E angelegt','[]',0,0,'2026-07-20 00:00:00','2026-07-20 00:00:00');"
+sql "INSERT INTO ${TABLE_PREFIX}pw_kommissionen (extern_id,name,beschreibung,mitglieder,aktiv,geloescht,erstellt_am,aktualisiert_am) VALUES ('e2e-gemischt-komm','E2E Gemischte Kommission','Von E2E angelegt','[{\"externId\":\"e2e-ex-1\",\"funktion\":\"Mitglied\"},{\"externId\":\"e2e-nofrak\",\"funktion\":\"Mitglied\"}]',1,0,'2026-07-20 00:00:00','2026-07-20 00:00:00');"
+# Ein pendentes Geschäft, das der «E2E Gemischte Kommission» zugeordnet ist
+# (der Status enthält die Kommissions-Tokens «E2E Gemischte») → die Kommission
+# zeigt ein pendentes Geschäft, der Browser-Test läuft ohne Skip. Der Status wird
+# per SQL erzwungen, da das Anlegen eigener Geschäfte einen festen Status setzt.
+# Ein EIGENES Geschäft (extern_id leer) auf den Kommissions-Pendent-Status setzen,
+# damit die «E2E Gemischte Kommission» ein pendentes Geschäft zeigt. Bewusst KEIN
+# synchronisiertes Geschäft: die Synchronisation (u.a. der Admin-Sync-Browsertest)
+# überschreibt deren Status wieder mit dem echten Parlamentsstatus; ein eigenes
+# Geschäft wird von der Synchronisation nicht angefasst. Datum weit in der
+# Vergangenheit, damit es keine «erstes Geschäft»-Auswahl anderer Tests verschiebt.
+# Als Fraktionsmitglied (parlwin_praesidium) anlegen — genau der Nutzer, der den
+# Kommissionen-Browser-Test ausführt; ein von admin angelegtes eigenes Geschäft
+# könnte für Fraktionsmitglieder anders sichtbar sein.
+api_expect_status POST "parlwin_praesidium" "$PRAESIDIUM_TOKEN" "/geschaefte" "201" \
+  --data-urlencode "titel=E2E Kommissionsgeschäft $(date +%s)"
+E2E_KOMM_GID="$(jq -r '.id' <<<"$LAST_BODY")"
+if [ -n "$E2E_KOMM_GID" ] && [ "$E2E_KOMM_GID" != "null" ]; then
+  sql "UPDATE ${TABLE_PREFIX}pw_geschaefte SET status='Bei Kommission E2E Gemischte pendent' WHERE id=${E2E_KOMM_GID};"
+fi
+# Absicherung im GLEICHEN Nutzerkontext wie der Browser-Test (parlwin_praesidium):
+# Seed-Kommission und das zugeordnete Geschäft müssen so geladen werden, sonst
+# kann der Kommissionen-Browser-Test sie nie finden.
+api_expect_status GET "parlwin_praesidium" "$PRAESIDIUM_TOKEN" "/kommissionen" "200"
+assert_json 'any(.[]; .name == "E2E Gemischte Kommission")' "Seed-Kommission «E2E Gemischte Kommission» fehlt in /kommissionen (praesidium-Sicht)"
+api_expect_status GET "parlwin_praesidium" "$PRAESIDIUM_TOKEN" "/geschaefte?show_erledigt=1&limit=1000" "200"
+assert_json 'any(.[]; (.status // "") | test("Gemischte"))' "Kein geladenes Geschäft mit Kommissions-Status «…Gemischte…» (praesidium-Sicht)"
+# Positiver Votum-Pfad (Backend-Feature ohne UI): eine Person wird für ein eigens
+# angelegtes Geschäft zuständig gemacht (Mitglied mit nextcloud_uid=parlwin_protokoll),
+# dann darf sie das Votum bearbeiten, als PDF abrufen und archivieren.
+sql "INSERT INTO ${TABLE_PREFIX}pw_mitglieder (extern_id,name,vorname,partei,fraktion,email,nextcloud_uid,aktiv,geloescht,erstellt_am,aktualisiert_am) VALUES ('e2e-votum-mit','Votum','Vera','E2E-Partei','E2E-Fraktion','vera.votum@example.org','parlwin_protokoll',1,0,'2026-07-20 00:00:00','2026-07-20 00:00:00');"
+api_expect_status POST "admin" "$ADMIN_TOKEN" "/geschaefte" "201" \
+  --data-urlencode "titel=E2E Votum-Geschäft $(date +%s)"
+VOTUM_G_ID="$(jq -r '.id' <<<"$LAST_BODY")"
+api_expect_status PUT "admin" "$ADMIN_TOKEN" "/geschaefte/${VOTUM_G_ID}" "200" \
+  --data-urlencode "zustaendigkeiten[0][mitgliedExternId]=e2e-votum-mit" \
+  --data-urlencode "zustaendigkeiten[0][personName]=Votum Vera" \
+  --data-urlencode "haupt_person_key=mitglied:e2e-votum-mit"
+# Der Wortlaut wird bewusst mit ausführbaren Bestandteilen gespeichert: die
+# Druckansicht muss die Formatierung erhalten, aber jedes ausführbare Element
+# verlieren. Wer ein Votum erfassen darf, darf damit keinen Code in den Browser
+# einer anderen Person bringen.
+api_expect_status PUT "parlwin_protokoll" "$PROTOKOLL_TOKEN" "/geschaefte/${VOTUM_G_ID}/votum" "200" \
+  --data-urlencode 'text=<p>E2E Votum im Rat</p><img/onerror="alert(1)" src=x><a href="javascript:alert(2)">Klick</a>'
+assert_json '.aktionTyp == "votum"' "Votum-Bearbeitung (zuständig) wurde nicht gespeichert"
+api_expect_status GET "parlwin_protokoll" "$PROTOKOLL_TOKEN" "/geschaefte/${VOTUM_G_ID}/votum/pdf" "200"
+assert_body_contains "E2E Votum im Rat" "Der Wortlaut fehlt in der Druckansicht des Votums"
+assert_body_contains "<p>E2E Votum im Rat</p>" "Die Formatierung des Wortlauts ging in der Druckansicht verloren"
+assert_body_not_contains "onerror" "Die Druckansicht des Votums gibt einen Ereignis-Handler aus"
+assert_body_not_contains "javascript:" "Die Druckansicht des Votums gibt einen ausführbaren Verweis aus"
+api_expect_status POST "parlwin_protokoll" "$PROTOKOLL_TOKEN" "/geschaefte/${VOTUM_G_ID}/votum/archivieren" "200"
+assert_json '.aktionTyp == "votum"' "Votum-Archivierung (zuständig) liefert keine Votum-Aktion"
+# Das eigens angelegte Votum-Geschäft wieder entfernen: als neuestes eigenes
+# Geschäft würde es sonst die «erstes Geschäft»-Auswahl der Browser-Tests
+# (u.a. den Echtzeit-Test) verschieben.
+sql "UPDATE ${TABLE_PREFIX}pw_geschaefte SET geloescht=1 WHERE id=${VOTUM_G_ID};"
+
+E2E_FOLGE_GID="$(sql "SELECT geschaeft_id FROM ${TABLE_PREFIX}pw_traktanden WHERE geschaeft_id>0 AND geloescht=0 ORDER BY geschaeft_id LIMIT 1;")"
+if [ -n "$E2E_FOLGE_GID" ]; then
+  E2E_FOLGE_SIT_A="$(sql "SELECT sitzung_id FROM ${TABLE_PREFIX}pw_traktanden WHERE geschaeft_id='${E2E_FOLGE_GID}' AND geloescht=0 LIMIT 1;")"
+  E2E_FOLGE_SIT_B="$(sql "SELECT id FROM ${TABLE_PREFIX}pw_sitzungen WHERE geloescht=0 AND id<>'${E2E_FOLGE_SIT_A}' ORDER BY id DESC LIMIT 1;")"
+  if [ -n "$E2E_FOLGE_SIT_B" ]; then
+    sql "INSERT INTO ${TABLE_PREFIX}pw_traktanden (sitzung_id,geschaeft_id,nummer,titel,beschreibung,geloescht,notizen,erstellt_am,aktualisiert_am) VALUES ('${E2E_FOLGE_SIT_B}','${E2E_FOLGE_GID}',99,'E2E Folgetraktandum','',0,'[]','2026-07-20 00:00:00','2026-07-20 00:00:00');"
+    echo "[E2E] Geschäft ${E2E_FOLGE_GID} zusätzlich als Traktandum von Sitzung ${E2E_FOLGE_SIT_B} verknüpft (Sitzungsnotiz-Folge)"
+  fi
+fi
+
 echo "[E2E] Multi-User-Browser-Test (Playwright, 3 gleichzeitige Nutzer)"
 export PW_U1="parlwin_praesidium" PW_P1="PwtP4ss!Praesidium"
 export PW_U2="parlwin_protokoll"  PW_P2="PwtP4ss!Protokoll"
@@ -884,25 +1203,41 @@ export PW_ADMIN_PASS="${NEXTCLOUD_ADMIN_PASSWORD}"
 # gravierend, weil rote Tests dann unbemerkt als grün durchgehen. Daher wird der
 # Lauf doppelt abgesichert: Exit-Code UND verbindliche Auswertung des
 # JUnit-Reports (Anzahl tests/failures/errors).
-PW_REPORT="${ROOT_DIR}/tests/e2e/.junit/e2e.xml"
-# Alten Report best-effort entfernen: die Datei wird vom Playwright-Container als
-# root angelegt, der Host-User kann sie evtl. nicht löschen — das darf den Lauf
-# NICHT abbrechen (Permission-Fehler tolerieren). Playwright überschreibt den
-# Report beim Lauf ohnehin; Frische und Gültigkeit sichern Exit-Code + der
-# Timestamp-Check unten ab.
-PW_REPORT_VORHER=""
-[ -f "$PW_REPORT" ] && PW_REPORT_VORHER="$(stat -c %Y "$PW_REPORT" 2>/dev/null || echo '')"
-rm -f "$PW_REPORT" 2>/dev/null || true
+#
+# Der Testcontainer bekommt KEIN Host-Verzeichnis gemountet (die Tests stecken im
+# Image). Der Report wird deshalb nach dem Lauf aus dem Container kopiert: der
+# Container läuft ohne `--rm` unter festem Namen, `docker cp` holt den Report, dann
+# wird der Container entfernt.
+#
+# Der Report liegt im frischen, pro Lauf erzeugten TEMP_DIR — NICHT in der
+# Arbeitskopie: dort kann kein Alt-Report den aktuellen Lauf vortäuschen, und
+# keine Altlast (z.B. ein root-owned tests/e2e/.junit früherer Läufe vor der
+# docker-cp-Umstellung) kann den Lauf vor dem ersten Browser-Test abbrechen.
+PW_REPORT="${TEMP_DIR}/e2e-junit/e2e.xml"
+PW_CONTAINER="parlwin-e2e-playwright"
+mkdir -p "$(dirname "$PW_REPORT")"
+# Reste eines abgebrochenen Vorlaufs entfernen, sonst kollidiert der feste Name.
+docker rm -f "$PW_CONTAINER" >/dev/null 2>&1 || true
 PW_EXIT=0
-docker compose run --rm playwright || PW_EXIT=$?
-[ "$PW_EXIT" -eq 0 ] || fail "Multi-User-Browser-E2E (Playwright) fehlgeschlagen (Exit-Code $PW_EXIT)"
+# --build: Das Playwright-Image enthält die Testdateien per COPY — ohne Build
+# liefe der Test still mit dem Stand des letzten Builds statt dem aktuellen.
+docker compose run --build --name "$PW_CONTAINER" playwright || PW_EXIT=$?
+# Report IMMER holen — auch nach rotem Lauf, denn er benennt die fehlgeschlagenen
+# Tests. Erst danach auswerten und den Container abräumen.
+docker cp "${PW_CONTAINER}:/work/.junit/e2e.xml" "$PW_REPORT" >/dev/null 2>&1 || true
+docker cp "${PW_CONTAINER}:/work/test-results" "${ROOT_DIR}/tests/e2e/" >/dev/null 2>&1 || true
+docker rm -f "$PW_CONTAINER" >/dev/null 2>&1 || true
 [ -f "$PW_REPORT" ] || fail "Playwright-JUnit-Report fehlt ($PW_REPORT) — Testlauf nicht verifizierbar"
-# Sicherstellen, dass der Report vom AKTUELLEN Lauf stammt (nicht ein alter, der
-# nicht gelöscht werden konnte): mtime muss sich geändert haben.
-if [ -n "$PW_REPORT_VORHER" ]; then
-  PW_REPORT_NACHHER="$(stat -c %Y "$PW_REPORT" 2>/dev/null || echo '')"
-  [ "$PW_REPORT_NACHHER" != "$PW_REPORT_VORHER" ] || fail "Playwright-JUnit-Report wurde nicht aktualisiert ($PW_REPORT) — Lauf nicht verifizierbar"
+# Der Aufrufer (tests/run-all.sh) braucht den Report DIESES Laufs für die
+# Gesamt-Zusammenfassung. Er wird direkt dorthin gelegt, wo der Aufrufer ihn
+# erwartet — und nie im Repo abgelegt: eine dort liegende Altlast würde sonst als
+# Ergebnis des aktuellen Laufs gezählt. Vor der Exit-Code-Prüfung, damit auch ein
+# roter Lauf mit seinen fehlgeschlagenen Tests in der Zusammenfassung erscheint.
+if [ -n "${PW_JUNIT_OUT:-}" ]; then
+  mkdir -p "$(dirname "$PW_JUNIT_OUT")"
+  cp "$PW_REPORT" "$PW_JUNIT_OUT"
 fi
+[ "$PW_EXIT" -eq 0 ] || fail "Multi-User-Browser-E2E (Playwright) fehlgeschlagen (Exit-Code $PW_EXIT)"
 if grep -qE 'failures="[1-9][0-9]*"|errors="[1-9][0-9]*"' "$PW_REPORT"; then
   fail "Multi-User-Browser-E2E (Playwright): fehlgeschlagene Tests laut JUnit-Report ($PW_REPORT)"
 fi
@@ -915,6 +1250,67 @@ grep -qE 'tests="[1-9][0-9]*"' "$PW_REPORT" || fail "Playwright-JUnit-Report mel
 # läuft, den SyncJob fällig machen, dann abwarten, bis der automatische Cron-Tick
 # einen Sync mit Quelle "background-job" startet. Bewusst zuletzt, damit ein
 # ausgelöster Sync die übrigen Prüfungen nicht beeinflusst.
+# F34: Ein Dokument im Ordner «Fraktion/40_Vorstösse/10_Eigene» wird beim
+# nächsten Hintergrund-Lauf automatisch als eigener Vorstoss übernommen. Der
+# Import hat keine Oberfläche — er läuft ausschliesslich in SyncJob::run() (vor
+# der Datensynchronisation) und liest den Ordner des Administrators. Deshalb
+# gehört diese Prüfung hierher, an den deterministischen Cron-Trigger, und nicht
+# in einen Browser-Test: die Datei wird jetzt abgelegt, der Cron-Tick unten löst
+# den Job aus, und da der Import VOR dem Sync läuft, ist er fertig, sobald der
+# Sync (source=background-job) sichtbar wird.
+echo "[E2E] F34: Dokument für den automatischen Vorstoss-Import ablegen"
+IMPORT_STAMP="$(date +%s)"
+IMPORT_NAME="e2e-import-${IMPORT_STAMP}"
+IMPORT_DAV_BASIS="${PROTOCOL}://${HOST}/remote.php/dav/files/admin"
+
+# WebDAV MKCOL (Ordner anlegen; 405 = existiert bereits, ist in Ordnung) — der
+# Import überspringt fehlende Ordner still, darum muss der Pfad existieren.
+dav_mkcol() {
+  docker compose exec -T -e DAV_URL="$1" -e DAV_USER="admin" -e DAV_PASS="${NEXTCLOUD_ADMIN_PASSWORD}" nextcloud-php-fpm php -r '
+$ctx = stream_context_create(["http" => [
+  "method" => "MKCOL",
+  "header" => "Authorization: Basic ".base64_encode(getenv("DAV_USER").":".getenv("DAV_PASS"))."\r\n",
+  "ignore_errors" => true, "timeout" => 30,
+]]);
+@file_get_contents(getenv("DAV_URL"), false, $ctx);
+if (isset($http_response_header[0]) && preg_match("/\s(\d{3})\s/", $http_response_header[0], $m)) { echo $m[1]; }'
+}
+# WebDAV PUT mit Textinhalt.
+dav_put() {
+  docker compose exec -T -e DAV_URL="$1" -e DAV_BODY="$2" -e DAV_USER="admin" -e DAV_PASS="${NEXTCLOUD_ADMIN_PASSWORD}" nextcloud-php-fpm php -r '
+$ctx = stream_context_create(["http" => [
+  "method" => "PUT",
+  "header" => "Authorization: Basic ".base64_encode(getenv("DAV_USER").":".getenv("DAV_PASS"))."\r\nContent-Type: text/plain\r\n",
+  "content" => getenv("DAV_BODY"),
+  "ignore_errors" => true, "timeout" => 30,
+]]);
+@file_get_contents(getenv("DAV_URL"), false, $ctx);
+if (isset($http_response_header[0]) && preg_match("/\s(\d{3})\s/", $http_response_header[0], $m)) { echo $m[1]; }'
+}
+# WebDAV DELETE (Aufräumen; Fehler werden geschluckt).
+dav_delete() {
+  docker compose exec -T -e DAV_URL="$1" -e DAV_USER="admin" -e DAV_PASS="${NEXTCLOUD_ADMIN_PASSWORD}" nextcloud-php-fpm php -r '
+$ctx = stream_context_create(["http" => [
+  "method" => "DELETE",
+  "header" => "Authorization: Basic ".base64_encode(getenv("DAV_USER").":".getenv("DAV_PASS"))."\r\n",
+  "ignore_errors" => true, "timeout" => 30,
+]]);
+@file_get_contents(getenv("DAV_URL"), false, $ctx);' >/dev/null 2>&1 || true
+}
+
+# Ordnerkette sicherstellen (URL-Kodierung: ö → %C3%B6, Leerzeichen → %20).
+dav_mkcol "${IMPORT_DAV_BASIS}/Fraktion" >/dev/null
+dav_mkcol "${IMPORT_DAV_BASIS}/Fraktion/40_Vorst%C3%B6sse" >/dev/null
+dav_mkcol "${IMPORT_DAV_BASIS}/Fraktion/40_Vorst%C3%B6sse/10_Eigene" >/dev/null
+IMPORT_DAV_URL="${IMPORT_DAV_BASIS}/Fraktion/40_Vorst%C3%B6sse/10_Eigene/${IMPORT_NAME}.txt"
+IMPORT_PUT_STATUS="$(dav_put "${IMPORT_DAV_URL}" "E2E Vorstoss-Dokument ${IMPORT_STAMP}")"
+[[ "$IMPORT_PUT_STATUS" =~ ^(201|204)$ ]] || fail "F34: Dokument konnte nicht im Fraktionsordner abgelegt werden (Status='${IMPORT_PUT_STATUS}')"
+
+# Vorbedingung: diesen Vorstoss gibt es noch nicht (der Dateiname ohne Endung
+# wird zum Titel).
+api_expect_status GET "admin" "$ADMIN_TOKEN" "/vorstoesse" "200"
+assert_json "all(.[]; .titel != \"${IMPORT_NAME}\")" "F34: Testvorstoss existiert schon vor dem Import"
+
 echo "[E2E] Cron-Job-Test: automatischer Cron-Tick löst die Synchronisation aus"
 
 # 1. Sicherstellen, dass kein Sync läuft; Fortschritt über die DB prüfen (der Job
@@ -930,9 +1326,13 @@ done
 # Fortschritt zurücksetzen, damit ein neuer Lauf eindeutig erkennbar ist.
 sql "DELETE FROM ${TABLE_PREFIX}appconfig WHERE appid='parlwin' AND configkey='sync_progress';" || true
 
-# 2. Sync-Stunden für den Test auf jede Stunde setzen (sonst synchronisiert der Job
-#    nur um 03:00/15:00 und der Test wäre nicht deterministisch).
-occ config:app:set parlwin sync_stunden --value="$(seq -s, 0 23)" >/dev/null
+# 2. Einen Zeitplan-Punkt auf JETZT setzen und den letzten Prüfzeitpunkt kurz davor,
+#    damit der Job deterministisch fällig ist (der Punkt liegt im Prüf-Fenster).
+NOW_DOW="$(TZ=Europe/Zurich date +%u)"
+NOW_HHMM="$(TZ=Europe/Zurich date +%H:%M)"
+NOW_MINUS="$(( $(date +%s) - 120 ))"
+occ config:app:set parlwin sync_zeitplan --value="[{\"tage\":[${NOW_DOW}],\"zeit\":\"${NOW_HHMM}\"}]" >/dev/null
+occ config:app:set parlwin sync_zeitplan_letzter_check --value="$NOW_MINUS" >/dev/null
 
 # 3. Den registrierten Background-Job ermitteln und fällig machen. Der nächste
 #    automatische Cron-Tick des Watchers führt ihn dann aus.
@@ -951,8 +1351,40 @@ done
 [[ "$CRON_TRIGGERED" == "1" ]] || fail "Der automatische Cron-Tick hat keinen Sync ausgelöst (sync_progress ohne source=background-job): ${CRON_PROG}"
 echo "[E2E] Cron-Job-Test bestanden: Background-Job hat die Synchronisation ausgelöst"
 
+# F34: Der Import läuft in SyncJob::run() VOR der Datensynchronisation. Sobald
+# oben source=background-job sichtbar wurde, ist er also bereits durch. Der
+# abgelegte «10_Eigene»-Vorstoss muss jetzt genau einmal existieren, mit
+# Herkunft «eigene» und dem Dateinamen (ohne Endung) als Titel.
+echo "[E2E] F34: Prüfe, dass das abgelegte Dokument als eigener Vorstoss übernommen wurde"
+IMPORT_OK=0
+for _ in $(seq 1 30); do
+  api_request GET "admin" "$ADMIN_TOKEN" "/vorstoesse" >/dev/null || true
+  if [[ "$LAST_STATUS" == "200" ]] && [[ "$(jq "[.[] | select(.titel == \"${IMPORT_NAME}\")] | length" <<<"$LAST_BODY")" == "1" ]]; then
+    IMPORT_OK=1; break
+  fi
+  sleep 2
+done
+[[ "$IMPORT_OK" == "1" ]] || fail "F34: Das Dokument «${IMPORT_NAME}.txt» wurde nicht als genau ein Vorstoss übernommen"
+assert_json "[.[] | select(.titel == \"${IMPORT_NAME}\")][0].herkunft == \"eigene\"" "F34: Der importierte Vorstoss trägt nicht die Herkunft «eigene»"
+IMPORT_VID="$(jq -r "[.[] | select(.titel == \"${IMPORT_NAME}\")][0].id" <<<"$LAST_BODY")"
+
+# Aufräumen: importierten Vorstoss und das abgelegte Dokument wieder entfernen.
+[[ -n "$IMPORT_VID" && "$IMPORT_VID" != "null" ]] && api_expect_status DELETE "admin" "$ADMIN_TOKEN" "/vorstoesse/${IMPORT_VID}" "200"
+dav_delete "${IMPORT_DAV_URL}"
+
 # 6. Aufräumen: laufenden Sync stoppen, Test-Konfiguration entfernen.
 api_expect_status POST "admin" "$ADMIN_TOKEN" "/sync/cancel" "200" || true
-occ config:app:delete parlwin sync_stunden >/dev/null 2>&1 || true
+occ config:app:delete parlwin sync_zeitplan >/dev/null 2>&1 || true
+occ config:app:delete parlwin sync_zeitplan_letzter_check >/dev/null 2>&1 || true
+
+# Standard-Zeitplan: ohne gespeicherten Zeitplan liefert die API die zwei
+# vorbelegten Standard-Einträge (alle Wochentage, 10:00 und 18:00). Die
+# Konfiguration ist nach dem Cron-Cleanup oben leer, der Default greift also.
+echo "[E2E] Standard-Sync-Zeitplan prüfen (leer → zwei Vorgaben 10:00/18:00, alle Wochentage)"
+api_expect_status GET "admin" "$ADMIN_TOKEN" "/settings/sync-zeitplan" "200"
+assert_json 'length == 2' "Standard-Zeitplan hat nicht genau zwei Einträge"
+assert_json 'any(.[]; .zeit == "10:00")' "Standard-Zeitplan enthält keinen 10:00-Eintrag"
+assert_json 'any(.[]; .zeit == "18:00")' "Standard-Zeitplan enthält keinen 18:00-Eintrag"
+assert_json 'all(.[]; (.tage | length) == 7)' "Standard-Zeitplan gilt nicht an allen sieben Wochentagen"
 
 echo "[E2E] Abgeschlossen: Integrationsprüfungen und Multi-User-Browser-Test bestanden."

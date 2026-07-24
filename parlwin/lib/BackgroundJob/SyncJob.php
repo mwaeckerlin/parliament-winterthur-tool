@@ -7,6 +7,7 @@ namespace OCA\ParliamentWinterthur\BackgroundJob;
 use OCA\ParliamentWinterthur\AppInfo\Application;
 use OCA\ParliamentWinterthur\Command\SyncCommand;
 use OCA\ParliamentWinterthur\Service\FraktionsraumService;
+use OCA\ParliamentWinterthur\Service\SyncZeitplan;
 use OCA\ParliamentWinterthur\Service\VorstossImportService;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\BackgroundJob\TimedJob;
@@ -16,12 +17,13 @@ use Symfony\Component\Console\Input\ArrayInput;
 use Symfony\Component\Console\Output\NullOutput;
 
 /**
- * Zweimal täglich (03:00 und 15:00 Uhr) Synchronisation der Parlamentsdaten.
+ * Automatische Synchronisation der Parlamentsdaten nach Zeitplan.
+ *
+ * Es gilt der konfigurierbare Zeitplan `sync_zeitplan` (Einträge mit Wochentagen
+ * und Uhrzeit, siehe SyncZeitplan). Ist keiner konfiguriert, gilt der Standard:
+ * zwei Läufe an allen Wochentagen um 10:00 und 18:00 Uhr (SyncZeitplan::standard).
  */
 class SyncJob extends TimedJob {
-    private const SYNC_HOURS_DEFAULT = '3,15';
-    private const TIMEZONE   = 'Europe/Zurich';
-
     public function __construct(
         ITimeFactory $time,
         private readonly SyncCommand $syncCommand,
@@ -31,42 +33,38 @@ class SyncJob extends TimedJob {
         private readonly VorstossImportService $vorstossImport,
     ) {
         parent::__construct($time);
-        // Mindestabstand 11 Stunden — verhindert Doppelläufe im selben Zeitfenster
-        $this->setInterval(11 * 3600);
+        // Kurzes Intervall: die Fälligkeit entscheidet der Zeitplan, nicht das
+        // Job-Intervall — so sind auch minutengenaue Zeitplan-Punkte möglich.
+        $this->setInterval(300);
         $this->setTimeSensitivity(self::TIME_SENSITIVE);
     }
 
-    /**
-     * Führt die vollständige Synchronisation aller Parlamentsdaten durch.
-     */
-    protected function aktuelleStunde(): int {
-        return (int) (new \DateTime('now', new \DateTimeZone(self::TIMEZONE)))->format('G');
+    /** Aktuelle Zeit als Timestamp — für Tests überschreibbar. */
+    protected function jetztTs(): int {
+        return time();
     }
 
     /**
-     * Stunden (0–23, Europe/Zurich), zu denen synchronisiert wird. Konfigurierbar
-     * über die App-Einstellung `sync_stunden` (kommagetrennt), Default 3 und 15 Uhr.
-     *
-     * @return int[]
+     * Entscheidet, ob JETZT ein automatischer Lauf fällig ist, und vermerkt den
+     * Prüfzeitpunkt (verhindert Doppelläufe und holt verpasste Zeitplan-Punkte
+     * nach einem Ausfall nach). Ohne konfigurierten Zeitplan gilt der Standard.
      */
-    protected function syncStunden(): array {
-        $roh = (string) $this->config->getAppValue(Application::APP_ID, 'sync_stunden', self::SYNC_HOURS_DEFAULT);
-        $stunden = [];
-        foreach (explode(',', $roh) as $teil) {
-            $teil = trim($teil);
-            if ($teil === '' || !is_numeric($teil)) {
-                continue;
-            }
-            $h = (int) $teil;
-            if ($h >= 0 && $h <= 23) {
-                $stunden[] = $h;
-            }
+    protected function istFaellig(): bool {
+        $jetzt = $this->jetztTs();
+        $plan = SyncZeitplan::mitStandard(
+            (string) $this->config->getAppValue(Application::APP_ID, 'sync_zeitplan', '[]')
+        );
+        $letzter = (int) $this->config->getAppValue(Application::APP_ID, 'sync_zeitplan_letzter_check', '0');
+        $this->config->setAppValue(Application::APP_ID, 'sync_zeitplan_letzter_check', (string) $jetzt);
+        // Erste Prüfung nach Aktivierung: nur initialisieren, nichts nachholen.
+        if ($letzter === 0) {
+            return false;
         }
-        return $stunden !== [] ? $stunden : [3, 15];
+        return SyncZeitplan::faellig($plan, $letzter, $jetzt);
     }
 
     protected function run(mixed $argument): void {
-        if (!in_array($this->aktuelleStunde(), $this->syncStunden(), true)) {
+        if (!$this->istFaellig()) {
             return;
         }
 

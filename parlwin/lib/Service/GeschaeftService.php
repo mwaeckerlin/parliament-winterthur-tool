@@ -235,6 +235,7 @@ class GeschaeftService {
      *   antrag_fraktion?: string,
      *   entscheid_fraktion?: string,
      *   notizen?: string,
+     *   prioritaet?: string,
      * } $felder
      */
     public function aktualisiereInterneFelder(int $id, array $felder): Geschaeft {
@@ -255,6 +256,9 @@ class GeschaeftService {
         }
         if (array_key_exists('notizen', $felder)) {
             $geschaeft->setNotizen($felder['notizen']);
+        }
+        if (array_key_exists('prioritaet', $felder)) {
+            $geschaeft->setPrioritaet($felder['prioritaet']);
         }
         $geschaeft->setAktualisiertAm($jetzt);
 

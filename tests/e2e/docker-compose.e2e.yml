@@ -16,20 +16,24 @@ services:
   # Wird gezielt über `docker compose run --rm playwright` aus run-compose-e2e.sh
   # gestartet (Profil verhindert Autostart bei `docker compose up`).
   playwright:
-    image: mcr.microsoft.com/playwright:v1.61.0-noble
+    # Eigenes Image: @playwright/test und die Testdateien sind eingebacken, damit
+    # der Testlauf ohne npm, ohne npm-Registry und ohne Zugriff auf das Arbeits-
+    # verzeichnis des Hosts auskommt (siehe Dockerfile.playwright).
+    build:
+      # Relative Pfade löst Compose gegen das Projektverzeichnis auf (= Repo-Wurzel),
+      # nicht gegen den Speicherort dieser Datei. Der Context umfasst nur die Tests.
+      context: tests/e2e
+      dockerfile: Dockerfile.playwright
+    image: mwaeckerlin/parliament-winterthur-tool:playwright
     profiles: ["tools"]
     # Muss im selben Netz wie nextcloud-nginx liegen, sonst ist der interne
     # Hostname nextcloud-nginx:8080 nicht auflösbar.
     networks:
       - nginx-php
-    working_dir: /work
-    volumes:
-      # Relativ zum Compose-Projektverzeichnis (= Repo-Wurzel), nicht zum
-      # Speicherort dieser Datei. Mountet das ganze Repo nach /work.
-      - .:/work
-      # node_modules als container-eigenes (anonymes) Volume: das `npm ci` im
-      # Container bleibt isoliert und verschmutzt nicht die Host-node_modules.
-      - /work/node_modules
+    # KEINE Bind-Mounts: Testdateien kommen per COPY ins Image, der JUnit-Report
+    # wird nach dem Lauf per `docker cp` herausgeholt (run-compose-e2e.sh). Ein
+    # gemountetes Repo würde den Lauf an lokale Arbeitsstände koppeln und dem
+    # Container Schreibzugriff auf die Arbeitskopie geben.
     environment:
       PARLWIN_BASE_URL: "http://nextcloud-nginx:8080"
       PW_U1: "${PW_U1:-parlwin_praesidium}"
@@ -40,6 +44,6 @@ services:
       PW_P3: "${PW_P3:-}"
       PW_ADMIN_PASS: "${PW_ADMIN_PASS:-}"
       CI: "1"
-    command: >
-      bash -lc "npm ci --no-audit --no-fund &&
-                npx playwright test --config tests/e2e/playwright.config.js"
+    # Kein `npm ci` mehr: @playwright/test steckt im Image (NODE_PATH), die Tests
+    # ebenso. Der Lauf ist damit unabhängig von der npm-Registry. Das Kommando
+    # kommt aus dem Dockerfile (CMD).

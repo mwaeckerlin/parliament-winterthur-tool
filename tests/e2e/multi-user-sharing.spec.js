@@ -311,17 +311,37 @@ test.describe('Fraktion: drei Nutzer arbeiten gleichzeitig zusammen', () => {
 
   // 12 & 13: User1 setzt einen Beschluss → User2 und User3 sehen ihn sofort ohne Reload.
   test('12+13: Beschluss-Änderung erscheint bei allen sofort (Echtzeit)', async () => {
-    // Erstes (pendentes) Geschäft bestimmen.
-    const liste = await page1.request.get(`${BASE_URL}/index.php/apps/parlwin/geschaefte?limit=1&show_erledigt=1`, {
-      headers: { 'OCS-APIRequest': 'true' },
-    })
-    const gId = (await liste.json())[0].id
+    // page1 öffnet die erste Zeile und liest die Geschäfts-ID aus dem eigenen
+    // Detail-Request. So treffen «Beschluss setzen» und «betrachten» GARANTIERT
+    // dasselbe Geschäft — die API-Reihenfolge (limit=1) kann von der gerenderten
+    // Tabellen-Reihenfolge abweichen (v.a. bei vielen gleich-datierten eigenen
+    // Geschäften), wodurch gepostet und betrachtet sonst auseinanderfielen.
+    // Gezielt die TITEL-Zelle klicken: die Zeilenmitte kann auf einer
+    // Inline-Edit-Zelle liegen, die Klicks abfängt.
+    await openParlwin(page1)
+    const [detailReq] = await Promise.all([
+      page1.waitForRequest(
+        (r) => /\/apps\/parlwin\/geschaefte\/\d+(?:\?|$)/.test(r.url()) && r.method() === 'GET',
+        { timeout: 30_000 },
+      ),
+      page1.locator('.pw-tabelle-geschaefte tbody tr .pw-col-titel').first().click(),
+    ])
+    await page1.waitForSelector('.pw-geschaeft-detail, .pw-modal, .pw-notiz-eingabe', { timeout: 30_000 })
+    const gId = detailReq.url().match(/\/geschaefte\/(\d+)/)[1]
 
-    // Alle drei öffnen dasselbe Geschäft im Detail.
-    for (const page of [page1, page2, page3]) {
+    // page2 und page3 öffnen dieselbe erste Zeile — dasselbe Geschäft wie page1.
+    for (const page of [page2, page3]) {
       await openParlwin(page)
-      await page.locator('.pw-tabelle-geschaefte tbody tr').first().click()
+      await page.locator('.pw-tabelle-geschaefte tbody tr .pw-col-titel').first().click()
       await page.waitForSelector('.pw-geschaeft-detail, .pw-modal, .pw-notiz-eingabe', { timeout: 30_000 })
+    }
+
+    // Sicherstellen, dass die WebSockets der Beobachter WIRKLICH verbunden sind,
+    // bevor der Beschluss gesetzt wird — ein Live-Event wird nicht nachgeliefert;
+    // in Firefox verbindet der WS deutlich langsamer. #pw-ws-status wird von
+    // main.js/realtime.js bei WS-open auf pw-ws-connected gesetzt.
+    for (const page of [page2, page3]) {
+      await page.locator('#pw-ws-status.pw-ws-connected').waitFor({ state: 'attached', timeout: 30_000 })
     }
 
     const detail = await page1.request.get(`${BASE_URL}/index.php/apps/parlwin/geschaefte/${gId}`, {
@@ -347,20 +367,19 @@ test.describe('Fraktion: drei Nutzer arbeiten gleichzeitig zusammen', () => {
 
   // 14: User1 schreibt eine Notiz → User2 und User3 sehen sie sofort ohne Reload.
   test('14: Notiz erscheint bei allen sofort (Echtzeit)', async () => {
-    // Die Notiz-Eingabe ist ein WYSIWYG-Editor (Tiptap/contenteditable), kein
-    // <textarea>: Tiptap legt den Platzhalter als data-placeholder ab, nicht als
-    // HTML-placeholder. Das Feld wird daher über das ProseMirror-Element der
-    // «Notiz hinzufügen»-Zeile angesprochen, Eingabe per Klick + Tastatur.
-    const notizEditor = (page) =>
-      page.locator('.pw-form-zeile', { hasText: 'Notiz hinzufügen' }).locator('.ProseMirror').first()
+    // Notizen haben einen eigenen Bereich mit dem Knopf «+ Neue Notiz»; der
+    // WYSIWYG-Editor (Tiptap/contenteditable) öffnet erst auf Klick. Eingabe
+    // per Klick + Tastatur; gespeichert wird beim Verlassen des Editors.
     for (const page of [page1, page2, page3]) {
       await openParlwin(page)
       await page.locator('.pw-tabelle-geschaefte tbody tr .pw-col-titel').first().click()
-      await notizEditor(page).waitFor({ state: 'visible', timeout: 30_000 })
+      await page.getByRole('button', { name: '+ Neue Notiz' }).waitFor({ state: 'visible', timeout: 30_000 })
     }
 
     const notizText = `E2E-Echtzeit-Notiz ${stamp}`
-    const eingabe = notizEditor(page1)
+    await page1.getByRole('button', { name: '+ Neue Notiz' }).click()
+    const eingabe = page1.locator('.pw-notizen-liste .ProseMirror').first()
+    await eingabe.waitFor({ state: 'visible', timeout: 15_000 })
     await eingabe.click()
     await page1.keyboard.type(notizText)
     await eingabe.blur() // speichert die Notiz (@blur) → löst Echtzeit-Event aus

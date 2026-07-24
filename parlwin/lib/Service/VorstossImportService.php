@@ -68,10 +68,23 @@ class VorstossImportService
     {
         $jetzt = (new \DateTime())->format('Y-m-d H:i:s');
         $vorstoss = new Vorstoss();
+        // ALLE Felder explizit setzen: der Mapper schreibt beim INSERT nur die
+        // per Setter markierten Felder — nicht gesetzte Textspalten blieben
+        // NULL und brachen später das Laden der ganzen Liste.
         $vorstoss->setTitel($this->titelAusDateiname($dateiname));
+        $vorstoss->setArt('');
         $vorstoss->setHerkunft($herkunft);
         $vorstoss->setStatus('neu');
+        $vorstoss->setPrioritaet('');
+        $vorstoss->setBeschluss('');
+        $vorstoss->setZustaendigkeit('');
+        $vorstoss->setHerkunftFraktion('');
+        $vorstoss->setAnsprechpartner('');
+        $vorstoss->setInhalt('');
+        $vorstoss->setNotizen('[]');
         $vorstoss->setDokument($relPfad);
+        $vorstoss->setGeschaeftId(0);
+        $vorstoss->setGeloescht(false);
         $vorstoss->setErstelltAm($jetzt);
         $vorstoss->setAktualisiertAm($jetzt);
         return $vorstoss;

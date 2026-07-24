@@ -269,6 +269,7 @@ if (!interface_exists('OCP\Files\Node')) {
         public function getSize(): int|float;
         public function getMimeType(): string;
         public function move(string $targetPath);
+        public function delete(): void;
     }');
 }
 if (!interface_exists('OCP\Files\Folder')) {
@@ -382,10 +383,18 @@ if (!class_exists('OCP\AppFramework\Db\Entity')) {
     eval ('namespace OCP\AppFramework\Db; class Entity {
         protected array $types = [];
         protected array $data = [];
+        protected array $updatedFieldsListe = [];
         protected function addType(string $field, string $type): void {
             $this->types[$field] = $type;
         }
-        public function markFieldUpdated(string $fieldName): void {}
+        public function markFieldUpdated(string $fieldName): void {
+            $this->updatedFieldsListe[$fieldName] = true;
+        }
+        // Wie die echte Entity: die per Setter markierten Felder — nur sie
+        // schreibt der QBMapper bei einem INSERT/UPDATE in die Datenbank.
+        public function getUpdatedFields(): array {
+            return $this->updatedFieldsListe;
+        }
         public function __call(string $name, array $arguments) {
             if (str_starts_with($name, "set")) {
                 $property = lcfirst(substr($name, 3));
@@ -394,6 +403,7 @@ if (!class_exists('OCP\AppFramework\Db\Entity')) {
                 } else {
                     $this->data[$property] = $arguments[0] ?? null;
                 }
+                $this->markFieldUpdated($property);
                 return $this;
             }
             if (str_starts_with($name, "get")) {
@@ -427,6 +437,7 @@ if (!class_exists('OCP\AppFramework\Db\QBMapper')) {
         }
         public function insert($entity) { return $entity; }
         public function update($entity) { return $entity; }
+        public function delete($entity) { return $entity; }
     }');
 }
 
@@ -465,6 +476,79 @@ if (!interface_exists('OCP\Share\IManager')) {
         public function createShare(IShare $share): IShare;
         public function getSharesBy(string $userId, int $shareType, $node = null, bool $reshares = false, int $limit = -1, int $offset = 0): array;
         public function deleteShare(IShare $share): void;
+    }');
+}
+
+if (!interface_exists('OCP\Search\IProvider')) {
+    // phpcs:ignore
+    eval ('namespace OCP\Search;
+    interface IProvider {
+        public function getId(): string;
+        public function getName(): string;
+        public function getOrder(string $route, array $routeParameters): int;
+        public function search(\OCP\IUser $user, ISearchQuery $query): SearchResult;
+    }
+    interface ISearchQuery {
+        public function getTerm(): string;
+        public function getLimit(): int;
+    }
+    class SearchResultEntry {
+        public function __construct(
+            public string $thumbnailUrl,
+            public string $title,
+            public string $subline,
+            public string $resourceUrl,
+            public string $icon = "",
+            public bool $rounded = false,
+        ) {}
+    }
+    class SearchResult {
+        private function __construct(public string $name, public array $entries) {}
+        public static function complete(string $name, array $entries): self { return new self($name, $entries); }
+    }');
+}
+
+if (!interface_exists('OCP\IUser')) {
+    // phpcs:ignore
+    eval ('namespace OCP; interface IUser { public function getUID(): string; }');
+}
+
+if (!interface_exists('OCP\IURLGenerator')) {
+    // phpcs:ignore
+    eval ('namespace OCP; interface IURLGenerator { public function linkToRoute(string $route, array $args = []): string; }');
+}
+
+if (!interface_exists('OCP\IL10N')) {
+    // phpcs:ignore
+    eval ('namespace OCP; interface IL10N { public function t(string $text, array $params = []): string; }');
+}
+
+// ── Template-Umgebung ────────────────────────────────────────────────────────
+// Nextcloud stellt Templates globale Ausgabe-Funktionen und den DI-Container
+// bereit. Mit diesen Stubs lassen sich die ausgelieferten Templates direkt
+// rendern und ihr Ergebnis prüfen (siehe tests/Templates/).
+
+if (!function_exists('p')) {
+    // phpcs:ignore
+    eval ('function p($string): void { echo htmlspecialchars((string) $string, ENT_QUOTES, "UTF-8"); }');
+}
+
+if (!function_exists('print_unescaped')) {
+    // phpcs:ignore
+    eval ('function print_unescaped($string): void { echo (string) $string; }');
+}
+
+if (!class_exists('OC\Security\CSP\ContentSecurityPolicyNonceManager')) {
+    // phpcs:ignore
+    eval ('namespace OC\Security\CSP; class ContentSecurityPolicyNonceManager {
+        public function getNonce(): string { return "test-nonce"; }
+    }');
+}
+
+if (!class_exists('OCP\Server')) {
+    // phpcs:ignore
+    eval ('namespace OCP; class Server {
+        public static function get(string $id) { return new $id(); }
     }');
 }
 

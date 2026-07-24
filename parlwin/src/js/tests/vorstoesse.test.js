@@ -38,9 +38,17 @@ describe('Vorstoesseliste', () => {
     expect(wrapper.vm.gefiltert.map(v => v.id)).toEqual([1])
   })
 
-  it('speichert einen neuen Vorstoss per POST', async () => {
+  it('das Neu-Anlegen öffnet die Maske, legt aber noch nichts an', async () => {
     const wrapper = shallowMount(Vorstoesseliste)
     wrapper.vm.neuerVorstoss()
+    expect(wrapper.vm.bearbeitung, 'Die vollständige Maske ist nicht offen').not.toBeNull()
+    expect(wrapper.vm.istEntwurf).toBe(true)
+    expect(
+      axios.post.mock.calls.filter(c => String(c[0]).includes('/vorstoesse')),
+      'Es wurde etwas angelegt, obwohl noch nicht gespeichert wurde',
+    ).toHaveLength(0)
+
+    // Erst «Speichern» legt an.
     wrapper.vm.bearbeitung.titel = 'Mehr Velowege'
     await wrapper.vm.speichern()
     const calls = axios.post.mock.calls.filter(c => String(c[0]).includes('/vorstoesse'))

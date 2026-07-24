@@ -14,11 +14,22 @@ services:
   # sensible defaults baked into the images.
 
   traefik:
-    image: traefik
+    # Die Routing-Konfiguration steckt im Abbild (COPY), nicht in einem Mount:
+    # kein Host-Verzeichnis im Container, kein Docker-Socket. Der Build-Root ist
+    # das Verzeichnis des Dockerfiles, dynamic.yml liegt daneben. Nach einer
+    # Änderung am Routing: docker compose up -d --build traefik
+    build:
+      context: traefik
+    image: mwaeckerlin/parliament-winterthur-tool:traefik
+    # Dieses Abbild entsteht ausschliesslich lokal beim Bauen und liegt in keiner
+    # Registry — ohne diese Angabe würde ein «--pull always» es dort suchen.
+    pull_policy: build
     command:
+      # Kein Docker-Provider: er verlangte den Docker-Socket im Container.
+      # Das Routing kommt aus der ins Abbild kopierten Datei; sie ändert sich zur
+      # Laufzeit nicht, deshalb wird sie auch nicht überwacht.
       - --providers.docker=false
       - --providers.file.filename=/etc/traefik/dynamic.yml
-      - --providers.file.watch=true
       - --entrypoints.web.address=:80
       - --entrypoints.websecure.address=:443
       - --entrypoints.web.http.redirections.entrypoint.to=websecure
@@ -28,7 +39,9 @@ services:
       - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
       - --certificatesresolvers.letsencrypt.acme.httpchallenge=true
       - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
-      - --log.level=DEBUG
+      # Produktions-Loglevel. Zur Fehlersuche vorübergehend auf DEBUG setzen —
+      # nie als ausgelieferter Standard.
+      - --log.level=INFO
       - --log.format=json
       - --accesslog=true
       - --accesslog.format=json
@@ -38,7 +51,6 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
       - traefik-letsencrypt:/letsencrypt
     networks:
       - traefik-nginx

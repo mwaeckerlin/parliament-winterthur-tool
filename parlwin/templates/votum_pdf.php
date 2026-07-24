@@ -133,7 +133,7 @@ $autor = (string) ($votum['autorName'] ?? '');
     </style>
 </head>
 <body>
-    <button type="button" class="druck-knopf" onclick="window.print()">Als PDF speichern / drucken</button>
+    <button type="button" class="druck-knopf" id="druck-knopf">Als PDF speichern / drucken</button>
 
     <header class="kopf">
         <h1>Votum im Rat</h1>
@@ -195,22 +195,12 @@ $autor = (string) ($votum['autorName'] ?? '');
             <p class="leer">— Noch kein Votum erfasst —</p>
         <?php else: ?>
             <?php
-            // TipTap-HTML ist auf ein sicheres Tag-Whitelist beschraenkt.
-            // Wir reichen es durch, entfernen aber sicherheitshalber
-            // alle script/style/iframe/object/embed Elemente.
-            $sicher = preg_replace(
-                '#<(script|style|iframe|object|embed|link|meta)\b[^>]*>.*?</\1>#is',
-                '',
-                $votumText
-            );
-            $sicher = preg_replace(
-                '#<(script|style|iframe|object|embed|link|meta)\b[^>]*/?>#is',
-                '',
-                (string) $sicher
-            );
-            // on*-Attribute entfernen
-            $sicher = preg_replace('#\son[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]*)#i', '', (string) $sicher);
-            echo $sicher;
+            // Der Wortlaut behaelt seine Formatierung, verliert aber jedes
+            // ausfuehrbare Element: erlaubt ist nur, was HtmlSanitizer auf
+            // seiner Positivliste fuehrt. Der Text stammt zwar aus dem Editor,
+            // wird aber ueber die Schnittstelle gespeichert und ist damit frei
+            // waehlbar - eine Positivliste ist deshalb Pflicht.
+            echo \OCA\ParliamentWinterthur\Service\HtmlSanitizer::sauber($votumText);
             ?>
         <?php endif; ?>
     </div>
@@ -219,15 +209,38 @@ $autor = (string) ($votum['autorName'] ?? '');
         Parliament Winterthur · Geschäft <?php p($externId !== '' ? $externId : (string) $_['id']); ?> · ausgedruckt am <?php p((new \DateTimeImmutable())->format('d.m.Y H:i')); ?>
     </footer>
 
-    <script>
+<?php
+// CSP-Nonce fuer das Inline-Script. Ohne ihn blockiert die Content-Security-
+// Policy von Nextcloud das Script vollstaendig - dann oeffnet sich weder der
+// Druck-Dialog automatisch, noch wirkt der Knopf. Gleiches Muster wie in
+// main.php und admin.php.
+$votumNonce = \OCP\Server::get(\OC\Security\CSP\ContentSecurityPolicyNonceManager::class)->getNonce();
+?>
+    <script nonce="<?php p($votumNonce); ?>">
         // Druck-Dialog automatisch oeffnen, sobald die Schriftarten geladen sind.
         // Der Benutzer kann dann im Dialog "Als PDF speichern" waehlen.
+        //
+        // Wichtig: der Dialog darf NIE ausbleiben. Frueher hing er allein an
+        // document.fonts.ready - loest dieses Versprechen nicht aus (etwa weil
+        // eine Schrift nicht geladen werden kann), oeffnete sich der Dialog gar
+        // nicht. Darum zusaetzlich ein Zeitlimit; gedruckt wird genau einmal.
         window.addEventListener('load', function () {
-            if (document.fonts && document.fonts.ready) {
-                document.fonts.ready.then(function () { window.print(); });
-            } else {
-                setTimeout(function () { window.print(); }, 250);
+            var gedruckt = false;
+            function drucken() {
+                if (gedruckt) { return; }
+                gedruckt = true;
+                window.print();
             }
+            if (document.fonts && document.fonts.ready) {
+                document.fonts.ready.then(drucken);
+            }
+            setTimeout(drucken, 500);
+        });
+
+        // Der Knopf braucht einen echten Listener: ein Inline-onclick waere
+        // durch dieselbe Content-Security-Policy blockiert und wirkungslos.
+        document.getElementById('druck-knopf').addEventListener('click', function () {
+            window.print();
         });
     </script>
 </body>

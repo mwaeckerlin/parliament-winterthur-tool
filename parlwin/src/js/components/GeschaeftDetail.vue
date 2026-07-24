@@ -6,8 +6,19 @@
     <template v-else>
       <header class="pw-detail-header">
         <div>
-          <p class="pw-detail-kicker">{{ geschaeft.nummer || 'Geschäft' }}</p>
-          <h3>{{ geschaeft.titel }}</h3>
+          <p class="pw-detail-kicker">{{ geschaeft.nummer || 'Eigenes Geschäft' }}</p>
+          <!-- Selbst angelegte Geschäfte sind vollständig bearbeitbar; bei
+               Parlamentsgeschäften stammt der Titel von der Webseite. -->
+          <input
+            v-if="istEigenes"
+            v-model="geschaeft.titel"
+            type="text"
+            class="pw-detail-titel-input"
+            placeholder="Titel des Geschäfts"
+            aria-label="Titel"
+            @change="stammdatenSpeichern"
+          />
+          <h3 v-else>{{ geschaeft.titel }}</h3>
         </div>
         <span :class="'pw-status-' + fraktionsstatusKlasse(geschaeft.fraktionsstatus)">
           {{ fraktionsstatusLabel(geschaeft.fraktionsstatus) }}
@@ -19,10 +30,51 @@
         <table class="pw-info-tabelle">
           <tbody>
             <tr><th>Nummer</th><td>{{ geschaeft.nummer }}</td></tr>
-            <tr><th>Typ</th><td>{{ geschaeft.typ }}</td></tr>
-            <tr><th>Status</th><td>{{ geschaeft.status }}</td></tr>
+            <tr>
+              <th>Typ</th>
+              <td>
+                <input
+                  v-if="istEigenes"
+                  v-model="geschaeft.typ"
+                  type="text"
+                  class="pw-input"
+                  placeholder="z.B. Kommissionsgeschäft"
+                  aria-label="Typ"
+                  @change="stammdatenSpeichern"
+                />
+                <template v-else>{{ geschaeft.typ }}</template>
+              </td>
+            </tr>
+            <tr>
+              <th>Status</th>
+              <td>
+                <input
+                  v-if="istEigenes"
+                  v-model="geschaeft.status"
+                  type="text"
+                  class="pw-input"
+                  placeholder="z.B. Pendent"
+                  aria-label="Status"
+                  @change="stammdatenSpeichern"
+                />
+                <template v-else>{{ kuerze(geschaeft.status) }}</template>
+              </td>
+            </tr>
             <tr><th>Fraktionsstatus</th><td>{{ fraktionsstatusLabel(geschaeft.fraktionsstatus) }}</td></tr>
-            <tr><th>Datum</th><td>{{ formatieredatum(geschaeft.datum) }}</td></tr>
+            <tr>
+              <th>Datum</th>
+              <td>
+                <input
+                  v-if="istEigenes"
+                  v-model="geschaeft.datum"
+                  type="date"
+                  class="pw-input"
+                  aria-label="Datum"
+                  @change="stammdatenSpeichern"
+                />
+                <template v-else>{{ formatieredatum(geschaeft.datum) }}</template>
+              </td>
+            </tr>
             <tr v-if="geschaeft.einreicher && geschaeft.einreicher.length">
               <th>Einreicher</th>
               <td>
@@ -47,6 +99,17 @@
         <h4>Fraktionsinterne Bearbeitung</h4>
 
         <div class="pw-form-zeile">
+          <label>Priorität</label>
+          <NcSelect
+            :model-value="prioritaetWahl"
+            :options="prioritaetOptionen"
+            :clearable="true"
+            placeholder="—"
+            @update:model-value="prioritaetGewaehlt"
+          />
+        </div>
+
+        <div class="pw-form-zeile">
           <label>Zuständigkeit</label>
           <PwMultiSelect
             class="pw-zustaendigkeit-select"
@@ -62,16 +125,9 @@
           </small>
         </div>
 
-        <div class="pw-form-zeile">
-          <label>Notiz hinzufügen</label>
-          <PwWysiwyg
-            :model-value="neueNotiz"
-            placeholder="Kommentar, Beobachtung, Hinweis"
-            @update:model-value="val => { neueNotiz = val; notizDebounce() }"
-            @blur="notizSpeichernBeiBlur"
-          />
-        </div>
-
+        <!-- Beschluss, Votum, Notizen, Dokumente und Verlauf hängen an einer
+             bestehenden ID und erscheinen deshalb erst nach dem Speichern. -->
+        <template v-if="!istNeu">
         <div class="pw-form-zeile">
           <label>Beschluss erfassen</label>
           <BeschlussWidget
@@ -79,10 +135,60 @@
             :options="beschlussOptionen"
             :disabled="!geschaeft.fraktionssitzung?.beschlussSchreibbar"
             @update:model-value="beschlussNachWahl"
+            @blur="beschlussSessionBeenden"
           />
           <small v-if="!geschaeft.fraktionssitzung?.beschlussSchreibbar" class="pw-hinweis">
             Im Fraktionssitzungsmodus darf nur der Protokollführer Beschlüsse erfassen.
           </small>
+        </div>
+
+        <!-- Votum im Rat: nur die zuständige Person erfasst den Wortlaut; das
+             PDF steht in der Werkzeugleiste bereit, sobald etwas erfasst ist. -->
+        <div class="pw-form-zeile pw-votum">
+          <label>Votum im Rat</label>
+          <PwWysiwyg
+            :model-value="votumHtml"
+            :editable="votumSchreibbar"
+            placeholder="Wortlaut des Votums"
+            :status="votumStatus"
+            :pdf-href="votumPdfUrl"
+            pdf-title="Votum als PDF drucken"
+            @update:model-value="votumGeaendert"
+            @blur="votumSofortSpeichern"
+          />
+          <small v-if="!votumSchreibbar" class="pw-hinweis">
+            Das Votum erfasst die für dieses Geschäft zuständige Person.
+          </small>
+          <NcButton
+            v-if="votumSchreibbar && votumHatInhalt"
+            type="secondary"
+            class="pw-votum-archivieren"
+            @click="votumArchivieren"
+          >
+            Votum archivieren
+          </NcButton>
+        </div>
+
+        <div class="pw-form-zeile">
+          <label>Notizen</label>
+          <NotizenListe
+            :basis-url="'geschaefte/' + geschaeftId"
+            :notizen="notizAktionen"
+            :aktuelle-uid="aktuelleUid"
+            @geaendert="onNotizenGeaendert"
+          />
+          <!-- Sitzungsnotizen: in Sitzungen erfasste, am Geschäft haftende Notizen.
+               Separat und ausklappbar, standardmässig eingeklappt. -->
+          <details class="pw-sitzungsnotizen-details">
+            <summary>Sitzungsnotizen<span v-if="sitzungsnotizAktive.length" class="pw-sitzungsnotizen-zahl">{{ sitzungsnotizAktive.length }}</span></summary>
+            <NotizenListe
+              :basis-url="'geschaefte/' + geschaeftId"
+              :notizen="sitzungsnotizAktionen"
+              :aktuelle-uid="aktuelleUid"
+              kategorie="sitzungsnotiz"
+              @geaendert="onSitzungsnotizenGeaendert"
+            />
+          </details>
         </div>
 
         <div class="pw-form-zeile">
@@ -90,89 +196,42 @@
           <GeschaeftDokumente
             :geschaeft-id="geschaeftId"
             :geschaeft-nummer="geschaeft.nummer || ''"
+            :titel="geschaeft.titel || ''"
           />
         </div>
+        </template>
+        <small v-else class="pw-hinweis">
+          Beschluss, Votum, Notizen, Dokumente und der Verlauf stehen bereit, sobald das Geschäft gespeichert ist.
+        </small>
       </div>
 
-      <div class="pw-detail-abschnitt">
-        <h4>Aktionszeitleiste</h4>
-        <div v-if="zeitleisteEintraege.length === 0" class="pw-hinweis">Noch keine Aktionen vorhanden.</div>
-        <div
-          v-for="(e, idx) in zeitleisteEintraege"
-          :key="e._key"
-          class="pw-timeline-eintrag"
-          :class="{ 'pw-timeline-drag-over': dragZeitleisteUeberIdx === idx }"
-          @dragstart="tlDragStart($event, idx)"
-          @dragover.prevent="tlDragOver($event, idx)"
-          @dragleave="tlDragLeave"
-          @drop.prevent="tlDrop($event, idx)"
-          @dragend="tlDragEnd"
-        >
-          <span class="pw-notiz-griff" draggable="true" title="Verschieben" aria-hidden="true">⠿</span>
-          <div class="pw-timeline-datum">
-            <span class="pw-timeline-datum-tag">{{ formatieredatum(e.erstelltAm) }}</span>
-            <span class="pw-timeline-datum-uhrzeit">{{ formatiereUhrzeit(e.erstelltAm) }}</span>
-            <small v-if="e._sitzungInfo" class="pw-traktandum-kontext-meta">{{ e._sitzungInfo }}</small>
+      <div v-if="istNeu" class="pw-modal-footer">
+        <NcButton type="primary" :disabled="!(geschaeft.titel || '').trim() || speichernLaeuft" @click="neuesGeschaeftSpeichern">Speichern</NcButton>
+        <NcButton @click="$emit('abbrechen')">Abbrechen</NcButton>
+      </div>
+
+      <Aktionszeitleiste
+        v-if="!istNeu"
+        :aktionen="geschaeft.aktionen || []"
+        :traktandum-kontext="traktandumKontext"
+        @oeffne-traktandum="id => $emit('oeffneTraktandum', id)"
+      />
+
+      <div v-if="verknuepfteVorstoesse.length" class="pw-detail-abschnitt">
+        <h4>Verknüpfte Vorstösse</h4>
+        <div v-for="v in verknuepfteVorstoesse" :key="v.id" class="pw-verknuepfter-vorstoss">
+          <h5>{{ v.titel }}<span v-if="v.art"> · {{ v.art }}</span></h5>
+          <div class="pw-data-card-grid">
+            <div v-if="v.beschluss" class="pw-data-pair"><span>Haltung</span><strong>{{ v.beschluss }}</strong></div>
+            <div v-if="vorstossZustaendigkeit(v)" class="pw-data-pair"><span>Zuständigkeit</span><strong>{{ vorstossZustaendigkeit(v) }}</strong></div>
           </div>
-          <span class="pw-timeline-autor">{{ e.autorName || e.autorUid || 'unbekannt' }}</span>
-          <div class="pw-timeline-inhalt">
-            <template v-if="e._type === 'traktandumNotiz'">
-              <span
-                v-if="e._sitzungId"
-                class="pw-timeline-text pw-notiz-text-klickbar"
-                role="button"
-                tabindex="0"
-                title="Zur Sitzung springen"
-                @click="$emit('oeffneTraktandum', e._sitzungId)"
-                @keydown.enter.prevent="$emit('oeffneTraktandum', e._sitzungId)"
-                v-html="markdownZuHtml(e.text)"
-              />
-              <span v-else class="pw-timeline-text" v-html="markdownZuHtml(e.text)" />
-            </template>
-            <template v-else-if="e.aktionTyp === 'notiz' && istEigeneAktion(e)">
-              <div v-if="bearbeitenNotizId === e.id" class="pw-notiz-bearbeiten-zeile">
-                <PwWysiwyg
-                  v-model="bearbeitenNotizText"
-                  placeholder="Notiz bearbeiten…"
-                />
-                <div class="pw-notiz-bearbeiten-aktionen">
-                  <button type="button" class="button pw-btn-mini" @click="notizBearbeitenSpeichern(e)">✓</button>
-                  <button type="button" class="button pw-btn-mini" @click="notizBearbeitenAbbrechen">✕</button>
-                </div>
-              </div>
-              <span
-                v-else-if="e.text"
-                class="pw-timeline-text pw-notiz-text-klickbar"
-                role="button"
-                tabindex="0"
-                title="Klicken zum Bearbeiten"
-                @click="notizBearbeitenStarten(e, $event)"
-                @keydown.enter.prevent="notizBearbeitenStarten(e)"
-                v-html="markdownZuHtml(e.text)"
-              />
-            </template>
-            <div v-else-if="e.text && e.aktionTyp === 'votum'" class="pw-timeline-text pw-timeline-html" v-html="e.text" />
-            <template v-else-if="e.titel && e.aktionTyp !== 'notiz'">
-              <span class="pw-timeline-text">{{ e.titel }}</span>
-              <span v-if="e.text" class="pw-timeline-detail">{{ e.text }}</span>
-            </template>
-            <span v-else-if="e.text" class="pw-timeline-text">{{ e.text }}</span>
-          </div>
-          <div class="pw-timeline-aktionen">
-            <button
-              v-if="e._type === 'aktion' && e.aktionTyp === 'notiz' && istEigeneAktion(e) && bearbeitenNotizId !== e.id"
-              type="button"
-              class="button pw-btn-mini"
-              title="Notiz löschen"
-              @click="notizLoeschen(e)"
-            >✕</button>
+          <div v-for="n in vorstossNotizen(v)" :key="n.id" class="pw-notiz-eintrag">
+            <div class="pw-notiz-kopf"><span class="pw-notiz-autor">{{ n.autorName || n.autorUid }}</span></div>
+            <div class="pw-notiz-inhalt" v-html="markdownZuHtml(n.text)" />
           </div>
         </div>
       </div>
 
-      <div class="pw-detail-aktionen">
-        <span v-if="meldung" class="pw-meldung" :class="fehler ? 'fehler' : 'erfolg'">{{ meldung }}</span>
-      </div>
     </template>
   </div>
 </template>
@@ -180,47 +239,46 @@
 <script>
 import { generateUrl } from '@nextcloud/router'
 import { getCurrentUser } from '@nextcloud/auth'
-import { vollerName, personKey, markdownZuHtml } from '../utils'
+import { showSuccess, showError } from '@nextcloud/dialogs'
+import { vollerName, personKey, markdownZuHtml, PRIORITAETEN, kuerze } from '../utils'
 import axios from '@nextcloud/axios'
 import NcSelect from '@nextcloud/vue/components/NcSelect'
-import PwMultiSelect from './PwMultiSelect.vue'
+import NcButton from '@nextcloud/vue/components/NcButton'
 import PwWysiwyg from './PwWysiwyg.vue'
+import PwMultiSelect from './PwMultiSelect.vue'
 import GeschaeftDokumente from './GeschaeftDokumente.vue'
 import BeschlussWidget from './BeschlussWidget.vue'
+import NotizenListe from './NotizenListe.vue'
+import Aktionszeitleiste from './Aktionszeitleiste.vue'
 import { subscribeRealtime } from '../realtime'
 
 export default {
   name: 'GeschaeftDetail',
-  components: { NcSelect, PwMultiSelect, PwWysiwyg, GeschaeftDokumente, BeschlussWidget },
+  components: { NcSelect, NcButton, PwWysiwyg, PwMultiSelect, GeschaeftDokumente, BeschlussWidget, NotizenListe, Aktionszeitleiste },
   props: {
     geschaeftId: { type: Number, required: true },
     mitglieder: { type: Array, default: () => [] },
     traktandumKontext: { type: Object, default: null },
   },
-  emits: ['gespeichert', 'oeffneTraktandum'],
+  emits: ['gespeichert', 'oeffneTraktandum', 'erstellt', 'abbrechen'],
   data() {
     return {
       laden: false,
       geschaeft: null,
-      neueNotiz: '',
       beschlussWert: null,
-      bearbeitenNotizId: null,
-      bearbeitenNotizText: '',
-      zeitleisteReihenfolge: [],
-      dragZeitleisteVonIdx: -1,
-      dragZeitleisteUeberIdx: -1,
+      beschlussAktionId: null,
+      // Läuft, während ein neu erfasstes Geschäft angelegt wird.
+      speichernLaeuft: false,
+      beschlussZuletztGespeichert: null,
       votumHtml: '',
       votumAktionId: null,
       votumSpeicherTimer: null,
       votumStatus: '',
       votumDirty: false,
-      notizTimer: null,
-      notizAktionId: null,
       ausgewaehltePersonKeys: [],
       hauptPersonKey: '',
-      meldung: '',
-      fehler: false,
       unsubRealtime: null,
+      verknuepfteVorstoesse: [],
     }
   },
   created() {
@@ -231,11 +289,6 @@ export default {
       this.unsubRealtime()
       this.unsubRealtime = null
     }
-    if (this.notizTimer) {
-      clearTimeout(this.notizTimer)
-      this.notizTimer = null
-      this.notizSpeichern()
-    }
     if (this.votumSpeicherTimer) {
       clearTimeout(this.votumSpeicherTimer)
       this.votumSpeicherTimer = null
@@ -244,6 +297,23 @@ export default {
     }
   },
   computed: {
+    // Neu-Modus: dieselbe Maske, aber es existiert noch kein Geschäft.
+    istNeu() {
+      return !this.geschaeftId
+    },
+    // Selbst angelegte Geschäfte tragen die externe ID «eigen:…». Sie stammen
+    // nicht von der Parlamentswebseite, werden vom Abgleich nicht überschrieben
+    // und sind deshalb in allen Stammdaten bearbeitbar.
+    istEigenes() {
+      return String(this.geschaeft?.externId || '').startsWith('eigen:')
+    },
+    prioritaetOptionen() {
+      return PRIORITAETEN
+    },
+    prioritaetWahl() {
+      const p = this.geschaeft?.prioritaet || ''
+      return PRIORITAETEN.find(o => o.value === p) || null
+    },
     aktiveMitglieder() {
       // Nur Fraktionsmitglieder, die auch als Nextcloud-User registriert sind,
       // können als zuständig gewählt werden.
@@ -279,51 +349,34 @@ export default {
       const erlaubt = Array.isArray(this.geschaeft?.erlaubteBeschluesse) ? this.geschaeft.erlaubteBeschluesse : []
       return erlaubt.map((b) => ({ label: b.label || b.code, value: b.code }))
     },
-    zeitleisteAktionen() {
-      const alle = this.geschaeft?.aktionen || []
-      return alle.filter(a => !(a.aktionTyp === 'votum' && a.entscheidGueltig))
+    /** UID des angemeldeten Nutzers — für «nur der Autor darf» in der Notizen-Liste. */
+    aktuelleUid() {
+      return getCurrentUser()?.uid || ''
     },
-    zeitleisteEintraege() {
-      const aktionen = this.zeitleisteAktionen.map(a => ({
-        ...a,
-        _key: String(a.id),
-        _type: 'aktion',
-        _sitzungInfo: null,
-        _sitzungId: null,
-      }))
-      const tk = this.traktandumKontext
-      const traktandumNotizen = (tk?.notizen || []).map((n, i) => {
-        const parts = []
-        if (tk.traktandumNummer) parts.push(`Trakt. ${tk.traktandumNummer}`)
-        if (tk.sitzungDatum) parts.push(this.formatieredatum(tk.sitzungDatum))
-        if (tk.sitzungTitel) parts.push(tk.sitzungTitel)
-        return {
-          id: null,
-          _key: `tk_${i}`,
-          _type: 'traktandumNotiz',
-          _sitzungId: tk.sitzungId || null,
-          aktionTyp: 'notiz',
-          titel: '',
-          text: n.text,
-          autorName: n.displayName || n.uid,
-          autorUid: n.uid,
-          erstelltAm: n.datum,
-          aktionCode: '',
-          entscheidGueltig: false,
-          _sitzungInfo: parts.join(', '),
-        }
-      })
-      const kombiniert = [...traktandumNotizen, ...aktionen]
-      if (this.zeitleisteReihenfolge.length > 0) {
-        const indexMap = {}
-        this.zeitleisteReihenfolge.forEach((key, i) => { indexMap[key] = i })
-        return [...kombiniert].sort((a, b) => {
-          const ia = indexMap[a._key] ?? Number.MAX_SAFE_INTEGER
-          const ib = indexMap[b._key] ?? Number.MAX_SAFE_INTEGER
-          return ia - ib
-        })
-      }
-      return kombiniert
+    /** Alle Notiz-Aktionen (AKTIVE und GELÖSCHTE) — die geteilte NotizenListe verwaltet sie. */
+    notizAktionen() {
+      const alle = this.geschaeft?.aktionen || []
+      return alle.filter(a => a.aktionTyp === 'notiz')
+    },
+    /** Sitzungsnotizen (in Sitzungen erfasst, am Geschäft haftend) — AKTIVE und GELÖSCHTE. */
+    sitzungsnotizAktionen() {
+      const alle = this.geschaeft?.aktionen || []
+      return alle.filter(a => a.aktionTyp === 'sitzungsnotiz')
+    },
+    /** Aktive (nicht gelöschte) Sitzungsnotizen — für die Zahl im aufklappbaren Titel. */
+    sitzungsnotizAktive() {
+      return this.sitzungsnotizAktionen.filter(a => !a.geloescht)
+    },
+    // Das Votum vertritt die Fraktion im Rat — erfassen darf es nur, wer für
+    // dieses Geschäft zuständig ist. Der Server weist andere ohnehin ab; hier
+    // bleibt das Feld für sie sichtbar, aber schreibgeschützt.
+    votumSchreibbar() {
+      const uid = (getCurrentUser()?.uid || '').toLowerCase()
+      if (!uid) return false
+      const ich = this.mitglieder.find(
+        (m) => ((m.nextcloudUid || m.nextcloud_uid || '').toLowerCase()) === uid,
+      )
+      return !!ich && this.ausgewaehltePersonKeys.includes(personKey(ich))
     },
     votumHatInhalt() {
       const t = (this.votumHtml || '').replace(/<[^>]*>/g, '').trim()
@@ -350,9 +403,48 @@ export default {
     markdownZuHtml,
     vollerName,
     personKey,
+    kuerze,
     personLabelByKey(key) {
       const member = this.mitglieder.find(m => this.personKey(m) === key)
       return member ? this.vollerName(member) : key
+    },
+    // Legt das in der Maske erfasste eigene Geschäft an. Danach übernimmt die
+    // Liste die neue Nummer und öffnet dieselbe Maske als Bearbeitung, sodass
+    // sich Dokumente und Notizen direkt anschliessen lassen.
+    async neuesGeschaeftSpeichern() {
+      const titel = (this.geschaeft?.titel || '').trim()
+      if (!titel || this.speichernLaeuft) return
+      this.speichernLaeuft = true
+      try {
+        const { data } = await axios.post(generateUrl('/apps/parlwin/geschaefte'), {
+          titel,
+          typ: this.geschaeft.typ || 'Eigenes Geschäft',
+          status: this.geschaeft.status || 'Pendent',
+        })
+        showSuccess('Gespeichert')
+        this.$emit('erstellt', data?.id || 0)
+      } catch (e) {
+        showError('Geschäft konnte nicht erstellt werden: ' + (e?.response?.data?.fehler || e?.message || ''))
+      } finally {
+        this.speichernLaeuft = false
+      }
+    },
+    // Titel, Typ, Status und Datum eines selbst angelegten Geschäfts speichern
+    // sofort — wie jede andere Eingabe in dieser Maske.
+    async stammdatenSpeichern() {
+      if (!this.istEigenes || !this.geschaeft?.id) return
+      try {
+        await axios.put(generateUrl(`/apps/parlwin/geschaefte/${this.geschaeft.id}/stammdaten`), {
+          titel: this.geschaeft.titel || '',
+          typ: this.geschaeft.typ || '',
+          status: this.geschaeft.status || '',
+          datum: this.geschaeft.datum || '',
+        })
+        showSuccess('Gespeichert')
+        this.$emit('gespeichert')
+      } catch (e) {
+        showError('Geschäft konnte nicht gespeichert werden: ' + (e?.response?.data?.fehler || e?.message || ''))
+      }
     },
     aenderungZustaendig(options) {
       const keys = (Array.isArray(options) ? options : [])
@@ -367,10 +459,30 @@ export default {
       this.speichereZustaendigkeiten()
     },
     async ladeDetail() {
+      // Neu-Modus: es gibt noch nichts zu laden. Dieselbe Maske sammelt die
+      // Eingaben, angelegt wird erst beim Speichern.
+      if (!this.geschaeftId) {
+        this.geschaeft = {
+          id: 0,
+          externId: 'eigen:neu',
+          titel: '',
+          nummer: '',
+          typ: 'Eigenes Geschäft',
+          status: 'Pendent',
+          datum: '',
+          aktionen: [],
+          zustaendigkeiten: [],
+        }
+        this.ausgewaehltePersonKeys = []
+        this.hauptPersonKey = ''
+        this.laden = false
+        return
+      }
       this.laden = true
       try {
         const { data } = await axios.get(generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}`))
         this.geschaeft = data
+        this.ladeVerknuepfteVorstoesse()
 
         const zustaendigkeiten = data.zustaendigkeiten || []
         this.ausgewaehltePersonKeys = zustaendigkeiten.map(z => z.personKey)
@@ -378,12 +490,16 @@ export default {
         this.hauptPersonKey = haupt?.personKey || ''
         this.synchronisiereHauptPersonKey()
         const lb = data.letzterBeschluss || null
+        this.beschlussAktionId = null
         if (!lb) {
           this.beschlussWert = null
+          this.beschlussZuletztGespeichert = null
         } else if (lb.aktionCode) {
           this.beschlussWert = { label: lb.titel || lb.aktionCode, value: lb.aktionCode }
+          this.beschlussZuletztGespeichert = lb.aktionCode + '\n'
         } else {
           this.beschlussWert = { label: lb.text || '', value: '', freitext: true }
+          this.beschlussZuletztGespeichert = '\n' + (lb.text || '')
         }
         const av = data.aktuellesVotum || null
         this.votumHtml = av?.text || ''
@@ -395,6 +511,23 @@ export default {
       } finally {
         this.laden = false
       }
+    },
+    async ladeVerknuepfteVorstoesse() {
+      try {
+        const { data } = await axios.get(generateUrl(`/apps/parlwin/vorstoesse/geschaeft/${this.geschaeftId}`))
+        this.verknuepfteVorstoesse = Array.isArray(data) ? data : []
+      } catch (e) {
+        this.verknuepfteVorstoesse = []
+      }
+    },
+    vorstossZustaendigkeit(vorstoss) {
+      const liste = Array.isArray(vorstoss.zustaendigkeit) ? vorstoss.zustaendigkeit : []
+      return liste.map(z => z.name).filter(Boolean).join(', ')
+    },
+    /** Aktive (nicht gelöschte) Notizen eines verknüpften Vorstosses (geteilter Notiz-Speicher: aktionen). */
+    vorstossNotizen(vorstoss) {
+      const liste = Array.isArray(vorstoss.aktionen) ? vorstoss.aktionen : []
+      return liste.filter(n => n.aktionTyp === 'notiz' && !n.geloescht)
     },
     handleRealtimeEvent(event) {
       const type = event?.type || ''
@@ -469,6 +602,18 @@ export default {
       const idx = aktionen.findIndex(a => a.id === aktionId)
       if (idx >= 0) aktionen.splice(idx, 1)
     },
+    // Priorität speichert wie alle Eingaben sofort; leer = nicht gesetzt.
+    async prioritaetGewaehlt(option) {
+      const prioritaet = option ? option.value : ''
+      try {
+        await axios.put(generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}/prioritaet`), { prioritaet })
+        if (this.geschaeft) this.geschaeft.prioritaet = prioritaet
+        showSuccess('Priorität gespeichert')
+        this.$emit('gespeichert')
+      } catch (e) {
+        showError('Priorität konnte nicht gespeichert werden: ' + (e?.response?.data?.fehler || e?.message || ''))
+      }
+    },
     async speichereZustaendigkeiten() {
       try {
         this.synchronisiereHauptPersonKey()
@@ -488,29 +633,27 @@ export default {
         }
         // Nur Aktionen neu laden (Audit-Trail-Eintrag) – kein Full-Reload
         await this._ladeAktionenNur()
-        this.meldung = 'Zuständigkeiten gespeichert'
-        this.fehler = false
+        showSuccess('Zuständigkeiten gespeichert')
         this.$emit('gespeichert')
       } catch (e) {
-        this.meldung = 'Fehler beim Speichern der Zuständigkeiten'
-        this.fehler = true
-        console.error(e)
+        showError('Fehler beim Speichern der Zuständigkeiten')
       }
     },
-    istEigeneAktion(a) {
-      const uid = (getCurrentUser()?.uid || '').toLowerCase()
-      return !!uid && (a.autorUid || '').toLowerCase() === uid
+    /**
+     * Übernimmt die von der geteilten NotizenListe gemeldete, vollständige
+     * Notizen-Liste: ersetzt die Notiz-Aktionen in der lokalen Aktionsliste
+     * (Nicht-Notiz-Aktionen bleiben), damit Zeitleiste und Realtime konsistent bleiben.
+     */
+    onNotizenGeaendert(neu) {
+      if (!this.geschaeft) return
+      const andere = (this.geschaeft.aktionen || []).filter(a => a.aktionTyp !== 'notiz')
+      this.geschaeft.aktionen = [...andere, ...(Array.isArray(neu) ? neu : [])]
     },
-    notizDebounce() {
-      if (this.notizTimer) clearTimeout(this.notizTimer)
-      this.notizTimer = setTimeout(() => { this.notizSpeichern(); this.notizTimer = null }, 5000)
-    },
-    async notizSpeichernBeiBlur() {
-      if (this.notizTimer) { clearTimeout(this.notizTimer); this.notizTimer = null }
-      await this.notizSpeichern()
-      // Feld erst nach blur leeren und Session zurücksetzen
-      this.neueNotiz = ''
-      this.notizAktionId = null
+    /** Wie onNotizenGeaendert, aber für die Sitzungsnotizen-Kategorie. */
+    onSitzungsnotizenGeaendert(neu) {
+      if (!this.geschaeft) return
+      const andere = (this.geschaeft.aktionen || []).filter(a => a.aktionTyp !== 'sitzungsnotiz')
+      this.geschaeft.aktionen = [...andere, ...(Array.isArray(neu) ? neu : [])]
     },
     async beschlussNachWahl(val) {
       const hatteWert = !!this.beschlussWert
@@ -521,91 +664,58 @@ export default {
         await this.beschlussSpeichern()
       }
     },
-    notizBearbeitenStarten(a) {
-      this.bearbeitenNotizId = a.id
-      this.bearbeitenNotizText = a.text || ''
+    beschlussSpeichern() {
+      // Wert JETZT capturen (nicht erst in der Kette), sonst kann ein
+      // dazwischen laufendes ladeDetail() den Wert zurücksetzen.
+      const wert = this.beschlussWert
+      // Serialisierung wie bei Notizen: verhindert doppelte POSTs bei
+      // Blur während laufendem Debounce-Save.
+      this._beschlussKette = (this._beschlussKette || Promise.resolve()).then(() => this._beschlussSpeichernIntern(wert))
+      return this._beschlussKette
     },
-    notizBearbeitenAbbrechen() {
-      this.bearbeitenNotizId = null
-      this.bearbeitenNotizText = ''
-    },
-    async notizBearbeitenSpeichern(a) {
-      const text = (this.bearbeitenNotizText || '').trim()
-      if (!text) return
+    async _beschlussSpeichernIntern(wert) {
+      if (!wert) return
+      const code = wert.freitext ? '' : (wert.value || '')
+      const text = wert.freitext ? (wert.label || '') : ''
+      const schluessel = code + '\n' + text
+      if (schluessel === this.beschlussZuletztGespeichert) return
       try {
-        const { data } = await axios.put(generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}/notizen/${a.id}`), { text })
-        this.notizBearbeitenAbbrechen()
-        this._aktionAktualisieren(data)
-      } catch (e) {
-        this.meldung = 'Fehler beim Bearbeiten der Notiz'
-        this.fehler = true
-        console.error(e)
-      }
-    },
-    async notizLoeschen(a) {
-      try {
-        await axios.delete(generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}/notizen/${a.id}`))
-        this._aktionEntfernen(a.id)
-      } catch (e) {
-        this.meldung = 'Fehler beim Löschen der Notiz'
-        this.fehler = true
-        console.error(e)
-      }
-    },
-    async notizSpeichern() {
-      const text = (this.neueNotiz || '').trim()
-      if (!text) return
-      try {
-        if (this.notizAktionId) {
-          // Gleiche Notiz in derselben Eingabe-Session aktualisieren
-          const { data } = await axios.put(
-            generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}/notizen/${this.notizAktionId}`),
-            { text }
+        let data
+        if (this.beschlussAktionId) {
+          // Gleiche Eingabe-Session → bestehende Aktion aktualisieren
+          const antwort = await axios.put(
+            generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}/beschluesse/${this.beschlussAktionId}`),
+            { code, text }
           )
+          data = antwort.data
           this._aktionAktualisieren(data)
         } else {
-          // Erste Speicherung → neue Aktion anlegen
-          const { data } = await axios.post(
-            generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}/notizen`),
-            { text }
+          const antwort = await axios.post(
+            generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}/beschluesse`),
+            { code, text }
           )
-          this.notizAktionId = data.id
+          data = antwort.data
+          this.beschlussAktionId = data?.id || null
           this._aktionHinzufuegen(data)
         }
-        this.meldung = 'Notiz gespeichert'
-        this.fehler = false
-        this.$emit('gespeichert')
-        // Kein ladeDetail() / Feld bleibt – erst blur löscht es
-      } catch (e) {
-        this.meldung = 'Fehler beim Speichern der Notiz'
-        this.fehler = true
-        console.error(e)
-      }
-    },
-    async beschlussSpeichern() {
-      if (!this.beschlussWert) return
-      const code = this.beschlussWert.freitext ? '' : (this.beschlussWert.value || '')
-      const text = this.beschlussWert.freitext ? (this.beschlussWert.label || '') : ''
-      try {
-        const { data } = await axios.post(
-          generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}/beschluesse`),
-          { code, text }
-        )
-        this._aktionHinzufuegen(data)
+        this.beschlussZuletztGespeichert = schluessel
         if (this.geschaeft) {
           this.geschaeft.letzterBeschluss = data
-            ? { aktionCode: code, titel: data.titel || this.beschlussWert.label || code, text }
+            ? { aktionCode: code, titel: data.titel || wert.label || code, text }
             : null
           this.geschaeft.fraktionsstatus = 'entschieden'
         }
-        this.meldung = 'Beschluss gespeichert'
-        this.fehler = false
+        showSuccess('Beschluss gespeichert')
         this.$emit('gespeichert')
       } catch (e) {
-        this.meldung = 'Fehler beim Speichern des Beschlusses'
-        this.fehler = true
-        console.error(e)
+        showError('Fehler beim Speichern des Beschlusses')
       }
+    },
+    async beschlussSessionBeenden() {
+      // Fokus-Verlust = Eingabe-Session zu Ende: laufende Speicherung abwarten,
+      // danach führt eine erneute Änderung zu einer NEUEN Aktion (History).
+      await this._beschlussKette
+      this.beschlussAktionId = null
     },
     async beschlussZuruecknehmen() {
       try {
@@ -613,18 +723,17 @@ export default {
           generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}/beschluesse`)
         )
         this.beschlussWert = null
+        this.beschlussAktionId = null
+        this.beschlussZuletztGespeichert = null
         if (data) this._aktionHinzufuegen(data)
         if (this.geschaeft) {
           this.geschaeft.letzterBeschluss = null
           this.geschaeft.fraktionsstatus = null
         }
-        this.meldung = 'Beschluss zurückgenommen'
-        this.fehler = false
+        showSuccess('Beschluss zurückgenommen')
         this.$emit('gespeichert')
       } catch (e) {
-        this.meldung = 'Fehler beim Zurücknehmen des Beschlusses'
-        this.fehler = true
-        console.error(e)
+        showError('Fehler beim Zurücknehmen des Beschlusses')
       }
     },
     async votumSpeichern() {
@@ -661,14 +770,11 @@ export default {
         })
         this.votumAktionId = data?.id || this.votumAktionId
         this.votumStatus = 'Gespeichert'
-        this.fehler = false
         this.$emit('gespeichert')
       } catch (e) {
         this.votumStatus = 'Fehler beim Speichern'
-        this.meldung = 'Fehler beim Speichern des Votums'
-        this.fehler = true
         this.votumDirty = true
-        console.error(e)
+        showError('Fehler beim Speichern des Votums')
       }
     },
     async votumArchivieren() {
@@ -679,14 +785,11 @@ export default {
         this.votumAktionId = null
         this.votumDirty = false
         this.votumStatus = 'Votum archiviert'
-        this.meldung = 'Votum archiviert'
-        this.fehler = false
+        showSuccess('Votum archiviert')
         await this.ladeDetail()
         this.$emit('gespeichert')
       } catch (e) {
-        this.meldung = 'Fehler beim Archivieren des Votums'
-        this.fehler = true
-        console.error(e)
+        showError('Fehler beim Archivieren des Votums')
       }
     },
     _scrollContainer() {
@@ -706,31 +809,6 @@ export default {
       if (c) c.scrollTop = top
       else window.scrollTo({ top, behavior: 'instant' })
     },
-    tlDragStart(event, idx) {
-      this.dragZeitleisteVonIdx = idx
-      event.dataTransfer.effectAllowed = 'move'
-    },
-    tlDragOver(event, idx) {
-      event.dataTransfer.dropEffect = 'move'
-      this.dragZeitleisteUeberIdx = idx
-    },
-    tlDragLeave() {
-      this.dragZeitleisteUeberIdx = -1
-    },
-    tlDrop(event, zuIdx) {
-      const vonIdx = this.dragZeitleisteVonIdx
-      this.dragZeitleisteUeberIdx = -1
-      this.dragZeitleisteVonIdx = -1
-      if (vonIdx < 0 || vonIdx === zuIdx) return
-      const eintraege = [...this.zeitleisteEintraege]
-      const [verschoben] = eintraege.splice(vonIdx, 1)
-      eintraege.splice(zuIdx, 0, verschoben)
-      this.zeitleisteReihenfolge = eintraege.map(e => e._key)
-    },
-    tlDragEnd() {
-      this.dragZeitleisteVonIdx = -1
-      this.dragZeitleisteUeberIdx = -1
-    },
     formatieredatum(datum) {
       if (!datum) return ''
       try {
@@ -745,14 +823,6 @@ export default {
         return new Date(wert).toLocaleString('de-CH')
       } catch {
         return wert
-      }
-    },
-    formatiereUhrzeit(wert) {
-      if (!wert) return ''
-      try {
-        return new Date(wert).toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' })
-      } catch {
-        return ''
       }
     },
     fraktionsstatusLabel(status) {

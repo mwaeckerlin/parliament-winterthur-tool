@@ -61,7 +61,9 @@ class FraktionsraumServiceTest extends TestCase {
         $folder = $this->createMock(Folder::class);
         // Alle Ordner fehlen → nodeExists liefert false
         $folder->method('nodeExists')->willReturn(false);
-        $folder->expects($this->exactly(15))->method('newFolder');
+        // Fraktion + 00_Allgemein + 10_Sitzungen (+2026) + 20_Geschäfte
+        // + 30_Kommissionen (+2) + 40_Vorstösse (+2) + 50_Wahlkampf + 60_Medien + 90_Archiv
+        $folder->expects($this->exactly(14))->method('newFolder');
         $fraktionNode = $this->createStub(Folder::class);
         $fraktionNode->method('getId')->willReturn(1);
         $folder->method('get')->with('Fraktion')->willReturn($fraktionNode);
@@ -87,17 +89,17 @@ class FraktionsraumServiceTest extends TestCase {
         $wahlkampfNode = $this->createMock(Folder::class);
         $wahlkampfNode->expects($this->once())
             ->method('move')
-            ->with('/admin/files/Fraktion/60_Wahlkampf')
+            ->with('/admin/files/Fraktion/50_Wahlkampf')
             ->willReturn($wahlkampfNode);
 
         $folder = $this->createStub(Folder::class);
-        // 40_Wahlkampf existiert (alt) und 60_Wahlkampf noch nicht → Move.
+        // 40_Wahlkampf existiert (alt) und 50_Wahlkampf noch nicht → Move.
         // 50_Medien fehlt → kein Move. Alle Struktur-Ordner existieren → kein newFolder.
         $folder->method('nodeExists')->willReturnCallback(function (string $p): bool {
             if ($p === 'Fraktion/40_Wahlkampf') {
                 return true;
             }
-            if ($p === 'Fraktion/60_Wahlkampf' || $p === 'Fraktion/50_Medien') {
+            if ($p === 'Fraktion/50_Wahlkampf' || $p === 'Fraktion/50_Medien') {
                 return false;
             }
             return true;

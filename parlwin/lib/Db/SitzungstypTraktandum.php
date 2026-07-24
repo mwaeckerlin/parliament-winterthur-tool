@@ -15,7 +15,7 @@ use OCP\AppFramework\Db\Entity;
  * @method string getTitel()
  * @method string getBeschreibung()
  */
-class SitzungstypTraktandum extends Entity
+class SitzungstypTraktandum extends Entity implements \JsonSerializable
 {
   protected int $typId = 0;
   protected int $position = 0;

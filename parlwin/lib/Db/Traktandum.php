@@ -26,7 +26,7 @@ use OCP\AppFramework\Db\Entity;
  * @method string      getAktualisiertAm()
  * @method void        setUrl(?string $url)
  */
-class Traktandum extends Entity {
+class Traktandum extends Entity implements \JsonSerializable {
     /** @var int Fremdschlüssel zur zugehörigen Sitzung */
     protected int $sitzungId = 0;
 

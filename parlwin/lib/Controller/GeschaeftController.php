@@ -56,6 +56,7 @@ class GeschaeftController extends Controller
         $filterEntscheidungsbedarfRaw = strtolower((string) $this->request->getParam('entscheidungsbedarf', ''));
         $showErledigtRaw = strtolower((string) $this->request->getParam('show_erledigt', '0'));
         $filterStatus = (string) $this->request->getParam('status', '');
+        $filterPrioritaet = (string) $this->request->getParam('prioritaet', '');
 
         $inklusiveErledigt = in_array($showErledigtRaw, ['1', 'true', 'ja'], true);
         $filterEntscheidungsbedarf = null;
@@ -70,6 +71,14 @@ class GeschaeftController extends Controller
         // Filter nach Status wenn angegeben
         if ($filterStatus !== '') {
             $geschaefte = array_filter($geschaefte, fn($g) => $g->getStatus() === $filterStatus);
+        }
+
+        // Filter nach Priorität. Nicht gesetzt ('') gilt als 'mittel'.
+        if ($filterPrioritaet !== '') {
+            $geschaefte = array_filter(
+                $geschaefte,
+                fn($g) => ($g->getPrioritaet() ?: 'mittel') === $filterPrioritaet
+            );
         }
 
         $daten = $this->fraktionsarbeitService->angereicherteGeschaefte(
@@ -125,16 +134,70 @@ class GeschaeftController extends Controller
         }
     }
 
+    /**
+     * Setzt die Priorität eines Geschäfts (hoch/mittel/tief). Leerstring '' setzt
+     * sie zurück (gilt dann als «mittel»).
+     */
+    #[NoAdminRequired]
+    public function setPrioritaet(int $id): DataResponse
+    {
+        $prioritaet = (string) $this->request->getParam('prioritaet', '');
+        if (!in_array($prioritaet, ['', 'hoch', 'mittel', 'tief'], true)) {
+            return new DataResponse(['fehler' => 'Ungültige Priorität'], Http::STATUS_BAD_REQUEST);
+        }
+        try {
+            $vorher = '';
+            try {
+                $vorher = (string) $this->geschaeftMapper->find($id)->getPrioritaet();
+            } catch (\Throwable $e) {
+                // Kein Vorher-Wert ermittelbar: die Änderung wird trotzdem
+                // ausgeführt und mit leerem Ausgangswert protokolliert.
+            }
+            $this->service->aktualisiereInterneFelder($id, ['prioritaet' => $prioritaet]);
+            // Keine Änderung ohne Spur.
+            $this->fraktionsarbeitService->protokolliereAenderung($id, ['Priorität' => [$vorher, $prioritaet]]);
+            $this->realtimePublisher->publish('geschaefte.updated', [
+                'id' => $id,
+                'grund' => 'prioritaet',
+            ]);
+            return new DataResponse(['prioritaet' => $prioritaet]);
+        } catch (\OCP\AppFramework\Db\DoesNotExistException) {
+            return new DataResponse(['fehler' => 'Nicht gefunden'], Http::STATUS_NOT_FOUND);
+        }
+    }
+
+    /**
+     * Notiz-Kategorie aus dem Request (Standard «notiz»). «sitzungsnotiz» sind
+     * am Geschäft haftende, in einer Sitzung erfasste Notizen.
+     */
+    private function notizKategorie(): string
+    {
+        $k = (string) $this->request->getParam('kategorie', 'notiz');
+        return in_array($k, ['notiz', 'sitzungsnotiz'], true) ? $k : 'notiz';
+    }
+
+    /** Alle Notizen einer Kategorie eines Geschäfts (aktiv und gelöscht). */
+    #[NoAdminRequired]
+    public function notizen(int $id): DataResponse
+    {
+        try {
+            return new DataResponse($this->fraktionsarbeitService->notizen($id, $this->notizKategorie()));
+        } catch (\InvalidArgumentException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+        }
+    }
+
     #[NoAdminRequired]
     public function addNotiz(int $id): DataResponse
     {
         $text = (string) $this->request->getParam('text', '');
+        $kategorie = $this->notizKategorie();
 
         try {
-            $aktion = $this->fraktionsarbeitService->notizHinzufuegen($id, $text);
+            $aktion = $this->fraktionsarbeitService->notizHinzufuegen($id, $text, $kategorie);
             $this->realtimePublisher->publish('geschaefte.action', [
                 'id' => $id,
-                'aktionTyp' => 'notiz',
+                'aktionTyp' => $kategorie,
             ]);
             return new DataResponse($aktion);
         } catch (\InvalidArgumentException $e) {
@@ -148,9 +211,22 @@ class GeschaeftController extends Controller
     public function updateNotiz(int $id, int $aktionId): DataResponse
     {
         $text = (string) $this->request->getParam('text', '');
+        // Autosave während des Tippens: führt die Stände zusammen, ohne eine
+        // neue Version anzulegen. Nur der Abschluss erzeugt eine Version.
+        $zwischenspeichern = filter_var(
+            $this->request->getParam('zwischenspeichern', false),
+            FILTER_VALIDATE_BOOLEAN
+        );
+        $kategorie = $this->notizKategorie();
         try {
-            $aktion = $this->fraktionsarbeitService->notizAktualisieren($id, $aktionId, $text);
-            $this->realtimePublisher->publish('geschaefte.action', ['id' => $id, 'aktionTyp' => 'notiz']);
+            $aktion = $this->fraktionsarbeitService->notizAktualisieren(
+                $id,
+                $aktionId,
+                $text,
+                !$zwischenspeichern,
+                $kategorie
+            );
+            $this->realtimePublisher->publish('geschaefte.action', ['id' => $id, 'aktionTyp' => $kategorie]);
             return new DataResponse($aktion);
         } catch (\InvalidArgumentException $e) {
             return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
@@ -162,10 +238,44 @@ class GeschaeftController extends Controller
     #[NoAdminRequired]
     public function deleteNotiz(int $id, int $aktionId): DataResponse
     {
+        $kategorie = $this->notizKategorie();
         try {
-            $this->fraktionsarbeitService->notizLoeschen($id, $aktionId);
-            $this->realtimePublisher->publish('geschaefte.action', ['id' => $id, 'aktionTyp' => 'notiz']);
+            $this->fraktionsarbeitService->notizLoeschen($id, $aktionId, $kategorie);
+            $this->realtimePublisher->publish('geschaefte.action', ['id' => $id, 'aktionTyp' => $kategorie]);
             return new DataResponse([]);
+        } catch (\InvalidArgumentException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+        } catch (\RuntimeException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_FORBIDDEN);
+        }
+    }
+
+    /**
+     * Macht das Löschen einer Notiz rückgängig (Undo) — nur der Autor darf das.
+     */
+    #[NoAdminRequired]
+    public function restoreNotiz(int $id, int $aktionId): DataResponse
+    {
+        $kategorie = $this->notizKategorie();
+        try {
+            $aktion = $this->fraktionsarbeitService->notizWiederherstellen($id, $aktionId, $kategorie);
+            $this->realtimePublisher->publish('geschaefte.action', ['id' => $id, 'aktionTyp' => $kategorie]);
+            return new DataResponse($aktion);
+        } catch (\InvalidArgumentException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+        } catch (\RuntimeException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_FORBIDDEN);
+        }
+    }
+
+    /**
+     * Archivierte Vorversionen einer Notiz (älteste zuerst).
+     */
+    #[NoAdminRequired]
+    public function notizRevisionen(int $id, int $aktionId): DataResponse
+    {
+        try {
+            return new DataResponse($this->fraktionsarbeitService->notizRevisionen($id, $aktionId, $this->notizKategorie()));
         } catch (\InvalidArgumentException $e) {
             return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
         } catch (\RuntimeException $e) {
@@ -181,6 +291,27 @@ class GeschaeftController extends Controller
 
         try {
             $aktion = $this->fraktionsarbeitService->beschlussHinzufuegen($id, $code, $text);
+            $this->realtimePublisher->publish('geschaefte.action', [
+                'id' => $id,
+                'aktionTyp' => 'beschluss',
+                'aktionCode' => $code,
+            ]);
+            return new DataResponse($aktion);
+        } catch (\InvalidArgumentException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+        } catch (\RuntimeException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_FORBIDDEN);
+        }
+    }
+
+    #[NoAdminRequired]
+    public function updateBeschluss(int $id, int $aktionId): DataResponse
+    {
+        $code = (string) $this->request->getParam('code', '');
+        $text = (string) $this->request->getParam('text', '');
+
+        try {
+            $aktion = $this->fraktionsarbeitService->beschlussAktualisieren($id, $aktionId, $code, $text);
             $this->realtimePublisher->publish('geschaefte.action', [
                 'id' => $id,
                 'aktionTyp' => 'beschluss',
@@ -299,9 +430,10 @@ class GeschaeftController extends Controller
                 'blank'
             );
         }
-        $response = new TemplateResponse(Application::APP_ID, 'votum_pdf', $daten, 'blank');
-        // Erlaubt Inline-Skripte des Templates (window.print()).
-        return $response;
+        // Bewusst die Standard-Sicherheitsrichtlinie: das Skript der Vorlage
+        // weist sich über den Nonce aus (siehe votum_pdf.php), Inline-Skripte
+        // bleiben verboten.
+        return new TemplateResponse(Application::APP_ID, 'votum_pdf', $daten, 'blank');
     }
 
     /**
@@ -493,6 +625,8 @@ class GeschaeftController extends Controller
         $titel = trim((string) $this->request->getParam('titel', ''));
         $typ = trim((string) $this->request->getParam('typ', 'Eigenes Geschäft'));
         $status = trim((string) $this->request->getParam('status', 'Pendent'));
+        // Angelegt wird erst beim ausdrücklichen Speichern — ohne Titel gibt es
+        // nichts anzulegen.
         if ($titel === '') {
             return new DataResponse(['fehler' => 'Titel erforderlich'], Http::STATUS_BAD_REQUEST);
         }
@@ -516,6 +650,97 @@ class GeschaeftController extends Controller
             return new DataResponse($daten, Http::STATUS_CREATED);
         } catch (\Throwable $e) {
             $this->logger->warning('parlwin: create() Fehler: {msg}', ['msg' => $e->getMessage()]);
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Ändert die Stammdaten eines selbst angelegten Geschäfts.
+     *
+     * Bei Parlamentsgeschäften stammen Titel, Typ, Status und Datum von der
+     * Webseite und würden beim nächsten Abgleich überschrieben — dort sind sie
+     * deshalb nur lesbar. Selbst angelegte Geschäfte («eigen:…») gehören uns
+     * und sind in allen Feldern bearbeitbar.
+     */
+    #[NoAdminRequired]
+    public function updateStammdaten(int $id): DataResponse
+    {
+        try {
+            $geschaeft = $this->geschaeftMapper->find($id);
+        } catch (\Throwable $e) {
+            return new DataResponse(['fehler' => 'Geschäft nicht gefunden'], Http::STATUS_NOT_FOUND);
+        }
+        if (!str_starts_with((string) $geschaeft->getExternId(), 'eigen:')) {
+            return new DataResponse(
+                ['fehler' => 'Nur selbst angelegte Geschäfte können bearbeitet werden'],
+                Http::STATUS_FORBIDDEN
+            );
+        }
+
+        $datum = $this->request->getParam('datum', null);
+        if ($datum !== null && trim((string) $datum) !== ''
+            && preg_match('/^\d{4}-\d{2}-\d{2}$/', trim((string) $datum)) !== 1) {
+            return new DataResponse(['fehler' => 'Datum muss im Format JJJJ-MM-TT vorliegen'], Http::STATUS_BAD_REQUEST);
+        }
+
+        $bezeichnungen = ['titel' => 'Titel', 'typ' => 'Typ', 'status' => 'Status', 'datum' => 'Datum'];
+        $getter = ['titel' => 'getTitel', 'typ' => 'getTyp', 'status' => 'getStatus', 'datum' => 'getDatum'];
+        $aenderungen = [];
+        foreach (['titel' => 'setTitel', 'typ' => 'setTyp', 'status' => 'setStatus', 'datum' => 'setDatum'] as $feld => $setter) {
+            $wert = $this->request->getParam($feld, null);
+            if ($wert === null) {
+                continue;
+            }
+            $neu = trim((string) $wert);
+            $alt = (string) $geschaeft->{$getter[$feld]}();
+            if ($alt !== $neu) {
+                $aenderungen[$bezeichnungen[$feld]] = [$alt, $neu];
+            }
+            $geschaeft->{$setter}($neu);
+        }
+        $geschaeft->setAktualisiertAm((new \DateTime())->format('Y-m-d H:i:s'));
+
+        try {
+            $this->geschaeftMapper->update($geschaeft);
+            // Keine Änderung ohne Spur: was geändert wurde, steht danach in der
+            // Aktionszeitleiste — mit Person und Zeitpunkt.
+            $this->fraktionsarbeitService->protokolliereAenderung($id, $aenderungen);
+            $this->realtimePublisher->publish('geschaefte.updated', ['id' => $id, 'grund' => 'stammdaten']);
+            return new DataResponse($this->fraktionsarbeitService->angereichertesGeschaeft($id));
+        } catch (\Throwable $e) {
+            $this->logger->warning('parlwin: updateStammdaten() Fehler: {msg}', ['msg' => $e->getMessage()]);
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Entfernt ein selbst angelegtes Geschäft endgültig.
+     *
+     * Nur eigene Geschäfte (externe ID «eigen:…») dürfen gelöscht werden.
+     * Geschäfte von der Parlamentswebseite gehören nicht uns: sie würden beim
+     * nächsten Abgleich ohnehin wieder auftauchen und dürfen deshalb hier nicht
+     * verschwinden.
+     */
+    #[NoAdminRequired]
+    public function destroy(int $id): DataResponse
+    {
+        try {
+            $geschaeft = $this->geschaeftMapper->find($id);
+        } catch (\Throwable $e) {
+            return new DataResponse(['fehler' => 'Geschäft nicht gefunden'], Http::STATUS_NOT_FOUND);
+        }
+        if (!str_starts_with((string) $geschaeft->getExternId(), 'eigen:')) {
+            return new DataResponse(
+                ['fehler' => 'Nur selbst angelegte Geschäfte können gelöscht werden'],
+                Http::STATUS_FORBIDDEN
+            );
+        }
+        try {
+            $this->geschaeftMapper->delete($geschaeft);
+            $this->realtimePublisher->publish('geschaefte.updated', ['id' => $id]);
+            return new DataResponse(['geloescht' => true]);
+        } catch (\Throwable $e) {
+            $this->logger->warning('parlwin: destroy() Fehler: {msg}', ['msg' => $e->getMessage()]);
             return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_INTERNAL_SERVER_ERROR);
         }
     }

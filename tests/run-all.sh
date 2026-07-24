@@ -50,14 +50,23 @@ section "Live-Tests (PHPUnit, externe Endpunkte)"
     --log-junit "${JUNIT_DIR}/php-live.xml" tests/Service/ScraperLiveEndpointTest.php )
 ensure_junit "php-live" "${JUNIT_DIR}/php-live.xml" "$?"
 
-section "End-to-End-Tests (Docker + Playwright)"
-rm -f "${ROOT}/tests/e2e/.junit/e2e.xml"
-"${ROOT}/tests/e2e/run-compose-e2e.sh"
-E2E_RC=$?
-# Browser-Szenarien (Playwright-JUnit) übernehmen, falls erzeugt.
-if [[ -f "${ROOT}/tests/e2e/.junit/e2e.xml" ]]; then
-  cp "${ROOT}/tests/e2e/.junit/e2e.xml" "${JUNIT_DIR}/e2e-browser.xml"
+section "Image-Contract (ausgelieferte Images ohne Shell)"
+( cd "${ROOT}" && npm run test:image )
+IMAGE_RC=$?
+if [[ "$IMAGE_RC" -eq 0 ]]; then
+  printf '<testsuite name="image-contract" tests="1" failures="0"><testcase classname="image" name="images-ohne-shell"/></testsuite>\n' \
+    >"${JUNIT_DIR}/image-contract.xml"
+else
+  printf '<testsuite name="image-contract" tests="1" failures="1"><testcase classname="image" name="images-ohne-shell"><failure message="image-contract.sh Exit-Code %s"/></testcase></testsuite>\n' \
+    "$IMAGE_RC" >"${JUNIT_DIR}/image-contract.xml"
 fi
+
+section "End-to-End-Tests (Docker + Playwright)"
+# Der e2e-Lauf legt den Playwright-Report direkt hier ab. Er wird bewusst NICHT
+# aus dem Arbeitsverzeichnis gelesen: dort lag früher ein Report fester Ablage,
+# der als Ergebnis des aktuellen Laufs gezählt wurde, obwohl er Wochen alt war.
+PW_JUNIT_OUT="${JUNIT_DIR}/e2e-browser.xml" "${ROOT}/tests/e2e/run-compose-e2e.sh"
+E2E_RC=$?
 # Die Bash-Integrationsprüfungen als einen Testfall abbilden (Exit-Code).
 if [[ "$E2E_RC" -eq 0 ]]; then
   printf '<testsuite name="e2e-integration" tests="1" failures="0"><testcase classname="e2e" name="integrationspruefungen"/></testsuite>\n' \

@@ -23,6 +23,7 @@
     "test:unit": "cd parlwin && phpunit --bootstrap tests/bootstrap.php --exclude-group live --fail-on-warning --fail-on-risky --fail-on-deprecation --fail-on-notice --fail-on-skipped --fail-on-incomplete tests",
     "test:js": "vitest run",
     "test:live": "cd parlwin && phpunit --bootstrap tests/bootstrap.php --group live --fail-on-warning --fail-on-risky --fail-on-deprecation --fail-on-notice --fail-on-skipped --fail-on-incomplete tests/Service/ScraperLiveEndpointTest.php",
+    "test:image": "docker compose build nextcloud-nginx nextcloud-php-fpm parlwin-realtime && bash tests/image-contract.sh mwaeckerlin/parliament-winterthur-tool:nginx mwaeckerlin/parliament-winterthur-tool:php-fpm mwaeckerlin/parliament-winterthur-tool:realtime",
     "test:e2e": "./tests/e2e/run-compose-e2e.sh",
     "test:e2e:browser": "playwright test --config tests/e2e/playwright.config.js",
     "test": "bash tests/run-all.sh"

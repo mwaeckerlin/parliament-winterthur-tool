@@ -1,0 +1,37 @@
+# Browser-Testrunner für die Multi-User-E2E-Tests.
+#
+# Das Basis-Image bringt die Browser mit, aber NICHT das npm-Paket
+# @playwright/test. Früher wurde das bei jedem Testlauf per `npm ci` nachgeladen –
+# und zwar gleich das komplette Projekt (webpack, vue, sass, …), obwohl die Tests
+# nur @playwright/test importieren. Damit hing jeder Testlauf an der Erreichbarkeit
+# der npm-Registry und brach dort reproduzierbar ab (network read ETIMEDOUT).
+#
+# Deshalb wird die einzige benötigte Abhängigkeit hier EINMAL beim Bauen des Images
+# installiert. Der Testlauf selbst braucht danach weder npm noch Netzwerkzugriff
+# nach aussen.
+#
+# Die Testdateien werden beim Bauen ins Image KOPIERT und nicht vom Host gemountet:
+# ein Bind-Mount würde den Lauf an lokale Arbeitsstände koppeln (parallele Edits
+# verändern den Testlauf) und dem Container Schreibzugriff auf das Arbeitsverzeichnis
+# geben. Ergebnisse werden nach dem Lauf per `docker cp` herausgeholt
+# (siehe run-compose-e2e.sh).
+FROM mcr.microsoft.com/playwright:v1.61.0-noble
+
+# Version an das Basis-Image gebunden: Die Browser im Image passen genau zu dieser
+# Playwright-Version. Beide zusammen hochziehen, nie einzeln.
+RUN npm install -g @playwright/test@1.61.0
+
+# Node sucht Module nur relativ zum Projekt (/work/node_modules). Global
+# installierte Pakete findet es ausschliesslich über NODE_PATH.
+ENV NODE_PATH=/usr/lib/node_modules
+
+# Unprivilegierter Nutzer (im Basis-Image vorhanden): der Testlauf schreibt seinen
+# Report nach /work/.junit und darf dafür nicht als root laufen. Das Arbeits-
+# verzeichnis selbst muss pwuser gehören — sonst scheitert das Anlegen von
+# /work/.junit und /work/test-results (EACCES).
+RUN mkdir -p /work && chown pwuser:pwuser /work
+WORKDIR /work
+COPY --chown=pwuser:pwuser . /work/
+USER pwuser
+
+CMD ["npx", "playwright", "test", "--config", "playwright.config.js"]
