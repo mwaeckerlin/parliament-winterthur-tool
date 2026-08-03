@@ -93,10 +93,9 @@ class NotizService
     }
 
     /**
-     * @param bool $revisionArchivieren Nur bei einer ABGESCHLOSSENEN Bearbeitung (✓ oder
-     *   echter Fokusverlust) wird die bisherige Fassung als Version archiviert. Das
-     *   Zwischenspeichern während des Tippens (Autosave) führt die Stände dagegen in
-     *   einem einzigen Eintrag zusammen und erzeugt keine Version.
+     * Jede bewusste Speicherung (✓) legt die bisherige Fassung als Version an;
+     * unveränderter Text erzeugt keine Version.
+     *
      * @return array<string, mixed>
      */
     public function aktualisieren(
@@ -104,7 +103,6 @@ class NotizService
         int $objektId,
         int $aktionId,
         string $text,
-        bool $revisionArchivieren = true,
         string $kategorie = 'notiz'
     ): array {
         $text = trim($text);
@@ -117,7 +115,7 @@ class NotizService
         // Bisherige Fassung archivieren, bevor der neue Text die Notiz überschreibt.
         // Unveränderter Text erzeugt keine Revision.
         $bisher = $aktion->getText();
-        if ($revisionArchivieren && $bisher !== '' && $bisher !== $text) {
+        if ($bisher !== '' && $bisher !== $text) {
             $revision = new NotizRevision();
             $revision->setAktionId($aktion->getId());
             $revision->setText($bisher);

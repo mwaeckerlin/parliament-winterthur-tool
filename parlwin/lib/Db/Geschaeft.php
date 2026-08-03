@@ -27,6 +27,8 @@ use OCP\AppFramework\Db\Entity;
  * @method string getEntscheidFraktion()
  * @method string getNotizen()
  * @method string getPrioritaet()
+ * @method string getInhalt()
+ * @method string getKommission()
  * @method string getQuelleHash()
  * @method string getQuelleAktualisiertAm()
  * @method string getEinreicher()
@@ -78,6 +80,15 @@ class Geschaeft extends Entity implements \JsonSerializable {
     /** @var string Priorität der Fraktion: '' (nicht gesetzt, gilt als mittel), 'hoch', 'mittel', 'tief' */
     protected string $prioritaet = '';
 
+    /**
+     * @var string Beschreibungstext eines selbst angelegten Geschäfts (Rich-Text).
+     * Bei Geschäften von der Parlamentswebseite leer — dort steht der Text in der Quelle.
+     */
+    protected string $inhalt = '';
+
+    /** @var string Zuständige Kommission (höchstens eine; leer = keine) */
+    protected string $kommission = '';
+
     /** @var string JSON-Array der Einreicher (Erstunterzeichner und Mitunterzeichner) */
     protected string $einreicher = '[]';
 
@@ -119,6 +130,8 @@ class Geschaeft extends Entity implements \JsonSerializable {
             'entscheidFraktion' => $this->getEntscheidFraktion(),
             'notizen' => $this->getNotizen(),
             'prioritaet' => $this->getPrioritaet(),
+            'inhalt' => $this->getInhalt(),
+            'kommission' => $this->getKommission(),
             'einreicher' => json_decode($this->getEinreicher(), true) ?? [],
             'quelleHash' => $this->getQuelleHash(),
             'quelleAktualisiertAm' => $this->getQuelleAktualisiertAm(),

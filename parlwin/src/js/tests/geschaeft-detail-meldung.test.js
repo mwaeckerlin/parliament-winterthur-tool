@@ -63,7 +63,8 @@ async function neueNotizAbschliessen(wrapper, text = 'Neue Notiz') {
   wrapper.vm.editorModus = 'neu'
   wrapper.vm.aktiveNotizId = null
   wrapper.vm.aktiveNotizText = text
-  await wrapper.vm.notizAbschliessen()
+  // Notizen speichern jetzt nur noch über das Häkchen.
+  await wrapper.vm.notizBestaetigen()
   await wrapper.vm.$nextTick()
 }
 

@@ -125,12 +125,8 @@ class VorstossController extends Controller
     public function updateNotiz(int $id, int $aktionId): DataResponse
     {
         $text = (string) $this->request->getParam('text', '');
-        $zwischenspeichern = filter_var(
-            $this->request->getParam('zwischenspeichern', false),
-            FILTER_VALIDATE_BOOLEAN
-        );
         try {
-            $aktion = $this->service->notizAktualisieren($id, $aktionId, $text, !$zwischenspeichern);
+            $aktion = $this->service->notizAktualisieren($id, $aktionId, $text);
             $this->realtimePublisher->publish('vorstoesse.updated', ['id' => $id, 'aktionTyp' => 'notiz']);
             return new DataResponse($aktion);
         } catch (\InvalidArgumentException $e) {

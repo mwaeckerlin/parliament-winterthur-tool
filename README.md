@@ -660,6 +660,15 @@ Fortschritt bereit:
 - API-Status: `GET /apps/parlwin/sync/status`
 - API-Abbruch: `POST /apps/parlwin/sync/cancel`
 
+**Typen für eigene Geschäfte:**
+
+Die Typen, die beim Anlegen eines eigenen Geschäfts zur Auswahl stehen, pflegt
+der Administrator im Bereich «Typen für eigene Geschäfte» (App-Einstellung
+`eigene_typen`, JSON-Liste von Bezeichnungen). Ohne Eintrag bleibt es beim Typ
+«Eigenes Geschäft». Der Status eines eigenen Geschäfts wird aus den Werten
+vorgeschlagen, die in der Datenbank bereits vorkommen
+(`GET /apps/parlwin/geschaefte/statuswerte`), bleibt aber frei überschreibbar.
+
 **Automatische Synchronisation (Hintergrund-Job):**
 
 Das Plugin registriert einen Hintergrund-Job, der die Daten automatisch

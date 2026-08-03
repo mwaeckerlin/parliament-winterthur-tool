@@ -134,6 +134,73 @@ function escapeHtml(text) {
   return div.innerHTML
 }
 
+// --- Typen für eigene Geschäfte ---------------------------------------------
+// Diese Liste füllt die Typ-Auswahl beim Anlegen eines eigenen Geschäfts.
+
+let typenSaveTimer = null
+
+// Erstellt eine Typen-Zeile (Bezeichnung + Löschen).
+function typenZeileErstellen(typ = '') {
+  const liste = document.getElementById('pw-typen-liste')
+  if (!liste) return null
+
+  const row = document.createElement('div')
+  row.className = 'pw-typen-row'
+  row.innerHTML = `
+    <input type="text" class="pw-input pw-typen-name" value="${escapeHtml(typ)}" placeholder="z.B. Kommissionsgeschäft" />
+    <button type="button" class="button pw-typen-delete" title="Löschen">×</button>
+  `
+  liste.appendChild(row)
+
+  row.querySelector('.pw-typen-delete').addEventListener('click', (e) => {
+    e.preventDefault()
+    row.remove()
+    typenAutoSpeichern()
+  })
+  row.querySelector('.pw-typen-name').addEventListener('change', typenAutoSpeichern)
+  return row
+}
+
+// Liest die Typen aus den Eingabezeilen; leere Zeilen zählen nicht.
+export function sammleEigeneTypen() {
+  const typen = []
+  document.querySelectorAll('#pw-typen-liste .pw-typen-row').forEach((row) => {
+    const typ = String(row.querySelector('.pw-typen-name').value || '').trim()
+    if (typ) typen.push(typ)
+  })
+  return typen
+}
+
+function typenAutoSpeichern() {
+  clearTimeout(typenSaveTimer)
+  showStatusMessage('pw-typen-status', 'Speichern...', false)
+  typenSaveTimer = setTimeout(() => {
+    axios
+      .post(generateUrl('/apps/parlwin/settings/eigene-typen'), { eigene_typen: sammleEigeneTypen() })
+      .then(() => showStatusMessage('pw-typen-status', 'Gespeichert', false))
+      .catch((err) => {
+        console.error('Fehler beim Speichern der Typen:', err)
+        showStatusMessage('pw-typen-status', 'Fehler beim Speichern', true)
+      })
+  }, 600)
+}
+
+// Lädt die gepflegten Typen und rendert die Eingabezeilen.
+export function ladeEigeneTypen() {
+  const liste = document.getElementById('pw-typen-liste')
+  if (!liste) return Promise.resolve()
+  return axios
+    .get(generateUrl('/apps/parlwin/settings/eigene-typen'))
+    .then((response) => {
+      const typen = Array.isArray(response.data) ? response.data : []
+      liste.innerHTML = ''
+      typen.forEach((typ) => typenZeileErstellen(String(typ || '')))
+    })
+    .catch((err) => {
+      console.error('Fehler beim Laden der Typen:', err)
+    })
+}
+
 // --- Zeitplan der automatischen Synchronisation (Wochentage + Uhrzeit) -------
 
 const WOCHENTAGE = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
@@ -224,6 +291,17 @@ document.addEventListener('DOMContentLoaded', () => {
     hinzufuegenBtn.addEventListener('click', (e) => {
       e.preventDefault()
       kuerzleHinzufuegen()
+    })
+  }
+
+  // Typen für eigene Geschäfte: Initial-Laden und Auto-Save
+  ladeEigeneTypen()
+  const typenBtn = document.getElementById('pw-typen-hinzufuegen')
+  if (typenBtn) {
+    typenBtn.addEventListener('click', (e) => {
+      e.preventDefault()
+      const row = typenZeileErstellen('')
+      if (row) row.querySelector('.pw-typen-name').focus()
     })
   }
 

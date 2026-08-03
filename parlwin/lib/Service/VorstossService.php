@@ -142,12 +142,11 @@ class VorstossService
     }
 
     /**
-     * @param bool $revisionArchivieren siehe {@see NotizService::aktualisieren()}
      * @return array<string, mixed>
      */
-    public function notizAktualisieren(int $id, int $aktionId, string $text, bool $revisionArchivieren = true): array
+    public function notizAktualisieren(int $id, int $aktionId, string $text): array
     {
-        return $this->notizService->aktualisieren(self::OBJEKT_TYP, $id, $aktionId, $text, $revisionArchivieren);
+        return $this->notizService->aktualisieren(self::OBJEKT_TYP, $id, $aktionId, $text);
     }
 
     public function notizLoeschen(int $id, int $aktionId): void

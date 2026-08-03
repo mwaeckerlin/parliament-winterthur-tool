@@ -198,12 +198,20 @@ async function notizenListeSchreiben(page, root, text) {
   await editor.click()
   await page.waitForTimeout(300)
   await editor.pressSequentially(text, { delay: 25 })
-  await editor.blur()
+  // Speichern nur über das Häkchen — kein Blur-Save mehr.
+  await root.locator('.pw-notiz-bearbeiten-aktionen button[title="Speichern"]').first().click()
 }
 
-/** Wählt in einem NcSelect/vue-select die erste bzw. eine bestimmte Option. */
+/** Wählt in einem NcSelect/vue-select die erste bzw. eine bestimmte Option.
+ *  Öffnet über ArrowDown am fokussierten Suchfeld (zuverlässig auch bei an den
+ *  Body teleportierten Dialogen); ein Toggle-Klick allein öffnete dort nicht. */
 async function ncSelectWaehle(page, container, optionText = null) {
-  await container.locator('.vs__dropdown-toggle').click()
+  const feld = container.locator('.vs__search, .vs__dropdown-toggle').first()
+  await feld.scrollIntoViewIfNeeded().catch(() => {})
+  await feld.focus().catch(() => {})
+  await page.keyboard.press('ArrowDown')
+  const offen = await container.evaluate((el) => el.classList.contains('vs--open')).catch(() => false)
+  if (!offen) await container.locator('.vs__dropdown-toggle').click()
   const option = optionText
     ? page.locator('.vs__dropdown-option', { hasText: optionText })
     : page.locator('.vs__dropdown-option')
@@ -661,6 +669,36 @@ test.describe('Sitzungen: «+ Neue Sitzung» im Kopf und Typ-Verzweigung', () =>
     await expect(form.locator('.pw-sitzung-titel-input')).toHaveValue(n1)
     expect(jsFehler, `JS-Fehler: ${jsFehler.join(' | ')}`).toEqual([])
   })
+
+  // Bug: «Verknüpfen mit» blieb im Dialog leer — die aufgeklappte Liste wird an
+  // den Body teleportiert und lag UNTER dem eigenen Dialog-Hintergrund (z-index
+  // 9999 statt des gemeinsamen Overlays). Der echte gerenderte z-index belegt
+  // den Fix zuverlässig; die CSS-Struktur nagelt der vitest-Guard fest.
+  test('«Verknüpfen mit»: der Dialog deckt die aufklappende Auswahl nicht mehr zu', async ({ page }) => {
+    const stamp = Date.now()
+    const name = `E2E-Verkn-Typ ${stamp}`
+    await login(page, USER)
+    await createSitzungstyp(page, { name, verknuepfen: true })
+    await gotoView(page, 'Sitzungen')
+
+    const menu = await oeffneNeuMenue(page)
+    await menu.getByRole('menuitem', { name }).click()
+    const form = page.locator('.pw-neue-sitzung-form')
+    await expect(form).toBeVisible({ timeout: 15_000 })
+
+    // Die Auswahl «Verknüpfen mit» ist im Dialog vorhanden.
+    const auswahl = form.locator('.pw-form-zeile', { hasText: 'Verknüpfen mit' }).locator('.v-select')
+    await expect(auswahl).toBeVisible()
+
+    // Der Dialog-Hintergrund liegt auf einer NIEDRIGEREN Ebene als die an den
+    // Body teleportierten Auswahllisten (.vs__dropdown-menu, z-index 2010).
+    // Vor dem Fix lag er auf 9999 und deckte die geöffnete Liste zu.
+    const overlay = page.locator('.pw-neue-sitzung-overlay')
+    const overlayZ = await overlay.evaluate((el) => Number(getComputedStyle(el).zIndex))
+    expect(overlayZ, 'Der Dialog liegt über den teleportierten Auswahllisten und deckt sie zu')
+      .toBeLessThan(2010)
+    expect(jsFehler, `JS-Fehler: ${jsFehler.join(' | ')}`).toEqual([])
+  })
 })
 
 // ===========================================================================
@@ -1100,18 +1138,23 @@ test.describe('Sitzungsnotiz: haftet am Geschäft', () => {
     await gotoView(page, 'Sitzungen')
     await zeigeAlleSitzungen(page)
     const karte = await oeffneSitzung(page, treffer.sitzungId)
-    const nl = karte.locator('.pw-table-desktop .pw-tabelle-traktanden tr.pw-traktandum-notizen-zeile')
-      .filter({ has: page.locator('.pw-sitzungsnotiz-hinweis') }).first().locator('.pw-notizen-liste')
+    const zelle = karte.locator('.pw-table-desktop .pw-tabelle-traktanden tr.pw-traktandum-notizen-zeile')
+      .filter({ has: page.locator('.pw-sitzungsnotiz-hinweis') }).first()
+    const nl = zelle.locator('.pw-notizen-liste')
     await notizenListeSchreiben(page, nl, notiz)
     const eintrag = nl.locator('.pw-notiz-eintrag', { hasText: notiz }).first()
     await expect(eintrag).toBeVisible({ timeout: 15_000 })
 
-    // Soft-Delete → Lösch-Vermerk.
+    // Soft-Delete → Lösch-Vermerk in der geteilten Aktionszeitleiste der
+    // Traktandenzeile (dieselbe Komponente wie im Geschäft/Vorstoss), nicht mehr
+    // in der Notizenliste.
+    const zeitleiste = zelle.locator('.pw-detail-abschnitt', { hasText: 'Aktionszeitleiste' })
     await eintrag.locator('.pw-btn-loeschen').click()
-    await expect(nl.getByText('hat seine Notiz gelöscht', { exact: false }).first()).toBeVisible({ timeout: 15_000 })
+    await expect(zeitleiste.getByText('hat seine Notiz gelöscht', { exact: false }).first(), 'Gelöschte Sitzungsnotiz fehlt in der Aktionszeitleiste').toBeVisible({ timeout: 15_000 })
+    await expect(nl.locator('.pw-notiz-eintrag', { hasText: notiz }), 'Gelöschte Sitzungsnotiz steht noch in der Notizenliste').toHaveCount(0)
 
-    // Wiederherstellen (↺) → Text kommt zurück.
-    await nl.locator('button[title="Löschen rückgängig machen"]').first().click()
+    // Wiederherstellen (↺) über die Aktionszeitleiste → Text kommt in die Liste zurück.
+    await zeitleiste.locator('button[title="Löschen rückgängig machen"]').first().click()
     await expect(nl.getByText(notiz, { exact: false }).first()).toBeVisible({ timeout: 15_000 })
     expect(jsFehler, `JS-Fehler: ${jsFehler.join(' | ')}`).toEqual([])
   })

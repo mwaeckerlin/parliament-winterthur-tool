@@ -369,7 +369,7 @@ test.describe('Fraktion: drei Nutzer arbeiten gleichzeitig zusammen', () => {
   test('14: Notiz erscheint bei allen sofort (Echtzeit)', async () => {
     // Notizen haben einen eigenen Bereich mit dem Knopf «+ Neue Notiz»; der
     // WYSIWYG-Editor (Tiptap/contenteditable) öffnet erst auf Klick. Eingabe
-    // per Klick + Tastatur; gespeichert wird beim Verlassen des Editors.
+    // per Klick + Tastatur; gespeichert wird über das Häkchen.
     for (const page of [page1, page2, page3]) {
       await openParlwin(page)
       await page.locator('.pw-tabelle-geschaefte tbody tr .pw-col-titel').first().click()
@@ -382,7 +382,8 @@ test.describe('Fraktion: drei Nutzer arbeiten gleichzeitig zusammen', () => {
     await eingabe.waitFor({ state: 'visible', timeout: 15_000 })
     await eingabe.click()
     await page1.keyboard.type(notizText)
-    await eingabe.blur() // speichert die Notiz (@blur) → löst Echtzeit-Event aus
+    // Häkchen speichert die Notiz → löst das Echtzeit-Event aus.
+    await page1.locator('.pw-notizen-liste .pw-notiz-bearbeiten-aktionen button[title="Speichern"]').first().click()
 
     for (const [page, user] of [[page2, USERS.u2], [page3, USERS.u3]]) {
       await expect(

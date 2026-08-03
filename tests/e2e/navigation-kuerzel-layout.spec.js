@@ -591,10 +591,14 @@ test.describe('Sofort-Speichern-Dialoge und Minimal-Erstellung', () => {
     await expect(detail.locator('.pw-dokumente')).toBeVisible()
     await expect(detail.getByLabel('Titel')).toHaveValue(titel)
 
-    // Die Stammdaten sind jetzt pflegbar und speichern sofort.
-    await detail.getByLabel('Typ').fill('E2E-Typ')
-    await detail.getByLabel('Typ').blur()
-    await expect(detail.getByLabel('Typ')).toHaveValue('E2E-Typ')
+    // Die Stammdaten sind jetzt pflegbar und speichern sofort. Der Typ ist eine
+    // Auswahl (Vorbelegung «Eigenes Geschäft»); der frei überschreibbare Status
+    // belegt hier, dass eine Stammdaten-Eingabe sofort gespeichert wird.
+    await expect(detail.getByLabel('Typ')).toContainText('Eigenes Geschäft')
+    await detail.getByLabel('Status').fill('E2E-Status')
+    await detail.getByLabel('Status').blur()
+    await page.waitForLoadState('networkidle')
+    await expect(detail.getByLabel('Status')).toHaveValue('E2E-Status')
     expect(jsFehler, `JavaScript-Fehler: ${jsFehler.join(' | ')}`).toEqual([])
   })
 })

@@ -80,7 +80,8 @@ async function neueNotizTippen(page, text) {
   // ohne Delay verschluckt keyboard.type führende Zeichen (Tipprace).
   await page.waitForTimeout(300)
   await editor.pressSequentially(text, { delay: 25 })
-  await editor.blur()
+  // Speichern nur über das Häkchen — kein Blur-Save mehr.
+  await page.locator('.pw-notizen-liste .pw-notiz-bearbeiten-aktionen button[title="Speichern"]').first().click()
 }
 
 test.describe('Vorstösse: Datenfluss end-to-end (kein Datenverlust)', () => {
@@ -140,17 +141,17 @@ test.describe('Vorstösse: Datenfluss end-to-end (kein Datenverlust)', () => {
     ).toHaveValue(TITEL, { timeout: 15_000 })
   })
 
-  test('Notiz speichert beim Verlassen des Editors und erscheint im Vorstoss', async ({ page }) => {
+  test('Notiz speichert über das Häkchen und erscheint im Vorstoss', async ({ page }) => {
     await login(page, USER)
     await erstelleVorstossUndOeffne(page, 'Notiz')
 
     // Geteilte Notizen-Komponente (wie beim Geschäft): erst «+ Neue Notiz», dann
-    // im geöffneten Editor tippen, danach speichert der Fokus-Verlust (kein Knopf).
+    // im geöffneten Editor tippen, danach speichert das Häkchen (kein Blur, kein Autosave).
     await neueNotizTippen(page, NOTIZ)
 
     await expect(
-      page.locator('.pw-notizen-liste').getByText(NOTIZ, { exact: false }).first(),
-      'Notiz erscheint nach dem Verlassen des Editors nicht',
+      page.locator('.pw-notizen-liste .pw-notiz-eintrag').getByText(NOTIZ, { exact: false }).first(),
+      'Notiz erscheint nach dem Speichern nicht',
     ).toBeVisible({ timeout: 15_000 })
     expect(jsFehler, `JavaScript-Fehler: ${jsFehler.join(' | ')}`).toEqual([])
   })
@@ -165,7 +166,7 @@ test.describe('Vorstösse: Datenfluss end-to-end (kein Datenverlust)', () => {
     const eintrag = liste.locator('.pw-notiz-eintrag', { hasText: NOTIZ }).first()
     await eintrag.waitFor({ state: 'visible', timeout: 30_000 })
 
-    // Bearbeiten: Klick auf den Notiztext öffnet den Inline-Editor; Text ergänzen, Blur speichert (Version).
+    // Bearbeiten: Klick auf den Notiztext öffnet den Inline-Editor; Text ergänzen, das Häkchen speichert (Version).
     await eintrag.locator('.pw-notiz-inhalt').click()
     const editEditor = eintrag.locator('.ProseMirror').first()
     await editEditor.waitFor({ state: 'visible', timeout: 15_000 })
@@ -173,22 +174,28 @@ test.describe('Vorstösse: Datenfluss end-to-end (kein Datenverlust)', () => {
     await page.waitForTimeout(300)
     await page.keyboard.press('Control+End') // ans Textende, damit angehängt statt vorangestellt wird
     await editEditor.pressSequentially(' bearbeitet', { delay: 25 })
-    await editEditor.blur()
+    await eintrag.locator('.pw-notiz-bearbeiten-aktionen button[title="Speichern"]').first().click()
     await expect(
       liste.getByText(bearbeitet, { exact: false }).first(),
       'Bearbeitete Notiz erscheint nicht',
     ).toBeVisible({ timeout: 15_000 })
 
-    // Löschen (Soft-Delete): erscheint als Vermerk mit Wiederherstellen.
+    // Löschen (Soft-Delete): erscheint als Vermerk mit Wiederherstellen in der
+    // Aktionszeitleiste, nicht mehr in der Notizenliste.
+    const zeitleiste = page.locator('.pw-detail-abschnitt', { hasText: 'Aktionszeitleiste' })
     await liste.locator('.pw-notiz-eintrag', { hasText: bearbeitet }).first()
       .locator('.pw-btn-loeschen').click()
     await expect(
-      liste.getByText('hat seine Notiz gelöscht', { exact: false }).first(),
-      'Gelöschte Notiz erscheint nicht als Vermerk',
+      zeitleiste.getByText('hat seine Notiz gelöscht', { exact: false }).first(),
+      'Gelöschte Notiz erscheint nicht als Vermerk in der Aktionszeitleiste',
     ).toBeVisible({ timeout: 15_000 })
+    await expect(
+      liste.locator('.pw-notiz-eintrag', { hasText: bearbeitet }),
+      'Gelöschte Notiz steht noch in der Notizenliste',
+    ).toHaveCount(0)
 
-    // Wiederherstellen (Undo): der Text kommt zurück.
-    await liste.locator('button[title="Löschen rückgängig machen"]').first().click()
+    // Wiederherstellen (Undo) über die Aktionszeitleiste: der Text kommt in die Liste zurück.
+    await zeitleiste.locator('button[title="Löschen rückgängig machen"]').first().click()
     await expect(
       liste.getByText(bearbeitet, { exact: false }).first(),
       'Wiederhergestellte Notiz erscheint nicht',

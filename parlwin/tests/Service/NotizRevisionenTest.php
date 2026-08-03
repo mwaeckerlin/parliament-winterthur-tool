@@ -116,40 +116,54 @@ class NotizRevisionenTest extends TestCase
         self::assertSame('Neuer Text', $aktion->getText(), 'Die Notiz selbst trägt den neuen Text');
     }
 
-    public function testZwischenspeichernWaehrendDesTippensErzeugtKeineRevision(): void
+    public function testJedesSpeichernLegtGenauEineVersionAn(): void
     {
-        // Autosave während der laufenden Eingabe (Debounce) führt die Stände in
-        // EINEM Eintrag zusammen — es darf dabei keine Version entstehen.
-        $aktion = $this->makeAktion(42, 'Alter Text');
+        // Gespeichert wird nur bewusst (Häkchen). Jede Speicherung legt genau eine
+        // Version an — zwei Bearbeitungen ergeben zwei Versionen, jede hält den
+        // zuvor gespeicherten Text fest.
+        $aktion = $this->makeAktion(42, 'Fassung 1');
         $aktualisiert = [];
         $geloescht = [];
         $revisionen = [];
         $service = $this->makeService($aktion, $aktualisiert, $geloescht, $revisionen);
 
-        $service->notizAktualisieren(1, 42, 'Tipp', false);
-        $service->notizAktualisieren(1, 42, 'Tipptipp', false);
+        $service->notizAktualisieren(1, 42, 'Fassung 2');
+        $service->notizAktualisieren(1, 42, 'Fassung 3');
 
-        self::assertSame([], $revisionen, 'Zwischenspeichern darf keine Revision anlegen');
-        self::assertSame('Tipptipp', $aktion->getText());
+        self::assertCount(2, $revisionen, 'Zwei Bearbeitungen müssen zwei Versionen ergeben');
+        self::assertSame('Fassung 1', $revisionen[0]->getText());
+        self::assertSame('Fassung 2', $revisionen[1]->getText());
+        self::assertSame('Fassung 3', $aktion->getText());
     }
 
-    public function testTippenUndAbschliessenErzeugtGenauEineRevision(): void
+    public function testUnveraenderterTextErzeugtKeineVersion(): void
     {
-        // Langsames Tippen (mehrere Autosaves) darf sich NICHT als mehrere
-        // Versionen im Verlauf niederschlagen — es bleibt bei genau einer.
+        // Erneutes Speichern ohne Textänderung darf den Verlauf nicht aufblähen.
         $aktion = $this->makeAktion(42, 'Alter Text');
         $aktualisiert = [];
         $geloescht = [];
         $revisionen = [];
         $service = $this->makeService($aktion, $aktualisiert, $geloescht, $revisionen);
 
-        $service->notizAktualisieren(1, 42, 'Zwi', false);
-        $service->notizAktualisieren(1, 42, 'Zwischen', false);
-        $service->notizAktualisieren(1, 42, 'Zwischenstand', false);
-        $service->notizAktualisieren(1, 42, 'Endfassung', true);
+        $service->notizAktualisieren(1, 42, 'Alter Text');
 
-        self::assertCount(1, $revisionen, 'Mehrfaches Zwischenspeichern darf nur EINE Version ergeben');
-        self::assertSame('Endfassung', $aktion->getText());
+        self::assertSame([], $revisionen, 'Unveränderter Text darf keine Version anlegen');
+    }
+
+    public function testMehrzeiligerTextWirdVollstaendigGespeichert(): void
+    {
+        // Regressions-Schutz gegen den Autosave-Bug: mehrzeilige Eingabe muss
+        // vollständig ankommen, nicht nur die erste Zeile.
+        $aktion = $this->makeAktion(42, 'Alter Text');
+        $aktualisiert = [];
+        $geloescht = [];
+        $revisionen = [];
+        $service = $this->makeService($aktion, $aktualisiert, $geloescht, $revisionen);
+
+        $ergebnis = $service->notizAktualisieren(1, 42, "Guten Tag\nHallo Welt");
+
+        self::assertSame("Guten Tag\nHallo Welt", $ergebnis['text'], 'Der vollständige mehrzeilige Text muss gespeichert werden');
+        self::assertSame("Guten Tag\nHallo Welt", $aktion->getText());
     }
 
     public function testLoeschenEntferntNichtsAusDerDatenbankSondernSetztNurDasFlag(): void

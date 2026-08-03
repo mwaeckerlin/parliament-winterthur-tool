@@ -15,14 +15,16 @@ Diese Regeln gelten für JEDE Ansicht und JEDES Element der App — ohne Ausnahm
    übernehmen — Feld für Feld, nie nur die ganze Seite grob.
 2. **Beim BEARBEITEN speichert jede Eingabe SOFORT.** Dort gibt es keine
    Abbrechen/Speichern-Buttons: Auswahlen speichern beim Wählen, Text beim
-   Verlassen des Feldes (Blur), Editor-Inhalte beim Verlassen des Editors;
-   lange Texteingaben werden zusätzlich nach 5 s zwischengespeichert, wobei
-   Tippstände im Verlauf zu EINEM Eintrag zusammengeführt werden (definitiv
-   gespeichert wird beim Verlassen). Dialoge werden mit ✕ geschlossen —
-   Schliessen verwirft nie Daten, denn alles ist bereits gespeichert.
-   Erfolgsmeldung als Nextcloud-Standard-Toast. Für das **Anlegen** gilt
-   stattdessen Anforderung 5: dort wird nichts vorab gespeichert, und die Maske
-   trägt «Speichern» und «Abbrechen».
+   Verlassen des Feldes (Blur), Editor-Inhalte (Votum, Beschreibung) beim
+   Verlassen des Editors. Dialoge werden mit ✕ geschlossen — Schliessen verwirft
+   nie Daten, denn alles ist bereits gespeichert. Erfolgsmeldung als
+   Nextcloud-Standard-Toast. **Ausnahme Notizen:** der Notiz-Editor speichert
+   NICHT beim Verlassen und hat keinen Autosave — gespeichert wird nur bewusst
+   über ✓ (Häkchen), ✕ verwirft. Weil Schliessen hier Daten verwerfen KANN,
+   warnt der Editor beim Verlassen der Seite oder des Dialogs vor ungespeicherten
+   Änderungen (siehe Abschnitt «Notizen»). Für das **Anlegen** gilt stattdessen
+   Anforderung 5: dort wird nichts vorab gespeichert, und die Maske trägt
+   «Speichern» und «Abbrechen».
 3. **Eingaben gehen NIE verloren.** Ein Fokus-Verlust ist nur dann ein
    «Feld verlassen», wenn der Fokus die Komponente wirklich verlässt
    (`relatedTarget` prüfen); Toolbar-Klicks per `@mousedown.prevent` abfangen;
@@ -63,6 +65,11 @@ Diese Regeln gelten für JEDE Ansicht und JEDES Element der App — ohne Ausnahm
 9. **Nextcloud-Standard 1:1:** CSS und Komponenten so weit wie möglich von
    Nextcloud und den Standard-Apps (Referenz: App «files») übernehmen — kein
    eigenes Design-System, keine eigenen Icon-Formate, NC-CSS-Variablen nutzen.
+   **Keine eigenen `z-index` in Komponenten:** Overlays und Dialoge nutzen den
+   gemeinsamen Hintergrund `.pw-modal-overlay`. Die an den Seitenkörper
+   geteleportierte Auswahlliste (`.vs__dropdown-menu`) liegt bewusst knapp über
+   diesem Hintergrund — ein eigener, höherer `z-index` deckt sie zu und macht
+   die Auswahl unsichtbar (Bug «Verknüpfen mit», 2026-07-24).
 10. **Priorität:** dreistufig (hoch/mittel/tief), Default ist NICHT gesetzt
    (leer, wirkt wie mittel); nicht gesetzt wird als «—» angezeigt und ist
    wieder abwählbar. In Übersichten wird hoch dezent hervorgehoben, tief
@@ -263,21 +270,32 @@ auch Vorstösse nutzen denselben Code:
   Doctrine-`createTable` in V29/V30 behoben. Raw-SQL in `postSchemaChange` nur
   noch für reine DATEN-Migrationen bestehender Instanzen (z.B. V32:
   JSON-Notizen → Aktionen).
-- **Semantik:** Bearbeiten archiviert die bisherige Fassung als Revision (ausser
-  beim Zwischenspeichern `zwischenspeichern=true` während des Tippens); Löschen
-  setzt nur `geloescht=true` (Text/History bleiben); Undo setzt es zurück. Nur
-  der Autor (`autor_uid` = aktuelle UID) darf bearbeiten/löschen/wiederherstellen.
+- **Semantik:** jede bewusste Speicherung (✓) archiviert die bisherige Fassung
+  als Revision (unveränderter Text erzeugt keine Revision); Löschen setzt nur
+  `geloescht=true` (Text/History bleiben); Undo setzt es zurück. Nur der Autor
+  (`autor_uid` = aktuelle UID) darf bearbeiten/löschen/wiederherstellen. Es gibt
+  keinen Autosave und kein Zwischenspeichern — der frühere PUT-Parameter
+  `zwischenspeichern` ist entfallen.
 - **REST:** identische Endpunkte für beide Objektarten unter
   `/geschaefte/{id}/notizen…` bzw. `/vorstoesse/{id}/notizen…` (GET Liste,
-  POST anlegen, PUT `{aktionId}` mit `zwischenspeichern`, DELETE `{aktionId}`,
+  POST anlegen, PUT `{aktionId}` (nur `text`), DELETE `{aktionId}`,
   POST `{aktionId}/wiederherstellen`, GET `{aktionId}/revisionen`). Vorstoss-
   Listen liefern die Notizen vorab angereichert als `aktionen`
   (`VorstossService::mitNotizen`, Batch-Query, kein N+1).
 - **Frontend** `components/NotizenListe.vue` — die eine geteilte Komponente
-  (Liste, Inline-Editor mit Versions-Blättern, «+ Neue Notiz», 5-s-Autosave,
-  Blur-Abschluss, Soft-Delete, Undo). `GeschaeftDetail.vue` und
-  `Vorstoesseliste.vue` binden sie mit `basis-url` (`geschaefte/{id}` bzw.
-  `vorstoesse/{id}`) ein; keiner enthält eigenen Notiz-Editor-Code.
+  (Liste, Inline-Editor mit Versions-Blättern, «+ Neue Notiz», Speichern nur
+  über ✓/✕, Warnung vor ungespeicherten Änderungen beim Verlassen). Gelöschte
+  Notizen erscheinen NICHT in dieser Liste, sondern als Vermerk «… hat seine
+  Notiz gelöscht» samt Wiederherstellen in `components/Aktionszeitleiste.vue`.
+  `GeschaeftDetail.vue` und `Vorstoesseliste.vue` binden `NotizenListe` mit
+  `basis-url` (`geschaefte/{id}` bzw. `vorstoesse/{id}`) ein und reichen
+  `basis-url`/`aktuelle-uid` an die Aktionszeitleiste weiter; keiner enthält
+  eigenen Notiz-Editor-Code. **Sitzungsnotizen am Traktandum:**
+  `Sitzungsliste.vue` bindet dieselbe `NotizenListe` (Kategorie `sitzungsnotiz`)
+  je Geschäft ein — und daneben dieselbe geteilte `Aktionszeitleiste`, damit
+  gelöschte Sitzungsnotizen auch dort (die Traktandenliste hat sonst keine
+  Aktionszeitleiste) als Vermerk mit Wiederherstellen erscheinen; sie wird nur
+  eingeblendet, wenn eine Sitzungsnotiz des Geschäfts gelöscht ist.
 - **Kategorie (`notiz` | `sitzungsnotiz`):** alle Notiz-Methoden (Service,
   `FraktionsarbeitService`, `NotizService`, Mapper `findNotizen`/
   `findNotizenFuerObjekte`) nehmen einen `kategorie`-Parameter (Default `notiz`),

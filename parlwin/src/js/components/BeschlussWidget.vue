@@ -7,7 +7,8 @@
       :value="currentText"
       :disabled="disabled"
       :placeholder="placeholder"
-      class="pw-input pw-beschluss-input"
+      :aria-label="ariaLabel || null"
+      :class="['pw-input', inputClass]"
       @input="handleInput"
       @blur="handleBlur"
       @change="handleChange"
@@ -26,6 +27,12 @@ export default {
     options: { type: Array, default: () => [] },
     disabled: { type: Boolean, default: false },
     placeholder: { type: String, default: 'Beschluss eingeben oder aus Liste wählen…' },
+    // Klasse des Eingabefeldes. Default ist der Beschluss; bei einem zweiten
+    // Einsatz desselben Widgets (z.B. Status am eigenen Geschäft) eine andere
+    // setzen, damit die beiden Felder unterscheidbar bleiben.
+    inputClass: { type: String, default: 'pw-beschluss-input' },
+    // Beschriftung für die Sprachausgabe; leer lässt das Attribut weg.
+    ariaLabel: { type: String, default: '' },
   },
   emits: ['update:modelValue', 'blur'],
   data() {

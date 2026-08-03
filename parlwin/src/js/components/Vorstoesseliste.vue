@@ -169,6 +169,7 @@
             </PwField>
             <PwField label="Notizen">
               <NotizenListe
+                ref="notizenListe"
                 :basis-url="'vorstoesse/' + bearbeitung.id"
                 :notizen="bearbeitung.aktionen || []"
                 :aktuelle-uid="aktuelleUid"
@@ -176,7 +177,12 @@
               />
             </PwField>
             <PwField label="Aktionszeitleiste">
-              <Aktionszeitleiste :aktionen="bearbeitung.aktionen || []" />
+              <Aktionszeitleiste
+                :aktionen="bearbeitung.aktionen || []"
+                :basis-url="'vorstoesse/' + bearbeitung.id"
+                :aktuelle-uid="aktuelleUid"
+                @notiz-wiederhergestellt="onNotizWiederhergestellt"
+              />
             </PwField>
             <PwField label="Geschäft">
               <div v-if="bearbeitung.geschaeftId" class="pw-hinweis">Mit einem Geschäft verknüpft und abgeschlossen.</div>
@@ -614,8 +620,25 @@ export default {
       }
     },
     schliessen() {
+      // Warnung, wenn im Notiz-Editor ungespeicherte Änderungen offen sind.
+      if (this.$refs.notizenListe?.hatUngespeicherteAenderungen?.()) {
+        // eslint-disable-next-line no-alert
+        if (!window.confirm('Die Notiz ist noch nicht gespeichert. Trotzdem schliessen?')) return
+      }
       this.bearbeitung = null
       this.istEntwurf = false
+    },
+    /**
+     * Eine in der Aktionszeitleiste wiederhergestellte Notiz zurück in die
+     * Aktionsliste übernehmen (geloescht=false).
+     */
+    onNotizWiederhergestellt(data) {
+      if (!this.bearbeitung || !data?.id) return
+      const idx = (this.bearbeitung.aktionen || []).findIndex(a => a.id === data.id)
+      if (idx < 0) return
+      const kopie = [...this.bearbeitung.aktionen]
+      kopie[idx] = data
+      this.bearbeitung.aktionen = kopie
     },
     // Speichert den aktuellen Bearbeitungsstand SOFORT (bei jeder Eingabe).
     // Ein leerer Titel wird nie weggespeichert.

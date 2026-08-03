@@ -2054,6 +2054,71 @@ class SettingsController extends Controller
     }
 
     /**
+     * Die Typen, die beim Anlegen eines eigenen Geschäfts zur Auswahl stehen.
+     * Ohne Konfiguration bleibt es beim bisherigen Standardtyp.
+     */
+    #[AuthorizedAdminSetting(settings: \OCA\ParliamentWinterthur\Settings\AdminSettings::class)]
+    public function getEigeneTypen(): DataResponse
+    {
+        return new DataResponse($this->eigeneTypen());
+    }
+
+    /**
+     * Speichert die Typenliste (komplette Liste ersetzen).
+     * Body: { "eigene_typen": ["Motion", "Postulat", …] }
+     */
+    #[AuthorizedAdminSetting(settings: \OCA\ParliamentWinterthur\Settings\AdminSettings::class)]
+    public function setEigeneTypen(): DataResponse
+    {
+        $roh = $this->request->getParam('eigene_typen', []);
+        if (!is_array($roh)) {
+            return new DataResponse(['fehler' => 'Ungültiges Format'], Http::STATUS_BAD_REQUEST);
+        }
+        $bereinigt = self::normalisiereTypen($roh);
+        $this->config->setAppValue(Application::APP_ID, 'eigene_typen', (string) json_encode($bereinigt));
+        return new DataResponse($bereinigt);
+    }
+
+    /**
+     * Der wirksame Typen-Katalog: der gepflegte, sonst der bisherige Standard.
+     *
+     * @return list<string>
+     */
+    private function eigeneTypen(): array
+    {
+        $bereinigt = self::normalisiereTypen(
+            json_decode($this->config->getAppValue(Application::APP_ID, 'eigene_typen', '[]'), true)
+        );
+
+        return $bereinigt === [] ? ['Eigenes Geschäft'] : $bereinigt;
+    }
+
+    /**
+     * Bringt eine Typenliste in Form: ohne Leereinträge, ohne Doppelte,
+     * Reihenfolge der Eingabe bleibt erhalten.
+     *
+     * @return list<string>
+     */
+    private static function normalisiereTypen(mixed $roh): array
+    {
+        if (!is_array($roh)) {
+            return [];
+        }
+        $typen = [];
+        foreach ($roh as $eintrag) {
+            if (is_array($eintrag)) {
+                continue;
+            }
+            $typ = trim((string) $eintrag);
+            if ($typ !== '' && !in_array($typ, $typen, true)) {
+                $typen[] = $typ;
+            }
+        }
+
+        return $typen;
+    }
+
+    /**
      * Gibt den Zeitplan der automatischen Synchronisation zurück.
      * Format: [{tage: [1..7], zeit: "HH:MM"}] (1 = Montag … 7 = Sonntag).
      */

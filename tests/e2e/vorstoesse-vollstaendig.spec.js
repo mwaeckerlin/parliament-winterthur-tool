@@ -88,7 +88,8 @@ async function neueNotizTippen(page, text) {
   await editor.click()
   await page.waitForTimeout(300)
   await editor.pressSequentially(text, { delay: 25 })
-  await editor.blur()
+  // Speichern nur über das Häkchen — kein Blur-Save mehr.
+  await page.locator('.pw-notizen-liste .pw-notiz-bearbeiten-aktionen button[title="Speichern"]').first().click()
 }
 
 // ---------------------------------------------------------------------------
@@ -594,8 +595,8 @@ test.describe('Vorstösse: Notizen (Versionen & Berechtigung)', () => {
     await eintrag.waitFor({ state: 'visible', timeout: 30_000 })
     await expect(eintrag).toContainText('AAA', { timeout: 15_000 })
 
-    // Zweite Fassung: Inline-Editor öffnen, ans Ende, BBB anhängen, blur
-    // (archiviert die erste Fassung als Revision).
+    // Zweite Fassung: Inline-Editor öffnen, ans Ende, BBB anhängen, das Häkchen
+    // speichert (archiviert die erste Fassung als Revision).
     await eintrag.locator('.pw-notiz-inhalt').click()
     const editEditor = eintrag.locator('.ProseMirror').first()
     await editEditor.waitFor({ state: 'visible', timeout: 15_000 })
@@ -603,7 +604,7 @@ test.describe('Vorstösse: Notizen (Versionen & Berechtigung)', () => {
     await page.waitForTimeout(300)
     await page.keyboard.press('Control+End')
     await editEditor.pressSequentially(' BBB', { delay: 25 })
-    await editEditor.blur()
+    await eintrag.locator('.pw-notiz-bearbeiten-aktionen button[title="Speichern"]').first().click()
     // Warten, bis der Editor geschlossen (gespeichert) und BBB im Eintrag sichtbar ist.
     await expect(eintrag.locator('.pw-notiz-bearbeiten-zeile')).toHaveCount(0, { timeout: 15_000 })
     await expect(eintrag).toContainText('BBB', { timeout: 15_000 })

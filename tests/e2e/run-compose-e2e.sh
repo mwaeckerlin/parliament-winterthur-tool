@@ -565,6 +565,49 @@ assert_json '.titel == "E2E Stammdaten geändert"' "Titel des eigenen Geschäfts
 assert_json '.typ == "E2E-Typ"' "Typ des eigenen Geschäfts wurde nicht gespeichert"
 assert_json '.status == "E2E-Status"' "Status des eigenen Geschäfts wurde nicht gespeichert"
 
+# Beschreibungstext und Kommission gehören zum eigenen Geschäft und sind
+# nachträglich änderbar; keine Kommission ist ein gültiger Zustand.
+api_expect_status PUT "admin" "$ADMIN_TOKEN" "/geschaefte/${EIGEN_VOR_SYNC_GID}/stammdaten" "200" \
+  --data-urlencode "inhalt=<p>E2E Beschreibung</p>" \
+  --data-urlencode "kommission=E2E-Kommission"
+assert_json '.inhalt == "<p>E2E Beschreibung</p>"' "Beschreibungstext des eigenen Geschäfts wurde nicht gespeichert"
+assert_json '.kommission == "E2E-Kommission"' "Kommission des eigenen Geschäfts wurde nicht gespeichert"
+api_expect_status PUT "admin" "$ADMIN_TOKEN" "/geschaefte/${EIGEN_VOR_SYNC_GID}/stammdaten" "200" \
+  --data-urlencode "kommission="
+assert_json '.kommission == ""' "Kommission liess sich nicht wieder entfernen"
+
+# Die Status-Auswahl speist sich aus den tatsächlich vorkommenden Werten — der
+# eben gesetzte «E2E-Status» muss darunter sein.
+api_expect_status GET "admin" "$ADMIN_TOKEN" "/geschaefte/statuswerte" "200"
+assert_json 'any(.[]; . == "E2E-Status")' "Status-Auswahl enthält den vorkommenden Wert nicht"
+
+# Die Typen für eigene Geschäfte pflegt der Administrator (leere/doppelte raus).
+# Indizierte Keys, weil die Test-Hilfsfunktion je Key nur EINEN Wert überträgt —
+# gleichnamige «eigene_typen[]» würden sich gegenseitig überschreiben.
+api_expect_status POST "admin" "$ADMIN_TOKEN" "/settings/eigene-typen" "200" \
+  --data-urlencode "eigene_typen[0]=Motion" \
+  --data-urlencode "eigene_typen[1]=" \
+  --data-urlencode "eigene_typen[2]=Motion" \
+  --data-urlencode "eigene_typen[3]=Postulat"
+assert_json '. == ["Motion","Postulat"]' "Typenliste wurde nicht bereinigt gespeichert"
+api_expect_status GET "admin" "$ADMIN_TOKEN" "/settings/eigene-typen" "200"
+assert_json '. == ["Motion","Postulat"]' "Gepflegte Typenliste wird nicht zurückgeliefert"
+
+# Ein neues eigenes Geschäft übernimmt Beschreibungstext, Kommission und Datum.
+api_expect_status POST "admin" "$ADMIN_TOKEN" "/geschaefte" "201" \
+  --data-urlencode "titel=E2E Eigenes mit Inhalt $(date +%s)" \
+  --data-urlencode "typ=Motion" \
+  --data-urlencode "inhalt=<p>Worum es geht</p>" \
+  --data-urlencode "kommission=E2E-Kommission" \
+  --data-urlencode "datum=2026-05-06"
+EIGEN_INHALT_GID="$(jq -r '.id' <<<"$LAST_BODY")"
+api_expect_status GET "admin" "$ADMIN_TOKEN" "/geschaefte/${EIGEN_INHALT_GID}" "200"
+assert_json '.inhalt == "<p>Worum es geht</p>"' "Neu angelegtes Geschäft trägt den Beschreibungstext nicht"
+assert_json '.kommission == "E2E-Kommission"' "Neu angelegtes Geschäft trägt die Kommission nicht"
+assert_json '.typ == "Motion"' "Neu angelegtes Geschäft trägt den Typ nicht"
+assert_json '.datum == "2026-05-06"' "Neu angelegtes Geschäft trägt das Datum nicht"
+sql "UPDATE ${TABLE_PREFIX}pw_geschaefte SET geloescht=1 WHERE id=${EIGEN_INHALT_GID};"
+
 # Ein unsinniges Datum wird abgewiesen statt still übernommen.
 api_expect_status PUT "admin" "$ADMIN_TOKEN" "/geschaefte/${EIGEN_VOR_SYNC_GID}/stammdaten" "400" \
   --data-urlencode "datum=04.03.2026"

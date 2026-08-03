@@ -69,76 +69,79 @@ function mountListe(notizen = [], aktuelleUid = 'testuser') {
   })
 }
 
-// Die Zeitleiste ist jetzt die geteilte Komponente Aktionszeitleiste — sie
-// filtert dieselben Aktionen (Notizen raus, gültige Vota raus) wie zuvor.
-function mountZeitleiste(aktionen = []) {
-  return shallowMount(Aktionszeitleiste, { props: { aktionen } })
+// Die Aktionszeitleiste zeigt aktive Notizen NICHT (die leben in der
+// NotizenListe), GELÖSCHTE Notizen aber als Lösch-Vermerk mit Wiederherstellen.
+function mountZeitleiste(aktionen = [], aktuelleUid = 'testuser') {
+  return shallowMount(Aktionszeitleiste, {
+    props: { aktionen, basisUrl: 'geschaefte/1', aktuelleUid },
+  })
 }
 
-describe('Zeitleiste — keine Notizen mehr (weder aktiv noch gelöscht)', () => {
+describe('Zeitleiste — aktive Notizen raus, gelöschte als Lösch-Vermerk', () => {
   it('zeigt eine aktive Notiz NICHT in der Aktionszeitleiste', () => {
     const wrapper = mountZeitleiste([NOTIZ])
     expect(wrapper.vm.zeitleisteEintraege.some(e => e.id === 7)).toBe(false)
   })
 
-  it('zeigt auch eine gelöschte Notiz NICHT in der Aktionszeitleiste', () => {
+  it('zeigt eine gelöschte Notiz als Lösch-Vermerk in der Aktionszeitleiste', () => {
     const wrapper = mountZeitleiste([NOTIZ_GELOESCHT])
-    expect(wrapper.vm.zeitleisteEintraege.some(e => e.id === 8)).toBe(false)
+    const eintrag = wrapper.vm.zeitleisteEintraege.find(e => e.id === 8)
+    expect(eintrag, 'Die gelöschte Notiz fehlt in der Aktionszeitleiste').toBeTruthy()
+    expect(eintrag._type).toBe('notizGeloescht')
+    // Der Vermerk erscheint, der Notiztext bleibt verborgen.
+    expect(wrapper.text()).toContain('hat seine Notiz gelöscht')
+    expect(wrapper.text()).not.toContain('Weg damit')
   })
 
-  it('reicht alle Notiz-Aktionen (aktiv + gelöscht) über notizAktionen an die Liste', async () => {
-    const wrapper = await mountDetail([NOTIZ, NOTIZ_GELOESCHT])
-    expect(wrapper.vm.notizAktionen.map(n => n.id)).toEqual(expect.arrayContaining([7, 8]))
+  it('bietet dem Autor einen Undo-Knopf, anderen nicht', () => {
+    const eigen = mountZeitleiste([NOTIZ_GELOESCHT], 'testuser')
+    expect(eigen.find('button[title="Löschen rückgängig machen"]').exists()).toBe(true)
+    const fremd = mountZeitleiste([NOTIZ_GELOESCHT], 'jemandanderes')
+    expect(fremd.find('button[title="Löschen rückgängig machen"]').exists()).toBe(false)
+  })
+
+  it('stellt die Notiz per Undo wieder her und meldet sie an die Elternansicht', async () => {
+    const axios = (await import('@nextcloud/axios')).default
+    axios.post.mockResolvedValueOnce({ data: { ...NOTIZ_GELOESCHT, geloescht: false } })
+    const wrapper = mountZeitleiste([NOTIZ_GELOESCHT])
+    await wrapper.vm.notizWiederherstellen({ ...NOTIZ_GELOESCHT, _type: 'notizGeloescht' })
+    expect(axios.post).toHaveBeenCalledWith(
+      expect.stringContaining('/notizen/8/wiederherstellen?kategorie=notiz'),
+    )
+    expect(wrapper.emitted('notiz-wiederhergestellt')).toBeTruthy()
   })
 
   it('lässt andere Aktionen (Beschluss) in der Zeitleiste', () => {
     const wrapper = mountZeitleiste([BESCHLUSS])
     expect(wrapper.vm.zeitleisteEintraege.some(e => e.id === 9)).toBe(true)
   })
+
+  it('reicht alle Notiz-Aktionen (aktiv + gelöscht) über notizAktionen an die Liste', async () => {
+    const wrapper = await mountDetail([NOTIZ, NOTIZ_GELOESCHT])
+    expect(wrapper.vm.notizAktionen.map(n => n.id)).toEqual(expect.arrayContaining([7, 8]))
+  })
 })
 
-describe('NotizenListe — aktive und gelöschte Notizen', () => {
+describe('NotizenListe — nur aktive Notizen', () => {
   it('führt eine aktive Notiz in der aktiven Liste', () => {
     const wrapper = mountListe([NOTIZ])
     expect(wrapper.vm.aktiveNotizen.map(n => n.id)).toContain(7)
   })
 
-  it('blendet gelöschte Notizen aus der aktiven Liste aus', () => {
+  it('blendet gelöschte Notizen aus (sie leben in der Aktionszeitleiste)', () => {
     const wrapper = mountListe([NOTIZ_GELOESCHT])
     expect(wrapper.vm.aktiveNotizen.map(n => n.id)).not.toContain(8)
-  })
-
-  it('rendert den Hinweis «hat seine Notiz gelöscht» statt des Notiztextes', () => {
-    const wrapper = mountListe([NOTIZ_GELOESCHT])
-    const text = wrapper.text()
-    expect(text).toContain('Notiz gelöscht')
-    expect(text).not.toContain('Weg damit')
-  })
-
-  it('bietet dem Autor einen Undo-Knopf, anderen nicht', () => {
-    const eigen = mountListe([NOTIZ_GELOESCHT], 'testuser')
-    expect(eigen.find('button[title="Löschen rückgängig machen"]').exists()).toBe(true)
-    const fremd = mountListe([NOTIZ_GELOESCHT], 'jemandanderes')
-    expect(fremd.find('button[title="Löschen rückgängig machen"]').exists()).toBe(false)
+    // Kein Lösch-Vermerk und kein Undo mehr in dieser Komponente.
+    expect(wrapper.text()).not.toContain('hat seine Notiz gelöscht')
+    expect(wrapper.find('button[title="Löschen rückgängig machen"]').exists()).toBe(false)
   })
 
   it('unterscheidet Löschen (Mülleimer-Icon) optisch vom Schliessen (✕)', () => {
     const wrapper = mountListe([NOTIZ])
     const loeschen = wrapper.find('button[title="Notiz löschen"]')
     expect(loeschen.exists()).toBe(true)
-    // Kein ✕-Textsymbol – das ist das Icon zum Schliessen des Fensters.
     expect(loeschen.text()).not.toContain('✕')
-    // Stattdessen ein eigenständiges Icon-Element (Mülleimer), kein blosses Textzeichen.
     expect(loeschen.element.children.length).toBeGreaterThan(0)
-  })
-
-  it('stellt die Notiz per Undo wieder her', async () => {
-    const wrapper = mountListe([NOTIZ_GELOESCHT])
-    await wrapper.vm.notizWiederherstellen(NOTIZ_GELOESCHT)
-    const axios = (await import('@nextcloud/axios')).default
-    expect(axios.post).toHaveBeenCalledWith(
-      expect.stringContaining('/notizen/8/wiederherstellen'),
-    )
   })
 })
 

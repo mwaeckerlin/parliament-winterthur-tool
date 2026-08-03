@@ -128,6 +128,18 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
                 </section>
 
                 <section class="pw-admin-card">
+                    <h3><?php p($l->t('Typen für eigene Geschäfte')); ?></h3>
+                    <p class="settings-hint">
+                        <?php p($l->t('Diese Typen stehen beim Anlegen eines eigenen Geschäfts zur Auswahl. Ohne Eintrag bleibt es beim Typ «Eigenes Geschäft».')); ?>
+                    </p>
+                    <div id="pw-typen-liste"></div>
+                    <button type="button" id="pw-typen-hinzufuegen" class="button">
+                        <?php p($l->t('+ Typ hinzufügen')); ?>
+                    </button>
+                    <span id="pw-typen-status" class="pw-sync-status"></span>
+                </section>
+
+                <section class="pw-admin-card">
                     <h3><?php p($l->t('Automatische Synchronisation')); ?></h3>
                     <p class="settings-hint">
                         <?php p($l->t('Zeitplan der automatischen Synchronisation: beliebige Einträge mit Wochentagen und Uhrzeit. Ohne Eintrag wird an allen Wochentagen um 10:00 und 18:00 Uhr synchronisiert.')); ?>

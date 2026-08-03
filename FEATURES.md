@@ -160,9 +160,12 @@ Nummern werden einmal vergeben und nie wiederverwendet; jeder Test in
       eine ältere Fassung als neue aktuelle übernehmen — der Verlauf bleibt
       vollständig. Bearbeiten, Löschen und Wiederherstellen einer Notiz kann
       nur ihr Verfasser; für andere ist sie sichtbar, aber nicht änderbar.
-      Gelöschte Notizen verschwinden nicht endgültig: in der Notizliste
-      erscheint «… hat seine Notiz gelöscht», und der Verfasser kann sie samt
-      Verlauf wiederherstellen.
+      Gespeichert wird nur bewusst über das Häkchen «✓» (kein automatisches
+      Zwischenspeichern, kein Speichern beim Verlassen des Feldes); bei
+      ungespeicherten Änderungen wird beim Verlassen gewarnt. Gelöschte Notizen
+      verschwinden nicht endgültig: in der Aktionszeitleiste erscheint «… hat
+      seine Notiz gelöscht», und der Verfasser kann sie samt Verlauf
+      wiederherstellen.
     - **F25** **Sitzungsnotizen:** Notizen, die man in einer Sitzung zu einem mit
       dieser Sitzung verknüpften Geschäft erfasst, haften am Geschäft (nicht an
       der einzelnen Sitzung). Sie erscheinen darum automatisch bei jeder
@@ -173,7 +176,8 @@ Nummern werden einmal vergeben und nie wiederverwendet; jeder Test in
       standardmässig eingeklappt; sie verhalten sich sonst wie normale Notizen
       (Formatierung, Versionsverlauf, Löschen mit Wiederherstellung).
     - **F26** **Votum im Rat:** eigener formatierter Text pro Geschäft (nur die
-      zuständige Person darf ihn erfassen und bearbeiten), als druckbares PDF
+      zuständige Person darf ihn erfassen und bearbeiten; für alle anderen
+      erscheint das Feld nur, wenn ein Votum vorliegt), als druckbares PDF
       speicherbar. Das PDF öffnet in einem eigenen Tab, löst den
       Drucken-Dialog automatisch aus und trägt: Titel «Votum im Rat» und den
       Geschäftstitel; darunter Geschäftsnummer, Zuständige der Fraktion (die
@@ -388,6 +392,10 @@ Nummern werden einmal vergeben und nie wiederverwendet; jeder Test in
   Partei-, Fraktions- und Kommissionsnamen. Das Suchtext-Feld schlägt die
   bestehenden Status-Werte sowie die aktuellen Fraktions- und Parteinamen vor;
   automatisch gespeichert.
+- **F69** Typen für eigene Geschäfte pflegen: eine beliebig lange Liste von
+  Bezeichnungen, mit Hinzufügen und Löschen, automatisch gespeichert. Diese
+  Typen stehen beim Anlegen eines eigenen Geschäfts zur Auswahl. Ohne Eintrag
+  bleibt es beim Typ «Eigenes Geschäft».
 
 ## Änderungsverlauf
 
@@ -555,7 +563,7 @@ Erscheint automatisch, wenn die Inhaltsspalte zu schmal für die Tabelle wird. S
 
 ### Geschäfts-Detailmaske
 
-Die Maske ist für alle Geschäfte gleich aufgebaut. Bei **selbst angelegten** Geschäften («+ Eigenes Geschäft») sind Titel, Typ, Status und Datum zusätzlich bearbeitbar; bei Geschäften von der Parlamentswebseite sind sie reine Anzeige, weil sie beim nächsten Abgleich von der Quelle überschrieben würden.
+Die Maske ist für alle Geschäfte gleich aufgebaut. Bei **selbst angelegten** Geschäften («+ Eigenes Geschäft») sind Titel, Beschreibungstext, Typ, Status, Datum und Kommission zusätzlich bearbeitbar; bei Geschäften von der Parlamentswebseite sind sie reine Anzeige, weil sie beim nächsten Abgleich von der Quelle überschrieben würden.
 
 #### Zustände beim Öffnen
 
@@ -569,20 +577,23 @@ Die Maske ist für alle Geschäfte gleich aufgebaut. Bei **selbst angelegten** G
     - Bei selbst angelegten Geschäften: Textfeld, Platzhalter «Titel des Geschäfts», Beschriftung für Sprachausgabe «Titel». Pflichtfeld faktisch ja: bleibt es leer, wird das Geschäft beim Schliessen verworfen. Vorbelegung: der gespeicherte Titel (bei einem frisch angelegten Geschäft leer). Speicherung: beim Verlassen des Feldes bzw. sobald die Änderung abgeschlossen ist — mit Rückmeldung «Gespeichert» bzw. «Geschäft konnte nicht gespeichert werden: …».
     - Sonst: reine Anzeige des Titels.
 3. **Fraktionsstatus-Marke** rechts — Text «Offen», «Neu zu entscheiden» oder «Entschieden»; farblich: «Neu zu entscheiden» wie offen, «Entschieden» wie erledigt, «Offen» neutral. Sie wird abgeleitet: kein Beschluss ⇒ «Offen»; Quelle nach dem letzten Beschluss aktualisiert ⇒ «Neu zu entscheiden»; sonst «Entschieden».
+    - Der Titel nutzt die ganze Zeilenbreite; die Fraktionsstatus-Marke steht rechts daneben, nie darunter.
+4. **Beschreibungstext** — **bedingte Sichtbarkeit**: nur bei selbst angelegten Geschäften, direkt unter dem Titel (vor den öffentlichen Informationen). Formatierter Textbereich mit Werkzeugleiste (siehe «Geteilte Bausteine → Formatierter Textbereich»), Platzhalter «Worum geht es?». Kein Pflichtfeld. Vorbelegung: der gespeicherte Text, bei einem frisch angelegten Geschäft leer. Speicherung beim Verlassen des Editors. Bei Geschäften von der Parlamentswebseite entfällt er — der Text steht dort auf der Quellseite.
 
 #### Bereich «Öffentliche Informationen»
 
 Tabelle mit Beschriftung links und Wert rechts, von oben nach unten:
 
 1. **«Nummer»** — Anzeige, nie bearbeitbar.
-2. **«Typ»** — bei selbst angelegten Geschäften Textfeld mit Platzhalter «z.B. Kommissionsgeschäft» (Sprachausgabe-Beschriftung «Typ»), sonst Anzeige. Kein Pflichtfeld. Vorbelegung: gespeicherter Wert, bei neu angelegten Geschäften «Eigenes Geschäft». Speicherung sofort beim Abschluss der Eingabe, Rückmeldung «Gespeichert».
-3. **«Status»** — bei selbst angelegten Geschäften Textfeld mit Platzhalter «z.B. Pendent», sonst Anzeige des Status in gekürzter Schreibweise. Kein Pflichtfeld. Speicherung sofort.
+2. **«Typ»** — bei selbst angelegten Geschäften Auswahlliste, deren Werte der Administrator pflegt (Admin-Bereich «Typen für eigene Geschäfte»). Sonst Anzeige. Kein Pflichtfeld. Vorbelegung: gespeicherter Wert, bei neu angelegten Geschäften «Eigenes Geschäft». Speicherung sofort bei der Auswahl, Rückmeldung «Gespeichert». Ist keine Typenliste konfiguriert, steht dort nur «Eigenes Geschäft».
+3. **«Status»** — bei selbst angelegten Geschäften dasselbe Widget wie beim Beschluss: eine Auswahl aus den Werten, die in der Datenbank bereits vorkommen, jederzeit mit einem frei eingetippten Wert überschreibbar. Sonst Anzeige des Status in gekürzter Schreibweise. Kein Pflichtfeld. Speicherung sofort.
 4. **«Fraktionsstatus»** — Anzeige «Offen» / «Neu zu entscheiden» / «Entschieden», nie bearbeitbar (wird abgeleitet).
-5. **«Datum»** — bei selbst angelegten Geschäften Datumsfeld (Sprachausgabe-Beschriftung «Datum»), sonst Anzeige in Schweizer Schreibweise. Kein Pflichtfeld. Speicherung sofort.
-6. **«Einreicher»** — **bedingte Sichtbarkeit**: nur, wenn zum Geschäft mindestens eine einreichende Person hinterlegt ist. Anzeige: Name, dahinter in Klammern die Rolle, mehrere durch Komma getrennt. Nie bearbeitbar.
-7. **«Letzte externe Änderung»** — Zeitpunkt der letzten Änderung an der Quelle in Schweizer Schreibweise; «—», wenn unbekannt. Nie bearbeitbar.
-8. **«Letzte Fraktionsentscheidung»** — Zeitpunkt des letzten Fraktionsbeschlusses; «—», wenn noch keiner gefasst wurde. Nie bearbeitbar.
-9. **«Link»** — **bedingte Sichtbarkeit**: nur wenn ein Link hinterlegt ist. Verweis mit dem Text «Auf Parlamentswebseite öffnen ↗», öffnet ein neues Fenster.
+5. **«Datum»** — bei selbst angelegten Geschäften Datumsfeld (Sprachausgabe-Beschriftung «Datum»), sonst Anzeige in Schweizer Schreibweise. Kein Pflichtfeld. **Vorbelegung beim Anlegen: das heutige Datum.** Speicherung sofort. Ein unsinniges Datum (nicht JJJJ-MM-TT) wird mit einer Meldung abgewiesen.
+6. **«Kommission»** — **bedingte Sichtbarkeit**: bei selbst angelegten Geschäften eine leerbare Auswahlliste (Platzhalter «—»), die **nur aktive** Kommissionen anbietet; höchstens eine ist wählbar, «keine» (leer) ist gültig. Bei Geschäften von der Parlamentswebseite nur angezeigt, wenn eine Kommission hinterlegt ist (dann in gekürzter Schreibweise). Speicherung sofort bei der Auswahl, auch beim Leeren.
+7. **«Einreicher»** — **bedingte Sichtbarkeit**: nur, wenn zum Geschäft mindestens eine einreichende Person hinterlegt ist. Anzeige: Name, dahinter in Klammern die Rolle, mehrere durch Komma getrennt. Nie bearbeitbar.
+8. **«Letzte externe Änderung»** — Zeitpunkt der letzten Änderung an der Quelle in Schweizer Schreibweise; «—», wenn unbekannt. Nie bearbeitbar.
+9. **«Letzte Fraktionsentscheidung»** — Zeitpunkt des letzten Fraktionsbeschlusses; «—», wenn noch keiner gefasst wurde. Nie bearbeitbar.
+10. **«Link»** — **bedingte Sichtbarkeit**: nur wenn ein Link hinterlegt ist. Verweis mit dem Text «Auf Parlamentswebseite öffnen ↗», öffnet ein neues Fenster.
 
 #### Bereich «Fraktionsinterne Bearbeitung»
 
@@ -833,30 +844,28 @@ Wird für Zuständigkeit, Ansprechpartner und alle Mehrfachfilter verwendet.
 
 Identisch bei Geschäften (reguläre Notizen und Sitzungsnotizen) und bei Vorstössen.
 
-1. **Hinweis «Noch keine Notizen vorhanden.»** — erscheint nur, wenn weder aktive noch gelöschte Notizen vorliegen und gerade kein Notizfeld offen ist.
-2. **Je bestehende Notiz** (von oben nach unten in der gespeicherten Reihenfolge):
+Notizen speichern **ausschliesslich** über das Häkchen «✓»; abgebrochen wird mit «✕».
+Es gibt **kein** automatisches Zwischenspeichern und **kein** Speichern beim Verlassen
+des Feldes. Nur die aktiven Notizen erscheinen hier — gelöschte stehen in der
+Aktionszeitleiste.
+
+1. **Hinweis «Noch keine Notizen vorhanden.»** — erscheint nur, wenn keine aktiven Notizen vorliegen und gerade kein Notizfeld offen ist.
+2. **Je aktive Notiz** (von oben nach unten in der gespeicherten Reihenfolge):
     1. **Name der verfassenden Person** (ersatzweise deren Benutzername).
     2. **Datum und Uhrzeit** der Erfassung in Schweizer Schreibweise (Uhrzeit auf Stunden und Minuten).
-    3. **Löschknopf** (Papierkorb-Symbol, Hilfetext «Notiz löschen») — **bedingte Sichtbarkeit**: nur bei **eigenen** Notizen und nur, solange diese Notiz nicht gerade bearbeitet wird. Wirkung: die Notiz wird sofort ohne Rückfrage entfernt und erscheint fortan als Löschvermerk (siehe unten). Fehlermeldung: «Fehler beim Löschen der Notiz».
+    3. **Löschknopf** (Papierkorb-Symbol, Hilfetext «Notiz löschen») — **bedingte Sichtbarkeit**: nur bei **eigenen** Notizen und nur, solange diese Notiz nicht gerade bearbeitet wird. Wirkung: die Notiz wird sofort ohne Rückfrage entfernt und erscheint fortan als Löschvermerk in der Aktionszeitleiste. Fehlermeldung: «Fehler beim Löschen der Notiz».
     4. **Notiztext**, formatiert dargestellt. Bei **eigenen** Notizen ist er anklickbar (Hilfetext «Klicken zum Bearbeiten»); ein Klick oder die «Eingabe»-Taste öffnet an dieser Stelle das Bearbeitungsfeld. Fremde Notizen sind nicht anklickbar und nicht bearbeitbar.
 3. **Bearbeitungsfeld** (dasselbe Feld für neue und bestehende Notizen):
     - Formatierter Textbereich mit Werkzeugleiste; Platzhalter «Notiz bearbeiten…» beim Bearbeiten, «Kommentar, Beobachtung, Hinweis» bei einer neuen Notiz.
     - Beim Bearbeiten einer bestehenden Notiz erscheinen in der Werkzeugleiste zusätzlich die Knöpfe zum Blättern in älteren Fassungen (siehe «Formatierter Textbereich»).
-    - **«✓»** — Hilfetext «Speichern». Schliesst die Bearbeitung ab und speichert. Blättert man gerade in einer älteren Fassung, hat der Knopf die Sonderfunktion «Wiederherstellen»: Der aktuelle Arbeitsstand wird zuerst regulär gesichert, danach wird die angezeigte ältere Fassung als neue aktuelle Fassung übernommen.
-    - **«✕»** — Hilfetext «Abbrechen». Schliesst das Feld, ohne weiter zu speichern (bereits automatisch Zwischengespeichertes bleibt erhalten).
-    - Klicks auf «✓» und «✕» sowie auf die Werkzeugleiste gelten **nicht** als Verlassen des Feldes und verwerfen nie eine Eingabe.
-4. **Speicherzeitpunkte**:
-    - **Automatisch** fünf Sekunden nach der letzten Eingabe — dieser Zwischenstand erzeugt **keine** neue Fassung in der Versionsgeschichte.
-    - **Beim Verlassen des Feldes** und beim Klick auf «✓» — dieser Abschluss legt eine Fassung in der Versionsgeschichte ab. Rückmeldung «Notiz gespeichert» bzw. «Fehler beim Speichern der Notiz» / «Fehler beim Bearbeiten der Notiz».
-    - **Beim Schliessen der Maske**, falls noch ein Feld offen ist: Der Stand wird als Abschluss gesichert.
-    - Eine **neue** Notiz wird erst angelegt, wenn sie nicht leer ist — ein geöffnetes, leer gebliebenes Feld erzeugt nichts.
+    - **«✓»** — Hilfetext «Speichern». Der **einzige** Speicherweg. Schliesst die Bearbeitung ab und legt bei einer Änderung eine Fassung in der Versionsgeschichte ab. Rückmeldung «Notiz gespeichert» bzw. «Fehler beim Speichern der Notiz» / «Fehler beim Bearbeiten der Notiz». Blättert man gerade in einer älteren Fassung, hat der Knopf die Sonderfunktion «Wiederherstellen»: Der aktuelle Arbeitsstand wird zuerst regulär gesichert (und damit als Fassung erhalten), danach wird die angezeigte ältere Fassung als neue aktuelle Fassung übernommen.
+    - **«✕»** — Hilfetext «Abbrechen». Schliesst das Feld, ohne zu speichern; die Eingabe wird verworfen.
+    - **Kein Speichern bei Fokus-Verlust**: verlässt man das Feld (Klick daneben, anderes Feld), bleibt der Editor offen und der Text erhalten. Klicks auf «✓», «✕» und auf die Werkzeugleiste verwerfen nie eine Eingabe.
+    - Eine **neue** Notiz wird erst beim «✓» angelegt, und nur wenn sie nicht leer ist — ein geöffnetes, leer gebliebenes Feld erzeugt nichts.
     - Wird der Text einer bestehenden Notiz vollständig geleert, wird die Notiz **nicht** gelöscht und der Leerstand nicht gespeichert; zum Löschen dient der Löschknopf.
-5. **Gelöschte Notizen** erscheinen unterhalb der aktiven Notizen als eigener Eintrag:
-    1. Name der verfassenden Person und Erfassungszeitpunkt wie oben.
-    2. Text «‹Name› hat seine Notiz gelöscht» (der ursprüngliche Notiztext bleibt verborgen); ist kein Name bekannt, steht «Jemand».
-    3. **«↺»** — Hilfetext «Löschen rückgängig machen». **Bedingte Sichtbarkeit**: nur für die verfassende Person. Wirkung: Notiz und ihre Versionsgeschichte kommen zurück; Rückmeldung «Notiz wiederhergestellt» bzw. «Notiz konnte nicht wiederhergestellt werden».
-6. **«+ Neue Notiz»** — Knopf am Ende der Liste, Hilfetext «Neue Notiz».
-    - Wirkung: öffnet ein leeres Bearbeitungsfeld am Ende der Liste. Ist bereits ein anderes Feld offen, wird dieses zuerst abgeschlossen und gespeichert.
+4. **Warnung bei ungespeicherten Änderungen**: Ist ein Notizfeld mit geändertem, noch nicht gespeichertem Text offen, erscheint beim Verlassen der Seite (Zurück, anderer Link, Tab/Fenster schliessen) sowie beim Schliessen der Detailmaske (✕ oder Klick daneben) und beim Öffnen einer anderen Notiz eine Rückfrage, ob die Änderungen verworfen werden sollen.
+5. **«+ Neue Notiz»** — Knopf am Ende der Liste, Hilfetext «Neue Notiz».
+    - Wirkung: öffnet ein leeres Bearbeitungsfeld am Ende der Liste. Ist bereits ein Feld mit ungespeicherten Änderungen offen, wird zuerst nachgefragt.
     - Solange das Feld für eine neue Notiz offen ist, erscheint diese Notiz nicht zusätzlich als fertiger Eintrag in der Liste.
     - Gesperrt: nie.
 
@@ -869,6 +878,7 @@ Identisch bei Geschäften (reguläre Notizen und Sitzungsnotizen) und bei Vorst�
     2. **Datum** und darunter **Uhrzeit** der Aktion in Schweizer Schreibweise; bei einer Traktandennotiz zusätzlich eine kleine Zeile mit Traktandennummer, Sitzungsdatum und Sitzungstitel.
     3. **Name der handelnden Person** (ersatzweise Benutzername, sonst «unbekannt»).
     4. **Inhalt** — je nach Art der Aktion: die Bezeichnung der Aktion und darunter der ergänzende Text (z.B. bei einem Beschluss oder einer Rücknahme), ein formatierter Notiztext bei Traktandennotizen, oder nur ein Text.
+    5. **Gelöschte Notiz** — für eine gelöschte Notiz (regulär oder Sitzungsnotiz) erscheint statt des Textes der Vermerk «‹Name› hat seine Notiz gelöscht» (der ursprüngliche Notiztext bleibt verborgen; ohne Namen «Jemand»). Daneben für die verfassende Person der Knopf **«↺»** (Hilfetext «Löschen rückgängig machen»): Notiz und Versionsgeschichte kommen zurück, die Notiz wandert zurück in ihre Notizenliste; Rückmeldung «Notiz wiederhergestellt» bzw. «Notiz konnte nicht wiederhergestellt werden». Aktive Notizen erscheinen hier NICHT (sie leben in der Notizenliste).
 4. **Was in der Zeitleiste nicht erscheint**: reguläre Notizen und Sitzungsnotizen (sie leben in ihren eigenen Listen) sowie ein aktuell gültiges Votum.
 5. **Traktandennotizen anklickbar** — **bedingte Sichtbarkeit**: nur, wenn die Maske aus einem Sitzungstraktandum heraus geöffnet wurde und die Sitzung bekannt ist. Hilfetext «Zur Sitzung springen»; ein Klick oder die «Eingabe»-Taste springt zur Sitzung.
 6. Es gibt in der Zeitleiste keine Bearbeitungs-, Lösch- oder Speicherfunktion.
@@ -1390,16 +1400,15 @@ Diese Liste tritt in beiden Traktandendarstellungen an die Stelle der einfachen 
 3. **Je Notiz:**
     1. **Autor** — Anzeigename, ersatzweise Benutzerkennung.
     2. **Datum und Uhrzeit** — Erstellungszeitpunkt im Schweizer Format.
-    3. **Löschknopf mit Papierkorb-Symbol** — Hinweistext «Notiz löschen»; **nur bei eigenen Notizen** und nur, solange die Notiz nicht gerade bearbeitet wird. Die Notiz verschwindet nicht ganz, sondern erscheint danach als Lösch-Vermerk (siehe Punkt 5).
+    3. **Löschknopf mit Papierkorb-Symbol** — Hinweistext «Notiz löschen»; **nur bei eigenen Notizen** und nur, solange die Notiz nicht gerade bearbeitet wird. Die Notiz verschwindet aus dieser Liste und erscheint danach als Lösch-Vermerk in der Aktionszeitleiste der Traktandenzeile (siehe Punkt 5).
     4. **Notiztext** — formatierter Text; eigene Notizen sind anklickbar bzw. per Eingabetaste auslösbar (Hinweistext «Klicken zum Bearbeiten») und öffnen den Editor an Ort und Stelle.
 4. **Bearbeitungszustand einer Notiz:**
     1. **Texteditor** — Platzhalter «Notiz bearbeiten…», vorbelegt mit dem bisherigen Text, mit vollständiger Formatierungsleiste **und zusätzlich den Knöpfen zum Blättern in früheren Fassungen**: «←» (Eine Version zurück), «→» (Eine Version vorwärts) und «»» (Zur neuesten Version). Sie erscheinen nur, wenn frühere Fassungen vorliegen; «→» und «»» nur, während eine ältere Fassung angezeigt wird. Dann steht rechts der Statustext «Ältere Fassung – nur Ansicht», und **der Editor ist gesperrt**.
     2. **Knopf «✓»** — Hinweistext «Speichern». Ausserhalb des Blätterns schliesst er die Bearbeitung ab. **Wird gerade eine ältere Fassung angezeigt, stellt er diese wieder her**: der Arbeitsstand wird zuerst gesichert, danach die angezeigte alte Fassung als neue aktuelle Fassung übernommen.
     3. **Knopf «✕»** — Hinweistext «Abbrechen». Schliesst den Editor ohne weiteres Speichern.
-    - **Speichern: fünf Sekunden nach dem letzten Tastendruck als Zwischenstand (ohne neue Fassung im Verlauf) und endgültig beim Verlassen des Feldes bzw. per «✓» (dabei wird die bisherige Fassung im Verlauf archiviert). Nach dem endgültigen Speichern erscheint die Meldung «Notiz gespeichert».** Ein leerer Text löscht die Notiz **nicht** — dafür ist der Löschknopf da.
-5. **Gelöschte Notiz** — statt des Textes erscheint der Vermerk «‹Autor› hat seine Notiz gelöscht»; der Text selbst bleibt verborgen. Daneben:
-    - **Knopf «↺»** — Hinweistext «Löschen rückgängig machen»; **nur für den Verfasser sichtbar**. Er holt die Notiz mitsamt ihrem Verlauf zurück; danach erscheint «Notiz wiederhergestellt».
-6. **Knopf «+ Neue Notiz»** — Hinweistext «Neue Notiz»; am Ende der Liste. Öffnet einen leeren Editor mit dem Platzhalter «Kommentar, Beobachtung, Hinweis» und den Knöpfen «✓» (Speichern) und «✕» (Abbrechen). Ein bereits offener Editor wird vorher abgeschlossen und gespeichert. Eine leer gelassene neue Notiz wird nicht angelegt. Beim Verlassen der Ansicht wird ein noch offener Editor selbsttätig gespeichert.
+    - **Speichern nur bewusst über «✓» (dabei wird die bisherige Fassung im Verlauf archiviert); es gibt kein automatisches Zwischenspeichern und kein Speichern beim Verlassen des Feldes. Nach dem Speichern erscheint die Meldung «Notiz gespeichert».** Ein leerer Text löscht die Notiz **nicht** — dafür ist der Löschknopf da. Bei ungespeicherten Änderungen wird beim Verlassen der Seite bzw. beim Schliessen gewarnt.
+5. **Gelöschte Notiz** — sie verschwindet aus dieser Liste und erscheint als Vermerk «‹Autor› hat seine Notiz gelöscht» in der **Aktionszeitleiste der Traktandenzeile** (dieselbe geteilte Aktionszeitleiste wie beim Geschäft/Vorstoss; sie erscheint hier nur, sobald eine Sitzungsnotiz gelöscht ist). Der ursprüngliche Text bleibt verborgen. Dort steht daneben — **nur für den Verfasser** — der Knopf **«↺»** (Hinweistext «Löschen rückgängig machen»): er holt die Notiz mitsamt Verlauf zurück in die Liste; danach erscheint «Notiz wiederhergestellt».
+6. **Knopf «+ Neue Notiz»** — Hinweistext «Neue Notiz»; am Ende der Liste. Öffnet einen leeren Editor mit dem Platzhalter «Kommentar, Beobachtung, Hinweis» und den Knöpfen «✓» (Speichern) und «✕» (Abbrechen). Ist bereits ein Editor mit ungespeicherten Änderungen offen, wird vorher nachgefragt, ob verworfen werden darf. Eine leer gelassene neue Notiz wird nicht angelegt.
 
 ---
 
@@ -1590,7 +1599,7 @@ Diese Liste tritt in beiden Traktandendarstellungen an die Stelle der einfachen 
 #### Zugang und Aufbau
 
 1. **Sichtbarkeit** — Der gesamte Verwaltungsbereich liegt in den Nextcloud-Verwaltungseinstellungen im eigenen Abschnitt «Parlament Winterthur» und ist ausschliesslich für Administratoren sichtbar und bedienbar. Alle Aktionen darin (Synchronisation, Zuordnungen, Zeitplan, Kürzel, Einstellungen) werden zusätzlich serverseitig auf Administratorrechte geprüft; ohne Rechte erscheint die Meldung «Zugriff verweigert. Bitte als Admin anmelden und erneut versuchen.», ohne Anmeldung «Nicht angemeldet. Bitte neu anmelden und erneut versuchen.».
-2. **Aufbau** — links eine schmale Spalte mit Synchronisation und Speicherstatus, rechts die Konfigurationskarten in dieser Reihenfolge: «Fraktionskonfiguration», «Fraktionsmitglieder ↔ Nextcloud-User», «Automatische Synchronisation», «Kürzel», «E-Mail-Einladungen».
+2. **Aufbau** — links eine schmale Spalte mit Synchronisation und Speicherstatus, rechts die Konfigurationskarten in dieser Reihenfolge: «Fraktionskonfiguration», «Fraktionsmitglieder ↔ Nextcloud-User», «Typen für eigene Geschäfte», «Automatische Synchronisation», «Kürzel», «E-Mail-Einladungen».
 
 #### Synchronisation (linke Spalte)
 
@@ -1672,6 +1681,16 @@ Diese Liste tritt in beiden Traktandendarstellungen an die Stelle der einfachen 
     3. **E-Mail** — durchgestrichen dargestellt, aus dem Benutzerkonto.
     4. **Username** — Statustext (Benutzername des Kontos), nicht bearbeitbar.
     5. **Gruppen** — Statustext mit der Fraktionsgruppe und den weiteren Gruppen des Kontos.
+
+#### Karte «Typen für eigene Geschäfte»
+
+1. **Erklärungstext** — wörtlich «Diese Typen stehen beim Anlegen eines eigenen Geschäfts zur Auswahl. Ohne Eintrag bleibt es beim Typ ‹Eigenes Geschäft›.»
+2. **Typenzeilen** — beliebig viele; Vorbelegung beim Öffnen: die gespeicherten Typen in gespeicherter Reihenfolge. Je Zeile in dieser Reihenfolge:
+    1. **Textfeld Bezeichnung** — Platzhalter «z.B. Kommissionsgeschäft». Pflichtfeld: für das Speichern der Zeile ja (leere Zeilen zählen nicht).
+    2. **Löschknopf «×»** — Hinweistext «Löschen»; entfernt die Zeile sofort und stösst das Speichern an.
+3. **Knopf «+ Typ hinzufügen»** — fügt am Ende eine leere Zeile an und setzt den Schreibcursor hinein. Speichert selbst noch nicht.
+4. **Statustext** — «Speichern...» unmittelbar nach jeder Änderung, danach «Gespeichert» oder «Fehler beim Speichern».
+5. **Speicherung** — Jede Änderung an einem Textfeld und jedes Löschen einer Zeile startet die Speicherung; ausgeführt wird sie kurz nach der letzten Änderung, wobei stets die komplette Liste ersetzt wird. Dabei werden leere Einträge und Doppelte entfernt, die Reihenfolge bleibt erhalten. Kein Speichern-Knopf, keine Sperre.
 
 #### Karte «Automatische Synchronisation»
 

@@ -1,6 +1,6 @@
 <template>
   <div class="pw-notizen-liste">
-    <div v-if="aktiveNotizen.length === 0 && geloeschteNotizen.length === 0 && !editorOffen" class="pw-hinweis">
+    <div v-if="aktiveNotizen.length === 0 && !editorOffen" class="pw-hinweis">
       Noch keine Notizen vorhanden.
     </div>
     <div
@@ -26,7 +26,6 @@
           placeholder="Notiz bearbeiten…"
           @update:model-value="notizEingabe"
           @version-angezeigt="v => angezeigteVersion = v"
-          @blur="notizAbschliessen"
         />
         <div class="pw-notiz-bearbeiten-aktionen">
           <button type="button" class="button pw-btn-mini" title="Speichern" @mousedown.prevent @click="notizBestaetigen">✓</button>
@@ -46,37 +45,14 @@
       />
     </div>
 
-    <!-- Gelöschte Notizen: nur ein Vermerk (der Text bleibt verborgen), der Autor
-         kann das Löschen rückgängig machen. Früher lebte dieser Teil in der
-         Aktionszeitleiste des Geschäfts — jetzt bei beiden (Geschäft + Vorstoss)
-         hier in der geteilten Notizen-Liste. -->
-    <div
-      v-for="n in geloeschteNotizen"
-      :key="'geloescht-' + n.id"
-      class="pw-notiz-eintrag pw-notiz-geloescht"
-    >
-      <div class="pw-notiz-kopf">
-        <span class="pw-notiz-autor">{{ n.autorName || n.autorUid }}</span>
-        <span class="pw-notiz-datum">{{ formatieredatum(n.erstelltAm) }} {{ formatiereUhrzeit(n.erstelltAm) }}</span>
-      </div>
-      <div class="pw-notiz-geloescht-zeile">
-        <span class="pw-notiz-geloescht-text">{{ (n.autorName || n.autorUid || 'Jemand') }} hat seine Notiz gelöscht</span>
-        <button
-          v-if="istEigeneAktion(n)"
-          type="button"
-          class="button pw-btn-mini"
-          title="Löschen rückgängig machen"
-          @click="notizWiederherstellen(n)"
-        >↺</button>
-      </div>
-    </div>
+    <!-- Gelöschte Notizen erscheinen NICHT hier, sondern als Lösch-Vermerk mit
+         Wiederherstellen in der Aktionszeitleiste (des Geschäfts/Vorstosses). -->
 
     <div v-if="editorOffen && editorModus === 'neu'" class="pw-notiz-bearbeiten-zeile">
       <PwWysiwyg
         :model-value="aktiveNotizText"
         placeholder="Kommentar, Beobachtung, Hinweis"
         @update:model-value="notizEingabe"
-        @blur="notizAbschliessen"
       />
       <div class="pw-notiz-bearbeiten-aktionen">
         <button type="button" class="button pw-btn-mini" title="Speichern" @mousedown.prevent @click="notizBestaetigen">✓</button>
@@ -106,10 +82,12 @@ import PwWysiwyg from './PwWysiwyg.vue'
  *
  * Sie kapselt die komplette Notiz-Behandlung: die Liste der Notizen, den
  * Inline-Editor mit Versions-Blättern (PwWysiwyg mit :revisionen), den
- * «+ Neue Notiz»-Knopf, den 5-Sekunden-Autosave (ohne Revision), den Abschluss
- * über Fokus-Verlust/Häkchen (mit Revision), Löschen (Soft-Delete) und die
- * gelöschten Notizen als «… hat seine Notiz gelöscht» mit Wiederherstellen
- * (nur der Autor).
+ * «+ Neue Notiz»-Knopf und das Speichern ausschliesslich über ✓ (Häkchen, legt
+ * bei einer Änderung eine Revision an) bzw. ✕ (verwirft) — kein Autosave, kein
+ * Speichern beim Fokus-Verlust; bei ungespeicherten Änderungen wird beim
+ * Verlassen gewarnt. Löschen ist ein Soft-Delete; gelöschte Notizen erscheinen
+ * NICHT hier, sondern als «… hat seine Notiz gelöscht» mit Wiederherstellen
+ * (nur der Autor) in der Aktionszeitleiste.
  *
  * Persistiert wird über REST unter `basisUrl` (z.B. `geschaefte/123` oder
  * `vorstoesse/45`). Die Komponente hält eine lokale Arbeitskopie der Notizen
@@ -147,11 +125,12 @@ export default {
       editorModus: null,
       aktiveNotizId: null,
       aktiveNotizText: '',
+      // Der Text beim Öffnen des Editors — zum Erkennen ungespeicherter Änderungen.
+      aktiveNotizOriginal: '',
       aktiveNotizRevisionen: [],
       // Text der aktuell im Verlauf angezeigten älteren Fassung (null = neueste/
       // Arbeitsstand). Nur relevant fürs explizite Ok (Restore) beim Blättern.
       angezeigteVersion: null,
-      notizTimer: null,
     }
   },
   watch: {
@@ -162,21 +141,19 @@ export default {
       },
     },
   },
+  mounted() {
+    // Browser-seitige Warnung bei ungespeicherten Notiz-Änderungen (Reload, URL,
+    // Tab schliessen). Das Verlassen des Dialogs (X, Klick daneben) prüft die
+    // Elternansicht über hatUngespeicherteAenderungen().
+    window.addEventListener('beforeunload', this.beforeUnloadWarnung)
+  },
   beforeUnmount() {
-    if (this.editorOffen) {
-      // Letzten Stand beim Verlassen sichern (final ⇒ Revision wird archiviert).
-      if (this.notizTimer) { clearTimeout(this.notizTimer); this.notizTimer = null }
-      this.notizPersistieren(true)
-    }
+    window.removeEventListener('beforeunload', this.beforeUnloadWarnung)
   },
   computed: {
     /** Aktive (nicht gelöschte) Notizen. */
     aktiveNotizen() {
       return this.arbeitsNotizen.filter(n => !n.geloescht)
-    },
-    /** Gelöschte Notizen — erscheinen nur als Lösch-Vermerk (mit Undo für den Autor). */
-    geloeschteNotizen() {
-      return this.arbeitsNotizen.filter(n => !!n.geloescht)
     },
     /** Query-Suffix, der die Kategorie an URL-basierte Anfragen (GET/DELETE/POST-Undo) anhängt. */
     _katParam() {
@@ -220,42 +197,56 @@ export default {
     _melde() {
       this.$emit('geaendert', this.arbeitsNotizen.map(n => ({ ...n })))
     },
+    /** Meldet dem Browser ungespeicherte Änderungen (beforeunload). */
+    beforeUnloadWarnung(e) {
+      if (!this.hatUngespeicherteAenderungen()) return
+      e.preventDefault()
+      e.returnValue = ''
+      return ''
+    },
     /**
-     * Öffnet einen leeren Editor für eine neue Notiz. Die Notiz wird erst in der
-     * DB angelegt, wenn sie nicht leer ist (siehe notizPersistieren). Ein bereits
-     * offener Editor wird vorher abgeschlossen.
+     * Es gibt ungespeicherte Änderungen, wenn der Editor offen ist und der Text
+     * vom Stand beim Öffnen abweicht. Die Elternansicht ruft das beim Schliessen
+     * des Dialogs (X / Klick daneben) ab, um zu warnen.
      */
-    async notizNeuOeffnen() {
-      if (this.editorOffen) await this.notizAbschliessen()
+    hatUngespeicherteAenderungen() {
+      if (!this.editorOffen) return false
+      return (this.aktiveNotizText || '').trim() !== (this.aktiveNotizOriginal || '').trim()
+    },
+    /**
+     * Fragt bei ungespeicherten Änderungen nach, bevor der offene Editor
+     * verworfen wird. Gibt true zurück, wenn fortgefahren werden darf.
+     */
+    darfEditorSchliessen() {
+      if (!this.hatUngespeicherteAenderungen()) return true
+      // eslint-disable-next-line no-alert
+      return window.confirm('Die Notiz ist noch nicht gespeichert. Änderungen verwerfen?')
+    },
+    /**
+     * Öffnet einen leeren Editor für eine neue Notiz. Die Notiz wird erst beim
+     * Häkchen in der DB angelegt (kein Autosave). Ist bereits ein Editor mit
+     * ungespeicherten Änderungen offen, wird zuerst nachgefragt.
+     */
+    notizNeuOeffnen() {
+      if (this.editorOffen && !this.darfEditorSchliessen()) return
       this.editorModus = 'neu'
       this.aktiveNotizId = null
       this.aktiveNotizText = ''
+      this.aktiveNotizOriginal = ''
       this.aktiveNotizRevisionen = []
       this.editorOffen = true
     },
-    /** Übernimmt Editor-Eingaben und stösst den verzögerten Zwischenspeicher an. */
+    /** Übernimmt Editor-Eingaben in den Arbeitsstand (kein Autosave). */
     notizEingabe(val) {
       this.aktiveNotizText = val
-      this.notizAutosave()
-    },
-    /** Macht das Löschen einer Notiz rückgängig — Notiz und History kommen zurück. */
-    async notizWiederherstellen(a) {
-      try {
-        const { data } = await axios.post(
-          generateUrl(`/apps/parlwin/${this.basisUrl}/notizen/${a.id}/wiederherstellen`) + this._katParam
-        )
-        this._lokalAktualisieren(data)
-        showSuccess('Notiz wiederhergestellt')
-      } catch (e) {
-        showError('Notiz konnte nicht wiederhergestellt werden')
-      }
     },
     /** Öffnet denselben Editor für eine bestehende Notiz (inline an ihrer Stelle). */
     async notizBearbeitenStarten(a) {
-      if (this.editorOffen && this.aktiveNotizId !== a.id) await this.notizAbschliessen()
+      if (this.editorOffen && this.aktiveNotizId !== a.id && !this.darfEditorSchliessen()) return
       this.editorModus = 'edit'
       this.aktiveNotizId = a.id
       this.aktiveNotizText = a.text || ''
+      this.aktiveNotizOriginal = a.text || ''
       this.aktiveNotizRevisionen = []
       this.editorOffen = true
       // Versions-History nachladen, damit im Editor geblättert werden kann.
@@ -284,46 +275,30 @@ export default {
         showError('Fehler beim Löschen der Notiz')
       }
     },
-    /** Verzögerter Zwischenspeicher (5 s) — legt KEINE Revision an. */
-    notizAutosave() {
-      if (this.notizTimer) clearTimeout(this.notizTimer)
-      this.notizTimer = setTimeout(() => { this.notizTimer = null; this.notizPersistieren(false) }, 5000)
-    },
     /**
-     * Abschluss über echten Fokus-Verlust (Blur): speichert IMMER nur den Arbeitsstand
-     * (auch während des Blätterns – nie die angezeigte alte Fassung) und räumt den
-     * Editor weg. Ein leerer neuer Editor wird verworfen, ohne etwas zu erzeugen.
-     */
-    async notizAbschliessen() {
-      if (!this.editorOffen) return
-      if (this.notizTimer) { clearTimeout(this.notizTimer); this.notizTimer = null }
-      await this.notizPersistieren(true)
-      this.notizEditorSchliessen()
-    },
-    /**
-     * Explizites Ok (Häkchen). Während des Blätterns hat es die Sonderfunktion
-     * «Restore»: Der Arbeitsstand wird regulär abgeschlossen (erzeugt bei Änderung
-     * eine Version), danach wird die angezeigte alte Fassung als Kopie als neue
-     * aktuelle Version angelegt. Ausserhalb des Blätterns = normaler Abschluss.
+     * Explizites Speichern (Häkchen). Legt bei einer Änderung eine Revision an
+     * (History). Wird gerade eine ältere Fassung angezeigt (Blättern), gilt das
+     * Häkchen als «Restore»: die angezeigte alte Fassung wird als neue aktuelle
+     * Version übernommen. Danach schliesst der Editor.
      */
     async notizBestaetigen() {
       if (!this.editorOffen) return
-      if (this.angezeigteVersion === null) {
-        await this.notizAbschliessen()
+      if (this.angezeigteVersion !== null) {
+        // Restore beim Blättern: zuerst den bearbeiteten Arbeitsstand sichern
+        // (er wird zur Revision, geht also nicht verloren), dann die angezeigte
+        // alte Fassung als neue aktuelle Version übernehmen.
+        const alteFassung = this.angezeigteVersion
+        await this.notizSpeichern()
+        this.aktiveNotizText = alteFassung
+        await this.notizSpeichern()
+        this.notizEditorSchliessen()
         return
       }
-      const alteFassung = this.angezeigteVersion
-      if (this.notizTimer) { clearTimeout(this.notizTimer); this.notizTimer = null }
-      // 1. Arbeitsstand final sichern (archiviert die bisherige Fassung, falls geändert).
-      await this.notizPersistieren(true)
-      // 2. Die angezeigte alte Fassung als Kopie als neue aktuelle Version anlegen.
-      this.aktiveNotizText = alteFassung
-      await this.notizPersistieren(true)
+      await this.notizSpeichern()
       this.notizEditorSchliessen()
     },
-    /** Bricht die Bearbeitung ab und räumt den Editor weg (ohne weiteren Speicher). */
+    /** Bricht die Bearbeitung ab und räumt den Editor weg — ohne zu speichern. */
     notizVerwerfen() {
-      if (this.notizTimer) { clearTimeout(this.notizTimer); this.notizTimer = null }
       this.notizEditorSchliessen()
     },
     notizEditorSchliessen() {
@@ -331,20 +306,24 @@ export default {
       this.editorModus = null
       this.aktiveNotizId = null
       this.aktiveNotizText = ''
+      this.aktiveNotizOriginal = ''
       this.aktiveNotizRevisionen = []
       this.angezeigteVersion = null
     },
-    notizPersistieren(final) {
-      // Serialisierung: paralleler Autosave + Abschluss laufen nacheinander, sonst
-      // sähen beide aktiveNotizId=null und legten zwei Notizen an.
-      this._notizKette = (this._notizKette || Promise.resolve()).then(() => this._notizPersistierenIntern(final))
+    /**
+     * Persistiert den Arbeitsstand: eine neue Notiz wird angelegt (POST), eine
+     * bestehende aktualisiert (PUT, archiviert bei Änderung eine Revision). Ein
+     * leerer Text erzeugt/ändert nichts. Serialisiert, damit zwei schnelle
+     * Aufrufe nicht zwei Notizen anlegen.
+     */
+    notizSpeichern() {
+      this._notizKette = (this._notizKette || Promise.resolve()).then(() => this._notizSpeichernIntern())
       return this._notizKette
     },
-    async _notizPersistierenIntern(final) {
+    async _notizSpeichernIntern() {
       const text = (this.aktiveNotizText || '').trim()
+      if (!text) return
       if (this.aktiveNotizId === null) {
-        // Neue Notiz: erst anlegen, wenn Text vorhanden ist (leer ⇒ nichts erzeugen).
-        if (!text) return
         try {
           const { data } = await axios.post(
             generateUrl(`/apps/parlwin/${this.basisUrl}/notizen`),
@@ -352,24 +331,22 @@ export default {
           )
           this.aktiveNotizId = data.id
           this._lokalHinzufuegen(data)
-          if (final) showSuccess('Notiz gespeichert')
+          showSuccess('Notiz gespeichert')
         } catch (e) {
           showError('Fehler beim Speichern der Notiz')
         }
         return
       }
-      // Bestehende (oder gerade erzeugte) Notiz aktualisieren. Leerer Text löscht
-      // nicht — dafür gibt es den Lösch-Knopf; so geht kein Inhalt verloren.
-      // zwischenspeichern=true beim Autosave verhindert das Anlegen einer Revision;
-      // nur der finale Abschluss (Ok/Fokus-Verlust) archiviert eine Revision.
-      if (!text) return
+      // Bestehende Notiz aktualisieren — der Abschluss archiviert bei einer
+      // Änderung eine Revision (History). Leerer Text löscht nicht (dafür gibt es
+      // den Lösch-Knopf), damit kein Inhalt verloren geht.
       try {
         const { data } = await axios.put(
           generateUrl(`/apps/parlwin/${this.basisUrl}/notizen/${this.aktiveNotizId}`),
-          { text, zwischenspeichern: !final, kategorie: this.kategorie }
+          { text, kategorie: this.kategorie }
         )
         this._lokalAktualisieren(data)
-        if (final) showSuccess('Notiz gespeichert')
+        showSuccess('Notiz gespeichert')
       } catch (e) {
         showError('Fehler beim Bearbeiten der Notiz')
       }
@@ -395,16 +372,6 @@ export default {
 </script>
 
 <style scoped>
-/* Alle übrigen Notiz-Stile (pw-notizen-liste, pw-notiz-eintrag, …) kommen aus der
-   globalen style.scss — gleiche Elemente wie bisher beim Geschäft. Eigenständig
-   ist nur der Lösch-Vermerk einer gelöschten Notiz. */
-.pw-notiz-geloescht-zeile {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-.pw-notiz-geloescht-text {
-  color: var(--pw-muted);
-  font-style: italic;
-}
+/* Alle Notiz-Stile (pw-notizen-liste, pw-notiz-eintrag, …) kommen aus der
+   globalen style.scss — gleiche Elemente wie bisher beim Geschäft. */
 </style>

@@ -199,7 +199,7 @@ async function ncOptions(page, root) {
   return labels.filter(Boolean)
 }
 
-/** Fügt am offenen Geschäft eine Notiz in der OBEREN NotizenListe hinzu (Blur speichert). */
+/** Fügt am offenen Geschäft eine Notiz in der OBEREN NotizenListe hinzu (Häkchen speichert). */
 async function notizAmGeschaeftTippen(page, text) {
   const liste = page.locator('.pw-geschaeft-detail .pw-notizen-liste').first()
   const neu = liste.locator('.pw-btn-neue-notiz')
@@ -210,7 +210,8 @@ async function notizAmGeschaeftTippen(page, text) {
   await editor.click()
   await page.waitForTimeout(300)
   await editor.pressSequentially(text, { delay: 25 })
-  await editor.blur()
+  // Speichern nur noch über das Häkchen — kein Blur-Save mehr.
+  await liste.locator('.pw-notiz-bearbeiten-aktionen button[title="Speichern"]').first().click()
 }
 
 /** Sortier-Schlüssel wie Geschaeftsliste.sortWert (Nummer: 2. Komponente auf 4 Stellen auffüllen). */
@@ -497,10 +498,15 @@ test.describe('Geschäfteliste: Filter und Suche', () => {
     await page.locator('#pw-search-slot button').click()
     await expect(page.locator('.pw-tabelle-geschaefte tbody tr').first()).toBeVisible()
 
-    // Suche nach Nummer: erledigte einblenden, eine echte Nummer nehmen.
+    // Suche nach Nummer: erledigte einblenden, die erste ECHTE Nummer nehmen.
+    // Eigene Geschäfte haben keine Nummer (leeres <strong>) und stehen wegen des
+    // heutigen Datums oft zuoberst — deshalb gezielt die erste Zelle MIT einer
+    // Ziffer, und darauf warten (die Liste lädt nach «Erledigte anzeigen» neu).
     await page.locator('#pw-filter-slot').getByText('Erledigte anzeigen').click()
-    await page.waitForLoadState('networkidle')
-    const ersteNr = (await page.locator('.pw-tabelle-geschaefte tbody .pw-col-nr strong').first().innerText()).trim()
+    const nummerZelle = page.locator('.pw-tabelle-geschaefte tbody .pw-col-nr strong')
+      .filter({ hasText: /\d/ }).first()
+    await nummerZelle.waitFor({ state: 'visible', timeout: 30_000 })
+    const ersteNr = (await nummerZelle.innerText()).trim()
     expect(ersteNr, 'Keine Geschäftsnummer gefunden').not.toBe('')
     await page.fill('#pw-search-slot input', ersteNr)
     await expect(page.locator('.pw-tabelle-geschaefte tbody tr', { hasText: ersteNr }).first()).toBeVisible()
@@ -585,22 +591,26 @@ test.describe('Eigenes Geschäft: Anlegen', () => {
     await expect(detail().locator('.pw-dokumente')).toBeVisible()
     await expect(page.locator('.pw-modal .pw-modal-footer')).toHaveCount(0)
 
-    // Bei einem eigenen Geschäft sind Titel, Typ, Status und Datum bearbeitbar
-    // (bei Geschäften von der Webseite stammen sie aus der Quelle).
-    await detail().getByLabel('Typ').fill('E2E-Typ')
-    await detail().getByLabel('Typ').blur()
+    // Bei einem eigenen Geschäft sind Titel, Status und Datum bearbeitbar (bei
+    // Geschäften von der Webseite stammen sie aus der Quelle). Der Typ ist eine
+    // Auswahl aus der Admin-Liste (Vorbelegung «Eigenes Geschäft»); seine
+    // Auswahl-Funktion prüfen die Modul- und Backend-Tests, hier zählt, dass er
+    // als Auswahlfeld existiert und vorbelegt ist.
+    await expect(detail().getByLabel('Typ')).toContainText('Eigenes Geschäft')
     await detail().getByLabel('Status').fill('E2E-Status')
     await detail().getByLabel('Status').blur()
+    await detail().getByLabel('Datum').fill('2026-05-06')
+    await detail().getByLabel('Datum').blur()
     await page.waitForLoadState('networkidle')
 
-    // Schliessen und erneut öffnen: alle Stammdaten sind gespeichert.
+    // Schliessen und erneut öffnen: die bearbeiteten Stammdaten sind gespeichert.
     await page.locator('.pw-modal .pw-btn-schliessen').first().click()
     await page.fill('#pw-search-slot input', titel)
     await page.locator('.pw-tabelle-geschaefte tbody tr', { hasText: titel }).first().click()
     await expect(detail()).toBeVisible({ timeout: 30_000 })
     await expect(detail().getByLabel('Titel')).toHaveValue(titel)
-    await expect(detail().getByLabel('Typ')).toHaveValue('E2E-Typ')
     await expect(detail().getByLabel('Status')).toHaveValue('E2E-Status')
+    await expect(detail().getByLabel('Datum')).toHaveValue('2026-05-06')
 
     expect(jsFehler, `JS-Fehler: ${jsFehler.join(' | ')}`).toEqual([])
   })
@@ -767,7 +777,7 @@ test.describe('BeschlussWidget am Geschäft', () => {
 
 // ---------------------------------------------------------------------------
 test.describe('Notizen am Geschäft (über GeschaeftDetail)', () => {
-  test('Hinzufügen bei Blur, leerer Editor erzeugt nichts, Bearbeiten (Version), Löschen und Wiederherstellen', async ({ page }) => {
+  test('Hinzufügen über Häkchen, leerer Editor erzeugt nichts, Bearbeiten (Version), Löschen und Wiederherstellen', async ({ page }) => {
     const jsFehler = fehlerWaechter(page)
     await login(page, USERS.u1)
     await gotoGeschaefte(page)
@@ -778,28 +788,27 @@ test.describe('Notizen am Geschäft (über GeschaeftDetail)', () => {
     await openDetailByTitel(page, titel)
 
     const liste = page.locator('.pw-geschaeft-detail .pw-notizen-liste').first()
+    const zeitleiste = page.locator('.pw-geschaeft-detail .pw-detail-abschnitt', { hasText: 'Aktionszeitleiste' })
     const notiz = 'E2E Geschäftsnotiz'
 
-    // Hinzufügen bei Blur.
+    // Hinzufügen über das Häkchen.
     await notizAmGeschaeftTippen(page, notiz)
-    await expect(liste.getByText(notiz, { exact: false }).first(), 'Notiz erscheint nach dem Blur nicht').toBeVisible({ timeout: 15_000 })
+    await expect(liste.getByText(notiz, { exact: false }).first(), 'Notiz erscheint nach dem Speichern nicht').toBeVisible({ timeout: 15_000 })
     await expect(liste.locator('.pw-notiz-eintrag', { hasText: notiz }), 'Notiz doppelt angelegt').toHaveCount(1)
 
-    // Notizen sind NICHT in der Aktionszeitleiste (leerer Hinweis bleibt).
-    await expect(page.locator('.pw-geschaeft-detail .pw-detail-abschnitt', { hasText: 'Aktionszeitleiste' })).toContainText('Noch keine Aktionen vorhanden')
+    // Aktive Notizen sind NICHT in der Aktionszeitleiste (leerer Hinweis bleibt).
+    await expect(zeitleiste).toContainText('Noch keine Aktionen vorhanden')
 
-    // Leerer Editor erzeugt nichts.
+    // Leerer Editor erzeugt beim Häkchen nichts.
     const vorher = await liste.locator('.pw-notiz-eintrag').count()
     await liste.locator('.pw-btn-neue-notiz').click()
     const leerEditor = liste.locator('.ProseMirror').first()
     await leerEditor.waitFor({ state: 'visible', timeout: 15_000 })
-    await leerEditor.click()
-    await page.waitForTimeout(300)
-    await leerEditor.blur()
+    await liste.locator('.pw-notiz-bearbeiten-aktionen button[title="Speichern"]').first().click()
     await page.waitForTimeout(500)
     await expect(liste.locator('.pw-notiz-eintrag'), 'Leerer Editor hat eine Notiz erzeugt').toHaveCount(vorher)
 
-    // Bearbeiten → Version.
+    // Bearbeiten → Version (Speichern über das Häkchen).
     const eintrag = liste.locator('.pw-notiz-eintrag', { hasText: notiz }).first()
     await eintrag.locator('.pw-notiz-inhalt').click()
     const editEditor = eintrag.locator('.ProseMirror').first()
@@ -808,15 +817,16 @@ test.describe('Notizen am Geschäft (über GeschaeftDetail)', () => {
     await page.waitForTimeout(300)
     await page.keyboard.press('Control+End')
     await editEditor.pressSequentially(' bearbeitet', { delay: 25 })
-    await editEditor.blur()
+    await eintrag.locator('.pw-notiz-bearbeiten-aktionen button[title="Speichern"]').first().click()
     await expect(liste.getByText(`${notiz} bearbeitet`, { exact: false }).first(), 'Bearbeitete Notiz erscheint nicht').toBeVisible({ timeout: 15_000 })
 
-    // Löschen (Soft-Delete) → Vermerk.
+    // Löschen (Soft-Delete) → Vermerk in der Aktionszeitleiste, nicht mehr in der Notizenliste.
     await liste.locator('.pw-notiz-eintrag', { hasText: `${notiz} bearbeitet` }).first().locator('.pw-btn-loeschen').click()
-    await expect(liste.getByText('hat seine Notiz gelöscht', { exact: false }).first()).toBeVisible({ timeout: 15_000 })
+    await expect(zeitleiste.getByText('hat seine Notiz gelöscht', { exact: false }).first(), 'Gelöschte Notiz fehlt in der Aktionszeitleiste').toBeVisible({ timeout: 15_000 })
+    await expect(liste.locator('.pw-notiz-eintrag', { hasText: `${notiz} bearbeitet` }), 'Gelöschte Notiz steht noch in der Notizenliste').toHaveCount(0)
 
-    // Wiederherstellen (Undo).
-    await liste.locator('button[title="Löschen rückgängig machen"]').first().click()
+    // Wiederherstellen (Undo) über die Aktionszeitleiste → Notiz kehrt in die Liste zurück.
+    await zeitleiste.locator('button[title="Löschen rückgängig machen"]').first().click()
     await expect(liste.getByText(`${notiz} bearbeitet`, { exact: false }).first(), 'Wiederhergestellte Notiz fehlt').toBeVisible({ timeout: 15_000 })
 
     expect(jsFehler, `JS-Fehler: ${jsFehler.join(' | ')}`).toEqual([])

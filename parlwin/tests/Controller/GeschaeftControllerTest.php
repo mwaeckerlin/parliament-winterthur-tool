@@ -193,6 +193,91 @@ class GeschaeftControllerTest extends TestCase
     }
 
     /**
+     * Feature: Beim Anlegen eines eigenen Geschäfts werden Beschreibungstext und
+     * Kommission mitgegeben — sie gehören zur Erfassung und dürfen nicht erst
+     * über einen zweiten Schritt setzbar sein.
+     */
+    public function testCreateUebernimmtInhaltUndKommission(): void
+    {
+        $parameter = [
+            'titel' => 'Mein eigenes Geschäft',
+            'inhalt' => '<p>Worum es geht</p>',
+            'kommission' => 'Aufsichtskommission',
+        ];
+        $request = $this->createStub(IRequest::class);
+        $request->method('getParam')
+            ->willReturnCallback(static function (string $key, mixed $default = null) use ($parameter): mixed {
+                return array_key_exists($key, $parameter) ? $parameter[$key] : $default;
+            });
+
+        $mapper = $this->createStub(GeschaeftMapper::class);
+        $mapper->method('naechsteId')->willReturn(42);
+        $gespeichert = null;
+        $mapper->method('insert')->willReturnCallback(static function (Geschaeft $g) use (&$gespeichert): Geschaeft {
+            $gespeichert = $g;
+            return $g;
+        });
+
+        $fraktionsarbeit = $this->createStub(FraktionsarbeitService::class);
+        $fraktionsarbeit->method('angereichertesGeschaeft')
+            ->willReturnCallback(static fn(int $id): array => ['id' => $id]);
+
+        $controller = new GeschaeftController(
+            $request,
+            $this->createStub(GeschaeftService::class),
+            $fraktionsarbeit,
+            $this->createStub(RealtimePublisherService::class),
+            $this->createStub(IRootFolder::class),
+            $this->createStub(IUserSession::class),
+            $this->createStub(LoggerInterface::class),
+            $mapper,
+        );
+
+        $controller->create();
+
+        $this->assertNotNull($gespeichert);
+        $this->assertSame('<p>Worum es geht</p>', $gespeichert->getInhalt());
+        $this->assertSame('Aufsichtskommission', $gespeichert->getKommission());
+    }
+
+    /**
+     * Feature: Beschreibungstext und Kommission sind auch nachträglich änderbar.
+     */
+    public function testStammdatenUebernehmenInhaltUndKommission(): void
+    {
+        $aktualisiert = null;
+        $controller = $this->controllerFuerGeschaeft(
+            $this->eigenesGeschaeft(),
+            ['inhalt' => '<p>Neu beschrieben</p>', 'kommission' => 'Sachkommission Stadtbau'],
+            $aktualisiert,
+        );
+
+        $response = $controller->updateStammdaten(7);
+
+        $this->assertSame(200, $response->getStatus());
+        $this->assertNotNull($aktualisiert);
+        $this->assertSame('<p>Neu beschrieben</p>', $aktualisiert->getInhalt());
+        $this->assertSame('Sachkommission Stadtbau', $aktualisiert->getKommission());
+    }
+
+    /**
+     * Keine Kommission ist ein gültiger Zustand: eine vorhandene Zuordnung lässt
+     * sich wieder entfernen.
+     */
+    public function testKommissionLaesstSichWiederEntfernen(): void
+    {
+        $geschaeft = $this->eigenesGeschaeft();
+        $geschaeft->setKommission('Aufsichtskommission');
+        $aktualisiert = null;
+        $controller = $this->controllerFuerGeschaeft($geschaeft, ['kommission' => ''], $aktualisiert);
+
+        $controller->updateStammdaten(7);
+
+        $this->assertNotNull($aktualisiert);
+        $this->assertSame('', $aktualisiert->getKommission());
+    }
+
+    /**
      * Baut einen Controller, der ein bestimmtes Geschäft findet, und protokolliert
      * Aktualisierungen und Löschungen. Für die Stammdaten- und Löschprüfungen.
      */

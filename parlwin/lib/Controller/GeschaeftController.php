@@ -211,19 +211,12 @@ class GeschaeftController extends Controller
     public function updateNotiz(int $id, int $aktionId): DataResponse
     {
         $text = (string) $this->request->getParam('text', '');
-        // Autosave während des Tippens: führt die Stände zusammen, ohne eine
-        // neue Version anzulegen. Nur der Abschluss erzeugt eine Version.
-        $zwischenspeichern = filter_var(
-            $this->request->getParam('zwischenspeichern', false),
-            FILTER_VALIDATE_BOOLEAN
-        );
         $kategorie = $this->notizKategorie();
         try {
             $aktion = $this->fraktionsarbeitService->notizAktualisieren(
                 $id,
                 $aktionId,
                 $text,
-                !$zwischenspeichern,
                 $kategorie
             );
             $this->realtimePublisher->publish('geschaefte.action', ['id' => $id, 'aktionTyp' => $kategorie]);
@@ -617,6 +610,16 @@ class GeschaeftController extends Controller
     }
 
     /**
+     * Die Status-Werte, die in der Datenbank vorkommen — Auswahlgrundlage beim
+     * eigenen Geschäft. Der Wert bleibt frei überschreibbar.
+     */
+    #[NoAdminRequired]
+    public function statuswerte(): DataResponse
+    {
+        return new DataResponse($this->geschaeftMapper->alleStatusWerte());
+    }
+
+    /**
      * Erstellt ein neues eigenes Geschäft (ohne Parlamentszugehörigkeit).
      */
     #[NoAdminRequired]
@@ -625,10 +628,16 @@ class GeschaeftController extends Controller
         $titel = trim((string) $this->request->getParam('titel', ''));
         $typ = trim((string) $this->request->getParam('typ', 'Eigenes Geschäft'));
         $status = trim((string) $this->request->getParam('status', 'Pendent'));
+        $inhalt = (string) $this->request->getParam('inhalt', '');
+        $kommission = trim((string) $this->request->getParam('kommission', ''));
+        $datum = trim((string) $this->request->getParam('datum', ''));
         // Angelegt wird erst beim ausdrücklichen Speichern — ohne Titel gibt es
         // nichts anzulegen.
         if ($titel === '') {
             return new DataResponse(['fehler' => 'Titel erforderlich'], Http::STATUS_BAD_REQUEST);
+        }
+        if ($datum !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $datum) !== 1) {
+            return new DataResponse(['fehler' => 'Datum muss im Format JJJJ-MM-TT vorliegen'], Http::STATUS_BAD_REQUEST);
         }
         $g = new Geschaeft();
         // Explizite ID vergeben: die Tabelle führt importierte Geschäfte mit
@@ -637,6 +646,9 @@ class GeschaeftController extends Controller
         $g->setTitel($titel);
         $g->setTyp($typ);
         $g->setStatus($status);
+        $g->setInhalt($inhalt);
+        $g->setKommission($kommission);
+        $g->setDatum($datum);
         $g->setGeloescht(false);
         // Eindeutige ExternId für eigene Geschäfte (nicht aus dem Parlament).
         $g->setExternId('eigen:' . uniqid('', true));
@@ -683,10 +695,20 @@ class GeschaeftController extends Controller
             return new DataResponse(['fehler' => 'Datum muss im Format JJJJ-MM-TT vorliegen'], Http::STATUS_BAD_REQUEST);
         }
 
-        $bezeichnungen = ['titel' => 'Titel', 'typ' => 'Typ', 'status' => 'Status', 'datum' => 'Datum'];
-        $getter = ['titel' => 'getTitel', 'typ' => 'getTyp', 'status' => 'getStatus', 'datum' => 'getDatum'];
+        $bezeichnungen = [
+            'titel' => 'Titel', 'typ' => 'Typ', 'status' => 'Status', 'datum' => 'Datum',
+            'inhalt' => 'Inhalt', 'kommission' => 'Kommission',
+        ];
+        $getter = [
+            'titel' => 'getTitel', 'typ' => 'getTyp', 'status' => 'getStatus', 'datum' => 'getDatum',
+            'inhalt' => 'getInhalt', 'kommission' => 'getKommission',
+        ];
         $aenderungen = [];
-        foreach (['titel' => 'setTitel', 'typ' => 'setTyp', 'status' => 'setStatus', 'datum' => 'setDatum'] as $feld => $setter) {
+        $setzer = [
+            'titel' => 'setTitel', 'typ' => 'setTyp', 'status' => 'setStatus', 'datum' => 'setDatum',
+            'inhalt' => 'setInhalt', 'kommission' => 'setKommission',
+        ];
+        foreach ($setzer as $feld => $setter) {
             $wert = $this->request->getParam($feld, null);
             if ($wert === null) {
                 continue;

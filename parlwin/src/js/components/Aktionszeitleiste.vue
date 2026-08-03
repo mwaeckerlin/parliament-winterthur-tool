@@ -34,6 +34,18 @@
           />
           <span v-else class="pw-timeline-text" v-html="markdownZuHtml(e.text)" />
         </template>
+        <!-- Gelöschte Notiz: nur ein Vermerk (der Text bleibt verborgen); der
+             Autor kann das Löschen rückgängig machen. -->
+        <div v-else-if="e._type === 'notizGeloescht'" class="pw-timeline-geloescht">
+          <span class="pw-timeline-geloescht-text">{{ (e.autorName || e.autorUid || 'Jemand') }} hat seine Notiz gelöscht</span>
+          <button
+            v-if="istEigeneAktion(e)"
+            type="button"
+            class="button pw-btn-mini"
+            title="Löschen rückgängig machen"
+            @click="notizWiederherstellen(e)"
+          >↺</button>
+        </div>
         <div v-else-if="e.text && e.aktionTyp === 'votum'" class="pw-timeline-text pw-timeline-html" v-html="e.text" />
         <template v-else-if="e.titel && e.aktionTyp !== 'notiz'">
           <span class="pw-timeline-text">{{ e.titel }}</span>
@@ -46,6 +58,9 @@
 </template>
 
 <script>
+import { generateUrl } from '@nextcloud/router'
+import { showSuccess, showError } from '@nextcloud/dialogs'
+import axios from '@nextcloud/axios'
 import { markdownZuHtml } from '../utils'
 
 // Geteilte Aktionszeitleiste für Geschäft UND Vorstoss — eine Komponente, keine
@@ -57,8 +72,13 @@ export default {
     aktionen: { type: Array, required: true },
     // Nur das Geschäft übergibt einen Traktandum-Kontext; der Vorstoss lässt ihn weg.
     traktandumKontext: { type: Object, default: null },
+    // API-Basis OHNE führenden Slash, z.B. `geschaefte/123` — für das
+    // Wiederherstellen einer gelöschten Notiz.
+    basisUrl: { type: String, default: '' },
+    // UID des angemeldeten Nutzers (für «nur der Autor darf wiederherstellen»).
+    aktuelleUid: { type: String, default: '' },
   },
-  emits: ['oeffne-traktandum'],
+  emits: ['oeffne-traktandum', 'notiz-wiederhergestellt'],
   data() {
     return {
       zeitleisteReihenfolge: [],
@@ -71,20 +91,24 @@ export default {
       const alle = this.aktionen || []
       return alle.filter(a => {
         if (a.aktionTyp === 'votum' && a.entscheidGueltig) return false
-        // Notizen und Sitzungsnotizen (aktive wie gelöschte) leben in ihren
-        // eigenen Listen (NotizenListe), nicht in der Zeitleiste.
-        if (a.aktionTyp === 'notiz' || a.aktionTyp === 'sitzungsnotiz') return false
+        const istNotiz = a.aktionTyp === 'notiz' || a.aktionTyp === 'sitzungsnotiz'
+        // AKTIVE Notizen leben in ihrer eigenen Liste (NotizenListe); GELÖSCHTE
+        // erscheinen hier als Lösch-Vermerk mit Wiederherstellen.
+        if (istNotiz && !a.geloescht) return false
         return true
       })
     },
     zeitleisteEintraege() {
-      const aktionen = this.zeitleisteAktionen.map(a => ({
-        ...a,
-        _key: String(a.id),
-        _type: 'aktion',
-        _sitzungInfo: null,
-        _sitzungId: null,
-      }))
+      const aktionen = this.zeitleisteAktionen.map(a => {
+        const istNotiz = a.aktionTyp === 'notiz' || a.aktionTyp === 'sitzungsnotiz'
+        return {
+          ...a,
+          _key: String(a.id),
+          _type: (istNotiz && a.geloescht) ? 'notizGeloescht' : 'aktion',
+          _sitzungInfo: null,
+          _sitzungId: null,
+        }
+      })
       const tk = this.traktandumKontext
       const traktandumNotizen = (tk?.notizen || []).map((n, i) => {
         const parts = []
@@ -122,6 +146,24 @@ export default {
   },
   methods: {
     markdownZuHtml,
+    istEigeneAktion(a) {
+      const uid = (this.aktuelleUid || '').toLowerCase()
+      return !!uid && (a.autorUid || '').toLowerCase() === uid
+    },
+    /** Macht das Löschen einer Notiz rückgängig — nur der Autor. */
+    async notizWiederherstellen(a) {
+      if (!this.basisUrl) return
+      const kat = encodeURIComponent(a.aktionTyp || 'notiz')
+      try {
+        const { data } = await axios.post(
+          generateUrl(`/apps/parlwin/${this.basisUrl}/notizen/${a.id}/wiederherstellen`) + `?kategorie=${kat}`
+        )
+        this.$emit('notiz-wiederhergestellt', data)
+        showSuccess('Notiz wiederhergestellt')
+      } catch (e) {
+        showError('Notiz konnte nicht wiederhergestellt werden')
+      }
+    },
     tlDragStart(event, idx) {
       this.dragZeitleisteVonIdx = idx
       event.dataTransfer.effectAllowed = 'move'
@@ -166,3 +208,16 @@ export default {
   },
 }
 </script>
+
+<style scoped>
+/* Lösch-Vermerk einer gelöschten Notiz in der Zeitleiste. */
+.pw-timeline-geloescht {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.pw-timeline-geloescht-text {
+  color: var(--pw-muted);
+  font-style: italic;
+}
+</style>

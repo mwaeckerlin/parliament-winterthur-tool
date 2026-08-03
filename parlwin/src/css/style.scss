@@ -1140,6 +1140,20 @@
   border-block-end: var(--pw-border-thin) solid var(--pw-border);
 }
 
+/* Der Titel nutzt die ganze Zeilenbreite; der Fraktionsstatus bleibt rechts
+   daneben. Ohne dies bleibt der Titelblock so schmal wie sein Inhalt, und das
+   Eingabefeld steht als kurzer Kasten in einer leeren Zeile. */
+.pw-detail-header > div:first-child {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+/* Der Beschreibungstext schliesst direkt an den Titel an. */
+.pw-detail-inhalt {
+  display: grid;
+  gap: var(--pw-gap-1);
+}
+
 .pw-detail-header h3,
 .pw-data-card h3,
 .pw-kommission-kopf h3 {

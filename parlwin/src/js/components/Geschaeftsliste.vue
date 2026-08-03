@@ -172,6 +172,7 @@
             <button type="button" class="button pw-btn-schliessen" aria-label="Dialog schliessen" @click.stop="schliesseDetail">✕</button>
           </div>
           <GeschaeftDetail
+            ref="detail"
             :geschaeft-id="ausgewaehlteGeschaeftId"
             :mitglieder="mitglieder"
             @gespeichert="nachSpeichern"
@@ -614,6 +615,11 @@ export default {
       this.ladeGeschaefte()
     },
     schliesseDetail() {
+      // Warnung, wenn im Notiz-Editor ungespeicherte Änderungen offen sind.
+      if (this.$refs.detail?.hatUngespeicherteNotizen?.()) {
+        // eslint-disable-next-line no-alert
+        if (!window.confirm('Die Notiz ist noch nicht gespeichert. Trotzdem schliessen?')) return
+      }
       this.ausgewaehlteGeschaeftId = null
       this.neuesGeschaeft = false
     },

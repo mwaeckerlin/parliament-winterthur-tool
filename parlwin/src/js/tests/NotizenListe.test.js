@@ -19,9 +19,10 @@ vi.mock('@nextcloud/dialogs', () => ({
 
 import axios from '@nextcloud/axios'
 
-// Die geteilte Notizen-Liste kapselt den kompletten Notiz-Editor-Zustand. Die
-// Persistenz läuft über `basisUrl`; hier `geschaefte/1` — die Tests gelten
-// identisch für Vorstösse (nur die basisUrl ist eine andere).
+// Die geteilte Notizen-Liste kapselt den kompletten Notiz-Editor-Zustand. Seit
+// dem Konzeptwechsel gilt für Notizen NUR Häkchen/X: KEIN Autosave (5 s), KEIN
+// Speichern bei Fokus-Verlust. Diese Tests nageln genau dieses Konzept fest —
+// sie sind die Absicherung gegen die zuvor untauglichen Autosave-Tests.
 function mountComponent(extraData = {}) {
   return shallowMount(NotizenListe, {
     props: { basisUrl: 'geschaefte/1', notizen: [], aktuelleUid: 'testuser' },
@@ -31,134 +32,126 @@ function mountComponent(extraData = {}) {
   })
 }
 
+describe('Kein Autosave, kein Speichern bei Fokus-Verlust', () => {
+  beforeEach(() => { vi.clearAllMocks(); vi.useFakeTimers() })
+  afterEach(() => { vi.useRealTimers() })
+
+  it('eine Eingabe löst KEIN Speichern aus — auch nach 5 Sekunden nicht', () => {
+    const wrapper = mountComponent({ editorOffen: true, editorModus: 'neu', aktiveNotizId: null, aktiveNotizText: '' })
+    wrapper.vm.notizEingabe('Guten Tag')
+    vi.advanceTimersByTime(5000)
+    expect(axios.post).not.toHaveBeenCalled()
+    expect(axios.put).not.toHaveBeenCalled()
+  })
+
+  it('die Komponente hat keinen Autosave-Timer und keine notizAbschliessen-Methode', () => {
+    const wrapper = mountComponent()
+    expect(wrapper.vm.notizAutosave).toBeUndefined()
+    expect(wrapper.vm.notizAbschliessen).toBeUndefined()
+  })
+
+  it('der Editor bietet keinen @blur-Handler, der speichert (nur Häkchen/X)', () => {
+    // Der Editor im Template bindet kein @blur mehr — Fokus-Verlust lässt den
+    // Editor offen. Belegt über die Abwesenheit von notizAbschliessen (der
+    // frühere Blur-Handler) und dass eine Eingabe nichts speichert.
+    const wrapper = mountComponent({ editorOffen: true, editorModus: 'edit', aktiveNotizId: 5, aktiveNotizText: 'x' })
+    wrapper.vm.notizEingabe('geändert')
+    vi.advanceTimersByTime(10000)
+    expect(axios.put).not.toHaveBeenCalled()
+  })
+})
+
+describe('Häkchen speichert, X verwirft', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
+  it('Häkchen legt eine neue Notiz an (POST) und schliesst den Editor', async () => {
+    const wrapper = mountComponent({ editorOffen: true, editorModus: 'neu', aktiveNotizId: null, aktiveNotizText: 'Neue Notiz' })
+    await wrapper.vm.notizBestaetigen()
+    expect(axios.post).toHaveBeenCalledOnce()
+    expect(wrapper.vm.editorOffen).toBe(false)
+  })
+
+  it('Häkchen an einer bestehenden Notiz aktualisiert sie (PUT) OHNE zwischenspeichern-Flag', async () => {
+    const wrapper = mountComponent({ editorOffen: true, editorModus: 'edit', aktiveNotizId: 42, aktiveNotizText: 'Endstand' })
+    await wrapper.vm.notizBestaetigen()
+    expect(axios.put).toHaveBeenCalledOnce()
+    const [, body] = axios.put.mock.calls[0]
+    // Kein Zwischenspeichern mehr: der Abschluss archiviert immer eine Revision.
+    expect(body).not.toHaveProperty('zwischenspeichern')
+  })
+
+  it('X verwirft ohne zu speichern und schliesst den Editor', () => {
+    const wrapper = mountComponent({ editorOffen: true, editorModus: 'edit', aktiveNotizId: 42, aktiveNotizText: 'X' })
+    wrapper.vm.notizVerwerfen()
+    expect(axios.post).not.toHaveBeenCalled()
+    expect(axios.put).not.toHaveBeenCalled()
+    expect(wrapper.vm.editorOffen).toBe(false)
+    expect(wrapper.vm.aktiveNotizText).toBe('')
+  })
+
+  it('ein leerer neuer Editor legt beim Häkchen nichts an', async () => {
+    const wrapper = mountComponent({ editorOffen: true, editorModus: 'neu', aktiveNotizId: null, aktiveNotizText: '' })
+    await wrapper.vm.notizBestaetigen()
+    expect(axios.post).not.toHaveBeenCalled()
+    expect(wrapper.vm.editorOffen).toBe(false)
+  })
+})
+
+describe('History: der mehrzeilige Text bleibt vollständig erhalten', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
+  it('speichert den gesamten mehrzeiligen Text (kein Verlust der Folgezeilen)', async () => {
+    const wrapper = mountComponent({ editorOffen: true, editorModus: 'neu', aktiveNotizId: null })
+    // «Guten Tag» + Zeilenumbruch + «Hallo Welt» — alles muss ankommen.
+    wrapper.vm.notizEingabe('Guten Tag\n\nHallo Welt')
+    await wrapper.vm.notizBestaetigen()
+    expect(axios.post).toHaveBeenCalledOnce()
+    expect(axios.post.mock.calls[0][1].text).toBe('Guten Tag\n\nHallo Welt')
+  })
+})
+
+describe('hatUngespeicherteAenderungen', () => {
+  it('ist false bei geschlossenem Editor', () => {
+    const wrapper = mountComponent()
+    expect(wrapper.vm.hatUngespeicherteAenderungen()).toBe(false)
+  })
+
+  it('ist false, wenn der Text dem Öffnungsstand entspricht', () => {
+    const wrapper = mountComponent({ editorOffen: true, aktiveNotizText: 'A', aktiveNotizOriginal: 'A' })
+    expect(wrapper.vm.hatUngespeicherteAenderungen()).toBe(false)
+  })
+
+  it('ist true, wenn der Text vom Öffnungsstand abweicht', () => {
+    const wrapper = mountComponent({ editorOffen: true, aktiveNotizText: 'A geändert', aktiveNotizOriginal: 'A' })
+    expect(wrapper.vm.hatUngespeicherteAenderungen()).toBe(true)
+  })
+})
+
 describe('notizBearbeitenStarten – Datenzustand', () => {
-  it('lädt die Notiz in den gemeinsamen Editor-Zustand', async () => {
+  it('lädt die Notiz in den Editor und merkt sich den Original-Text', async () => {
     const wrapper = mountComponent()
     await wrapper.vm.notizBearbeitenStarten({ id: 42, text: 'Testnotiz' })
     expect(wrapper.vm.aktiveNotizId).toBe(42)
     expect(wrapper.vm.aktiveNotizText).toBe('Testnotiz')
+    expect(wrapper.vm.aktiveNotizOriginal).toBe('Testnotiz')
     expect(wrapper.vm.editorModus).toBe('edit')
     expect(wrapper.vm.editorOffen).toBe(true)
   })
-
-  it('setzt aktiveNotizText auf leer wenn aktion.text fehlt', async () => {
-    const wrapper = mountComponent()
-    await wrapper.vm.notizBearbeitenStarten({ id: 5, text: '' })
-    expect(wrapper.vm.aktiveNotizText).toBe('')
-  })
 })
 
-describe('notizVerwerfen', () => {
-  it('räumt den Editor weg, ohne zu speichern', () => {
-    const wrapper = mountComponent({ editorOffen: true, editorModus: 'edit', aktiveNotizId: 42, aktiveNotizText: 'X' })
-    wrapper.vm.notizVerwerfen()
-    expect(wrapper.vm.editorOffen).toBe(false)
-    expect(wrapper.vm.aktiveNotizId).toBeNull()
-    expect(wrapper.vm.aktiveNotizText).toBe('')
-  })
-})
-
-describe('notizAutosave', () => {
-  beforeEach(() => { vi.useFakeTimers() })
-  afterEach(() => { vi.useRealTimers() })
-
-  it('persistiert als Zwischenspeicher (final=false) nach 5 Sekunden', () => {
-    const wrapper = mountComponent({ editorOffen: true, editorModus: 'neu', aktiveNotizText: 'Test' })
-    const spy = vi.spyOn(wrapper.vm, 'notizPersistieren').mockResolvedValue()
-    wrapper.vm.notizAutosave()
-    expect(spy).not.toHaveBeenCalled()
-    vi.advanceTimersByTime(5000)
-    expect(spy).toHaveBeenCalledOnce()
-    expect(spy).toHaveBeenCalledWith(false)
-  })
-
-  it('setzt vorherigen Timer zurück', () => {
-    const wrapper = mountComponent({ editorOffen: true, editorModus: 'neu', aktiveNotizText: 'A' })
-    const spy = vi.spyOn(wrapper.vm, 'notizPersistieren').mockResolvedValue()
-    wrapper.vm.notizAutosave()
-    wrapper.vm.notizAutosave()
-    vi.advanceTimersByTime(5000)
-    expect(spy).toHaveBeenCalledOnce()
-  })
-})
-
-describe('notizAbschliessen – Timer abbrechen und final speichern', () => {
-  beforeEach(() => { vi.useFakeTimers() })
-  afterEach(() => { vi.useRealTimers() })
-
-  it('bricht den Autosave-Timer ab und speichert final (final=true)', async () => {
-    const wrapper = mountComponent({ editorOffen: true, editorModus: 'neu', aktiveNotizText: 'Sofort' })
-    const spy = vi.spyOn(wrapper.vm, 'notizPersistieren').mockResolvedValue()
-    wrapper.vm.notizAutosave()
-    await wrapper.vm.notizAbschliessen()
-    expect(spy).toHaveBeenCalledWith(true)
-    vi.advanceTimersByTime(5000)
-    // Der abgebrochene Autosave-Timer feuert nicht mehr.
-    expect(spy).toHaveBeenCalledOnce()
-  })
-})
-
-describe('notizPersistieren – POST/PUT je nach Zustand', () => {
-  beforeEach(() => { vi.clearAllMocks() })
-
-  it('legt für eine neue Notiz (aktiveNotizId=null) eine Aktion an (POST)', async () => {
-    const wrapper = mountComponent({ editorOffen: true, editorModus: 'neu', aktiveNotizId: null, aktiveNotizText: 'Hallo' })
-    await wrapper.vm.notizPersistieren(false)
-    expect(axios.post).toHaveBeenCalledOnce()
-    expect(axios.put).not.toHaveBeenCalled()
-  })
-
-  it('aktualisiert eine bestehende Notiz (PUT), kein POST', async () => {
-    const wrapper = mountComponent({ editorOffen: true, editorModus: 'edit', aktiveNotizId: 42, aktiveNotizText: 'Hallo' })
-    await wrapper.vm.notizPersistieren(false)
-    expect(axios.put).toHaveBeenCalledOnce()
-    expect(axios.post).not.toHaveBeenCalled()
-  })
-
-  it('speichert keine leere Notiz', async () => {
-    const wrapper = mountComponent({ editorOffen: true, editorModus: 'neu', aktiveNotizId: null, aktiveNotizText: '' })
-    await wrapper.vm.notizPersistieren(false)
-    expect(axios.post).not.toHaveBeenCalled()
-    expect(axios.put).not.toHaveBeenCalled()
-  })
-
-  it('legt beim Zwischenspeichern KEINE Revision an (zwischenspeichern=true)', async () => {
-    const wrapper = mountComponent({ editorOffen: true, editorModus: 'edit', aktiveNotizId: 42, aktiveNotizText: 'Zwischenstand' })
-    await wrapper.vm.notizPersistieren(false)
-    const [, body] = axios.put.mock.calls[0]
-    expect(body.zwischenspeichern).toBe(true)
-  })
-
-  it('archiviert beim finalen Abschluss eine Revision (zwischenspeichern=false)', async () => {
-    const wrapper = mountComponent({ editorOffen: true, editorModus: 'edit', aktiveNotizId: 42, aktiveNotizText: 'Endstand' })
-    await wrapper.vm.notizPersistieren(true)
-    const [, body] = axios.put.mock.calls[0]
-    expect(body.zwischenspeichern).toBe(false)
-  })
-
-  it('richtet die Requests an die basisUrl (Geschäft oder Vorstoss)', async () => {
-    const wrapper = mountComponent({ editorOffen: true, editorModus: 'neu', aktiveNotizId: null, aktiveNotizText: 'Hallo' })
-    await wrapper.vm.notizPersistieren(false)
-    expect(axios.post.mock.calls[0][0]).toContain('/apps/parlwin/geschaefte/1/notizen')
-  })
-})
-
-describe('notizAbschliessen – räumt den Editor weg', () => {
-  beforeEach(() => { vi.clearAllMocks() })
-
-  it('schliesst den Editor nach dem Speichern', async () => {
-    const wrapper = mountComponent({ editorOffen: true, editorModus: 'neu', aktiveNotizId: null, aktiveNotizText: 'Wird gespeichert' })
-    await wrapper.vm.notizAbschliessen()
-    expect(wrapper.vm.editorOffen).toBe(false)
-    expect(wrapper.vm.aktiveNotizText).toBe('')
-    expect(wrapper.vm.aktiveNotizId).toBeNull()
-  })
-
-  it('räumt einen leeren neuen Editor weg, ohne etwas anzulegen', async () => {
-    const wrapper = mountComponent({ editorOffen: true, editorModus: 'neu', aktiveNotizId: null, aktiveNotizText: '' })
-    await wrapper.vm.notizAbschliessen()
-    expect(axios.post).not.toHaveBeenCalled()
-    expect(wrapper.vm.editorOffen).toBe(false)
+describe('Gelöschte Notizen erscheinen NICHT in der Notizen-Liste', () => {
+  it('zeigt nur aktive Notizen; gelöschte bleiben der Aktionszeitleiste vorbehalten', () => {
+    const notizen = [
+      { id: 1, aktionTyp: 'notiz', text: 'aktiv', autorUid: 'testuser', geloescht: false },
+      { id: 2, aktionTyp: 'notiz', text: 'weg', autorUid: 'testuser', geloescht: true },
+    ]
+    const wrapper = shallowMount(NotizenListe, {
+      props: { basisUrl: 'geschaefte/1', notizen, aktuelleUid: 'testuser' },
+    })
+    expect(wrapper.vm.aktiveNotizen).toHaveLength(1)
+    expect(wrapper.vm.aktiveNotizen[0].id).toBe(1)
+    // Kein Lösch-Vermerk mehr in dieser Komponente.
+    expect(wrapper.text()).not.toContain('hat seine Notiz gelöscht')
   })
 })
 
@@ -178,17 +171,17 @@ describe('notizLoeschen – Soft-Delete meldet die aktualisierte Liste', () => {
   })
 })
 
-describe('notizPersistieren – keine Duplikate bei parallelen Speicherungen', () => {
+describe('notizSpeichern – keine Duplikate bei schnellen Aufrufen', () => {
   beforeEach(() => { vi.clearAllMocks() })
 
-  it('Blur während laufendem Debounce-POST erzeugt keine zweite Notiz', async () => {
+  it('zwei schnelle Speicherungen erzeugen keine zweite Notiz', async () => {
     let ersteAntwortAusloesen
     axios.post.mockImplementationOnce(() => new Promise(resolve => {
       ersteAntwortAusloesen = () => resolve({ data: { id: 50, aktionTyp: 'notiz', text: 'X', titel: '', autorUid: 'testuser', geloescht: false } })
     }))
     const wrapper = mountComponent({ editorOffen: true, editorModus: 'neu', aktiveNotizId: null, aktiveNotizText: 'X' })
-    const erste = wrapper.vm.notizPersistieren(false)
-    const zweite = wrapper.vm.notizPersistieren(true)
+    const erste = wrapper.vm.notizSpeichern()
+    const zweite = wrapper.vm.notizSpeichern()
     await vi.waitFor(() => { if (typeof ersteAntwortAusloesen !== 'function') throw new Error('POST noch nicht gestartet') })
     ersteAntwortAusloesen()
     await erste

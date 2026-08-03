@@ -36,29 +36,31 @@ describe('GeschaeftDetail — Votum', () => {
     },
   })
 
-  it('die Maske zeigt ein Feld «Votum im Rat» mit Editor und Archivieren-Knopf', async () => {
-    // Ohne Bedienelement ist das Votum für den Nutzer nicht erreichbar — die
-    // Logik allein genügt nicht.
+  it('für Nicht-Zuständige ist das leere Votum-Feld NICHT sichtbar (kein grauer Kasten)', async () => {
     const wrapper = mountFn()
-    // Die Maske rendert erst, wenn das Geschäft geladen ist.
     wrapper.vm.laden = false
     wrapper.vm.geschaeft = { id: 1, titel: 'T', aktionen: [], zustaendigkeiten: [] }
     await wrapper.vm.$nextTick()
-    const labels = wrapper.findAll('.pw-form-zeile > label').map((l) => l.text())
-    expect(labels, 'Feld «Votum im Rat» fehlt in der Geschäftsmaske').toContain('Votum im Rat')
-    expect(
-      wrapper.find('.pw-votum .pw-wysiwyg-stub, .pw-votum pwwysiwyg-stub').exists()
-        || wrapper.find('.pw-votum').html().includes('wysiwyg'),
-      'Im Votum-Feld fehlt der Texteditor',
-    ).toBe(true)
-    // Ohne Zuständigkeit bleibt das Feld sichtbar, aber schreibgeschützt —
-    // mit Hinweis, wer es erfassen darf.
+    // Niemand zuständig, Votum leer → das Feld erscheint gar nicht.
     expect(wrapper.vm.votumSchreibbar).toBe(false)
+    expect(wrapper.vm.votumHatInhalt).toBe(false)
+    expect(wrapper.find('.pw-votum').exists(), 'Ein leeres Votum darf für Nicht-Zuständige kein Feld zeigen').toBe(false)
+  })
+
+  it('für Nicht-Zuständige mit vorhandenem Votum ist der Wortlaut sichtbar, aber schreibgeschützt', async () => {
+    const wrapper = mountFn()
+    // Erst das anfängliche Laden abwarten (es setzt votumHtml sonst danach zurück).
+    await flushPromises()
+    wrapper.vm.laden = false
+    wrapper.vm.geschaeft = { id: 1, titel: 'T', aktionen: [], zustaendigkeiten: [] }
+    wrapper.vm.votumHtml = '<p>Ein erfasstes Votum</p>'
+    await wrapper.vm.$nextTick()
+    expect(wrapper.vm.votumSchreibbar).toBe(false)
+    expect(wrapper.vm.votumHatInhalt).toBe(true)
+    // Feld sichtbar (Wortlaut lesbar), Hinweis auf die Zuständigkeit, kein Archivieren.
+    expect(wrapper.find('.pw-votum').exists(), 'Ein vorhandenes Votum muss auch für Nicht-Zuständige sichtbar sein').toBe(true)
     expect(wrapper.find('.pw-votum .pw-hinweis').exists(), 'Hinweis zur Zuständigkeit fehlt').toBe(true)
-    expect(
-      wrapper.find('.pw-votum-archivieren').exists(),
-      'Ohne Zuständigkeit darf kein Archivieren-Knopf erscheinen',
-    ).toBe(false)
+    expect(wrapper.find('.pw-votum-archivieren').exists()).toBe(false)
   })
 
   it('die zuständige Person kann das Votum erfassen und archivieren', async () => {

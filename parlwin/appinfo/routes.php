@@ -9,7 +9,9 @@ return [
 
         // Geschäfte
         ['name' => 'geschaeft#index', 'url' => '/geschaefte', 'verb' => 'GET'],
-        ['name' => 'geschaeft#show', 'url' => '/geschaefte/{id}', 'verb' => 'GET'],
+        // Vor der {id}-Route: sonst schluckt sie den Pfad als Geschäfts-ID.
+        ['name' => 'geschaeft#statuswerte', 'url' => '/geschaefte/statuswerte', 'verb' => 'GET'],
+        ['name' => 'geschaeft#show', 'url' => '/geschaefte/{id}', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
         ['name' => 'geschaeft#update', 'url' => '/geschaefte/{id}', 'verb' => 'PUT'],
         ['name' => 'geschaeft#setPrioritaet', 'url' => '/geschaefte/{id}/prioritaet', 'verb' => 'PUT'],
         ['name' => 'geschaeft#notizen', 'url' => '/geschaefte/{id}/notizen', 'verb' => 'GET'],
@@ -113,6 +115,9 @@ return [
 
         ['name' => 'settings#getStatusKuerzel', 'url' => '/settings/status-kuerzel', 'verb' => 'GET'],
         ['name' => 'settings#setStatusKuerzel', 'url' => '/settings/status-kuerzel', 'verb' => 'POST'],
+
+        ['name' => 'settings#getEigeneTypen', 'url' => '/settings/eigene-typen', 'verb' => 'GET'],
+        ['name' => 'settings#setEigeneTypen', 'url' => '/settings/eigene-typen', 'verb' => 'POST'],
 
         ['name' => 'settings#getSyncZeitplan', 'url' => '/settings/sync-zeitplan', 'verb' => 'GET'],
         ['name' => 'settings#setSyncZeitplan', 'url' => '/settings/sync-zeitplan', 'verb' => 'POST'],

@@ -191,17 +191,15 @@ class FraktionsarbeitService
     }
 
     /**
-     * @param bool $revisionArchivieren siehe {@see NotizService::aktualisieren()}
      * @return array<string, mixed>
      */
     public function notizAktualisieren(
         int $geschaeftId,
         int $aktionId,
         string $text,
-        bool $revisionArchivieren = true,
         string $kategorie = 'notiz'
     ): array {
-        return $this->notizService->aktualisieren(self::OBJEKT_TYP, $geschaeftId, $aktionId, $text, $revisionArchivieren, self::pruefeKategorie($kategorie));
+        return $this->notizService->aktualisieren(self::OBJEKT_TYP, $geschaeftId, $aktionId, $text, self::pruefeKategorie($kategorie));
     }
 
     public function notizLoeschen(int $geschaeftId, int $aktionId, string $kategorie = 'notiz'): void

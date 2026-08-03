@@ -116,15 +116,15 @@ class VorstossNotizenTest extends TestCase
         self::assertSame('Neuer Text', $this->aktionen[$aktion['id']]->getText());
     }
 
-    public function testZwischenspeichernErzeugtKeineVersion(): void
+    public function testJedeSpeicherungLegtEineVersionAn(): void
     {
         $service = $this->makeService();
-        $aktion = $service->notizHinzufuegen(3, 'Start');
+        $aktion = $service->notizHinzufuegen(3, 'Fassung 1');
 
-        $service->notizAktualisieren(3, $aktion['id'], 'Tipp', false);
-        $service->notizAktualisieren(3, $aktion['id'], 'Tipptipp', false);
+        $service->notizAktualisieren(3, $aktion['id'], 'Fassung 2');
+        $service->notizAktualisieren(3, $aktion['id'], 'Fassung 3');
 
-        self::assertSame([], $this->revisionen, 'Autosave darf keine Version anlegen');
+        self::assertCount(2, $this->revisionen, 'Jede Speicherung (Häkchen) legt genau eine Version an');
     }
 
     public function testLoeschenIstSoftDeleteMitUndo(): void

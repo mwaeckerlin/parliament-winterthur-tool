@@ -46,40 +46,26 @@ describe('Notiz-Editor — neue Notiz und Bearbeiten teilen einen Ablauf', () =>
     axios.put.mockImplementation((url, body) => Promise.resolve({ data: notizAntwort(99, body?.text || '') }))
   })
 
-  it('erzeugt beim Autosave einer neuen Notiz genau EINE Notiz (kein Doppel)', async () => {
-    vi.useFakeTimers()
-    try {
-      const wrapper = mountListe([])
-      await wrapper.find('button[title="Neue Notiz"]').trigger('click')
-      tippe(wrapper, 'Test, Hallo Welt')
-      await vi.advanceTimersByTimeAsync(5000)
-      await Promise.resolve()
+  it('speichert eine neue Notiz erst beim Häkchen (genau EINE, kein Doppel)', async () => {
+    const wrapper = mountListe([])
+    await wrapper.find('button[title="Neue Notiz"]').trigger('click')
+    tippe(wrapper, 'Test, Hallo Welt')
+    await wrapper.vm.notizBestaetigen()
 
-      const axios = (await import('@nextcloud/axios')).default
-      expect(axios.post).toHaveBeenCalledTimes(1)
-      // Die persistierte Notiz liegt in der aktiven Liste …
-      expect(wrapper.vm.aktiveNotizen.filter(n => n.id === 99)).toHaveLength(1)
-    } finally {
-      vi.useRealTimers()
-    }
+    const axios = (await import('@nextcloud/axios')).default
+    expect(axios.post).toHaveBeenCalledTimes(1)
+    expect(wrapper.vm.aktiveNotizen.filter(n => n.id === 99)).toHaveLength(1)
   })
 
-  it('zeigt die im Editor aktive Notiz NICHT zusätzlich als statischen Eintrag (keine Doppelung)', async () => {
-    vi.useFakeTimers()
-    try {
-      const wrapper = mountListe([])
-      await wrapper.find('button[title="Neue Notiz"]').trigger('click')
-      tippe(wrapper, 'Test, Hallo Welt')
-      await vi.advanceTimersByTimeAsync(5000)
-      await Promise.resolve()
-      await wrapper.vm.$nextTick()
+  it('zeigt eine gespeicherte Notiz nach dem Häkchen genau einmal (keine Doppelung)', async () => {
+    const wrapper = mountListe([])
+    await wrapper.find('button[title="Neue Notiz"]').trigger('click')
+    tippe(wrapper, 'Test, Hallo Welt')
+    await wrapper.vm.notizBestaetigen()
+    await wrapper.vm.$nextTick()
 
-      // Nach dem Autosave gehört die Notiz dem noch offenen Editor — sie darf nicht
-      // gleichzeitig als statischer Notiz-Text erscheinen.
-      expect(wrapper.findAll('.pw-notiz-inhalt')).toHaveLength(0)
-    } finally {
-      vi.useRealTimers()
-    }
+    // Nach dem Häkchen ist der Editor zu und die Notiz erscheint einmal.
+    expect(wrapper.findAll('.pw-notiz-inhalt')).toHaveLength(1)
   })
 
   it('lässt den «Neue Notiz»-Knopf sichtbar, während der Editor offen ist', async () => {
@@ -88,11 +74,24 @@ describe('Notiz-Editor — neue Notiz und Bearbeiten teilen einen Ablauf', () =>
     expect(wrapper.find('button[title="Neue Notiz"]').exists()).toBe(true)
   })
 
-  it('räumt einen leeren neuen Editor bei Fokus-Verlust weg, ohne etwas zu erzeugen', async () => {
+  it('Fokus-Verlust speichert NICHT und lässt den Editor offen', async () => {
     const wrapper = mountListe([])
     await wrapper.find('button[title="Neue Notiz"]').trigger('click')
+    tippe(wrapper, 'Angefangen')
+    // Ein Blur des Editors darf weder speichern noch den Editor schliessen.
     const editor = wrapper.findComponent({ name: 'PwWysiwyg' })
     editor.vm.$emit('blur')
+    await wrapper.vm.$nextTick()
+
+    const axios = (await import('@nextcloud/axios')).default
+    expect(axios.post).not.toHaveBeenCalled()
+    expect(wrapper.vm.editorOffen).toBe(true)
+  })
+
+  it('X räumt einen leeren neuen Editor weg, ohne etwas zu erzeugen', async () => {
+    const wrapper = mountListe([])
+    await wrapper.find('button[title="Neue Notiz"]').trigger('click')
+    wrapper.vm.notizVerwerfen()
     await wrapper.vm.$nextTick()
 
     const axios = (await import('@nextcloud/axios')).default
@@ -146,9 +145,9 @@ describe('Notiz-Editor — neue Notiz und Bearbeiten teilen einen Ablauf', () =>
 
     const puts = axios.put.mock.calls
     expect(puts).toHaveLength(2)
-    // Erst der Arbeitsstand F (final ⇒ Revision), dann die alte Fassung B als Kopie.
-    expect(puts[0][1]).toMatchObject({ text: 'F', zwischenspeichern: false })
-    expect(puts[1][1]).toMatchObject({ text: 'B', zwischenspeichern: false })
+    // Erst der Arbeitsstand F (wird zur Revision), dann die alte Fassung B als Kopie.
+    expect(puts[0][1]).toMatchObject({ text: 'F' })
+    expect(puts[1][1]).toMatchObject({ text: 'B' })
     expect(wrapper.vm.editorOffen).toBe(false)
   })
 
@@ -165,7 +164,7 @@ describe('Notiz-Editor — neue Notiz und Bearbeiten teilen einen Ablauf', () =>
     await wrapper.vm.notizBestaetigen()
 
     expect(axios.put.mock.calls).toHaveLength(1)
-    expect(axios.put.mock.calls[0][1]).toMatchObject({ text: 'F', zwischenspeichern: false })
+    expect(axios.put.mock.calls[0][1]).toMatchObject({ text: 'F' })
     expect(wrapper.vm.editorOffen).toBe(false)
   })
 

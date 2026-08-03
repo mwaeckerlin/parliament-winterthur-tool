@@ -25,6 +25,18 @@
         </span>
       </header>
 
+      <!-- Der Beschreibungstext steht direkt unter dem Titel: er sagt, worum es
+           geht, und gehört damit vor alle Detailangaben. Bei Geschäften von der
+           Parlamentswebseite steht der Text in der Quelle — dort entfällt er. -->
+      <div v-if="istEigenes" class="pw-detail-inhalt">
+        <PwWysiwyg
+          :model-value="geschaeft.inhalt || ''"
+          placeholder="Worum geht es?"
+          @update:model-value="inhaltGeaendert"
+          @blur="stammdatenSpeichern"
+        />
+      </div>
+
       <div class="pw-detail-abschnitt pw-oeffentlich">
         <h4>Öffentliche Informationen</h4>
         <table class="pw-info-tabelle">
@@ -33,14 +45,15 @@
             <tr>
               <th>Typ</th>
               <td>
-                <input
+                <!-- Die Typen für eigene Geschäfte pflegt die Administration. -->
+                <NcSelect
                   v-if="istEigenes"
-                  v-model="geschaeft.typ"
-                  type="text"
-                  class="pw-input"
-                  placeholder="z.B. Kommissionsgeschäft"
+                  :model-value="geschaeft.typ || null"
+                  :options="typOptionen"
+                  :clearable="false"
+                  placeholder="Typ wählen …"
                   aria-label="Typ"
-                  @change="stammdatenSpeichern"
+                  @update:model-value="typGewaehlt"
                 />
                 <template v-else>{{ geschaeft.typ }}</template>
               </td>
@@ -48,14 +61,17 @@
             <tr>
               <th>Status</th>
               <td>
-                <input
+                <!-- Vorgeschlagen wird, was es bereits gibt; ein eigener Status
+                     lässt sich jederzeit eintippen (gleiches Widget wie beim
+                     Beschluss). -->
+                <BeschlussWidget
                   v-if="istEigenes"
-                  v-model="geschaeft.status"
-                  type="text"
-                  class="pw-input"
-                  placeholder="z.B. Pendent"
+                  :model-value="{ label: geschaeft.status || '', value: geschaeft.status || '' }"
+                  :options="statusWidgetOptionen"
+                  input-class="pw-status-input"
                   aria-label="Status"
-                  @change="stammdatenSpeichern"
+                  placeholder="Status wählen oder eingeben …"
+                  @update:model-value="statusGeaendert($event && $event.label)"
                 />
                 <template v-else>{{ kuerze(geschaeft.status) }}</template>
               </td>
@@ -74,6 +90,24 @@
                 />
                 <template v-else>{{ formatieredatum(geschaeft.datum) }}</template>
               </td>
+            </tr>
+            <tr v-if="istEigenes">
+              <th>Kommission</th>
+              <td>
+                <!-- Höchstens eine Kommission; keine ist ebenfalls gültig. -->
+                <NcSelect
+                  :model-value="geschaeft.kommission || null"
+                  :options="kommissionsOptionen"
+                  :clearable="true"
+                  placeholder="—"
+                  aria-label="Kommission"
+                  @update:model-value="kommissionGewaehlt"
+                />
+              </td>
+            </tr>
+            <tr v-else-if="geschaeft.kommission">
+              <th>Kommission</th>
+              <td>{{ kuerze(geschaeft.kommission) }}</td>
             </tr>
             <tr v-if="geschaeft.einreicher && geschaeft.einreicher.length">
               <th>Einreicher</th>
@@ -142,9 +176,10 @@
           </small>
         </div>
 
-        <!-- Votum im Rat: nur die zuständige Person erfasst den Wortlaut; das
-             PDF steht in der Werkzeugleiste bereit, sobald etwas erfasst ist. -->
-        <div class="pw-form-zeile pw-votum">
+        <!-- Votum im Rat: die zuständige Person erfasst den Wortlaut; das PDF
+             steht bereit, sobald etwas erfasst ist. Für Nicht-Zuständige ist das
+             Feld nur sichtbar, wenn ein Votum vorliegt (kein leerer Kasten). -->
+        <div v-if="votumSchreibbar || votumHatInhalt" class="pw-form-zeile pw-votum">
           <label>Votum im Rat</label>
           <PwWysiwyg
             :model-value="votumHtml"
@@ -172,6 +207,7 @@
         <div class="pw-form-zeile">
           <label>Notizen</label>
           <NotizenListe
+            ref="notizenListe"
             :basis-url="'geschaefte/' + geschaeftId"
             :notizen="notizAktionen"
             :aktuelle-uid="aktuelleUid"
@@ -182,6 +218,7 @@
           <details class="pw-sitzungsnotizen-details">
             <summary>Sitzungsnotizen<span v-if="sitzungsnotizAktive.length" class="pw-sitzungsnotizen-zahl">{{ sitzungsnotizAktive.length }}</span></summary>
             <NotizenListe
+              ref="sitzungsnotizenListe"
               :basis-url="'geschaefte/' + geschaeftId"
               :notizen="sitzungsnotizAktionen"
               :aktuelle-uid="aktuelleUid"
@@ -214,7 +251,10 @@
         v-if="!istNeu"
         :aktionen="geschaeft.aktionen || []"
         :traktandum-kontext="traktandumKontext"
+        :basis-url="'geschaefte/' + geschaeftId"
+        :aktuelle-uid="aktuelleUid"
         @oeffne-traktandum="id => $emit('oeffneTraktandum', id)"
+        @notiz-wiederhergestellt="onNotizWiederhergestellt"
       />
 
       <div v-if="verknuepfteVorstoesse.length" class="pw-detail-abschnitt">
@@ -279,10 +319,17 @@ export default {
       hauptPersonKey: '',
       unsubRealtime: null,
       verknuepfteVorstoesse: [],
+      // Auswahlwerte der Stammdaten: Typen pflegt der Administrator, die
+      // Status-Werte stammen aus den vorhandenen Geschäften, die Kommissionen
+      // aus der Synchronisation.
+      typOptionen: [],
+      statusOptionen: [],
+      kommissionen: [],
     }
   },
   created() {
     this.unsubRealtime = subscribeRealtime(this.handleRealtimeEvent)
+    this.ladeAuswahllisten()
   },
   beforeUnmount() {
     if (this.unsubRealtime) {
@@ -309,6 +356,15 @@ export default {
     },
     prioritaetOptionen() {
       return PRIORITAETEN
+    },
+    // Zur Auswahl stehen nur aktive Kommissionen — eine aufgelöste Kommission
+    // bekommt kein neues Geschäft mehr.
+    kommissionsOptionen() {
+      return (this.kommissionen || []).filter(k => k.aktiv !== false).map(k => k.name)
+    },
+    // Das Beschluss-Widget erwartet Paare aus Beschriftung und Wert.
+    statusWidgetOptionen() {
+      return (this.statusOptionen || []).map(s => ({ label: s, value: s }))
     },
     prioritaetWahl() {
       const p = this.geschaeft?.prioritaet || ''
@@ -408,6 +464,45 @@ export default {
       const member = this.mitglieder.find(m => this.personKey(m) === key)
       return member ? this.vollerName(member) : key
     },
+    /** Heutiges Datum als JJJJ-MM-TT — Vorbelegung eines neuen Geschäfts. */
+    heute() {
+      return new Date().toISOString().slice(0, 10)
+    },
+    // Die Auswahlwerte der Stammdaten. Der Typ kommt aus der Administration,
+    // der Status aus den tatsächlich vorkommenden Werten (bleibt frei
+    // überschreibbar), die Kommissionen aus der Synchronisation.
+    async ladeAuswahllisten() {
+      const [typen, status, kommissionen] = await Promise.all([
+        axios.get(generateUrl('/apps/parlwin/settings/eigene-typen')).catch(() => ({ data: [] })),
+        axios.get(generateUrl('/apps/parlwin/geschaefte/statuswerte')).catch(() => ({ data: [] })),
+        axios.get(generateUrl('/apps/parlwin/kommissionen')).catch(() => ({ data: [] })),
+      ])
+      this.typOptionen = Array.isArray(typen.data) ? typen.data : []
+      this.statusOptionen = Array.isArray(status.data) ? status.data : []
+      this.kommissionen = Array.isArray(kommissionen.data) ? kommissionen.data : []
+    },
+    // Eine Kommission je Geschäft; keine zu wählen ist zulässig.
+    kommissionGewaehlt(wahl) {
+      if (!this.geschaeft) return
+      this.geschaeft.kommission = wahl || ''
+      this.stammdatenSpeichern()
+    },
+    statusGeaendert(wert) {
+      if (!this.geschaeft) return
+      this.geschaeft.status = wert || ''
+      this.stammdatenSpeichern()
+    },
+    // Der Beschreibungstext speichert wie jede Eingabe beim Verlassen; während
+    // des Tippens wird nur der Stand gehalten.
+    inhaltGeaendert(html) {
+      if (!this.geschaeft) return
+      this.geschaeft.inhalt = html || ''
+    },
+    typGewaehlt(wahl) {
+      if (!this.geschaeft) return
+      this.geschaeft.typ = wahl || ''
+      this.stammdatenSpeichern()
+    },
     // Legt das in der Maske erfasste eigene Geschäft an. Danach übernimmt die
     // Liste die neue Nummer und öffnet dieselbe Maske als Bearbeitung, sodass
     // sich Dokumente und Notizen direkt anschliessen lassen.
@@ -420,6 +515,9 @@ export default {
           titel,
           typ: this.geschaeft.typ || 'Eigenes Geschäft',
           status: this.geschaeft.status || 'Pendent',
+          inhalt: this.geschaeft.inhalt || '',
+          kommission: this.geschaeft.kommission || '',
+          datum: this.geschaeft.datum || '',
         })
         showSuccess('Gespeichert')
         this.$emit('erstellt', data?.id || 0)
@@ -439,6 +537,8 @@ export default {
           typ: this.geschaeft.typ || '',
           status: this.geschaeft.status || '',
           datum: this.geschaeft.datum || '',
+          inhalt: this.geschaeft.inhalt || '',
+          kommission: this.geschaeft.kommission || '',
         })
         showSuccess('Gespeichert')
         this.$emit('gespeichert')
@@ -469,7 +569,11 @@ export default {
           nummer: '',
           typ: 'Eigenes Geschäft',
           status: 'Pendent',
-          datum: '',
+          // Ein neu erfasstes Geschäft entsteht heute — das ist in aller Regel
+          // das gesuchte Datum und bleibt änderbar.
+          datum: this.heute(),
+          inhalt: '',
+          kommission: '',
           aktionen: [],
           zustaendigkeiten: [],
         }
@@ -654,6 +758,28 @@ export default {
       if (!this.geschaeft) return
       const andere = (this.geschaeft.aktionen || []).filter(a => a.aktionTyp !== 'sitzungsnotiz')
       this.geschaeft.aktionen = [...andere, ...(Array.isArray(neu) ? neu : [])]
+    },
+    /**
+     * Eine in der Aktionszeitleiste wiederhergestellte Notiz zurück in die
+     * Aktionsliste übernehmen (geloescht=false) — sie wandert damit von der
+     * Zeitleiste zurück in ihre Notizen-Liste.
+     */
+    onNotizWiederhergestellt(data) {
+      if (!this.geschaeft || !data?.id) return
+      const idx = (this.geschaeft.aktionen || []).findIndex(a => a.id === data.id)
+      if (idx < 0) return
+      const kopie = [...this.geschaeft.aktionen]
+      kopie[idx] = data
+      this.geschaeft.aktionen = kopie
+    },
+    /**
+     * Ob eine der Notizen-Listen einen offenen Editor mit ungespeicherten
+     * Änderungen hat. Die Elternansicht prüft das, bevor sie den Dialog schliesst.
+     */
+    hatUngespeicherteNotizen() {
+      return [this.$refs.notizenListe, this.$refs.sitzungsnotizenListe]
+        .filter(Boolean)
+        .some(r => typeof r.hatUngespeicherteAenderungen === 'function' && r.hatUngespeicherteAenderungen())
     },
     async beschlussNachWahl(val) {
       const hatteWert = !!this.beschlussWert

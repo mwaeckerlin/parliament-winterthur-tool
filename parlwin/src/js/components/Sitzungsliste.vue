@@ -38,7 +38,10 @@
 
   <!-- Neue Sitzung: Vollständiges Formular (1:1 NC-Kalender-Layout) -->
   <Teleport to="body">
-    <div v-if="gewaehlterTyp" class="pw-neue-sitzung-overlay" @click.self="gewaehlterTyp = null">
+    <!-- Derselbe Dialog-Hintergrund wie überall: er liegt bewusst knapp unter
+         der aufgeklappten Auswahlliste, die an den Seitenkörper gehängt wird.
+         Ein eigener Hintergrund auf höherer Ebene deckte die Liste zu. -->
+    <div v-if="gewaehlterTyp" class="pw-modal-overlay pw-neue-sitzung-overlay" @click.self="gewaehlterTyp = null">
       <div class="pw-neue-sitzung-form pw-neue-sitzung-form-gross">
         <div class="pw-modal-kopf pw-modal-kopf-leer">
           <button type="button" class="button pw-btn-schliessen" aria-label="Dialog schliessen" @click.stop="gewaehlterTyp = null">✕</button>
@@ -335,6 +338,13 @@
                               kategorie="sitzungsnotiz"
                               @geaendert="v => sitzungsnotizen = { ...sitzungsnotizen, [geschaeftIdVon(t)]: v }"
                             />
+                            <Aktionszeitleiste
+                              v-if="(sitzungsnotizen[geschaeftIdVon(t)] || []).some(n => n.geloescht)"
+                              :aktionen="sitzungsnotizen[geschaeftIdVon(t)] || []"
+                              :basis-url="'geschaefte/' + geschaeftIdVon(t)"
+                              :aktuelle-uid="aktuelleUid"
+                              @notiz-wiederhergestellt="v => onSitzungsnotizWiederhergestellt(geschaeftIdVon(t), v)"
+                            />
                           </template>
                           <SitzungNotizen
                             v-else
@@ -446,6 +456,13 @@
                                 kategorie="sitzungsnotiz"
                                 @geaendert="v => sitzungsnotizen = { ...sitzungsnotizen, [geschaeftIdVon(t)]: v }"
                               />
+                              <Aktionszeitleiste
+                                v-if="(sitzungsnotizen[geschaeftIdVon(t)] || []).some(n => n.geloescht)"
+                                :aktionen="sitzungsnotizen[geschaeftIdVon(t)] || []"
+                                :basis-url="'geschaefte/' + geschaeftIdVon(t)"
+                                :aktuelle-uid="aktuelleUid"
+                                @notiz-wiederhergestellt="v => onSitzungsnotizWiederhergestellt(geschaeftIdVon(t), v)"
+                              />
                             </template>
                             <SitzungNotizen
                               v-else
@@ -548,6 +565,13 @@
                           kategorie="sitzungsnotiz"
                           @geaendert="v => sitzungsnotizen = { ...sitzungsnotizen, [geschaeftIdVon(t)]: v }"
                         />
+                        <Aktionszeitleiste
+                          v-if="(sitzungsnotizen[geschaeftIdVon(t)] || []).some(n => n.geloescht)"
+                          :aktionen="sitzungsnotizen[geschaeftIdVon(t)] || []"
+                          :basis-url="'geschaefte/' + geschaeftIdVon(t)"
+                          :aktuelle-uid="aktuelleUid"
+                          @notiz-wiederhergestellt="v => onSitzungsnotizWiederhergestellt(geschaeftIdVon(t), v)"
+                        />
                       </template>
                       <SitzungNotizen
                         v-else
@@ -598,6 +622,7 @@ import { subscribeRealtime } from '../realtime'
 import GeschaeftDetail from './GeschaeftDetail.vue'
 import SitzungNotizen from './SitzungNotizen.vue'
 import NotizenListe from './NotizenListe.vue'
+import Aktionszeitleiste from './Aktionszeitleiste.vue'
 import GeschaeftDokumente from './GeschaeftDokumente.vue'
 import NcActions from '@nextcloud/vue/components/NcActions'
 import NcActionButton from '@nextcloud/vue/components/NcActionButton'
@@ -611,7 +636,7 @@ import PwField from './PwField.vue'
 
 export default {
   name: 'Sitzungsliste',
-  components: { GeschaeftDetail, SitzungNotizen, NotizenListe, GeschaeftDokumente, NcActions, NcActionButton, NcButton, NcCheckboxRadioSwitch, NcLoadingIcon, NcSelect, NcTextField, PwMultiSelect, PwField },
+  components: { GeschaeftDetail, SitzungNotizen, NotizenListe, Aktionszeitleiste, GeschaeftDokumente, NcActions, NcActionButton, NcButton, NcCheckboxRadioSwitch, NcLoadingIcon, NcSelect, NcTextField, PwMultiSelect, PwField },
   props: {
     mitglieder:   { type: Array, default: () => [] },
     fraktionen:   { type: Array, default: () => [] },
@@ -1115,6 +1140,18 @@ export default {
         this.sitzungsnotizen = { ...this.sitzungsnotizen, [gid]: [] }
       }
     },
+    // Eine in der Aktionszeitleiste der Traktandenliste wiederhergestellte
+    // Sitzungsnotiz zurück in die Notizliste übernehmen (geloescht=false).
+    onSitzungsnotizWiederhergestellt(geschaeftId, data) {
+      const gid = Number(geschaeftId || 0)
+      if (gid <= 0 || !data?.id) return
+      const liste = this.sitzungsnotizen[gid] || []
+      const idx = liste.findIndex(a => a.id === data.id)
+      if (idx < 0) return
+      const kopie = [...liste]
+      kopie[idx] = data
+      this.sitzungsnotizen = { ...this.sitzungsnotizen, [gid]: kopie }
+    },
     gefilterteTraktanden(sitzungId) {
       const liste = this.traktanden[sitzungId] || []
       const s = (this.suche || '').trim().toLowerCase()
@@ -1270,15 +1307,8 @@ export default {
 </script>
 
 <style scoped>
-.pw-neue-sitzung-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 9999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
+/* Aussehen und Ebene kommen aus .pw-modal-overlay (style.scss) — hier steht
+   bewusst nichts mehr, damit es genau einen Dialog-Hintergrund gibt. */
 
 .pw-neue-sitzung-form {
   background: var(--color-main-background);

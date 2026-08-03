@@ -1,5 +1,21 @@
 # Changelog
 
+- 2026-07-27 **1.7.32**
+    - Notizen speichern jetzt nur noch bewusst über das Häkchen; Abbrechen (✕) verwirft
+        - Kein automatisches Zwischenspeichern mehr nach fünf Sekunden und kein Speichern beim Verlassen des Feldes — das führte zu unvollständig gespeicherten Notizen und einer unzuverlässigen Versionsgeschichte
+        - Wer eine noch nicht gespeicherte Notiz offen hat und die Seite verlässt (Zurück, anderer Link, Tab schliessen) oder den Dialog schliesst, wird gewarnt
+        - Der Versionsverlauf ist wieder verlässlich: jedes bewusste Speichern legt eine Version an, mehrzeilige Notizen gehen nicht mehr verloren
+    - Gelöschte Notizen erscheinen wieder in der Aktionszeitleiste als «… hat seine Notiz gelöscht» (mit Wiederherstellen für den Verfasser), nicht mehr zwischen den aktiven Notizen
+        - Das gilt auch für Sitzungsnotizen direkt in der Traktandenliste einer Sitzung: gelöscht und wiederhergestellt wird dort über dieselbe Aktionszeitleiste
+    - Das «Votum im Rat» erfasst weiterhin die zuständige Person; für alle anderen erscheint das Feld nur, wenn ein Votum vorliegt (kein leerer, unbrauchbarer Kasten mehr)
+
+- 2026-07-26 **1.7.31**
+    - Eigenes Geschäft anlegen ist vollständiger: das Datum ist auf heute vorbelegt, direkt unter dem Titel steht ein Beschreibungstext (mit Formatierung), der Titel nutzt die ganze Breite
+        - Neu wählbar: eine Kommission (nur aktive, höchstens eine, «keine» ist erlaubt)
+        - Der Typ kommt aus einer Liste, die der Administrator pflegt; der Status wird aus den bereits vorkommenden Werten vorgeschlagen und lässt sich frei überschreiben
+    - Neuer Admin-Bereich «Typen für eigene Geschäfte»: Bezeichnungen hinzufügen und löschen, automatisch gespeichert
+    - Bei einer neuen Sitzung zeigt «Verknüpfen mit» die Auswahl wieder an – die aufgeklappte Liste war bisher hinter dem Dialog verborgen
+
 - 2026-07-24 **1.7.30**
     - Die Aktionszeitleiste gibt es jetzt auch bei den Vorstössen – dieselbe Darstellung wie beim Geschäft
     - Sitzungstypen lassen sich wieder anlegen; das Anlegen mit nur einem Namen schlug bisher fehl, und im Bearbeiten stehen alle Felder zur Verfügung

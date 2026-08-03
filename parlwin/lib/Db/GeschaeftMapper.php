@@ -245,6 +245,33 @@ class GeschaeftMapper extends QBMapper
         $geschaeft->setId($externIdAlsInt);
     }
 
+    /**
+     * Alle tatsächlich vorkommenden Status-Werte, alphabetisch. Grundlage der
+     * Status-Auswahl beim eigenen Geschäft: angeboten wird, was es wirklich
+     * gibt — statt einer erfundenen Liste.
+     *
+     * @return list<string>
+     */
+    public function alleStatusWerte(): array
+    {
+        $qb = $this->db->getQueryBuilder();
+        $qb->selectDistinct('status')
+            ->from($this->getTableName())
+            ->where($qb->expr()->neq('status', $qb->createNamedParameter('')))
+            ->orderBy('status', 'ASC');
+        $result = $qb->executeQuery();
+        $werte = [];
+        while (($zeile = $result->fetch()) !== false) {
+            $status = trim((string) ($zeile['status'] ?? ''));
+            if ($status !== '' && !in_array($status, $werte, true)) {
+                $werte[] = $status;
+            }
+        }
+        $result->closeCursor();
+
+        return $werte;
+    }
+
     private function idExistiert(int $id): bool
     {
         $qb = $this->db->getQueryBuilder();

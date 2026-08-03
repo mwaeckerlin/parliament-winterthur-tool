@@ -68,6 +68,7 @@ const GESCHAEFT_INFO_ZEILEN = [
   'Status',
   'Fraktionsstatus',
   'Datum',
+  'Kommission',
   'Letzte externe Änderung',
   'Letzte Fraktionsentscheidung',
 ]
@@ -80,11 +81,12 @@ const GESCHAEFT_FELDER_NEU = [
 
 /**
  * Geschäft: Bereiche, die an einer bestehenden ID hängen und deshalb erst nach
- * dem Speichern erscheinen.
+ * dem Speichern erscheinen. «Votum im Rat» fehlt hier bewusst: es ist zusätzlich
+ * zuständigen-gebunden (leer nur für die zuständige Person sichtbar) und wird
+ * darum separat geprüft.
  */
 const GESCHAEFT_FELDER_NACH_SPEICHERN = [
   'Beschluss erfassen',
-  'Votum im Rat',
   'Notizen',
   'Dokumente zum Geschäft',
 ]
@@ -310,8 +312,13 @@ test.describe('«+ Neu» öffnet dieselbe vollständige Maske wie die Bearbeitun
     await oeffneAnsicht(page, 'Vorstösse', /Neuer Vorstoss/)
     // Erst zählen, wenn die Liste wirklich geladen ist — sonst wird eine noch
     // leere Liste als Ausgangswert festgehalten und der Vergleich am Ende
-    // schlägt fehl, obwohl nichts angelegt wurde.
+    // schlägt fehl, obwohl nichts angelegt wurde. networkidle allein genügt bei
+    // der WebSocket-Verbindung nicht: auf eine Karte ODER die Leermeldung warten.
     await page.waitForLoadState('networkidle')
+    await Promise.race([
+      page.locator('.pw-data-card').first().waitFor({ state: 'visible', timeout: 30_000 }).catch(() => {}),
+      page.getByText('Keine Vorstösse vorhanden').waitFor({ state: 'visible', timeout: 30_000 }).catch(() => {}),
+    ])
     const vorher = await page.locator('.pw-data-card').count()
 
     await page.getByRole('button', { name: /Neuer Vorstoss/ }).click()
@@ -340,8 +347,13 @@ test.describe('«+ Neu» öffnet dieselbe vollständige Maske wie die Bearbeitun
     await oeffneAnsicht(page, 'Vorstösse', /Neuer Vorstoss/)
     // Erst zählen, wenn die Liste wirklich geladen ist — sonst wird eine noch
     // leere Liste als Ausgangswert festgehalten und der Vergleich am Ende
-    // schlägt fehl, obwohl nichts angelegt wurde.
+    // schlägt fehl, obwohl nichts angelegt wurde. networkidle allein genügt bei
+    // der WebSocket-Verbindung nicht: auf eine Karte ODER die Leermeldung warten.
     await page.waitForLoadState('networkidle')
+    await Promise.race([
+      page.locator('.pw-data-card').first().waitFor({ state: 'visible', timeout: 30_000 }).catch(() => {}),
+      page.getByText('Keine Vorstösse vorhanden').waitFor({ state: 'visible', timeout: 30_000 }).catch(() => {}),
+    ])
     const vorher = await page.locator('.pw-data-card').count()
 
     await page.getByRole('button', { name: /Neuer Vorstoss/ }).click()
@@ -439,10 +451,69 @@ test.describe('«+ Neu» öffnet dieselbe vollständige Maske wie die Bearbeitun
     await expect(detail.locator('.pw-beschluss-input')).toBeVisible()
     await expect(detail.locator('.pw-dokumente')).toBeVisible()
     await expect(detail.getByText('Aktionszeitleiste')).toBeVisible()
+    // «Votum im Rat» ist zuständigen-gebunden: der eben angelegte Datensatz ist
+    // noch niemandem zugewiesen, darum bleibt das leere Feld für die (nicht
+    // zuständige) erfassende Person verborgen. Sein Erscheinen und Bearbeiten für
+    // die zuständige Person prüft der Votum-Test (F26) vollständig.
+    await expect(detail.locator('.pw-votum'), 'Leeres Votum darf der nicht zuständigen Person nicht erscheinen').toHaveCount(0)
     await expect(detail.getByLabel('Titel')).toHaveValue(titel)
 
     // Beim Bearbeiten schliesst wieder das ✕ und es gibt keinen Fuss mehr.
     await expect(modal.locator('.pw-modal-footer')).toHaveCount(0)
+    await page.locator('.pw-modal .pw-btn-schliessen').first().click()
+  })
+
+  test('Eigenes Geschäft: Datum auf heute, Beschreibung unter dem Titel, Titel volle Breite, Kommission wählbar', async ({ page }) => {
+    const titel = `E2E Eigenes Voll ${Date.now()}`
+    const heute = new Date().toISOString().slice(0, 10)
+    await login(page, U1)
+    await oeffneAnsicht(page, 'Geschäfte', /Eigenes Geschäft/)
+    await page.getByRole('button', { name: /Eigenes Geschäft/ }).click()
+
+    const detail = page.locator('.pw-geschaeft-detail')
+    await detail.waitFor({ state: 'visible', timeout: 30_000 })
+
+    // Datum ist auf heute vorbelegt.
+    await expect(detail.getByLabel('Datum')).toHaveValue(heute)
+
+    // Der Beschreibungstext steht direkt unter dem Titel, VOR den öffentlichen
+    // Informationen — als echter Editor bedienbar.
+    const inhalt = detail.locator('.pw-detail-inhalt')
+    await expect(inhalt).toBeVisible()
+    const inhaltBox = await inhalt.boundingBox()
+    const oeffentlichBox = await detail.locator('.pw-oeffentlich').boundingBox()
+    expect(inhaltBox.y, 'Beschreibungstext steht nicht vor den öffentlichen Informationen')
+      .toBeLessThan(oeffentlichBox.y)
+
+    // Der Titel nutzt die ganze Breite der Kopfzeile (Status daneben, nicht darunter).
+    const titelBox = await detail.getByLabel('Titel').boundingBox()
+    const headerBox = await detail.locator('.pw-detail-header').boundingBox()
+    expect(titelBox.width, 'Titel nutzt nicht annähernd die ganze Breite')
+      .toBeGreaterThan(headerBox.width * 0.6)
+
+    // Beschreibungstext füllen (contenteditable), Titel setzen.
+    await inhalt.locator('[contenteditable="true"]').first().click()
+    await page.keyboard.type('Worum es geht')
+    await detail.getByLabel('Titel').fill(titel)
+
+    // Kommission: nur aktive; genau eine wählbar. Erste Option übernehmen — dass
+    // sie anklickbar ist, belegt zugleich, dass die Auswahlliste sichtbar liegt.
+    const kommission = detail.locator('tr', { hasText: 'Kommission' }).locator('.v-select')
+    await ncPick(page, kommission, '')
+    const gewaehlteKommission = (await kommission.locator('.vs__selected').textContent())?.trim()
+    expect(gewaehlteKommission, 'Es wurde keine Kommission übernommen').toBeTruthy()
+
+    // Nach dem Speichern geht dieselbe Maske in die Bearbeitung über und behält
+    // die erfassten Werte (DB-Persistenz von Inhalt/Kommission prüft der
+    // Backend-e2e-Lauf, Status/Datum der Datenfluss-Test).
+    const modal = page.locator('.pw-modal').first()
+    await speichernKnopf(modal).click()
+    await expect(detail.locator('.pw-btn-neue-notiz').first()).toBeVisible({ timeout: 30_000 })
+    await expect(detail.locator('.pw-detail-inhalt')).toContainText('Worum es geht')
+    await expect(detail.locator('tr', { hasText: 'Kommission' }).locator('.vs__selected'))
+      .toContainText(gewaehlteKommission)
+    await expect(detail.getByLabel('Datum')).toHaveValue(heute)
+
     await page.locator('.pw-modal .pw-btn-schliessen').first().click()
   })
 
