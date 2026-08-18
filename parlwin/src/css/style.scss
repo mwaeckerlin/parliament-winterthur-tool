@@ -1979,6 +1979,22 @@
   text-decoration: underline;
 }
 
+/* Link-artiger Knopf für die gegenseitigen Geschäfts-Verweise (eigenes ↔ offizielles). */
+.pw-verweis-knopf {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-primary-element);
+  cursor: pointer;
+  font: inherit;
+  text-align: start;
+  text-decoration: underline;
+}
+
+.pw-verweis-knopf:hover {
+  text-decoration: none;
+}
+
 .pw-member-local-exists {
   color: color-mix(in srgb, var(--color-success, var(--color-primary-element)) 80%, var(--color-main-text));
 }

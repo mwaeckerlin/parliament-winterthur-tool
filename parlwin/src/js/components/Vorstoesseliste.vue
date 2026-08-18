@@ -102,7 +102,7 @@
               <NcSelect :model-value="statusWahl" :options="statusWahlOptionen" :clearable="false" @update:model-value="statusGewaehlt" />
             </PwField>
             <PwField label="Priorität">
-              <NcSelect :model-value="prioritaetWahl" :options="prioritaetOptionen" :clearable="true" placeholder="Nicht gesetzt" @update:model-value="prioritaetGewaehlt" />
+              <PwPrioritaetSelect :model-value="bearbeitung.prioritaet" @update:model-value="prioritaetGewaehlt" />
             </PwField>
           </div>
           <PwField label="Zuständigkeit">
@@ -201,29 +201,13 @@
     </div>
     </Teleport>
 
-    <!-- Verknüpfung mit einem Geschäft -->
-    <Teleport to="body">
-    <div v-if="verknuepfenDialog" class="pw-modal-overlay" @click.self="verknuepfenSchliessen">
-      <div class="pw-modal">
-        <div class="pw-modal-kopf">
-          <h3>Mit Geschäft verknüpfen</h3>
-          <button type="button" class="button pw-btn-schliessen" aria-label="Dialog schliessen" @click.stop="verknuepfenSchliessen">✕</button>
-        </div>
-        <div class="pw-modal-body">
-          <NcTextField v-model="geschaeftSuche" label="Suche" placeholder="Nr. oder Titel" />
-          <small class="pw-hinweis">Ähnlichste zum Vorstoss-Titel zuerst, sonst neueste.</small>
-          <ul class="pw-verknuepfen-liste">
-            <li v-for="g in aehnlicheGeschaefte" :key="g.id">
-              <button type="button" class="button pw-verknuepfen-eintrag" @click="verknuepfen(g)">
-                <strong>{{ g.nummer || '—' }}</strong> <span>{{ g.titel }}</span>
-              </button>
-            </li>
-          </ul>
-          <div v-if="!aehnlicheGeschaefte.length" class="pw-hinweis">Keine Geschäfte gefunden.</div>
-        </div>
-      </div>
-    </div>
-    </Teleport>
+    <!-- Verknüpfung mit einem Geschäft (geteilter Dialog) -->
+    <GeschaeftVerknuepfenDialog
+      v-if="verknuepfenDialog"
+      :titel="bearbeitung?.titel || ''"
+      @verknuepfen="verknuepfen"
+      @schliessen="verknuepfenSchliessen"
+    />
   </section>
 </template>
 
@@ -233,7 +217,7 @@ import axios from '@nextcloud/axios'
 import { showError, showSuccess } from '@nextcloud/dialogs'
 import '@nextcloud/dialogs/style.css'
 import { getCurrentUser } from '@nextcloud/auth'
-import { vollerName, personKey, PRIORITAETEN, kuerze } from '../utils'
+import { vollerName, personKey, kuerze } from '../utils'
 import NcTextField from '@nextcloud/vue/components/NcTextField'
 import NcButton from '@nextcloud/vue/components/NcButton'
 import NcSelect from '@nextcloud/vue/components/NcSelect'
@@ -242,10 +226,12 @@ import NcEmptyContent from '@nextcloud/vue/components/NcEmptyContent'
 import PwField from './PwField.vue'
 import BeschlussWidget from './BeschlussWidget.vue'
 import PwMultiSelect from './PwMultiSelect.vue'
+import PwPrioritaetSelect from './PwPrioritaetSelect.vue'
 import PwWysiwyg from './PwWysiwyg.vue'
 import GeschaeftDokumente from './GeschaeftDokumente.vue'
 import NotizenListe from './NotizenListe.vue'
 import Aktionszeitleiste from './Aktionszeitleiste.vue'
+import GeschaeftVerknuepfenDialog from './GeschaeftVerknuepfenDialog.vue'
 
 const HERKUENFTE = [
   { code: 'eigene', label: 'Eigene' },
@@ -272,7 +258,7 @@ const FREMD_BESCHLUESSE = [
 
 export default {
   name: 'Vorstoesseliste',
-  components: { NcTextField, NcButton, NcSelect, NcLoadingIcon, NcEmptyContent, PwField, BeschlussWidget, PwMultiSelect, PwWysiwyg, GeschaeftDokumente, NotizenListe, Aktionszeitleiste },
+  components: { NcTextField, NcButton, NcSelect, NcLoadingIcon, NcEmptyContent, PwField, BeschlussWidget, PwMultiSelect, PwPrioritaetSelect, PwWysiwyg, GeschaeftDokumente, NotizenListe, Aktionszeitleiste, GeschaeftVerknuepfenDialog },
   props: {
     mitglieder: { type: Array, default: () => [] },
     fraktionen: { type: Array, default: () => [] },
@@ -293,8 +279,6 @@ export default {
       erstellenLaeuft: false,
       eigeneFraktion: String(window.PARLWIN_CONFIG?.fraktion || ''),
       verknuepfenDialog: false,
-      geschaefteListe: [],
-      geschaeftSuche: '',
       HERKUENFTE,
       STATUS,
     }
@@ -331,13 +315,6 @@ export default {
     },
     fremdBeschlussOptionen() {
       return FREMD_BESCHLUESSE.map(b => ({ label: b, value: b }))
-    },
-    prioritaetOptionen() {
-      return PRIORITAETEN
-    },
-    prioritaetWahl() {
-      const p = this.bearbeitung?.prioritaet || ''
-      return PRIORITAETEN.find(o => o.value === p) || null
     },
     fremdBeschlussWert() {
       const b = this.bearbeitung?.beschluss || ''
@@ -389,24 +366,6 @@ export default {
       const unter = this.bearbeitung.herkunft === 'fremde' ? '20_Fremde' : '10_Eigene'
       return `Fraktion/40_Vorstösse/${unter}/V${this.bearbeitung.id}-*`
     },
-    // Geschäfte zur Verknüpfung: nach Titel-Ähnlichkeit zum Vorstoss und Datum
-    // (neueste zuerst) sortiert; optional per Suche eingegrenzt.
-    aehnlicheGeschaefte() {
-      const vorstossTitel = this.bearbeitung?.titel || ''
-      const suche = (this.geschaeftSuche || '').toLowerCase().trim()
-      let liste = this.geschaefteListe.filter(g => !g.geloescht)
-      if (suche) {
-        liste = liste.filter(g =>
-          (g.titel || '').toLowerCase().includes(suche) ||
-          (g.nummer || '').toLowerCase().includes(suche))
-      }
-      return [...liste].sort((a, b) => {
-        const sb = this.titelAehnlichkeit(vorstossTitel, b.titel || '')
-        const sa = this.titelAehnlichkeit(vorstossTitel, a.titel || '')
-        if (sb !== sa) return sb - sa
-        return String(b.datum || '').localeCompare(String(a.datum || ''))
-      })
-    },
     gefiltert() {
       const q = (this.suche || '').toLowerCase().trim()
       const herkunft = this.herkunftOption?.value || ''
@@ -429,23 +388,7 @@ export default {
     vollerName,
     personKey,
     kuerze,
-    // Zahl gemeinsamer (längerer) Titelwörter als einfaches Ähnlichkeitsmass.
-    titelAehnlichkeit(a, b) {
-      const worte = t => new Set((t || '').toLowerCase().split(/\W+/).filter(w => w.length > 2))
-      const wa = worte(a)
-      const wb = worte(b)
-      let gemeinsam = 0
-      wa.forEach(w => { if (wb.has(w)) gemeinsam++ })
-      return gemeinsam
-    },
-    async verknuepfenOeffnen() {
-      this.geschaeftSuche = ''
-      try {
-        const { data } = await axios.get(generateUrl('/apps/parlwin/geschaefte'), { params: { limit: 500 } })
-        this.geschaefteListe = Array.isArray(data) ? data : []
-      } catch (e) {
-        this.geschaefteListe = []
-      }
+    verknuepfenOeffnen() {
       this.verknuepfenDialog = true
     },
     verknuepfenSchliessen() {
@@ -490,8 +433,8 @@ export default {
       return vorstoss.prioritaet || 'mittel'
     },
     // Jede Auswahl speichert SOFORT — wie überall in der App (Konsistenz).
-    prioritaetGewaehlt(option) {
-      this.bearbeitung.prioritaet = option ? option.value : ''
+    prioritaetGewaehlt(wert) {
+      this.bearbeitung.prioritaet = wert || ''
       this.feldSpeichern()
     },
     artGewaehlt(option) {
@@ -672,6 +615,4 @@ export default {
 .pw-data-card-aktionen { display: flex; justify-content: flex-end; margin-block-start: 0.5rem; }
 .pw-von-bis { display: flex; gap: 0.75rem; flex-wrap: wrap; }
 .pw-von-bis > * { flex: 1 1 14rem; }
-.pw-verknuepfen-liste { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.25rem; }
-.pw-verknuepfen-eintrag { inline-size: 100%; text-align: start; justify-content: flex-start; gap: 0.5rem; }
 </style>

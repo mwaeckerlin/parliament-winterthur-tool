@@ -13,6 +13,15 @@ Diese Regeln gelten für JEDE Ansicht und JEDES Element der App — ohne Ausnahm
    Verhalten, an allen Orten. Vor jedem neuen UI-Element zuerst den
    Nextcloud-Standard und ALLE vergleichbaren Stellen der App prüfen und exakt
    übernehmen — Feld für Feld, nie nur die ganze Seite grob.
+   - **Ein Datentyp = EIN Eingabe-Widget, von einer Basis abgeleitet, überall
+     verwendet.** Einzel-Auswahl-Basis ist `PwSelect` (Label-Formatter, Rohwert
+     rein/raus); davon abgeleitet `PwKommissionSelect` (zeigt Kürzel, speichert
+     den vollen Namen), `PwPrioritaetSelect` (kapselt `PRIORITAETEN`),
+     `PwTypSelect`; Datum → `PwDatumInput`; Mehrfach/Personen → `PwMultiSelect`;
+     Auswahl-mit-Freitext → `BeschlussWidget`. **Anzeige-Regeln (z.B. Kürzel)
+     sitzen IM Widget**, nie in der Einbaustelle — sonst «vergisst» eine Stelle
+     sie. Fehlt für einen Datentyp ein Widget, zuerst eines anlegen; NIE roh
+     `NcSelect`/`<input>` inline für einen Datentyp bauen.
 2. **Beim BEARBEITEN speichert jede Eingabe SOFORT.** Dort gibt es keine
    Abbrechen/Speichern-Buttons: Auswahlen speichern beim Wählen, Text beim
    Verlassen des Feldes (Blur), Editor-Inhalte (Votum, Beschreibung) beim
@@ -326,14 +335,47 @@ auch Vorstösse nutzen denselben Code:
   `sitzungsnotiz` aus. Die Spalte `pw_geschaeft_aktionen.objekt_typ`/`geloescht`
   werden per Doctrine (V31/V33) zuverlässig geführt.
 
-### Ähnlichkeitssuche Vorstoss → Geschäft
+### Verknüpfen mit einem Geschäft (Vorstoss→Geschäft UND eigenes→offizielles)
 
-`Vorstoesseliste.vue::aehnlicheGeschaefte` + `titelAehnlichkeit`: nicht
-gelöschte Geschäfte, optional per Suchtext über Titel/Nummer (lowercase
-`includes`) gefiltert, sortiert nach absteigender Ähnlichkeit; bei Gleichstand
-`String(b.datum).localeCompare(a.datum)` (neueste zuerst). Ähnlichkeit =
-Anzahl gemeinsamer Tokens zweier Titel; Tokens = Menge der kleingeschriebenen
-Wörter aus `split(/\W+/)` mit Länge > 2. Kein Fuzzy-/Levenshtein-Mass.
+EIN geteilter Dialog `components/GeschaeftVerknuepfenDialog.vue` (kein
+Copy-Paste): lädt die Geschäfte selbst (`GET /geschaefte?limit=500`), filtert
+nicht gelöschte, optional per Suchtext über Titel/Nummer (lowercase `includes`),
+sortiert nach absteigender Titel-Ähnlichkeit zum Quell-Titel; bei Gleichstand
+`String(b.datum).localeCompare(a.datum)` (neueste zuerst). Props: `titel`
+(Quell-Titel), `ausschlussId` (dieses Geschäft nicht anbieten), `nurOffizielle`
+(nur Parlamentsgeschäfte, keine `eigen:`), `inklusiveErledigt` (lädt mit
+`show_erledigt=1`, damit ein bereits erledigtes offizielles Geschäft auffindbar
+bleibt), `kopf`; Events `verknuepfen(geschaeft)` und `schliessen`. Das
+Ähnlichkeitsmass `titelAehnlichkeit(a, b)` liegt in `utils.js` (Anzahl gemeinsamer
+kleingeschriebener Tokens aus `split(/\W+/)` mit Länge > 2; kein
+Fuzzy-/Levenshtein-Mass) und wird von beiden Aufrufern genutzt.
+
+- **Vorstoss→Geschäft** (`Vorstoesseliste.vue`): `POST /vorstoesse/{id}/verknuepfen`
+  mit `geschaeftId`; der Vorstoss wird `erledigt`, seine Priorität wandert ins
+  Geschäft (`VorstossService::verknuepfen`).
+- **Eigenes→offizielles Geschäft** (`GeschaeftDetail.vue`, nur bei `eigen:` und
+  nicht neu; `nurOffizielle=true`, `inklusiveErledigt=true`,
+  `ausschlussId=geschaeftId`): `POST /geschaefte/{id}/verknuepfen` mit
+  `zielGeschaeftId` → `FraktionsarbeitService::verknuepfe` (dort, weil Notizen,
+  Zuständigkeit und Geschäftsfelder gebündelt sind). Ablauf:
+    - Prüft, dass die Quelle ein `eigen:`-Geschäft ist (sonst 400); setzt am eigenen
+      `verknuepft_geschaeft_id` (Spalte via Migration V35) und `status='erledigt'`.
+    - **Übertrag «sofern beim Ziel leer»**: skalare Felder (`prioritaet`, `typ`,
+      `kommission`, `datum`, `inhalt`) via `UEBERTRAG_FELDER` nur, wenn beim Ziel
+      leer; Zuständigkeit via `zustaendigkeitenSetzen`, nur wenn das Ziel keine
+      aktive hat.
+    - **Notizen**: `GeschaeftAktionMapper::verschiebeNotizen(von, zu)` verschiebt die
+      Notiz-Aktionen (`aktion_typ IN ('notiz','sitzungsnotiz')`, `objekt_typ='geschaeft'`)
+      per `UPDATE geschaeft_id`. `NotizRevision` hängt an der Aktions-ID und wandert
+      dadurch automatisch mit.
+    - Der Controller publiziert `geschaefte.updated` für BEIDE Ids (eigenes + Ziel).
+  Gegenseitige, anklickbare Verlinkung: das Ziel liefert seine verknüpften eigenen
+  Geschäfte über `GET /geschaefte/{id}/verknuepfte-eigene` →
+  `FraktionsarbeitService::verknuepfteEigene` (nutzt `GeschaeftMapper::findByVerknuepft`);
+  das eigene Geschäft trägt in `angereichertesGeschaeft` das Feld `verknuepftGeschaeft`
+  (`{id, nummer, titel}`). `GeschaeftDetail` rendert beide Verweise als
+  `.pw-verweis-knopf` und meldet einen Klick über das Event `oeffneGeschaeft(id)`,
+  das `Geschaeftsliste` mit `oeffneDetail(id)` in derselben Detail-Maske öffnet.
 
 ### Votum-PDF
 

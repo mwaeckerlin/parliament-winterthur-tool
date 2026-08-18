@@ -38,6 +38,11 @@ export const PRIORITAETEN = [
   { value: 'tief', label: 'Tief' },
 ]
 
+// Anzeigetext einer Prioritätsstufe (der EINE Ort für die Wert→Text-Umrechnung).
+export function prioritaetLabel(value) {
+  return (PRIORITAETEN.find(p => p.value === value) || {}).label || ''
+}
+
 // Wendet die konfigurierten Kürzel (Suchtext → Kürzel) auf einen Anzeigetext an.
 // Gilt gleichermassen für Status-, Partei-, Fraktions- und Kommissionsnamen.
 // Längere Suchtexte werden zuerst ersetzt, damit ein kürzerer Eintrag einen
@@ -50,4 +55,16 @@ export function kuerze(text, liste) {
     if (suche && kuerzel) result = result.split(suche).join(kuerzel)
   }
   return result
+}
+
+// Einfaches Titel-Ähnlichkeitsmass: Zahl gemeinsamer Wörter (länger als zwei
+// Zeichen). Wird beim Verknüpfen (Vorstoss→Geschäft, eigenes→offizielles
+// Geschäft) genutzt, um ähnliche Ziele zuoberst vorzuschlagen.
+export function titelAehnlichkeit(a, b) {
+  const worte = t => new Set((t || '').toLowerCase().split(/\W+/).filter(w => w.length > 2))
+  const wa = worte(a)
+  const wb = worte(b)
+  let gemeinsam = 0
+  wa.forEach(w => { if (wb.has(w)) gemeinsam++ })
+  return gemeinsam
 }

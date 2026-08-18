@@ -14,6 +14,8 @@ return [
         ['name' => 'geschaeft#show', 'url' => '/geschaefte/{id}', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
         ['name' => 'geschaeft#update', 'url' => '/geschaefte/{id}', 'verb' => 'PUT'],
         ['name' => 'geschaeft#setPrioritaet', 'url' => '/geschaefte/{id}/prioritaet', 'verb' => 'PUT'],
+        ['name' => 'geschaeft#verknuepfen', 'url' => '/geschaefte/{id}/verknuepfen', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
+        ['name' => 'geschaeft#verknuepfteEigene', 'url' => '/geschaefte/{id}/verknuepfte-eigene', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
         ['name' => 'geschaeft#notizen', 'url' => '/geschaefte/{id}/notizen', 'verb' => 'GET'],
         ['name' => 'geschaeft#addNotiz', 'url' => '/geschaefte/{id}/notizen', 'verb' => 'POST'],
         ['name' => 'geschaeft#updateNotiz', 'url' => '/geschaefte/{id}/notizen/{aktionId}', 'verb' => 'PUT'],

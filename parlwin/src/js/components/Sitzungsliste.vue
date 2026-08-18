@@ -59,7 +59,7 @@
         <!-- Datum -->
         <div class="pw-form-zeile">
           <span class="pw-form-ikon" aria-hidden="true">📅</span>
-          <input v-model="neueSitzungDatum" type="date" class="pw-form-feld pw-form-feld-flex" :min="heuteDatum" />
+          <PwDatumInput :model-value="neueSitzungDatum" class="pw-form-feld pw-form-feld-flex" :min="heuteDatum" @update:model-value="neueSitzungDatum = $event" />
         </div>
 
         <!-- Von / Bis -->
@@ -633,10 +633,11 @@ import NcSelect from '@nextcloud/vue/components/NcSelect'
 import NcTextField from '@nextcloud/vue/components/NcTextField'
 import PwMultiSelect from './PwMultiSelect.vue'
 import PwField from './PwField.vue'
+import PwDatumInput from './PwDatumInput.vue'
 
 export default {
   name: 'Sitzungsliste',
-  components: { GeschaeftDetail, SitzungNotizen, NotizenListe, Aktionszeitleiste, GeschaeftDokumente, NcActions, NcActionButton, NcButton, NcCheckboxRadioSwitch, NcLoadingIcon, NcSelect, NcTextField, PwMultiSelect, PwField },
+  components: { GeschaeftDetail, SitzungNotizen, NotizenListe, Aktionszeitleiste, GeschaeftDokumente, NcActions, NcActionButton, NcButton, NcCheckboxRadioSwitch, NcLoadingIcon, NcSelect, NcTextField, PwMultiSelect, PwField, PwDatumInput },
   props: {
     mitglieder:   { type: Array, default: () => [] },
     fraktionen:   { type: Array, default: () => [] },

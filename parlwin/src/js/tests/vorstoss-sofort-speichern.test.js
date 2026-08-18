@@ -54,7 +54,8 @@ describe('Vorstoesseliste — jede Eingabe speichert sofort', () => {
     expect(axios.put.mock.calls[0][0]).toContain('/apps/parlwin/vorstoesse/7')
     expect(axios.put.mock.calls[0][1].art).toBe('Motion')
 
-    wrapper.vm.prioritaetGewaehlt({ label: 'Hoch', value: 'hoch' })
+    // PwPrioritaetSelect emittiert den Rohwert (String).
+    wrapper.vm.prioritaetGewaehlt('hoch')
     await Promise.resolve()
     expect(axios.put).toHaveBeenCalledTimes(2)
     expect(axios.put.mock.calls[1][1].prioritaet).toBe('hoch')

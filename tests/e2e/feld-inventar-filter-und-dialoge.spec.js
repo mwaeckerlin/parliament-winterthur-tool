@@ -78,7 +78,11 @@ test.describe('Feld-Inventar: Filterbereiche jeder Ansicht', () => {
     await page.fill('#pw-search-slot input', 'zzz-kein-treffer-zzz')
     await expect(page.locator('.pw-tabelle-geschaefte tbody tr')).toHaveCount(0)
     await page.getByRole('button', { name: 'Filter zurücksetzen' }).click()
-    await expect(page.locator('.pw-tabelle-geschaefte tbody tr')).toHaveCount(vorher, { timeout: 30_000 })
+    // Zurücksetzen stellt die (ungefilterte) Liste wieder her. Nicht exakt gegen
+    // «vorher» prüfen: die geteilte Testinstanz kann nebenläufig Geschäfte gewinnen
+    // — es müssen mindestens wieder so viele Zeilen sein wie zuvor.
+    await expect.poll(async () => page.locator('.pw-tabelle-geschaefte tbody tr').count(), { timeout: 30_000 })
+      .toBeGreaterThanOrEqual(vorher)
   })
 
   test('Vorstösse: Herkunft- und Status-Filter vorhanden und wirksam', async ({ page }) => {

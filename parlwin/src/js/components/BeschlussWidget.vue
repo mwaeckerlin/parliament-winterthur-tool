@@ -64,11 +64,11 @@ export default {
       const text = event.target.value
       this.localText = text
       if (this.timer) clearTimeout(this.timer)
-      if (!text.trim()) {
-        this.timer = null
-        this.$emit('update:modelValue', null)
-        return
-      }
+      // Auch der leere Zwischenzustand wird verzögert (nicht sofort als null
+      // gespeichert): Beim Umwählen über die Datalist ist das Feld kurz leer,
+      // bevor der neue Wert einrastet — ein sofortiges null-Emit würde einen
+      // Zwischenstand «→ —» speichern und einen zweiten Zeitleisten-Eintrag
+      // erzeugen. Blur/Change (echter Abschluss) speichern weiterhin sofort.
       this.timer = setTimeout(() => {
         this.timer = null
         this.emitValue(text)

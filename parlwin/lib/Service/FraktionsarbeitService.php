@@ -151,6 +151,23 @@ class FraktionsarbeitService
         $daten['fraktionssitzung'] = $this->fraktionssitzungKontext();
         $this->fuelleFraktionsstatus($daten, $geschaeft, $letzterBeschluss);
 
+        // Quell-Seite der Verknüpfung: zeigt das eigene Geschäft, mit welchem
+        // offiziellen Geschäft (Nr. + Titel) es verknüpft und abgeschlossen wurde.
+        $verknuepftId = (int) $geschaeft->getVerknuepftGeschaeftId();
+        $daten['verknuepftGeschaeft'] = null;
+        if ($verknuepftId > 0) {
+            try {
+                $ziel = $this->geschaeftMapper->find($verknuepftId);
+                $daten['verknuepftGeschaeft'] = [
+                    'id' => (int) $ziel->getId(),
+                    'nummer' => $ziel->getNummer(),
+                    'titel' => $ziel->getTitel(),
+                ];
+            } catch (DoesNotExistException) {
+                $daten['verknuepftGeschaeft'] = null;
+            }
+        }
+
         return $daten;
     }
 
@@ -175,6 +192,94 @@ class FraktionsarbeitService
     public function notizen(int $geschaeftId, string $kategorie = 'notiz'): array
     {
         return $this->notizService->liste(self::OBJEKT_TYP, $geschaeftId, self::pruefeKategorie($kategorie));
+    }
+
+    /**
+     * Die mit einem offiziellen Geschäft verknüpften eigenen Geschäfte, angereichert
+     * mit ihren Aktionen (Notizen) — das Gegenstück zu «Verknüpfte Vorstösse»: das
+     * offizielle Geschäft zeigt so die eigenen Geschäfte samt deren Notizen.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function verknuepfteEigene(int $zielId): array
+    {
+        return array_map(function (Geschaeft $g): array {
+            $daten = $g->jsonSerialize();
+            $aktionen = $this->aktionMapper->findByGeschaeft((int) $g->getId());
+            $daten['aktionen'] = array_map(fn(GeschaeftAktion $a): array => $this->mapAktion($a), $aktionen);
+            return $daten;
+        }, $this->geschaeftMapper->findByVerknuepft($zielId));
+    }
+
+    /** Skalare Angaben, die von einem eigenen ins offizielle Geschäft wandern, sofern dort leer. */
+    private const UEBERTRAG_FELDER = [
+        ['getPrioritaet', 'setPrioritaet'],
+        ['getTyp', 'setTyp'],
+        ['getKommission', 'setKommission'],
+        ['getDatum', 'setDatum'],
+        ['getInhalt', 'setInhalt'],
+    ];
+
+    /**
+     * Verknüpft ein selbst angelegtes Geschäft mit einem offiziellen Parlaments-
+     * geschäft (wie Vorstoss→Geschäft): das eigene Geschäft wird als «erledigt»
+     * abgeschlossen und verweist auf das offizielle; die beiden bleiben gegenseitig
+     * verlinkt (beidseitig anklickbar). Notizen und alle weiteren Angaben
+     * (Priorität, Typ, Kommission, Datum, Inhalt, Zuständigkeit) wandern ins
+     * offizielle Geschäft, sofern sie dort noch nicht gesetzt sind.
+     *
+     * @return array<string, mixed> Das abgeschlossene eigene Geschäft, angereichert.
+     */
+    public function verknuepfe(int $eigenesId, int $zielId): array
+    {
+        $eigenes = $this->geschaeftMapper->find($eigenesId);
+        if (!str_starts_with($eigenes->getExternId(), 'eigen:')) {
+            throw new \InvalidArgumentException('Nur selbst angelegte Geschäfte können mit einem offiziellen Geschäft verknüpft werden');
+        }
+        if ($zielId <= 0 || $zielId === $eigenesId) {
+            throw new \InvalidArgumentException('Ungültiges Zielgeschäft');
+        }
+        $ziel = $this->geschaeftMapper->find($zielId);
+        $jetzt = (new \DateTime())->format('Y-m-d H:i:s');
+
+        // Skalare Angaben übertragen, sofern beim offiziellen Geschäft noch leer.
+        $zielGeaendert = false;
+        foreach (self::UEBERTRAG_FELDER as [$get, $set]) {
+            if (trim((string) $ziel->$get()) === '' && trim((string) $eigenes->$get()) !== '') {
+                $ziel->$set($eigenes->$get());
+                $zielGeaendert = true;
+            }
+        }
+        if ($zielGeaendert) {
+            $ziel->setAktualisiertAm($jetzt);
+            $this->geschaeftMapper->update($ziel);
+        }
+
+        // Zuständigkeit übertragen, sofern das offizielle Geschäft keine aktive hat.
+        if ($this->zustaendigkeitMapper->findAktiveByGeschaeft($zielId) === []) {
+            $personen = [];
+            $haupt = '';
+            foreach ($this->zustaendigkeitMapper->findAktiveByGeschaeft($eigenesId) as $z) {
+                $personen[] = ['mitgliedExternId' => $z->getMitgliedExternId(), 'personName' => $z->getPersonName()];
+                if ($z->getIstHaupt()) {
+                    $haupt = $z->getPersonKey();
+                }
+            }
+            if ($personen !== []) {
+                $this->zustaendigkeitenSetzen($zielId, $personen, $haupt);
+            }
+        }
+
+        // Notizen ans offizielle Geschäft übertragen (verschieben).
+        $this->aktionMapper->verschiebeNotizen($eigenesId, $zielId);
+
+        // Verknüpfen und das eigene Geschäft abschliessen.
+        $eigenes->setVerknuepftGeschaeftId($zielId);
+        $eigenes->setStatus('erledigt');
+        $eigenes->setAktualisiertAm($jetzt);
+        $this->geschaeftMapper->update($eigenes);
+
+        return $this->angereichertesGeschaeft($eigenesId);
     }
 
     /**

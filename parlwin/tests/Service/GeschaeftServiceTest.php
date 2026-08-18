@@ -384,4 +384,5 @@ class GeschaeftServiceTest extends TestCase {
 
         $this->assertSame($expected, $service->alle(25, 10, true));
     }
+
 }

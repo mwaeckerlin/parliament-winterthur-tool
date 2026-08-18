@@ -63,6 +63,35 @@ describe('BeschlussWidget — Auswahl aus Liste', () => {
   })
 })
 
+// ── Ein Wechsel = ein Update (kein zwischenzeitliches Leeren) ─────────────────
+// Bug: Ein Statuswechsel erzeugte ZWEI Zeitleisten-Events («Pendent» → «—» und
+// «—» → neuer Wert). Ursache: die Datalist-Neuauswahl leert das Feld kurz, und
+// der Leerzustand emittierte SOFORT null — das speicherte einen Zwischenstand.
+describe('BeschlussWidget — ein Wechsel erzeugt kein Zwischen-null', () => {
+  it('ein kurzer Leerzustand vor der Neuauswahl emittiert kein zwischenzeitliches null', async () => {
+    const wrapper = mount({ modelValue: OPTIONS[0] })
+    const input = wrapper.find('input')
+    input.element.value = ''
+    await input.trigger('input')
+    input.element.value = 'Ablehnung'
+    await input.trigger('change')
+    // Genau EIN Update — auf den neuen Wert, ohne zwischenzeitliches null.
+    expect(wrapper.emitted('update:modelValue')).toEqual([[OPTIONS[1]]])
+  })
+
+  it('gilt auch für Freitext-Werte (Screenshot-Fall): ein Wechsel = genau ein Update', async () => {
+    const wrapper = mount({ modelValue: { label: 'Pendent', value: '', freitext: true } })
+    const input = wrapper.find('input')
+    input.element.value = ''
+    await input.trigger('input')
+    input.element.value = 'Bei der Aufsichtskommission pendent'
+    await input.trigger('blur')
+    const updates = wrapper.emitted('update:modelValue') || []
+    expect(updates.length).toBe(1)
+    expect(updates[0][0]).toMatchObject({ label: 'Bei der Aufsichtskommission pendent', freitext: true })
+  })
+})
+
 // ── Autosave bei Blur ─────────────────────────────────────────────────────────
 
 describe('BeschlussWidget — Blur speichert', () => {

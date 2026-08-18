@@ -167,6 +167,43 @@ class GeschaeftController extends Controller
     }
 
     /**
+     * Verknüpft ein selbst angelegtes Geschäft mit einem offiziellen
+     * Parlamentsgeschäft und schliesst es damit als «erledigt» ab; die Priorität
+     * wird ins offizielle Geschäft übernommen — analog zu Vorstoss→Geschäft.
+     */
+    #[NoAdminRequired]
+    public function verknuepfen(int $id): DataResponse
+    {
+        $zielId = (int) $this->request->getParam('zielGeschaeftId', 0);
+        if ($zielId <= 0) {
+            return new DataResponse(['fehler' => 'Zielgeschäft fehlt'], Http::STATUS_BAD_REQUEST);
+        }
+        try {
+            $geschaeft = $this->fraktionsarbeitService->verknuepfe($id, $zielId);
+        } catch (\OCP\AppFramework\Db\DoesNotExistException) {
+            return new DataResponse(['fehler' => 'Geschäft nicht gefunden'], Http::STATUS_NOT_FOUND);
+        } catch (\InvalidArgumentException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+        }
+        // Beide Seiten haben sich geändert: das eigene (abgeschlossen/verlinkt) UND
+        // das offizielle (übertragene Notizen/Angaben, neue Verknüpfung).
+        $this->realtimePublisher->publish('geschaefte.updated', ['id' => $id, 'grund' => 'verknuepft']);
+        $this->realtimePublisher->publish('geschaefte.updated', ['id' => $zielId, 'grund' => 'verknuepft']);
+        return new DataResponse($geschaeft);
+    }
+
+    /**
+     * Die mit diesem offiziellen Geschäft verknüpften eigenen Geschäfte (samt ihren
+     * Notizen) — Gegenstück zu «Verknüpfte Vorstösse»: das offizielle Geschäft zeigt
+     * so die eigenen Geschäfte, die auf es verlinkt wurden.
+     */
+    #[NoAdminRequired]
+    public function verknuepfteEigene(int $id): DataResponse
+    {
+        return new DataResponse($this->fraktionsarbeitService->verknuepfteEigene($id));
+    }
+
+    /**
      * Notiz-Kategorie aus dem Request (Standard «notiz»). «sitzungsnotiz» sind
      * am Geschäft haftende, in einer Sitzung erfasste Notizen.
      */

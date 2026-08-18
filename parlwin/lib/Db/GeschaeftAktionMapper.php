@@ -65,6 +65,25 @@ class GeschaeftAktionMapper extends QBMapper
     }
 
     /**
+     * Verschiebt alle Notizen (reguläre und Sitzungsnotizen) eines Geschäfts an ein
+     * anderes — bei der Verknüpfung eigenes→offizielles wandern die Notizen mit.
+     * Die Notiz-Versionen (NotizRevision) hängen an der Aktions-ID und wandern
+     * dadurch automatisch mit.
+     *
+     * @return int Anzahl verschobener Notizen
+     */
+    public function verschiebeNotizen(int $vonGeschaeftId, int $zuGeschaeftId): int
+    {
+        $qb = $this->db->getQueryBuilder();
+        $qb->update($this->getTableName())
+            ->set('geschaeft_id', $qb->createNamedParameter($zuGeschaeftId, IQueryBuilder::PARAM_INT))
+            ->where($qb->expr()->eq('geschaeft_id', $qb->createNamedParameter($vonGeschaeftId, IQueryBuilder::PARAM_INT)))
+            ->andWhere($qb->expr()->eq('objekt_typ', $qb->createNamedParameter('geschaeft')))
+            ->andWhere($qb->expr()->in('aktion_typ', $qb->createNamedParameter(['notiz', 'sitzungsnotiz'], IQueryBuilder::PARAM_STR_ARRAY)));
+        return $qb->executeStatement();
+    }
+
+    /**
      * Alle Notiz-Aktionen (aktiv und gelöscht) eines Objekts — neueste zuerst,
      * identisch zur Reihenfolge von findByGeschaeft. Für den geteilten
      * NotizService (Geschäft wie Vorstoss).

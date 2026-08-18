@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import Geschaeftsliste from '../components/Geschaeftsliste.vue'
+import PwPrioritaetSelect from '../components/PwPrioritaetSelect.vue'
 import axios from '@nextcloud/axios'
 
 const stylePath = resolve(dirname(fileURLToPath(import.meta.url)), '../../css/style.scss')
@@ -69,11 +70,21 @@ describe('Geschaeftsliste — Priorität', () => {
     expect(gerufen.body).toEqual({ prioritaet: 'hoch' })
   })
 
-  it('zeigt bei nicht gesetzter Priorität KEINE Auswahl (Default undefiniert, nicht «Mittel»)', () => {
+  it('bindet die Prioritätsauswahl an den ROHWERT (nicht «Mittel»): nicht gesetzt bleibt leer', async () => {
     const wrapper = shallowMount(Geschaeftsliste, { props: { mitglieder: [] } })
-    expect(wrapper.vm.prioritaetOptionFuer({ prioritaet: '' })).toBeNull()
-    expect(wrapper.vm.prioritaetOptionFuer({})).toBeNull()
-    expect(wrapper.vm.prioritaetOptionFuer({ prioritaet: 'hoch' })).toEqual({ value: 'hoch', label: 'Hoch' })
+    axios.get.mockResolvedValue({ data: [
+      { id: 1, status: 'Pendent', prioritaet: '' },
+      { id: 2, status: 'Pendent', prioritaet: 'hoch' },
+    ] })
+    await wrapper.vm.ladeGeschaefte()
+    await wrapper.vm.$nextTick()
+    // Das geteilte PwPrioritaetSelect bekommt den Rohwert; «nicht gesetzt» bleibt
+    // leer (das Widget zeigt dann keine Auswahl), es wird kein «mittel» erfunden.
+    const werte = wrapper.findAllComponents(PwPrioritaetSelect).map(s => s.props('modelValue'))
+    expect(werte.length).toBeGreaterThan(0)
+    expect(werte).toContain('')
+    expect(werte).toContain('hoch')
+    expect(werte).not.toContain('mittel')
   })
 
   it('definiert die Prioritäts-Stile (Hervorhebung hoch, Abschwächung tief)', () => {

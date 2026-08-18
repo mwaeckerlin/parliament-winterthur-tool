@@ -46,12 +46,10 @@
               <th>Typ</th>
               <td>
                 <!-- Die Typen für eigene Geschäfte pflegt die Administration. -->
-                <NcSelect
+                <PwTypSelect
                   v-if="istEigenes"
-                  :model-value="geschaeft.typ || null"
+                  :model-value="geschaeft.typ"
                   :options="typOptionen"
-                  :clearable="false"
-                  placeholder="Typ wählen …"
                   aria-label="Typ"
                   @update:model-value="typGewaehlt"
                 />
@@ -80,13 +78,12 @@
             <tr>
               <th>Datum</th>
               <td>
-                <input
+                <PwDatumInput
                   v-if="istEigenes"
-                  v-model="geschaeft.datum"
-                  type="date"
+                  :model-value="geschaeft.datum"
                   class="pw-input"
                   aria-label="Datum"
-                  @change="stammdatenSpeichern"
+                  @update:model-value="datumGeaendert"
                 />
                 <template v-else>{{ formatieredatum(geschaeft.datum) }}</template>
               </td>
@@ -94,12 +91,11 @@
             <tr v-if="istEigenes">
               <th>Kommission</th>
               <td>
-                <!-- Höchstens eine Kommission; keine ist ebenfalls gültig. -->
-                <NcSelect
-                  :model-value="geschaeft.kommission || null"
+                <!-- Höchstens eine Kommission; keine ist ebenfalls gültig.
+                     Gekürzte Anzeige, voller Name gespeichert (PwKommissionSelect). -->
+                <PwKommissionSelect
+                  :model-value="geschaeft.kommission"
                   :options="kommissionsOptionen"
-                  :clearable="true"
-                  placeholder="—"
                   aria-label="Kommission"
                   @update:model-value="kommissionGewaehlt"
                 />
@@ -134,11 +130,8 @@
 
         <div class="pw-form-zeile">
           <label>Priorität</label>
-          <NcSelect
-            :model-value="prioritaetWahl"
-            :options="prioritaetOptionen"
-            :clearable="true"
-            placeholder="—"
+          <PwPrioritaetSelect
+            :model-value="geschaeft.prioritaet"
             @update:model-value="prioritaetGewaehlt"
           />
         </div>
@@ -157,6 +150,20 @@
           <small class="pw-hinweis">
             Falls mehrere Personen ausgewählt sind, wird die erste Auswahl intern als Hauptzuständigkeit geführt.
           </small>
+        </div>
+
+        <!-- Ein eigenes Geschäft lässt sich mit dem offiziellen Parlaments-
+             geschäft verknüpfen (wie Vorstoss→Geschäft): es wird dadurch als
+             erledigt abgeschlossen, die Priorität wandert ins offizielle Geschäft. -->
+        <div v-if="istEigenes && !istNeu" class="pw-form-zeile">
+          <label>Offizielles Geschäft</label>
+          <div v-if="geschaeft.verknuepftGeschaeftId && geschaeft.verknuepftGeschaeft" class="pw-hinweis">
+            Mit dem offiziellen Geschäft
+            <button type="button" class="pw-verweis-knopf" @click="$emit('oeffneGeschaeft', geschaeft.verknuepftGeschaeft.id)"><strong>{{ geschaeft.verknuepftGeschaeft.nummer || '—' }}</strong> «{{ geschaeft.verknuepftGeschaeft.titel }}»</button>
+            verknüpft und abgeschlossen.
+          </div>
+          <div v-else-if="geschaeft.verknuepftGeschaeftId" class="pw-hinweis">Mit einem offiziellen Geschäft verknüpft und abgeschlossen.</div>
+          <NcButton v-else type="secondary" @click="verknuepfenOeffnen">Mit offiziellem Geschäft verknüpfen</NcButton>
         </div>
 
         <!-- Beschluss, Votum, Notizen, Dokumente und Verlauf hängen an einer
@@ -257,9 +264,20 @@
         @notiz-wiederhergestellt="onNotizWiederhergestellt"
       />
 
+      <GeschaeftVerknuepfenDialog
+        v-if="verknuepfenDialog"
+        :titel="geschaeft.titel || ''"
+        :ausschluss-id="geschaeftId"
+        :nur-offizielle="true"
+        :inklusive-erledigt="true"
+        kopf="Mit offiziellem Geschäft verknüpfen"
+        @verknuepfen="verknuepfen"
+        @schliessen="verknuepfenDialog = false"
+      />
+
       <div v-if="verknuepfteVorstoesse.length" class="pw-detail-abschnitt">
         <h4>Verknüpfte Vorstösse</h4>
-        <div v-for="v in verknuepfteVorstoesse" :key="v.id" class="pw-verknuepfter-vorstoss">
+        <div v-for="v in verknuepfteVorstoesse" :key="v.id" class="pw-verknuepfter-eintrag">
           <h5>{{ v.titel }}<span v-if="v.art"> · {{ v.art }}</span></h5>
           <div class="pw-data-card-grid">
             <div v-if="v.beschluss" class="pw-data-pair"><span>Haltung</span><strong>{{ v.beschluss }}</strong></div>
@@ -272,6 +290,19 @@
         </div>
       </div>
 
+      <!-- Gegenstück zu «Verknüpfte Vorstösse»: die eigenen Geschäfte, die auf
+           dieses offizielle Geschäft verlinkt wurden. Ihre Notizen und Angaben sind
+           beim Verknüpfen hierher gewandert; der Titel ist anklickbar (hin und her). -->
+      <div v-if="verknuepfteEigene.length" class="pw-detail-abschnitt">
+        <h4>Verknüpfte eigene Geschäfte</h4>
+        <div v-for="e in verknuepfteEigene" :key="e.id" class="pw-verknuepfter-eintrag">
+          <h5><button type="button" class="pw-verweis-knopf" @click="$emit('oeffneGeschaeft', e.id)">{{ e.titel }}</button></h5>
+          <div class="pw-data-card-grid">
+            <div v-if="prioritaetLabel(e.prioritaet)" class="pw-data-pair"><span>Priorität</span><strong>{{ prioritaetLabel(e.prioritaet) }}</strong></div>
+          </div>
+        </div>
+      </div>
+
     </template>
   </div>
 </template>
@@ -280,27 +311,31 @@
 import { generateUrl } from '@nextcloud/router'
 import { getCurrentUser } from '@nextcloud/auth'
 import { showSuccess, showError } from '@nextcloud/dialogs'
-import { vollerName, personKey, markdownZuHtml, PRIORITAETEN, kuerze } from '../utils'
+import { vollerName, personKey, markdownZuHtml, kuerze, prioritaetLabel } from '../utils'
 import axios from '@nextcloud/axios'
-import NcSelect from '@nextcloud/vue/components/NcSelect'
 import NcButton from '@nextcloud/vue/components/NcButton'
+import PwPrioritaetSelect from './PwPrioritaetSelect.vue'
+import PwKommissionSelect from './PwKommissionSelect.vue'
+import PwTypSelect from './PwTypSelect.vue'
+import PwDatumInput from './PwDatumInput.vue'
 import PwWysiwyg from './PwWysiwyg.vue'
 import PwMultiSelect from './PwMultiSelect.vue'
 import GeschaeftDokumente from './GeschaeftDokumente.vue'
 import BeschlussWidget from './BeschlussWidget.vue'
 import NotizenListe from './NotizenListe.vue'
 import Aktionszeitleiste from './Aktionszeitleiste.vue'
+import GeschaeftVerknuepfenDialog from './GeschaeftVerknuepfenDialog.vue'
 import { subscribeRealtime } from '../realtime'
 
 export default {
   name: 'GeschaeftDetail',
-  components: { NcSelect, NcButton, PwWysiwyg, PwMultiSelect, GeschaeftDokumente, BeschlussWidget, NotizenListe, Aktionszeitleiste },
+  components: { NcButton, PwWysiwyg, PwMultiSelect, PwPrioritaetSelect, PwKommissionSelect, PwTypSelect, PwDatumInput, GeschaeftDokumente, BeschlussWidget, NotizenListe, Aktionszeitleiste, GeschaeftVerknuepfenDialog },
   props: {
     geschaeftId: { type: Number, required: true },
     mitglieder: { type: Array, default: () => [] },
     traktandumKontext: { type: Object, default: null },
   },
-  emits: ['gespeichert', 'oeffneTraktandum', 'erstellt', 'abbrechen'],
+  emits: ['gespeichert', 'oeffneTraktandum', 'erstellt', 'abbrechen', 'oeffneGeschaeft'],
   data() {
     return {
       laden: false,
@@ -309,6 +344,8 @@ export default {
       beschlussAktionId: null,
       // Läuft, während ein neu erfasstes Geschäft angelegt wird.
       speichernLaeuft: false,
+      // Dialog «Mit offiziellem Geschäft verknüpfen» (nur eigene Geschäfte).
+      verknuepfenDialog: false,
       beschlussZuletztGespeichert: null,
       votumHtml: '',
       votumAktionId: null,
@@ -319,6 +356,7 @@ export default {
       hauptPersonKey: '',
       unsubRealtime: null,
       verknuepfteVorstoesse: [],
+      verknuepfteEigene: [],
       // Auswahlwerte der Stammdaten: Typen pflegt der Administrator, die
       // Status-Werte stammen aus den vorhandenen Geschäften, die Kommissionen
       // aus der Synchronisation.
@@ -354,9 +392,6 @@ export default {
     istEigenes() {
       return String(this.geschaeft?.externId || '').startsWith('eigen:')
     },
-    prioritaetOptionen() {
-      return PRIORITAETEN
-    },
     // Zur Auswahl stehen nur aktive Kommissionen — eine aufgelöste Kommission
     // bekommt kein neues Geschäft mehr.
     kommissionsOptionen() {
@@ -365,10 +400,6 @@ export default {
     // Das Beschluss-Widget erwartet Paare aus Beschriftung und Wert.
     statusWidgetOptionen() {
       return (this.statusOptionen || []).map(s => ({ label: s, value: s }))
-    },
-    prioritaetWahl() {
-      const p = this.geschaeft?.prioritaet || ''
-      return PRIORITAETEN.find(o => o.value === p) || null
     },
     aktiveMitglieder() {
       // Nur Fraktionsmitglieder, die auch als Nextcloud-User registriert sind,
@@ -427,12 +458,19 @@ export default {
     // dieses Geschäft zuständig ist. Der Server weist andere ohnehin ab; hier
     // bleibt das Feld für sie sichtbar, aber schreibgeschützt.
     votumSchreibbar() {
+      const key = this.eigenerPersonKey
+      return !!key && this.ausgewaehltePersonKeys.includes(key)
+    },
+    // Der personKey des angemeldeten Nutzers, sofern er ein Fraktionsmitglied mit
+    // Nextcloud-Konto ist. Eine Stelle für «der Erzeuger ist per Default zuständig»
+    // UND für das Votum-Schreibrecht (keine Doppel-Logik).
+    eigenerPersonKey() {
       const uid = (getCurrentUser()?.uid || '').toLowerCase()
-      if (!uid) return false
+      if (!uid) return ''
       const ich = this.mitglieder.find(
         (m) => ((m.nextcloudUid || m.nextcloud_uid || '').toLowerCase()) === uid,
       )
-      return !!ich && this.ausgewaehltePersonKeys.includes(personKey(ich))
+      return ich ? personKey(ich) : ''
     },
     votumHatInhalt() {
       const t = (this.votumHtml || '').replace(/<[^>]*>/g, '').trim()
@@ -487,6 +525,35 @@ export default {
       this.geschaeft.kommission = wahl || ''
       this.stammdatenSpeichern()
     },
+    datumGeaendert(wert) {
+      if (!this.geschaeft) return
+      this.geschaeft.datum = wert || ''
+      this.stammdatenSpeichern()
+    },
+    verknuepfenOeffnen() {
+      this.verknuepfenDialog = true
+    },
+    // Verknüpft das eigene Geschäft mit einem offiziellen (wie Vorstoss→Geschäft):
+    // es wird als erledigt abgeschlossen, die Priorität wandert ins offizielle.
+    async verknuepfen(ziel) {
+      if (!this.geschaeftId || !ziel?.id) return
+      try {
+        const { data } = await axios.post(
+          generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}/verknuepfen`),
+          { zielGeschaeftId: ziel.id }
+        )
+        if (this.geschaeft) {
+          this.geschaeft.verknuepftGeschaeftId = data.verknuepftGeschaeftId || ziel.id
+          this.geschaeft.verknuepftGeschaeft = { id: ziel.id, nummer: ziel.nummer || '', titel: ziel.titel || '' }
+          this.geschaeft.status = data.status || 'erledigt'
+        }
+        this.verknuepfenDialog = false
+        showSuccess('Mit dem offiziellen Geschäft verknüpft')
+        this.$emit('gespeichert')
+      } catch (e) {
+        showError('Verknüpfung fehlgeschlagen: ' + (e?.response?.data?.fehler || e?.message || ''))
+      }
+    },
     statusGeaendert(wert) {
       if (!this.geschaeft) return
       this.geschaeft.status = wert || ''
@@ -519,8 +586,16 @@ export default {
           kommission: this.geschaeft.kommission || '',
           datum: this.geschaeft.datum || '',
         })
+        const neueId = data?.id || 0
+        // Die vorausgewählte Zuständigkeit (per Default der Erzeuger) am neu
+        // angelegten Geschäft festhalten — gleiche Payload-Bildung wie sonst.
+        if (neueId && this.ausgewaehltePersonKeys.length) {
+          try {
+            await axios.put(generateUrl(`/apps/parlwin/geschaefte/${neueId}`), this._zustaendigkeitenBody())
+          } catch (e) { /* Zuständigkeit ist nachträglich änderbar — nicht blockieren */ }
+        }
         showSuccess('Gespeichert')
-        this.$emit('erstellt', data?.id || 0)
+        this.$emit('erstellt', neueId)
       } catch (e) {
         showError('Geschäft konnte nicht erstellt werden: ' + (e?.response?.data?.fehler || e?.message || ''))
       } finally {
@@ -577,8 +652,11 @@ export default {
           aktionen: [],
           zustaendigkeiten: [],
         }
-        this.ausgewaehltePersonKeys = []
-        this.hauptPersonKey = ''
+        // Der Erzeuger ist per Default zuständig: als Vorauswahl sichtbar und
+        // beim Speichern übernommen; vor dem Speichern noch änderbar.
+        const eigen = this.eigenerPersonKey
+        this.ausgewaehltePersonKeys = eigen ? [eigen] : []
+        this.hauptPersonKey = eigen || ''
         this.laden = false
         return
       }
@@ -587,6 +665,7 @@ export default {
         const { data } = await axios.get(generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}`))
         this.geschaeft = data
         this.ladeVerknuepfteVorstoesse()
+        this.ladeVerknuepfteEigene()
 
         const zustaendigkeiten = data.zustaendigkeiten || []
         this.ausgewaehltePersonKeys = zustaendigkeiten.map(z => z.personKey)
@@ -624,6 +703,15 @@ export default {
         this.verknuepfteVorstoesse = []
       }
     },
+    async ladeVerknuepfteEigene() {
+      try {
+        const { data } = await axios.get(generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}/verknuepfte-eigene`))
+        this.verknuepfteEigene = Array.isArray(data) ? data : []
+      } catch (e) {
+        this.verknuepfteEigene = []
+      }
+    },
+    prioritaetLabel,
     vorstossZustaendigkeit(vorstoss) {
       const liste = Array.isArray(vorstoss.zustaendigkeit) ? vorstoss.zustaendigkeit : []
       return liste.map(z => z.name).filter(Boolean).join(', ')
@@ -707,8 +795,8 @@ export default {
       if (idx >= 0) aktionen.splice(idx, 1)
     },
     // Priorität speichert wie alle Eingaben sofort; leer = nicht gesetzt.
-    async prioritaetGewaehlt(option) {
-      const prioritaet = option ? option.value : ''
+    async prioritaetGewaehlt(wert) {
+      const prioritaet = wert || ''
       try {
         await axios.put(generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}/prioritaet`), { prioritaet })
         if (this.geschaeft) this.geschaeft.prioritaet = prioritaet
@@ -718,20 +806,22 @@ export default {
         showError('Priorität konnte nicht gespeichert werden: ' + (e?.response?.data?.fehler || e?.message || ''))
       }
     },
+    // Baut den Zuständigkeits-Payload aus der aktuellen Auswahl. Eine Stelle,
+    // gemeinsam genutzt von der Sofort-Speicherung und der Neuanlage.
+    _zustaendigkeitenBody() {
+      this.synchronisiereHauptPersonKey()
+      const zustaendigkeiten = this.ausgewaehltePersonKeys.map(key => {
+        const member = this.mitglieder.find(m => this.personKey(m) === key)
+        return {
+          mitgliedExternId: member?.externId || member?.extern_id || '',
+          personName: member ? this.vollerName(member) : this.personLabelByKey(key),
+        }
+      })
+      return { zustaendigkeiten, haupt_person_key: this.hauptPersonKey }
+    },
     async speichereZustaendigkeiten() {
       try {
-        this.synchronisiereHauptPersonKey()
-        const zustaendigkeiten = this.ausgewaehltePersonKeys.map(key => {
-          const member = this.mitglieder.find(m => this.personKey(m) === key)
-          return {
-            mitgliedExternId: member?.externId || member?.extern_id || '',
-            personName: member ? this.vollerName(member) : this.personLabelByKey(key),
-          }
-        })
-        const { data } = await axios.put(generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}`), {
-          zustaendigkeiten,
-          haupt_person_key: this.hauptPersonKey,
-        })
+        const { data } = await axios.put(generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}`), this._zustaendigkeitenBody())
         if (this.geschaeft && Array.isArray(data?.zustaendigkeiten)) {
           this.geschaeft.zustaendigkeiten = data.zustaendigkeiten
         }

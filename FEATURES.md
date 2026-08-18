@@ -116,6 +116,39 @@ Nummern werden einmal vergeben und nie wiederverwendet; jeder Test in
 - **F66** Ein selbst angelegtes Geschäft lässt sich wieder löschen. Geschäfte von
   der Parlamentswebseite lassen sich nicht löschen — sie kämen bei der nächsten
   Aktualisierung ohnehin zurück.
+- **F70** Ein selbst angelegtes Geschäft lässt sich mit dem offiziellen
+  Parlamentsgeschäft verknüpfen, sobald dieses nach dem Abgleich erscheint — genau
+  wie ein Vorstoss mit einem Geschäft verknüpft wird. In der Maske eines eigenen
+  Geschäfts steht dafür in der fraktionsinternen Bearbeitung die Zeile «Offizielles
+  Geschäft» mit dem Knopf «Mit offiziellem Geschäft verknüpfen»; er öffnet einen
+  Auswahldialog mit Suchfeld (Platzhalter «Nr. oder Titel») und einer Liste, die
+  die Geschäfte nach Titel-Ähnlichkeit zum eigenen Geschäft vorschlägt (ähnlichste
+  zuerst, bei Gleichstand die neuesten). Angeboten werden nur offizielle Geschäfte
+  — erledigte eingeschlossen, denn das gesuchte offizielle Geschäft kann bereits
+  erledigt sein; eigene Geschäfte und das Geschäft selbst sind ausgeschlossen; gibt
+  es keine, erscheint «Keine Geschäfte gefunden». Nach der Wahl:
+    - Das eigene Geschäft wird als «erledigt» abgeschlossen und ist mit dem
+      offiziellen Geschäft verknüpft. An Stelle des Knopfes steht der Hinweis «Mit
+      dem offiziellen Geschäft ‹Nummer› «‹Titel›» verknüpft und abgeschlossen», wobei
+      Nummer und Titel ein **anklickbarer Verweis** sind, der das offizielle Geschäft
+      öffnet. (Ist das Ziel ausnahmsweise nicht mehr auffindbar, steht nur «Mit einem
+      offiziellen Geschäft verknüpft und abgeschlossen».)
+    - **Notizen und alle weiteren Angaben wandern ins offizielle Geschäft, sofern
+      dort noch nicht gesetzt**: die Notizen (reguläre und Sitzungsnotizen, samt
+      Versionsverlauf) werden ans offizielle Geschäft übertragen und erscheinen dort
+      in dessen Notizliste; Priorität, Typ, Kommission, Datum, Inhalt und die
+      Zuständigkeit werden nur dann übernommen, wenn das offizielle Geschäft im
+      jeweiligen Feld noch leer ist — bereits gesetzte Angaben des offiziellen
+      Geschäfts bleiben unverändert.
+    - Die beiden Geschäfte sind danach **gegenseitig verlinkt und beidseitig
+      anklickbar** («hin und her»): Am offiziellen Geschäft erscheint der Bereich
+      «Verknüpfte eigene Geschäfte» (nur wenn mindestens ein eigenes Geschäft darauf
+      verweist) mit je Eintrag dem anklickbaren Titel (öffnet das eigene Geschäft)
+      und, falls gesetzt, dessen Priorität. Vom eigenen Geschäft führt der oben
+      genannte Verweis zurück zum offiziellen.
+  Bei einem Geschäft von der Parlamentswebseite gibt es den Knopf «Mit offiziellem
+  Geschäft verknüpfen» nicht (nur eigene Geschäfte lassen sich verknüpfen). Fehler
+  beim Verknüpfen: «Verknüpfung fehlgeschlagen: …».
 - **F19** Ein Klick öffnet das Geschäft mit allen öffentlichen Informationen und der
   fraktionsinternen Bearbeitung:
     - **F20** **Priorität** (hoch/mittel/tief, abwählbar).
@@ -589,7 +622,7 @@ Tabelle mit Beschriftung links und Wert rechts, von oben nach unten:
 3. **«Status»** — bei selbst angelegten Geschäften dasselbe Widget wie beim Beschluss: eine Auswahl aus den Werten, die in der Datenbank bereits vorkommen, jederzeit mit einem frei eingetippten Wert überschreibbar. Sonst Anzeige des Status in gekürzter Schreibweise. Kein Pflichtfeld. Speicherung sofort.
 4. **«Fraktionsstatus»** — Anzeige «Offen» / «Neu zu entscheiden» / «Entschieden», nie bearbeitbar (wird abgeleitet).
 5. **«Datum»** — bei selbst angelegten Geschäften Datumsfeld (Sprachausgabe-Beschriftung «Datum»), sonst Anzeige in Schweizer Schreibweise. Kein Pflichtfeld. **Vorbelegung beim Anlegen: das heutige Datum.** Speicherung sofort. Ein unsinniges Datum (nicht JJJJ-MM-TT) wird mit einer Meldung abgewiesen.
-6. **«Kommission»** — **bedingte Sichtbarkeit**: bei selbst angelegten Geschäften eine leerbare Auswahlliste (Platzhalter «—»), die **nur aktive** Kommissionen anbietet; höchstens eine ist wählbar, «keine» (leer) ist gültig. Bei Geschäften von der Parlamentswebseite nur angezeigt, wenn eine Kommission hinterlegt ist (dann in gekürzter Schreibweise). Speicherung sofort bei der Auswahl, auch beim Leeren.
+6. **«Kommission»** — **bedingte Sichtbarkeit**: bei selbst angelegten Geschäften eine leerbare Auswahlliste (Platzhalter «—»), die **nur aktive** Kommissionen in gekürzter Schreibweise anbietet (gespeichert wird der volle Name); höchstens eine ist wählbar, «keine» (leer) ist gültig. Bei Geschäften von der Parlamentswebseite nur angezeigt, wenn eine Kommission hinterlegt ist (dann in gekürzter Schreibweise). Speicherung sofort bei der Auswahl, auch beim Leeren.
 7. **«Einreicher»** — **bedingte Sichtbarkeit**: nur, wenn zum Geschäft mindestens eine einreichende Person hinterlegt ist. Anzeige: Name, dahinter in Klammern die Rolle, mehrere durch Komma getrennt. Nie bearbeitbar.
 8. **«Letzte externe Änderung»** — Zeitpunkt der letzten Änderung an der Quelle in Schweizer Schreibweise; «—», wenn unbekannt. Nie bearbeitbar.
 9. **«Letzte Fraktionsentscheidung»** — Zeitpunkt des letzten Fraktionsbeschlusses; «—», wenn noch keiner gefasst wurde. Nie bearbeitbar.
@@ -607,7 +640,7 @@ Tabelle mit Beschriftung links und Wert rechts, von oben nach unten:
 2. **«Zuständigkeit»**
     - Art: Mehrfachauswahl, leerbar, Platzhalter «—»; gewählte Personen erscheinen als entfernbare Marken und verschwinden aus der Auswahlliste.
     - Pflichtfeld: nein.
-    - Vorbelegung: die am Geschäft eingetragenen zuständigen Personen.
+    - Vorbelegung: die am Geschäft eingetragenen zuständigen Personen; beim Anlegen eines neuen eigenen Geschäfts ist die anlegende Person vorausgewählt, sofern sie Fraktionsmitglied mit Benutzerkonto ist (vor dem Speichern noch änderbar).
     - Auswahlwerte und Reihenfolge: zuerst alle **aktiven** Fraktionsmitglieder **mit Benutzerkonto**, alphabetisch nach vollem Namen; danach alle **inaktiven** Mitglieder mit Benutzerkonto, ebenfalls alphabetisch, jeweils mit dem Zusatz «(inaktiv)» hinter dem Namen. Mitglieder ohne Benutzerkonto stehen nicht zur Wahl.
     - Hinweistext direkt unter dem Feld: «Falls mehrere Personen ausgewählt sind, wird die erste Auswahl intern als Hauptzuständigkeit geführt.»
     - Dynamisches Verhalten: Die Hauptzuständigkeit wird automatisch auf die erste ausgewählte Person gesetzt, sobald die bisherige Hauptperson nicht mehr ausgewählt ist.
@@ -744,7 +777,7 @@ Felder von oben nach unten:
     - Speicherung: sofort bei der Auswahl.
     - Dynamisches Verhalten: Wird der Vorstoss mit einem Geschäft verknüpft, springt der Status automatisch auf «Erledigt».
 5. **«Priorität»** (drittes Feld der Dreiergruppe)
-    - Art: Auswahlliste, leerbar, Platzhalter «Nicht gesetzt».
+    - Art: Auswahlliste, leerbar, Platzhalter «—» (dasselbe Prioritäts-Widget wie beim Geschäft).
     - Pflichtfeld: nein.
     - Vorbelegung: die gespeicherte Priorität; bei neuem Vorstoss leer.
     - Auswahlwerte in dieser Reihenfolge: «Hoch», «Mittel», «Tief».

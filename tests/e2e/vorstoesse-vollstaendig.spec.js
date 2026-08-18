@@ -358,11 +358,11 @@ test.describe('Vorstösse: Liste, Karten, Suche & Filter', () => {
     await expect(k).not.toHaveClass(/pw-prio-hoch/)
     await expect(k).not.toHaveClass(/pw-prio-tief/)
 
-    // Abwählen: Anzeige «Nicht gesetzt», NICHT «Mittel»; Karte bleibt neutral.
+    // Abwählen: Platzhalter «—» (einheitlich wie beim Geschäft), NICHT «Mittel»; Karte bleibt neutral.
     await ncLeeren(feld(page, 'Priorität'))
     await expect(feld(page, 'Priorität').locator('.vs__selected')).toHaveCount(0)
     await expect(feld(page, 'Priorität')).not.toContainText('Mittel')
-    await expect(feld(page, 'Priorität').locator('input.vs__search')).toHaveAttribute('placeholder', 'Nicht gesetzt')
+    await expect(feld(page, 'Priorität').locator('input.vs__search')).toHaveAttribute('placeholder', '—')
     await expect(k).not.toHaveClass(/pw-prio-hoch/)
     await expect(k).not.toHaveClass(/pw-prio-tief/)
   })
@@ -373,7 +373,6 @@ test.describe('Vorstösse: Neuer Vorstoss & Vorbelegung', () => {
   test('Ein Vorstoss ohne echten Titel lässt sich nicht speichern und wird nicht angelegt', async ({ page }) => {
     await login(page, U1)
     await oeffneVorstoesse(page)
-    const vorher = await page.locator('.pw-data-card').count()
     await page.getByRole('button', { name: /Neuer Vorstoss/ }).click()
 
     const dialog = page.locator('.pw-modal').first()
@@ -393,7 +392,11 @@ test.describe('Vorstösse: Neuer Vorstoss & Vorbelegung', () => {
     await expect(dialog.locator('.pw-btn-schliessen'), 'Im Neu-Modus darf es kein ✕ geben').toHaveCount(0)
     await dialog.locator('.pw-modal-footer').getByRole('button', { name: 'Abbrechen' }).click()
     await page.waitForLoadState('networkidle')
-    await expect(page.locator('.pw-data-card')).toHaveCount(vorher, { timeout: 30_000 })
+    // «Abbrechen» schliesst den Dialog und legt nichts an — dass ohne Titel gar
+    // nichts speicherbar ist, sichern die «Speichern ist gesperrt»-Prüfungen oben
+    // ab. NICHT die globale Kartenzahl prüfen: die Vorstossliste ist in der
+    // geteilten Testinstanz nebenläufig (andere Tests/Echtzeit legen Vorstösse an).
+    await expect(page.locator('.pw-modal'), 'Abbrechen muss den Dialog schliessen').toHaveCount(0, { timeout: 30_000 })
   })
 
   test('Nach Erstellen: Herkunft «Eigene», Status «Neu» und der Ersteller als Zuständigkeit', async ({ page }) => {
@@ -799,7 +802,7 @@ test.describe('Vorstösse: Verknüpfung mit Geschäft', () => {
     await page.locator('#pw-search-slot input').first().fill(zielSuche)
     await page.locator('.pw-tabelle-geschaefte tbody tr', { hasText: ziel.titel }).first()
       .locator('.pw-col-titel').click()
-    const block = page.locator('.pw-verknuepfter-vorstoss', { hasText: titel })
+    const block = page.locator('.pw-verknuepfter-eintrag', { hasText: titel })
     await block.waitFor({ state: 'visible', timeout: 30_000 })
     await expect(block.locator('h5')).toContainText(titel)
     await expect(block.locator('h5')).toContainText('Interpellation')

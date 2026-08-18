@@ -49,7 +49,8 @@ describe('GeschaeftDetail — Priorität', () => {
 
   it('eine Prioritätswahl speichert sofort über den Prioritäts-Endpunkt', async () => {
     const wrapper = mountFn()
-    await wrapper.vm.prioritaetGewaehlt({ label: 'Hoch', value: 'hoch' })
+    // PwPrioritaetSelect emittiert den Rohwert (String), nicht das Option-Objekt.
+    await wrapper.vm.prioritaetGewaehlt('hoch')
     expect(axios.put).toHaveBeenCalledTimes(1)
     expect(axios.put.mock.calls[0][0]).toContain('/apps/parlwin/geschaefte/1/prioritaet')
     expect(axios.put.mock.calls[0][1]).toEqual({ prioritaet: 'hoch' })
@@ -57,7 +58,7 @@ describe('GeschaeftDetail — Priorität', () => {
 
   it('Abwählen speichert die Priorität als «nicht gesetzt» (leer)', async () => {
     const wrapper = mountFn()
-    await wrapper.vm.prioritaetGewaehlt(null)
+    await wrapper.vm.prioritaetGewaehlt('')
     expect(axios.put.mock.calls[0][1]).toEqual({ prioritaet: '' })
   })
 })

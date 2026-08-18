@@ -333,4 +333,102 @@ class FraktionsarbeitServiceTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $service->beschlussAktualisieren(1, 78, '', 'Neuer Text');
     }
+
+    // Feature F70: Ein eigenes Geschäft mit einem offiziellen verknüpfen (wie
+    // Vorstoss→Geschäft). Das eigene wird abgeschlossen und verweist aufs
+    // offizielle; Notizen wandern mit; leere Angaben werden ins offizielle
+    // übertragen, gesetzte NICHT überschrieben.
+    private function makeVerknuepfMapper(Geschaeft $eigenes, Geschaeft $ziel): GeschaeftMapper
+    {
+        $mapper = $this->createStub(GeschaeftMapper::class);
+        $mapper->method('find')->willReturnCallback(
+            static fn(int $id): Geschaeft => $id === (int) $eigenes->getId() ? $eigenes : $ziel
+        );
+        $mapper->method('update')->willReturnCallback(static fn(Geschaeft $g): Geschaeft => $g);
+        return $mapper;
+    }
+
+    public function testVerknuepfeUebertraegtLeereAngabenVerschiebtNotizenUndSchliesstAb(): void
+    {
+        $eigenes = new Geschaeft();
+        $eigenes->setId(500);
+        $eigenes->setExternId('eigen:abc');
+        $eigenes->setStatus('Pendent');
+        $eigenes->setPrioritaet('hoch');
+        $eigenes->setTyp('Motion');
+
+        $ziel = new Geschaeft();
+        $ziel->setId(42);
+        $ziel->setExternId('1388420');
+        $ziel->setPrioritaet('');
+        $ziel->setTyp('');
+
+        $verschoben = [];
+        $aktionMapper = $this->createStub(GeschaeftAktionMapper::class);
+        $aktionMapper->method('verschiebeNotizen')->willReturnCallback(
+            static function (int $von, int $zu) use (&$verschoben): int {
+                $verschoben = [$von, $zu];
+                return 3;
+            }
+        );
+
+        $service = $this->makeService(
+            $this->makeVerknuepfMapper($eigenes, $ziel),
+            $aktionMapper,
+            $this->createStub(GeschaeftZustaendigkeitMapper::class),
+        );
+
+        $service->verknuepfe(500, 42);
+
+        self::assertSame('erledigt', $eigenes->getStatus(), 'Das eigene Geschäft wird abgeschlossen');
+        self::assertSame(42, $eigenes->getVerknuepftGeschaeftId(), 'Das eigene Geschäft verweist auf das offizielle');
+        self::assertSame('hoch', $ziel->getPrioritaet(), 'Leere Priorität wird ins offizielle Geschäft übertragen');
+        self::assertSame('Motion', $ziel->getTyp(), 'Leerer Typ wird ins offizielle Geschäft übertragen');
+        self::assertSame([500, 42], $verschoben, 'Die Notizen werden ans offizielle Geschäft verschoben');
+    }
+
+    public function testVerknuepfeUeberschreibtGesetzteAngabenNicht(): void
+    {
+        $eigenes = new Geschaeft();
+        $eigenes->setId(500);
+        $eigenes->setExternId('eigen:abc');
+        $eigenes->setPrioritaet('hoch');
+        $eigenes->setTyp('Motion');
+
+        $ziel = new Geschaeft();
+        $ziel->setId(42);
+        $ziel->setExternId('1388420');
+        $ziel->setPrioritaet('tief');
+        $ziel->setTyp('Interpellation');
+
+        $service = $this->makeService(
+            $this->makeVerknuepfMapper($eigenes, $ziel),
+            $this->createStub(GeschaeftAktionMapper::class),
+            $this->createStub(GeschaeftZustaendigkeitMapper::class),
+        );
+
+        $service->verknuepfe(500, 42);
+
+        self::assertSame('tief', $ziel->getPrioritaet(), 'Eine bereits gesetzte Priorität wird NICHT überschrieben');
+        self::assertSame('Interpellation', $ziel->getTyp(), 'Ein bereits gesetzter Typ wird NICHT überschrieben');
+    }
+
+    public function testVerknuepfeLehntEinOffiziellesGeschaeftAlsQuelleAb(): void
+    {
+        $offiziell = new Geschaeft();
+        $offiziell->setId(42);
+        $offiziell->setExternId('1388420');
+
+        $mapper = $this->createStub(GeschaeftMapper::class);
+        $mapper->method('find')->willReturn($offiziell);
+
+        $service = $this->makeService(
+            $mapper,
+            $this->createStub(GeschaeftAktionMapper::class),
+            $this->createStub(GeschaeftZustaendigkeitMapper::class),
+        );
+
+        $this->expectException(\InvalidArgumentException::class);
+        $service->verknuepfe(42, 43);
+    }
 }

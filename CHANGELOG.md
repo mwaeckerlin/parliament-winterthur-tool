@@ -1,5 +1,18 @@
 # Changelog
 
+- 2026-08-10 **1.7.34**
+    - Ein selbst angelegtes Geschäft lässt sich jetzt mit dem offiziellen Parlamentsgeschäft verknüpfen — genau wie ein Vorstoss mit einem Geschäft
+        - In der Maske eines eigenen Geschäfts öffnet «Mit offiziellem Geschäft verknüpfen» einen Auswahldialog, der die ähnlichsten Geschäfte zuoberst vorschlägt (Suche nach Nummer oder Titel möglich); angeboten werden nur offizielle Geschäfte, erledigte eingeschlossen
+        - Nach der Wahl ist das eigene Geschäft erledigt und mit dem offiziellen verknüpft
+        - Notizen und alle weiteren Angaben (Priorität, Typ, Kommission, Datum, Inhalt, Zuständigkeit) wandern dabei ins offizielle Geschäft, sofern sie dort noch nicht gesetzt sind — bereits vorhandene Angaben des offiziellen Geschäfts bleiben unverändert
+        - Die beiden Geschäfte sind gegenseitig verlinkt und lassen sich hin und her anklicken: das offizielle zeigt die verknüpften eigenen Geschäfte, das eigene verweist zurück aufs offizielle
+
+- 2026-08-07 **1.7.33**
+    - Die Auswahlfelder für Kommission, Priorität, Typ und Datum funktionieren überall gleich — dasselbe Feld sieht überall gleich aus und verhält sich gleich
+        - Das Kommissions-Auswahlfeld zeigt die Namen jetzt gekürzt an (wie überall sonst); gespeichert wird weiterhin der volle Name
+    - Beim Anlegen eines eigenen Geschäfts ist die anlegende Person automatisch als zuständig vorausgewählt (vor dem Speichern noch änderbar)
+    - Ein Statuswechsel erzeugt jetzt genau einen Eintrag in der Aktionszeitleiste (bisher entstand zusätzlich ein irreführender Zwischeneintrag «→ —»)
+
 - 2026-07-27 **1.7.32**
     - Notizen speichern jetzt nur noch bewusst über das Häkchen; Abbrechen (✕) verwirft
         - Kein automatisches Zwischenspeichern mehr nach fünf Sekunden und kein Speichern beim Verlassen des Feldes — das führte zu unvollständig gespeicherten Notizen und einer unzuverlässigen Versionsgeschichte

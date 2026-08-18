@@ -1358,7 +1358,7 @@ echo "[E2E] Cron-Job-Test: automatischer Cron-Tick löst die Synchronisation aus
 
 # 1. Sicherstellen, dass kein Sync läuft; Fortschritt über die DB prüfen (der Job
 #    läuft per CLI, daher nicht über den FPM-APCu-Cache der /sync/status-API).
-api_expect_status POST "admin" "$ADMIN_TOKEN" "/sync/cancel" "200" || true
+api_request POST "admin" "$ADMIN_TOKEN" "/sync/cancel" >/dev/null 2>&1 || true  # best-effort: 200 (gestoppt) und 202 (Abbruch angefordert) sind beide gültig; der tatsächliche Stopp wird separat über die DB geprüft
 CRON_CLEAN=0
 for _ in $(seq 1 60); do
   CRON_PROG="$(sql "SELECT configvalue FROM ${TABLE_PREFIX}appconfig WHERE appid='parlwin' AND configkey='sync_progress';")"
@@ -1416,7 +1416,7 @@ IMPORT_VID="$(jq -r "[.[] | select(.titel == \"${IMPORT_NAME}\")][0].id" <<<"$LA
 dav_delete "${IMPORT_DAV_URL}"
 
 # 6. Aufräumen: laufenden Sync stoppen, Test-Konfiguration entfernen.
-api_expect_status POST "admin" "$ADMIN_TOKEN" "/sync/cancel" "200" || true
+api_request POST "admin" "$ADMIN_TOKEN" "/sync/cancel" >/dev/null 2>&1 || true  # best-effort: 200 (gestoppt) und 202 (Abbruch angefordert) sind beide gültig; der tatsächliche Stopp wird separat über die DB geprüft
 occ config:app:delete parlwin sync_zeitplan >/dev/null 2>&1 || true
 occ config:app:delete parlwin sync_zeitplan_letzter_check >/dev/null 2>&1 || true
 

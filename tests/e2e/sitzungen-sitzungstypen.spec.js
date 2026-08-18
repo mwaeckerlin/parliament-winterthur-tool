@@ -344,7 +344,6 @@ test.describe('Sitzungstypen', () => {
   test('Ein Sitzungstyp ohne Namen wird nicht angelegt: Klick daneben verwirft nichts, «Abbrechen» schliesst', async ({ page }) => {
     await login(page, USER)
     await gotoView(page, 'Sitzungstypen')
-    const vorher = await page.locator('.pw-sitzungstyp-karte').count()
 
     await page.getByRole('button', { name: /Neuer Typ/ }).click()
     const maske = page.locator('.pw-modal-overlay', { has: page.locator('.pw-modal-kopf h3') })
@@ -356,12 +355,13 @@ test.describe('Sitzungstypen', () => {
     await expect(maske, 'Der Klick daneben darf die Neu-Maske nicht schliessen').toBeVisible()
     await expect(maske.locator('.pw-modal-kopf h3')).toHaveText('Neuer Sitzungstyp')
 
-    // Verworfen wird nur über «Abbrechen» — und dabei entsteht kein Sitzungstyp.
+    // «Ohne Namen wird nicht angelegt» = «Speichern» ist gesperrt; verworfen wird
+    // über «Abbrechen», das die Maske schliesst. Nicht die globale Kartenzahl prüfen
+    // (die nebenläufige Testinstanz legt echte Typen an).
+    await expect(maske.locator('.pw-modal-footer').getByRole('button', { name: 'Speichern' }), 'Ohne Namen muss «Speichern» gesperrt sein').toBeDisabled()
     await maske.locator('.pw-modal-footer').getByRole('button', { name: 'Abbrechen' }).click()
     await expect(page.locator('.pw-modal-overlay')).toHaveCount(0)
     await page.waitForLoadState('networkidle')
-
-    await expect(page.locator('.pw-sitzungstyp-karte')).toHaveCount(vorher, { timeout: 30_000 })
     expect(jsFehler, `JS-Fehler: ${jsFehler.join(' | ')}`).toEqual([])
   })
 

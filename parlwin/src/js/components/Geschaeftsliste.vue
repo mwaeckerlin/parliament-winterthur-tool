@@ -61,13 +61,10 @@
                 <span v-if="erstunterzeichner(g)" class="pw-col-einreicher">{{ erstunterzeichner(g) }}</span>
               </td>
               <td data-label="Prio" class="pw-col-inline-edit pw-col-prio" @click.stop>
-                <NcSelect
+                <PwPrioritaetSelect
                   class="pw-inline-select"
-                  :model-value="prioritaetOptionFuer(g)"
-                  :options="prioritaetOptionen"
-                  :clearable="true"
-                  placeholder="—"
-                  @update:model-value="aenderungPrioritaet(g, $event ? $event.value : '')"
+                  :model-value="g.prioritaet"
+                  @update:model-value="aenderungPrioritaet(g, $event)"
                 />
               </td>
               <td v-if="statusSpalteAnzeigen" data-label="Status" class="pw-col-status">
@@ -136,14 +133,11 @@
             </div>
 
             <div class="pw-card-prio" @click.stop>
-              <NcSelect
+              <PwPrioritaetSelect
                 class="pw-inline-select"
-                :model-value="prioritaetOptionFuer(g)"
-                :options="prioritaetOptionen"
-                :clearable="true"
+                :model-value="g.prioritaet"
                 input-label="Priorität"
-                placeholder="—"
-                @update:model-value="aenderungPrioritaet(g, $event ? $event.value : '')"
+                @update:model-value="aenderungPrioritaet(g, $event)"
               />
             </div>
 
@@ -178,6 +172,7 @@
             @gespeichert="nachSpeichern"
             @erstellt="nachErstellen"
             @abbrechen="neuAbbrechen"
+            @oeffne-geschaeft="oeffneDetail"
           />
         </div>
       </div>
@@ -195,6 +190,7 @@ import GeschaeftDetail from './GeschaeftDetail.vue'
 import NcTextField from '@nextcloud/vue/components/NcTextField'
 import NcSelect from '@nextcloud/vue/components/NcSelect'
 import PwMultiSelect from './PwMultiSelect.vue'
+import PwPrioritaetSelect from './PwPrioritaetSelect.vue'
 import BeschlussWidget from './BeschlussWidget.vue'
 import NcCheckboxRadioSwitch from '@nextcloud/vue/components/NcCheckboxRadioSwitch'
 import NcButton from '@nextcloud/vue/components/NcButton'
@@ -203,7 +199,7 @@ import NcEmptyContent from '@nextcloud/vue/components/NcEmptyContent'
 
 export default {
   name: 'Geschaeftsliste',
-  components: { GeschaeftDetail, NcTextField, NcSelect, PwMultiSelect, NcCheckboxRadioSwitch, NcButton, NcLoadingIcon, NcEmptyContent, BeschlussWidget },
+  components: { GeschaeftDetail, NcTextField, NcSelect, PwMultiSelect, PwPrioritaetSelect, NcCheckboxRadioSwitch, NcButton, NcLoadingIcon, NcEmptyContent, BeschlussWidget },
   props: {
     mitglieder: { type: Array, default: () => [] },
   },
@@ -466,12 +462,6 @@ export default {
     },
     prioritaetEffektiv(geschaeft) {
       return geschaeft.prioritaet || 'mittel'
-    },
-    prioritaetOptionFuer(geschaeft) {
-      // Den ECHTEN Wert anzeigen (nicht den fürs Highlight «effektiven»): nicht
-      // gesetzt ⇒ keine Auswahl (Placeholder «—»), nicht «Mittel».
-      const p = geschaeft.prioritaet || ''
-      return PRIORITAETEN.find(o => o.value === p) || null
     },
     async aenderungPrioritaet(geschaeft, wert) {
       const prioritaet = ['hoch', 'mittel', 'tief'].includes(wert) ? wert : ''

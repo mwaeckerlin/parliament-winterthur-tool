@@ -874,6 +874,91 @@ test.describe('Notizen am Geschäft (über GeschaeftDetail)', () => {
 })
 
 // ---------------------------------------------------------------------------
+test.describe('Eigenes Geschäft → offizielles Geschäft verknüpfen', () => {
+  test('verknüpfen überträgt Notizen und Angaben, verlinkt beide Seiten anklickbar (hin und her) und schliesst das eigene Geschäft ab', async ({ page }) => {
+    await login(page, USERS.u1)
+    await gotoGeschaefte(page)
+
+    // Denselben Ladeweg wie der Verknüpfen-Dialog (inkl. erledigte) nutzen, damit
+    // das Ziel garantiert angeboten wird — die Testdaten führen die offiziellen
+    // Geschäfte alle als «erledigt».
+    const alle = await (await api(page, 'get', '/geschaefte?show_erledigt=1&limit=500')).json()
+    // Ein offizielles Geschäft OHNE Priorität wählen: nur dann greift der Übertrag
+    // «sofern beim Ziel leer», den der Test unten prüft.
+    const ziel = alle.find(g => !g.geloescht && g.titel && !g.prioritaet && !String(g.externId || '').startsWith('eigen:'))
+    expect(ziel, 'Kein offizielles Geschäft ohne Priorität für die Verknüpfung gefunden').toBeTruthy()
+
+    // Eigenes Geschäft anlegen, Priorität «hoch» setzen und eine Notiz erfassen
+    // (die Notiz muss später am offiziellen Geschäft mitangezeigt werden).
+    const titel = eindeutig('EigenVerkn')
+    const notizText = `E2E VerknNotiz ${titel}`
+    const eigenId = await apiCreateGeschaeft(page, titel)
+    const pRes = await api(page, 'put', `/geschaefte/${eigenId}/prioritaet`, { prioritaet: 'hoch' })
+    expect(pRes.ok(), 'Priorität-Seed fehlgeschlagen').toBeTruthy()
+    await apiAddNotiz(page, eigenId, notizText)
+    await page.reload()
+    await gotoGeschaefte(page)
+    await openDetailByTitel(page, titel)
+
+    // Verknüpfen-Knopf → geteilter Dialog → offizielles Geschäft wählen.
+    const btn = page.locator('.pw-geschaeft-detail').getByRole('button', { name: 'Mit offiziellem Geschäft verknüpfen' })
+    await btn.waitFor({ state: 'visible', timeout: 30_000 })
+    await btn.click()
+    const dialog = page.locator('.pw-modal', { has: page.locator('.pw-verknuepfen-liste') })
+    await dialog.locator('input').first().fill(ziel.titel.slice(0, Math.min(20, ziel.titel.length)))
+    const eintrag = dialog.locator('.pw-verknuepfen-eintrag', { hasText: ziel.titel }).first()
+    await eintrag.waitFor({ state: 'visible', timeout: 30_000 })
+    await eintrag.click()
+
+    // Quell-Seite: das eigene Geschäft ist verknüpft und abgeschlossen UND nennt
+    // sichtbar das offizielle Geschäft, mit dem es verknüpft wurde.
+    const quellHinweis = page.locator('.pw-geschaeft-detail').getByText(/verknüpft und abgeschlossen/i).first()
+    await expect(quellHinweis, 'Verknüpfung wird nicht bestätigt').toBeVisible({ timeout: 15_000 })
+    await expect(quellHinweis, 'Quell-Hinweis nennt das offizielle Geschäft nicht')
+      .toContainText(ziel.titel.slice(0, Math.min(30, ziel.titel.length)))
+
+    // Datenprüfung: eigenes erledigt + verlinkt; offizielles hat die Priorität übernommen.
+    const eigenNach = await (await api(page, 'get', `/geschaefte/${eigenId}`)).json()
+    expect(eigenNach.verknuepftGeschaeftId, 'Eigenes Geschäft verweist nicht auf das offizielle').toBe(ziel.id)
+    expect(String(eigenNach.status).toLowerCase(), 'Eigenes Geschäft ist nicht erledigt').toContain('erledigt')
+    const zielNach = await (await api(page, 'get', `/geschaefte/${ziel.id}`)).json()
+    expect(zielNach.prioritaet, 'Priorität wurde nicht ins offizielle Geschäft übernommen').toBe('hoch')
+
+    // Ziel-Seite: Notiz UND Angaben sind ans offizielle Geschäft gewandert; das
+    // eigene Geschäft erscheint dort als anklickbarer Verweis. Offizielles ist
+    // «erledigt» → einblenden.
+    await page.reload()
+    await gotoGeschaefte(page)
+    await page.locator('#pw-filter-slot').getByText('Erledigte anzeigen').click()
+    await openDetailByTitel(page, ziel.titel)
+    // Die übertragene Notiz ist jetzt am offiziellen Geschäft sichtbar.
+    await expect(
+      page.locator('.pw-geschaeft-detail').getByText(notizText).first(),
+      'Übertragene Notiz fehlt am offiziellen Geschäft',
+    ).toBeVisible({ timeout: 30_000 })
+    // Verknüpftes eigenes Geschäft ist als anklickbarer Verweis gelistet.
+    const block = page.locator('.pw-geschaeft-detail .pw-detail-abschnitt', { hasText: 'Verknüpfte eigene Geschäfte' })
+    await expect(block, 'Block «Verknüpfte eigene Geschäfte» fehlt am offiziellen Geschäft').toBeVisible()
+    const eigenVerweis = block.locator('.pw-verknuepfter-eintrag', { hasText: titel }).locator('.pw-verweis-knopf').first()
+    await expect(eigenVerweis, 'Eigenes Geschäft fehlt als Verweis').toBeVisible()
+
+    // «Her»: Klick auf den Verweis öffnet das eigene Geschäft, das zurück aufs
+    // offizielle verweist (gegenseitige Verlinkung, hin und her klickbar).
+    await eigenVerweis.click()
+    const zurueckVerweis = page.locator('.pw-geschaeft-detail .pw-form-zeile', { hasText: 'Offizielles Geschäft' }).locator('.pw-verweis-knopf').first()
+    await expect(zurueckVerweis, 'Rück-Verweis aufs offizielle Geschäft fehlt').toBeVisible({ timeout: 30_000 })
+    await expect(zurueckVerweis).toContainText(ziel.titel.slice(0, Math.min(30, ziel.titel.length)))
+
+    // «Hin»: Klick auf den Rück-Verweis führt wieder zum offiziellen Geschäft.
+    await zurueckVerweis.click()
+    await expect(
+      page.locator('.pw-geschaeft-detail .pw-detail-abschnitt', { hasText: 'Verknüpfte eigene Geschäfte' }),
+      'Rücksprung zum offiziellen Geschäft fehlgeschlagen',
+    ).toBeVisible({ timeout: 30_000 })
+  })
+})
+
+// ---------------------------------------------------------------------------
 test.describe('Sitzungsnotizen am Geschäft', () => {
   test('separat, standardmässig eingeklappt, Zahl in der Summary, nicht in der oberen Notizliste, aufklappbar', async ({ page }) => {
     await login(page, USERS.u1)
@@ -989,7 +1074,7 @@ test.describe('Verknüpfte Vorstösse am Geschäft', () => {
 
     const block = page.locator('.pw-geschaeft-detail .pw-detail-abschnitt', { hasText: 'Verknüpfte Vorstösse' })
     await expect(block, 'Verknüpfte-Vorstösse-Block fehlt').toBeVisible({ timeout: 30_000 })
-    await expect(block.locator('.pw-verknuepfter-vorstoss h5', { hasText: vTitel })).toBeVisible()
+    await expect(block.locator('.pw-verknuepfter-eintrag h5', { hasText: vTitel })).toBeVisible()
     await expect(block, 'Haltung fehlt').toContainText('Unterstützen')
     await expect(block, 'Zuständigkeit fehlt').toContainText('E2E Zuständige Person')
     await expect(block, 'Vorstoss-Notiz fehlt').toContainText(vNotiz)

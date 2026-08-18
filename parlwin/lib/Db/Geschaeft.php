@@ -29,6 +29,7 @@ use OCP\AppFramework\Db\Entity;
  * @method string getPrioritaet()
  * @method string getInhalt()
  * @method string getKommission()
+ * @method int    getVerknuepftGeschaeftId()
  * @method string getQuelleHash()
  * @method string getQuelleAktualisiertAm()
  * @method string getEinreicher()
@@ -89,6 +90,13 @@ class Geschaeft extends Entity implements \JsonSerializable {
     /** @var string Zuständige Kommission (höchstens eine; leer = keine) */
     protected string $kommission = '';
 
+    /**
+     * @var int Bei einem selbst angelegten Geschäft: das offizielle Parlaments-
+     * geschäft, mit dem es verknüpft (und dadurch abgeschlossen) wurde. 0 = nicht
+     * verknüpft. Analog zu Vorstoss→Geschäft.
+     */
+    protected int $verknuepftGeschaeftId = 0;
+
     /** @var string JSON-Array der Einreicher (Erstunterzeichner und Mitunterzeichner) */
     protected string $einreicher = '[]';
 
@@ -106,6 +114,7 @@ class Geschaeft extends Entity implements \JsonSerializable {
 
     public function __construct() {
         $this->addType('geloescht', 'boolean');
+        $this->addType('verknuepftGeschaeftId', 'integer');
     }
 
     /**
@@ -132,6 +141,7 @@ class Geschaeft extends Entity implements \JsonSerializable {
             'prioritaet' => $this->getPrioritaet(),
             'inhalt' => $this->getInhalt(),
             'kommission' => $this->getKommission(),
+            'verknuepftGeschaeftId' => $this->getVerknuepftGeschaeftId(),
             'einreicher' => json_decode($this->getEinreicher(), true) ?? [],
             'quelleHash' => $this->getQuelleHash(),
             'quelleAktualisiertAm' => $this->getQuelleAktualisiertAm(),

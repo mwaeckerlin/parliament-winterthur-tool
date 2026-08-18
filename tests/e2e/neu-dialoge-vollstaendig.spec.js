@@ -310,17 +310,6 @@ test.describe('«+ Neu» öffnet dieselbe vollständige Maske wie die Bearbeitun
     const titel = `E2E Klick-daneben ${Date.now()}`
     await login(page, U1)
     await oeffneAnsicht(page, 'Vorstösse', /Neuer Vorstoss/)
-    // Erst zählen, wenn die Liste wirklich geladen ist — sonst wird eine noch
-    // leere Liste als Ausgangswert festgehalten und der Vergleich am Ende
-    // schlägt fehl, obwohl nichts angelegt wurde. networkidle allein genügt bei
-    // der WebSocket-Verbindung nicht: auf eine Karte ODER die Leermeldung warten.
-    await page.waitForLoadState('networkidle')
-    await Promise.race([
-      page.locator('.pw-data-card').first().waitFor({ state: 'visible', timeout: 30_000 }).catch(() => {}),
-      page.getByText('Keine Vorstösse vorhanden').waitFor({ state: 'visible', timeout: 30_000 }).catch(() => {}),
-    ])
-    const vorher = await page.locator('.pw-data-card').count()
-
     await page.getByRole('button', { name: /Neuer Vorstoss/ }).click()
     const modal = page.locator('.pw-modal').first()
     await modal.waitFor({ state: 'visible', timeout: 30_000 })
@@ -337,25 +326,16 @@ test.describe('«+ Neu» öffnet dieselbe vollständige Maske wie die Bearbeitun
     // Und es wurde nichts angelegt, solange nicht gespeichert ist.
     await abbrechenKnopf(modal).click()
     await page.waitForLoadState('networkidle')
-    await expect(page.locator('.pw-data-card')).toHaveCount(vorher, { timeout: 30_000 })
-    await expect(page.locator('.pw-data-card', { hasText: titel })).toHaveCount(0)
+    // Nicht die globale Kartenzahl prüfen (nebenläufige Testinstanz): der Dialog ist
+    // geschlossen und der abgebrochene Vorstoss darf nicht angelegt sein.
+    await expect(page.locator('.pw-modal-overlay'), 'Abbrechen muss die Maske schliessen').toHaveCount(0, { timeout: 30_000 })
+    await expect(page.locator('.pw-data-card', { hasText: titel }), 'Der abgebrochene Vorstoss wurde angelegt').toHaveCount(0)
   })
 
   test('Neuer Vorstoss: «Abbrechen» verwirft die Eingaben restlos', async ({ page }) => {
     const titel = `E2E Abbrechen ${Date.now()}`
     await login(page, U1)
     await oeffneAnsicht(page, 'Vorstösse', /Neuer Vorstoss/)
-    // Erst zählen, wenn die Liste wirklich geladen ist — sonst wird eine noch
-    // leere Liste als Ausgangswert festgehalten und der Vergleich am Ende
-    // schlägt fehl, obwohl nichts angelegt wurde. networkidle allein genügt bei
-    // der WebSocket-Verbindung nicht: auf eine Karte ODER die Leermeldung warten.
-    await page.waitForLoadState('networkidle')
-    await Promise.race([
-      page.locator('.pw-data-card').first().waitFor({ state: 'visible', timeout: 30_000 }).catch(() => {}),
-      page.getByText('Keine Vorstösse vorhanden').waitFor({ state: 'visible', timeout: 30_000 }).catch(() => {}),
-    ])
-    const vorher = await page.locator('.pw-data-card').count()
-
     await page.getByRole('button', { name: /Neuer Vorstoss/ }).click()
     const modal = page.locator('.pw-modal').first()
     await modal.waitFor({ state: 'visible', timeout: 30_000 })
@@ -364,7 +344,8 @@ test.describe('«+ Neu» öffnet dieselbe vollständige Maske wie die Bearbeitun
     await page.waitForLoadState('networkidle')
 
     await expect(page.locator('.pw-modal-overlay')).toHaveCount(0)
-    await expect(page.locator('.pw-data-card')).toHaveCount(vorher, { timeout: 30_000 })
+    // Robust statt globaler Kartenzahl (nebenläufige Testinstanz): der konkret
+    // erfasste Titel und ein «Ohne Titel»-Platzhalter dürfen nicht als Karte auftauchen.
     await expect(page.locator('.pw-data-card', { hasText: titel })).toHaveCount(0)
     await expect(page.locator('.pw-data-card', { hasText: 'Ohne Titel' })).toHaveCount(0)
   })
@@ -451,11 +432,11 @@ test.describe('«+ Neu» öffnet dieselbe vollständige Maske wie die Bearbeitun
     await expect(detail.locator('.pw-beschluss-input')).toBeVisible()
     await expect(detail.locator('.pw-dokumente')).toBeVisible()
     await expect(detail.getByText('Aktionszeitleiste')).toBeVisible()
-    // «Votum im Rat» ist zuständigen-gebunden: der eben angelegte Datensatz ist
-    // noch niemandem zugewiesen, darum bleibt das leere Feld für die (nicht
-    // zuständige) erfassende Person verborgen. Sein Erscheinen und Bearbeiten für
-    // die zuständige Person prüft der Votum-Test (F26) vollständig.
-    await expect(detail.locator('.pw-votum'), 'Leeres Votum darf der nicht zuständigen Person nicht erscheinen').toHaveCount(0)
+    // «Votum im Rat» ist zuständigen-gebunden. Beim Anlegen eines eigenen
+    // Geschäfts ist die erfassende Person per Default zuständig (Zuständigkeits-
+    // Vorauswahl), darum erscheint das Votum-Feld hier bearbeitbar. Dass es für
+    // NICHT zuständige Personen verborgen bleibt, prüft der Votum-Test (F26).
+    await expect(detail.locator('.pw-votum'), 'Für die per Default zuständige erfassende Person erscheint das Votum-Feld').toBeVisible()
     await expect(detail.getByLabel('Titel')).toHaveValue(titel)
 
     // Beim Bearbeiten schliesst wieder das ✕ und es gibt keinen Fuss mehr.
@@ -521,7 +502,6 @@ test.describe('«+ Neu» öffnet dieselbe vollständige Maske wie die Bearbeitun
     const titel = `E2E Geschaeft Abbrechen ${Date.now()}`
     await login(page, U1)
     await oeffneAnsicht(page, 'Geschäfte', /Eigenes Geschäft/)
-    const vorher = await page.locator('.pw-tabelle-geschaefte tbody tr').count()
 
     await page.getByRole('button', { name: /Eigenes Geschäft/ }).click()
     const detail = page.locator('.pw-geschaeft-detail')
@@ -537,7 +517,9 @@ test.describe('«+ Neu» öffnet dieselbe vollständige Maske wie die Bearbeitun
     await abbrechenKnopf(page.locator('.pw-modal').first()).click()
     await page.waitForLoadState('networkidle')
     await expect(page.locator('.pw-geschaeft-detail')).toHaveCount(0)
-    await expect(page.locator('.pw-tabelle-geschaefte tbody tr')).toHaveCount(vorher, { timeout: 30_000 })
+    // Robust statt globaler Zeilenzahl (nebenläufige Testinstanz): das konkret
+    // erfasste Geschäft darf nicht als Tabellenzeile auftauchen.
+    await expect(page.locator('.pw-tabelle-geschaefte tbody tr', { hasText: titel }), 'Das abgebrochene Geschäft wurde angelegt').toHaveCount(0)
   })
 
   // =========================================================================

@@ -91,15 +91,37 @@ describe('Vorstoesseliste — Notizen & Geschäfts-Verknüpfung', () => {
     expect(wrapper.vm.bearbeitung.status).toBe('erledigt')
   })
 
-  it('sortiert Geschäfte nach Titel-Ähnlichkeit, bei Gleichstand neueste zuerst', () => {
-    const wrapper = simple()
-    wrapper.vm.bearbeiten({ id: 5, titel: 'Mehr Velowege in der Stadt' })
-    wrapper.vm.geschaefteListe = [
+  // Die Ähnlichkeitssuche steckt jetzt im GETEILTEN Verknüpfen-Dialog (kein
+  // Copy-Paste; genutzt von Vorstoss→Geschäft UND eigenes→offizielles Geschäft).
+  it('der geteilte Verknüpfen-Dialog sortiert Geschäfte nach Titel-Ähnlichkeit, bei Gleichstand neueste zuerst', async () => {
+    axios.get.mockResolvedValue({ data: [
       { id: 1, titel: 'Ganz anderes Thema', datum: '2026-05-01' },
       { id: 2, titel: 'Mehr Velowege bauen', datum: '2026-01-02' },
       { id: 3, titel: 'Noch etwas Anderes', datum: '2026-06-01' },
-    ]
-    const ids = wrapper.vm.aehnlicheGeschaefte.map(g => g.id)
+    ] })
+    const { default: GeschaeftVerknuepfenDialog } = await import('../components/GeschaeftVerknuepfenDialog.vue')
+    const dlg = shallowMount(GeschaeftVerknuepfenDialog, { props: { titel: 'Mehr Velowege in der Stadt' } })
+    await Promise.resolve()
+    await Promise.resolve()
+    await dlg.vm.$nextTick()
+    const ids = dlg.vm.aehnliche.map(g => g.id)
     expect(ids[0]).toBe(2) // höchste Titel-Ähnlichkeit («Velowege»/«Mehr»/«Stadt»)
+  })
+
+  it('der geteilte Dialog bietet mit nurOffizielle keine eigenen Geschäfte an und schliesst sich selbst nicht ein', async () => {
+    axios.get.mockResolvedValue({ data: [
+      { id: 10, titel: 'Offizielles A', externId: '2026.1', datum: '2026-05-01' },
+      { id: 11, titel: 'Eigenes B', externId: 'eigen:xy', datum: '2026-05-02' },
+      { id: 12, titel: 'Offizielles C (selbst)', externId: '2026.2', datum: '2026-05-03' },
+    ] })
+    const { default: GeschaeftVerknuepfenDialog } = await import('../components/GeschaeftVerknuepfenDialog.vue')
+    const dlg = shallowMount(GeschaeftVerknuepfenDialog, { props: { titel: 'x', nurOffizielle: true, ausschlussId: 12 } })
+    await Promise.resolve()
+    await Promise.resolve()
+    await dlg.vm.$nextTick()
+    const ids = dlg.vm.aehnliche.map(g => g.id)
+    expect(ids).toContain(10)
+    expect(ids).not.toContain(11) // eigenes ausgeblendet
+    expect(ids).not.toContain(12) // Selbst-Verknüpfung ausgeschlossen
   })
 })

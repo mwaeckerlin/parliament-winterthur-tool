@@ -532,7 +532,7 @@ test.describe('Feld-Inventar: Dialog «Mit Geschäft verknüpfen»', () => {
     // `.first()`: unter der Trefferliste kann zusätzlich die Leermeldung stehen,
     // die dieselbe Hinweis-Klasse trägt.
     await expect(dialog.locator('.pw-hinweis').first(), 'Hinweistext zur Sortierung fehlt')
-      .toHaveText('Ähnlichste zum Vorstoss-Titel zuerst, sonst neueste.')
+      .toHaveText('Ähnlichste zum Titel zuerst, sonst neueste.')
     await expect(dialog.locator('.pw-verknuepfen-liste'), 'Trefferliste fehlt').toBeAttached()
     await expect(dialog.locator('.pw-btn-schliessen'), 'Schliessen-Knopf fehlt').toBeVisible()
 

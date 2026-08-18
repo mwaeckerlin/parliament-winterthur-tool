@@ -131,6 +131,23 @@ class GeschaeftMapper extends QBMapper
     }
 
     /**
+     * Die eigenen Geschäfte, die mit einem offiziellen Geschäft verknüpft sind
+     * (neueste zuerst) — Gegenstück zur Vorstoss→Geschäft-Verknüpfung.
+     *
+     * @return Geschaeft[]
+     */
+    public function findByVerknuepft(int $zielId): array
+    {
+        $qb = $this->db->getQueryBuilder();
+        $qb->select('*')
+            ->from($this->getTableName())
+            ->where($qb->expr()->eq('verknuepft_geschaeft_id', $qb->createNamedParameter($zielId, IQueryBuilder::PARAM_INT)))
+            ->andWhere($qb->expr()->eq('geloescht', $qb->createNamedParameter(false, IQueryBuilder::PARAM_BOOL)))
+            ->orderBy('aktualisiert_am', 'DESC');
+        return $this->findEntities($qb);
+    }
+
+    /**
      * Sucht ein Geschäft anhand der externen ID (von der Parlamentswebseite).
      *
      * @throws DoesNotExistException wenn nicht gefunden
