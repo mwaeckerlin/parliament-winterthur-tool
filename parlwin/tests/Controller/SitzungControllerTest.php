@@ -45,6 +45,7 @@ class SitzungControllerTest extends TestCase
         IRequest $request,
         ?SitzungstypService $sitzungstypService = null,
         ?\OCA\ParliamentWinterthur\Service\DeckService $deckService = null,
+        ?\OCA\ParliamentWinterthur\Service\SitzungVorstossService $sitzungVorstossService = null,
     ): SitzungController {
         return new SitzungController(
             $request,
@@ -55,6 +56,7 @@ class SitzungControllerTest extends TestCase
             $this->createStub(\OCP\Files\IRootFolder::class),
             $this->createStub(\Psr\Log\LoggerInterface::class),
             $this->createStub(\OCA\ParliamentWinterthur\Service\SitzungGeschaeftService::class),
+            $sitzungVorstossService ?? $this->createStub(\OCA\ParliamentWinterthur\Service\SitzungVorstossService::class),
             $deckService ?? $this->createStub(\OCA\ParliamentWinterthur\Service\DeckService::class),
             $this->createStub(\OCP\IConfig::class),
         );
@@ -76,6 +78,36 @@ class SitzungControllerTest extends TestCase
         $response = $this->makeController($this->makeRequest([]))->todoErstellen(1);
 
         $this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+    }
+
+    // Sitzung↔Vorstoss: eigene und fremde Vorstösse an eine Sitzung traktandieren.
+    public function testVorstossVerlinkenGibt400OhneVorstossId(): void
+    {
+        $response = $this->makeController($this->makeRequest([]))->vorstossVerlinken(1);
+        $this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+    }
+
+    public function testVorstossVerlinkenDelegiertUndGibtVorstossIdsZurueck(): void
+    {
+        $service = $this->createMock(\OCA\ParliamentWinterthur\Service\SitzungVorstossService::class);
+        $service->expects($this->once())->method('verlinke')->with(1, 7);
+        $service->method('vorstossIdsFuerSitzung')->with(1)->willReturn([7]);
+
+        $request = $this->makeRequest(['vorstossId' => '7']);
+        $response = $this->makeController($request, null, null, $service)->vorstossVerlinken(1);
+
+        $this->assertSame(['vorstossIds' => [7]], $response->getData());
+    }
+
+    public function testVorstossEntlinkenGibtVorstossIdsZurueck(): void
+    {
+        $service = $this->createMock(\OCA\ParliamentWinterthur\Service\SitzungVorstossService::class);
+        $service->expects($this->once())->method('entlinke')->with(1, 7);
+        $service->method('vorstossIdsFuerSitzung')->with(1)->willReturn([]);
+
+        $response = $this->makeController($this->makeRequest([]), null, null, $service)->vorstossEntlinken(1, 7);
+
+        $this->assertSame(['vorstossIds' => []], $response->getData());
     }
 
     public function testTodoErstellenGibt400WennDeckFehlt(): void
@@ -171,6 +203,7 @@ class SitzungControllerTest extends TestCase
             $this->createStub(\OCP\Files\IRootFolder::class),
             $this->createStub(\Psr\Log\LoggerInterface::class),
             $this->createStub(\OCA\ParliamentWinterthur\Service\SitzungGeschaeftService::class),
+            $this->createStub(\OCA\ParliamentWinterthur\Service\SitzungVorstossService::class),
             $this->createStub(\OCA\ParliamentWinterthur\Service\DeckService::class),
             $this->createStub(\OCP\IConfig::class),
         );

@@ -6,6 +6,7 @@ namespace OCA\ParliamentWinterthur\Tests\Controller;
 
 use OCA\ParliamentWinterthur\Controller\VorstossController;
 use OCA\ParliamentWinterthur\Db\Vorstoss;
+use OCA\ParliamentWinterthur\Service\DokumentLinkService;
 use OCA\ParliamentWinterthur\Service\RealtimePublisherService;
 use OCA\ParliamentWinterthur\Service\VorstossService;
 use OCP\AppFramework\Db\DoesNotExistException;
@@ -36,6 +37,7 @@ class VorstossControllerTest extends TestCase
             $this->createStub(IRootFolder::class),
             $this->createStub(IUserSession::class),
             $this->createStub(LoggerInterface::class),
+            $this->createStub(DokumentLinkService::class),
         );
     }
 

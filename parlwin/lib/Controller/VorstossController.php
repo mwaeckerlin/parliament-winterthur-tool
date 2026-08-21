@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OCA\ParliamentWinterthur\Controller;
 
 use OCA\ParliamentWinterthur\AppInfo\Application;
+use OCA\ParliamentWinterthur\Service\DokumentLinkService;
 use OCA\ParliamentWinterthur\Service\RealtimePublisherService;
 use OCA\ParliamentWinterthur\Service\VorstossService;
 use OCP\AppFramework\Controller;
@@ -33,8 +34,25 @@ class VorstossController extends Controller
         private readonly IRootFolder $rootFolder,
         private readonly IUserSession $userSession,
         private readonly LoggerInterface $logger,
+        private readonly DokumentLinkService $dokumentLinks,
     ) {
         parent::__construct(Application::APP_ID, $request);
+    }
+
+    /**
+     * Ablage-Ordner neuer Vorstoss-Dokumente: jahr-basiert (nach Erstellungsjahr),
+     * NICHT nach interner Versionsnummer. Neue Dateien werden hier abgelegt und
+     * anschliessend explizit mit dem Vorstoss verknüpft (siehe DokumentLinkService).
+     */
+    private function ablageOrdner(int $id): string
+    {
+        $vorstoss = $this->service->find($id);
+        $unterordner = self::UNTERORDNER[$vorstoss->getHerkunft()] ?? self::UNTERORDNER['eigene'];
+        $jahr = substr((string) $vorstoss->getErstelltAm(), 0, 4);
+        if (!preg_match('/^\d{4}$/', $jahr)) {
+            $jahr = date('Y');
+        }
+        return 'Fraktion/40_Vorstösse/' . $unterordner . '/' . $jahr;
     }
 
     #[NoAdminRequired]
@@ -262,7 +280,7 @@ class VorstossController extends Controller
             return new DataResponse(['fehler' => 'Name und Endung erforderlich'], Http::STATUS_BAD_REQUEST);
         }
         try {
-            [$ordnerPfad, $praefix] = $this->ordnerUndPraefix($id);
+            $ordnerPfad = $this->ablageOrdner($id);
         } catch (DoesNotExistException) {
             return new DataResponse(['fehler' => 'Vorstoss nicht gefunden'], Http::STATUS_NOT_FOUND);
         }
@@ -271,7 +289,7 @@ class VorstossController extends Controller
             return new DataResponse(['fehler' => 'Nicht angemeldet'], Http::STATUS_UNAUTHORIZED);
         }
         $sanitisiert = str_replace([' ', '/', '\\'], ['_', '_', '_'], $name);
-        $dateiName = $praefix . '-' . $sanitisiert . '.' . $extension;
+        $dateiName = $sanitisiert . '.' . $extension;
         try {
             $userFolder = $this->rootFolder->getUserFolder($user->getUID());
             $this->ordnerketteAnlegen($userFolder, $ordnerPfad);
@@ -287,6 +305,7 @@ class VorstossController extends Controller
                 }
             }
             $datei = $userFolder->newFile($zielPfad, $inhalt);
+            $this->dokumentLinks->verknuepfe('vorstoss', $id, $datei->getId());
             return new DataResponse([
                 'name' => $datei->getName(),
                 'pfad' => $zielPfad,
@@ -314,7 +333,7 @@ class VorstossController extends Controller
             return new DataResponse(['fehler' => 'Keine Datei hochgeladen'], Http::STATUS_BAD_REQUEST);
         }
         try {
-            [$ordnerPfad, $praefix] = $this->ordnerUndPraefix($id);
+            $ordnerPfad = $this->ablageOrdner($id);
         } catch (DoesNotExistException) {
             return new DataResponse(['fehler' => 'Vorstoss nicht gefunden'], Http::STATUS_NOT_FOUND);
         }
@@ -323,13 +342,14 @@ class VorstossController extends Controller
         try {
             $userFolder = $this->rootFolder->getUserFolder($user->getUID());
             $this->ordnerketteAnlegen($userFolder, $ordnerPfad);
-            $zielPfad = $ordnerPfad . '/' . $praefix . '-' . $sanitisiert;
+            $zielPfad = $ordnerPfad . '/' . $sanitisiert;
             $inhalt = file_get_contents($datei['tmp_name']);
             $node = $userFolder->nodeExists($zielPfad)
                 ? $userFolder->get($zielPfad)
                 : $userFolder->newFile($zielPfad, $inhalt);
             if ($node instanceof \OCP\Files\File) {
                 $node->putContent($inhalt);
+                $this->dokumentLinks->verknuepfe('vorstoss', $id, $node->getId());
             }
             return new DataResponse([
                 'name' => $node->getName(),

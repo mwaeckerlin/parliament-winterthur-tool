@@ -252,6 +252,9 @@
               :praefix="sitzung.datum"
               :jahr-text="(sitzung.datum || '').slice(0, 4)"
               :ordner-hinweis="`Fraktion/10_Sitzungen/${(sitzung.datum || '').slice(0, 4)}/${sitzung.datum}-*`"
+              objekt-typ="sitzung"
+              :objekt-id="sitzung.id"
+              :start-pfad="`Fraktion/10_Sitzungen/${(sitzung.datum || '').slice(0, 4)}`"
             />
           </div>
 
@@ -269,6 +272,23 @@
               label="label"
               placeholder="Geschäft verknüpfen…"
               @update:model-value="opt => geschaeftAusgewaehlt(sitzung.id, opt)"
+            />
+          </div>
+
+          <!-- Verknüpfte Vorstösse (eigene und fremde) -->
+          <div class="pw-sitzung-vorstoesse">
+            <h4>Verknüpfte Vorstösse</h4>
+            <ul v-if="(verknuepfteVorstossIds[sitzung.id] || []).length" class="pw-verknuepfte-vorstoesse">
+              <li v-for="vid in verknuepfteVorstossIds[sitzung.id]" :key="vid">
+                <span>{{ vorstossTitel(vid) }}</span>
+                <button type="button" class="button pw-btn-mini" title="Verknüpfung lösen" @click="entlinkeVorstossVonSitzung(sitzung.id, vid)">✕</button>
+              </li>
+            </ul>
+            <NcSelect
+              :options="vorstoesseOptionenFuer(sitzung.id)"
+              label="label"
+              placeholder="Vorstoss verknüpfen…"
+              @update:model-value="opt => vorstossAusgewaehlt(sitzung.id, opt)"
             />
           </div>
 
@@ -378,7 +398,7 @@
                     <tbody>
                       <template v-for="t in gefilterteTraktanden(sitzung.id)" :key="t.id">
                         <tr
-                          :class="['pw-table-row-clickable', { 'pw-geloescht': t.geschaeft?.geloescht }]"
+                          :class="['pw-table-row-clickable', { 'pw-geloescht': t.geschaeft?.geloescht, 'pw-prio-hoch': t.geschaeft?.prioritaet === 'hoch', 'pw-prio-tief': t.geschaeft?.prioritaet === 'tief' }]"
                           tabindex="0"
                           role="button"
                           :aria-label="`Traktandum ${t.nummer} öffnen`"
@@ -482,7 +502,7 @@
                     v-for="t in gefilterteTraktanden(sitzung.id)"
                     :key="`karte-${t.id}`"
                     class="pw-traktandum-karte"
-                    :class="{ 'pw-geloescht': t.geschaeft?.geloescht }"
+                    :class="{ 'pw-geloescht': t.geschaeft?.geloescht, 'pw-prio-hoch': t.geschaeft?.prioritaet === 'hoch', 'pw-prio-tief': t.geschaeft?.prioritaet === 'tief' }"
                   >
                     <div
                       class="pw-traktandum-karte-kopf"
@@ -661,6 +681,10 @@ export default {
       verknuepfteSitzungen: {},
       verknuepfteGeschaeftIds: {},
       geschaefteAlle: [],
+      verknuepfteVorstossIds: {},
+      vorstoesseAlle: [],
+      verknuepfteVorstossIds: {},
+      vorstoesseAlle: [],
       neuesTodoText: {},
       ausgewaehlteGeschaeftId: null,
       ausgewaehltesGeschaeftTraktandumKontext: null,
@@ -942,8 +966,11 @@ export default {
     },
     vollerName,
     personKey,
-    async ladeSitzungen() {
-      this.laden = true
+    async ladeSitzungen(zeigeLaden = true) {
+      // Bei Realtime-Updates KEIN Lade-Zustand: sonst verschwindet die Liste kurz
+      // (v-if auf `laden`) und der Scrollbalken/Fokus springt bei allen Mitlesenden.
+      // Die eigentliche Aktualisierung läuft über mergeSitzungen() in-place.
+      if (zeigeLaden) this.laden = true
       try {
         const { data } = await axios.get(generateUrl('/apps/parlwin/sitzungen'), {
           params: { limit: 100 },
@@ -952,7 +979,7 @@ export default {
       } catch (e) {
         console.error('Fehler beim Laden der Sitzungen:', e)
       } finally {
-        this.laden = false
+        if (zeigeLaden) this.laden = false
       }
     },
     // Aktualisiert die Sitzungsliste in-place, damit ein Realtime-Sync nicht das
@@ -986,6 +1013,8 @@ export default {
         await this.ladeVerknuepfteSitzungen(id)
         await this.ladeGeschaefteAlle()
         await this.ladeVerknuepfteGeschaefte(id)
+        await this.ladeVorstoesseAlle()
+        await this.ladeVerknuepfteVorstoesse(id)
       }
     },
     async ladeVerknuepfteGeschaefte(id) {
@@ -1043,6 +1072,55 @@ export default {
       try {
         const { data } = await axios.delete(generateUrl(`/apps/parlwin/sitzungen/${sitzungId}/geschaefte/${geschaeftId}`))
         this.verknuepfteGeschaeftIds = { ...this.verknuepfteGeschaeftIds, [sitzungId]: (data && data.geschaeftIds) || [] }
+      } catch (e) {
+        showError('Verknüpfung konnte nicht gelöst werden: ' + (e?.response?.data?.fehler || e?.message || ''))
+      }
+    },
+    // --- Verknüpfte Vorstösse (eigene und fremde), analog zu den Geschäften ---
+    async ladeVorstoesseAlle() {
+      if (this.vorstoesseAlle.length) return
+      try {
+        const { data } = await axios.get(generateUrl('/apps/parlwin/vorstoesse'))
+        this.vorstoesseAlle = Array.isArray(data) ? data : []
+      } catch (e) {
+        this.vorstoesseAlle = []
+      }
+    },
+    async ladeVerknuepfteVorstoesse(id) {
+      try {
+        const { data } = await axios.get(generateUrl(`/apps/parlwin/sitzungen/${id}/vorstoesse`))
+        this.verknuepfteVorstossIds = { ...this.verknuepfteVorstossIds, [id]: (data && data.vorstossIds) || [] }
+      } catch (e) {
+        this.verknuepfteVorstossIds = { ...this.verknuepfteVorstossIds, [id]: [] }
+      }
+    },
+    vorstossTitel(vorstossId) {
+      const v = this.vorstoesseAlle.find(x => x.id === vorstossId)
+      if (!v) return '#' + vorstossId
+      const herkunft = v.herkunft === 'fremde' ? 'fremd' : 'eigen'
+      return `${v.titel || ''} (${v.art || herkunft})`.trim()
+    },
+    vorstoesseOptionenFuer(sitzungId) {
+      const verknuepft = new Set(this.verknuepfteVorstossIds[sitzungId] || [])
+      return this.vorstoesseAlle
+        .filter(v => !v.geloescht && !verknuepft.has(v.id))
+        .map(v => ({ id: v.id, label: `${v.titel || ''} (${v.art || (v.herkunft === 'fremde' ? 'fremd' : 'eigen')})`.trim() }))
+    },
+    vorstossAusgewaehlt(sitzungId, opt) {
+      if (opt && opt.id) this.verlinkeVorstossMitSitzung(sitzungId, opt.id)
+    },
+    async verlinkeVorstossMitSitzung(sitzungId, vorstossId) {
+      try {
+        const { data } = await axios.post(generateUrl(`/apps/parlwin/sitzungen/${sitzungId}/vorstoesse`), { vorstossId })
+        this.verknuepfteVorstossIds = { ...this.verknuepfteVorstossIds, [sitzungId]: (data && data.vorstossIds) || [] }
+      } catch (e) {
+        showError('Vorstoss konnte nicht verknüpft werden: ' + (e?.response?.data?.fehler || e?.message || ''))
+      }
+    },
+    async entlinkeVorstossVonSitzung(sitzungId, vorstossId) {
+      try {
+        const { data } = await axios.delete(generateUrl(`/apps/parlwin/sitzungen/${sitzungId}/vorstoesse/${vorstossId}`))
+        this.verknuepfteVorstossIds = { ...this.verknuepfteVorstossIds, [sitzungId]: (data && data.vorstossIds) || [] }
       } catch (e) {
         showError('Verknüpfung konnte nicht gelöst werden: ' + (e?.response?.data?.fehler || e?.message || ''))
       }
@@ -1105,7 +1183,7 @@ export default {
     handleRealtimeEvent(event) {
       const type = event?.type || ''
       if (type === 'sync.completed' || type === 'sitzungen.updated') {
-        this.ladeSitzungen()
+        this.ladeSitzungen(false)
       }
       if (type === 'traktanden.updated') {
         const sitzungId = Number(event?.payload?.sitzungId || 0)

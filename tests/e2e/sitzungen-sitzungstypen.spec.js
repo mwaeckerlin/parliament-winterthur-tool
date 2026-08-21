@@ -967,6 +967,32 @@ test.describe('Sitzungen: Verknüpfungen und To-do', () => {
     expect(jsFehler, `JS-Fehler: ${jsFehler.join(' | ')}`).toEqual([])
   })
 
+  test('Verknüpfte Vorstösse hinzufügen und wieder lösen', async ({ page }) => {
+    const stamp = Date.now()
+    const name = `E2E-VerknV-Typ ${stamp}`
+    const titel = `E2E-VerknV-Sitzung ${stamp}`
+    await login(page, USER)
+    // Einen Vorstoss anlegen, damit die Auswahl sicher etwas bietet.
+    const vorstoss = await (await apiPost(page, '/vorstoesse', { titel: `E2E-Vorstoss ${stamp}` })).json()
+    expect(vorstoss && vorstoss.id, 'Vorstoss nicht angelegt').toBeTruthy()
+
+    const typId = await createSitzungstyp(page, { name })
+    const s = await createSitzung(page, { typId, datum: inEinerWoche(), titel })
+    await gotoView(page, 'Sitzungen')
+    const karte = await oeffneSitzung(page, s.id)
+
+    const bereich = karte.locator('.pw-sitzung-vorstoesse')
+    await expect(bereich).toBeVisible()
+    // Einen Vorstoss über das Select verknüpfen.
+    await ncSelectWaehle(page, bereich.locator('.v-select'))
+    await expect(bereich.locator('.pw-verknuepfte-vorstoesse li')).toHaveCount(1, { timeout: 15_000 })
+
+    // Wieder lösen (✕).
+    await bereich.locator('.pw-verknuepfte-vorstoesse li button[title="Verknüpfung lösen"]').click()
+    await expect(bereich.locator('.pw-verknuepfte-vorstoesse li')).toHaveCount(0, { timeout: 15_000 })
+    expect(jsFehler, `JS-Fehler: ${jsFehler.join(' | ')}`).toEqual([])
+  })
+
   test('To-do zu Deck: nach dem Hinzufügen ist das Eingabefeld leer bzw. es erscheint ein Fehler-Toast', async ({ page }) => {
     const stamp = Date.now()
     const name = `E2E-Todo-Typ ${stamp}`

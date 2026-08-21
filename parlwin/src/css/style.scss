@@ -161,7 +161,11 @@
 .pw-nav-filter {
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
+  /* KEIN justify-content: flex-end – das klemmt bei Überlauf den oberen Rand
+     unerreichbar über den scrollbaren Bereich (Flexbox-Overflow-Bug) und lässt
+     die obersten Filter die Navi-Einträge überdecken. Das Bottom-Anchoring
+     übernimmt margin-block-start: auto am Body (kollabiert bei Überlauf → oben
+     erreichbar, scrollt sauber). */
   gap: var(--pw-gap-1);
   padding: var(--pw-gap-1);
   inline-size: 100%;
@@ -172,6 +176,8 @@
 .pw-nav-filter .pw-filter-body {
   display: flex;
   flex-direction: column;
+  /* schiebt den Filter bei freiem Platz nach unten, gibt ihn bei Überlauf frei */
+  margin-block-start: auto;
   gap: var(--pw-gap-1);
 }
 
@@ -1605,9 +1611,11 @@
   opacity: 0.68;
 }
 
-/* Priorität in den Übersichten: «hoch» dezent hervorheben, «tief» abschwächen. */
+/* Priorität in ALLEN Übersichten (Geschäfte, Vorstösse, Sitzungs-Traktanden):
+   «hoch» dezent hervorheben, «tief» abschwächen. */
 .pw-data-card.pw-prio-hoch,
-.pw-tabelle-geschaefte tr.pw-prio-hoch > td {
+.pw-traktandum-karte.pw-prio-hoch,
+tr.pw-prio-hoch > td {
   background: var(--pw-prio-hoch-bg);
 }
 .pw-prio-tief {

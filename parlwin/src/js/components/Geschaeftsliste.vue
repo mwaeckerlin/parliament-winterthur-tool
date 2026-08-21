@@ -10,6 +10,11 @@
       <PwMultiSelect :model-value="filterZustaendige" :options="zustaendigeLabels" input-label="Zuständigkeit" placeholder="Alle" @update:model-value="filterZustaendige = $event || []" />
       <PwMultiSelect :model-value="filterBeschlussOptions" :options="beschlussOptionsList" input-label="Beschluss" placeholder="Alle" @update:model-value="filterBeschluss = ($event || []).map(o => o.value)" />
       <PwMultiSelect :model-value="filterPrioritaetOptions" :options="prioritaetOptionen" input-label="Priorität" placeholder="Alle" @update:model-value="filterPrioritaet = ($event || []).map(o => o.value)" />
+      <PwMultiSelect :model-value="filterEinreicher" :options="einreicherOptionen" input-label="Einreicher" placeholder="Alle" @update:model-value="filterEinreicher = $event || []" />
+      <NcCheckboxRadioSwitch v-model="nurErsteinreicher" type="switch">
+        Nur Ersteinreicher
+      </NcCheckboxRadioSwitch>
+      <PwMultiSelect :model-value="filterPartei" :options="parteiOptionen" input-label="Partei" placeholder="Alle" @update:model-value="filterPartei = $event || []" />
       <NcCheckboxRadioSwitch v-model="zeigeErledigte" type="switch">
         Erledigte anzeigen
       </NcCheckboxRadioSwitch>
@@ -218,6 +223,9 @@ export default {
       filterTyp: [],
       filterZustaendige: [],
       filterBeschluss: [],
+      filterEinreicher: [],
+      filterPartei: [],
+      nurErsteinreicher: false,
       filterEntscheidungsbedarf: '',
       zeigeErledigte: false,
       sortFeld: 'datum',
@@ -249,6 +257,34 @@ export default {
     },
     alleTypen() {
       return [...new Set(this.geschaefte.map(g => g.typ).filter(Boolean))].sort()
+    },
+    // Auswahl der Einreicher-Personen: die Namen aller Einreicher über alle Geschäfte.
+    einreicherOptionen() {
+      const namen = new Set()
+      this.geschaefte.forEach(g => this.einreicherNamen(g).forEach(n => namen.add(n)))
+      return [...namen].sort((a, b) => a.localeCompare(b))
+    },
+    // Auswahl der Parteien: die Parteien, die als Einreicher tatsächlich vorkommen.
+    parteiOptionen() {
+      const parteien = new Set()
+      this.geschaefte.forEach(g => this.einreicherParteien(g).forEach(p => parteien.add(p)))
+      return [...parteien].sort((a, b) => a.localeCompare(b))
+    },
+    // Nachschlage-Index Einreicher→Partei aus den Mitgliedern (Personen-ID der
+    // Webseite zuerst, sonst normalisierter Name — wie im Backend beim Zuordnen
+    // der einreichenden Mitglieder).
+    parteiIndex() {
+      const byExtern = {}
+      const byName = {}
+      this.mitglieder.forEach(m => {
+        const partei = m.partei || m.Partei || ''
+        if (!partei) return
+        const extId = String(m.externId || m.extern_id || '')
+        if (extId) byExtern[extId] = partei
+        const name = this.normEinreicherName(m.name || '')
+        if (name) byName[name] = partei
+      })
+      return { byExtern, byName }
     },
     prioritaetOptionen() {
       return PRIORITAETEN
@@ -366,6 +402,17 @@ export default {
       }
       if (this.filterPrioritaet.length > 0) {
         liste = liste.filter(g => this.filterPrioritaet.includes(this.prioritaetEffektiv(g)))
+      }
+      // Einreicher-Person: standardmässig trifft jeder Einreicher; mit «Nur
+      // Ersteinreicher» nur der erste (Erstunterzeichner) eines Geschäfts.
+      if (this.filterEinreicher.length > 0) {
+        liste = liste.filter(g => this.nurErsteinreicher
+          ? this.filterEinreicher.includes(this.ersteinreicherName(g))
+          : this.einreicherNamen(g).some(n => this.filterEinreicher.includes(n)))
+      }
+      // Partei: das Geschäft trifft, wenn eine Partei eines Einreichers gewählt ist.
+      if (this.filterPartei.length > 0) {
+        liste = liste.filter(g => this.einreicherParteien(g).some(p => this.filterPartei.includes(p)))
       }
 
       liste.sort((a, b) => {
@@ -500,8 +547,10 @@ export default {
       }
       this.ladeGeschaefte()
     },
-    async ladeGeschaefte() {
-      this.laden = true
+    async ladeGeschaefte(zeigeLaden = true) {
+      // Bei Realtime-Reloads KEIN Lade-Flackern (sonst verschwindet die Liste kurz
+      // und der Scrollbalken/Fokus springt); mergeGeschaefte() patcht in-place.
+      if (zeigeLaden) this.laden = true
       try {
         const params = { limit: 500 }
         params.show_erledigt = this.zeigeErledigte ? '1' : '0'
@@ -513,7 +562,7 @@ export default {
       } catch (fehler) {
         console.error('Fehler beim Laden der Geschäfte:', fehler)
       } finally {
-        this.laden = false
+        if (zeigeLaden) this.laden = false
       }
     },
     // In-place-Merge (wie bei den Sitzungen): ein Realtime-Sync baut so nicht das
@@ -544,7 +593,7 @@ export default {
       if (this.reloadTimer) return
       this.reloadTimer = window.setTimeout(async () => {
         this.reloadTimer = null
-        await this.ladeGeschaefte()
+        await this.ladeGeschaefte(false)
       }, 250)
     },
     sortiereNach(feld) {
@@ -600,6 +649,9 @@ export default {
       this.filterTyp = []
       this.filterZustaendige = []
       this.filterBeschluss = []
+      this.filterEinreicher = []
+      this.filterPartei = []
+      this.nurErsteinreicher = false
       this.filterEntscheidungsbedarf = ''
       this.zeigeErledigte = false
       this.ladeGeschaefte()
@@ -629,6 +681,32 @@ export default {
       const liste = g.einreicher
       if (!Array.isArray(liste) || liste.length === 0) return ''
       return liste.map(p => p.name).join(', ')
+    },
+    // Normalisierung wie im Backend (trim, Mehrfach-Leerzeichen zu einem, klein).
+    normEinreicherName(name) {
+      return String(name || '').trim().replace(/\s+/g, ' ').toLowerCase()
+    },
+    einreicherNamen(g) {
+      const liste = Array.isArray(g.einreicher) ? g.einreicher : []
+      return liste.map(e => e && e.name).filter(Boolean)
+    },
+    ersteinreicherName(g) {
+      const liste = Array.isArray(g.einreicher) ? g.einreicher : []
+      return (liste[0] && liste[0].name) || ''
+    },
+    // Distinkte Parteien der Einreicher eines Geschäfts (über die Mitglieder aufgelöst).
+    einreicherParteien(g) {
+      const liste = Array.isArray(g.einreicher) ? g.einreicher : []
+      const idx = this.parteiIndex
+      const out = new Set()
+      liste.forEach(e => {
+        if (!e) return
+        const extId = String(e.externId || e.extern_id || '')
+        let partei = extId && idx.byExtern[extId] ? idx.byExtern[extId] : ''
+        if (!partei) partei = idx.byName[this.normEinreicherName(e.name || '')] || ''
+        if (partei) out.add(partei)
+      })
+      return [...out]
     },
     formatieredatumKurz(datum) {
       if (!datum) return ''

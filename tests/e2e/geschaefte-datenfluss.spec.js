@@ -536,7 +536,8 @@ test.describe('Geschäfteliste: Filter und Suche', () => {
     await page.waitForLoadState('networkidle')
     await expect(page.locator('#pw-search-slot input')).toHaveValue('')
     // Schalter wieder aus: erledigte nicht mehr gelistet – der Zähler geht zurück auf die kleine Standardmenge.
-    await expect(page.locator('#pw-filter-slot .checkbox-radio-switch input[type="checkbox"]')).not.toBeChecked()
+    // Gezielt der «Erledigte anzeigen»-Schalter (der Filter hat mehrere Switches).
+    await expect(page.locator('#pw-filter-slot').getByRole('checkbox', { name: 'Erledigte anzeigen' })).not.toBeChecked()
   })
 
   test('Entscheidungsbedarf-Auswahl lädt die Liste neu und behält Geschäfte', async ({ page }) => {

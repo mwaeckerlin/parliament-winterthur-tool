@@ -15,11 +15,12 @@
           <span class="pw-dokument-name">{{ d.name }}</span>
         </a>
         <a :href="downloadUrl(d)" class="button pw-btn-mini" :download="d.name" title="Herunterladen">⤓</a>
+        <button v-if="d.verknuepft" type="button" class="button pw-btn-mini" title="Verknüpfung lösen" @click="linkLoesen(d)">✕</button>
       </li>
     </ul>
 
-    <div v-if="bereit" class="pw-dokument-aktionen">
-      <NcActions v-model:open="menuOffen" :menu-name="'+ Neues Dokument'" type="primary">
+    <div v-if="bereit || hatLinks" class="pw-dokument-aktionen">
+      <NcActions v-if="bereit" v-model:open="menuOffen" :menu-name="'+ Neues Dokument'" type="primary">
         <NcActionButton
           v-for="t in vorlagen"
           :key="t.label + t.extension"
@@ -28,7 +29,8 @@
           {{ t.label }}
         </NcActionButton>
       </NcActions>
-      <button type="button" class="button" @click="uploadKlick">⤒ Hochladen</button>
+      <button v-if="bereit" type="button" class="button" @click="uploadKlick">⤒ Hochladen</button>
+      <button v-if="hatLinks" type="button" class="button" @click="verknuepfenKlick">🔗 Verknüpfen</button>
       <input
         ref="uploadInput"
         type="file"
@@ -46,9 +48,9 @@
           </div>
           <div class="pw-modal-body">
             <label>
-              Dateiname (ohne Präfix und Endung)
+              {{ praefixWert ? 'Dateiname (ohne Präfix und Endung)' : 'Dateiname (ohne Endung)' }}
               <div class="pw-dokument-name-vorschau">
-                <span class="pw-dokument-praefix">{{ praefixWert }}-</span>
+                <span v-if="praefixWert" class="pw-dokument-praefix">{{ praefixWert }}-</span>
                 <input ref="nameInput" v-model="neuerName" type="text" class="pw-input" placeholder="z. B. Überweisung Rede" @keyup.enter="dokumentErstellen" />
                 <span class="pw-dokument-suffix">.{{ aktiveVorlage?.extension }}</span>
               </div>
@@ -75,6 +77,7 @@
 <script>
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
+import { getFilePickerBuilder } from '@nextcloud/dialogs'
 import NcActions from '@nextcloud/vue/components/NcActions'
 import NcActionButton from '@nextcloud/vue/components/NcActionButton'
 
@@ -105,6 +108,12 @@ export default {
     // Vorschlag für den Dateinamen (Geschäfts-/Vorstoss-Titel); wird beim
     // Erstellen normalisiert vorbelegt.
     titel: { type: String, default: '' },
+    // Explizite Verknüpfung bestehender Dateien (überall gleich): Objekttyp
+    // (vorstoss|geschaeft|sitzung) + Objekt-ID. Nur gesetzt → «Verknüpfen»-Knopf.
+    objektTyp: { type: String, default: '' },
+    objektId: { type: Number, default: 0 },
+    // Startordner des Filepickers (Default: aktuelles Jahr, aber frei navigierbar).
+    startPfad: { type: String, default: '' },
   },
   data() {
     return {
@@ -135,11 +144,17 @@ export default {
       return m ? m[1] : ''
     },
     bereit() {
-      return !!(this.apiBasis ? this.praefixWert : (this.geschaeftId && this.geschaeftNummer))
+      // apiBasis-Modus (Vorstoss/Sitzung): der Ablageordner ergibt sich aus der
+      // Basis-URL; ein Datei-Präfix ist NICHT mehr nötig (jahr-basierte Ablage).
+      return !!(this.apiBasis ? this.apiBasis : (this.geschaeftId && this.geschaeftNummer))
     },
     // Titel als Dateiname-Vorschlag: Leerzeichen und Pfadtrenner → «_».
     standardName() {
       return (this.titel || '').trim().replace(/[ /\\]+/g, '_')
+    },
+    // «Verknüpfen» steht bereit, sobald Objekttyp und -ID gesetzt sind.
+    hatLinks() {
+      return !!(this.objektTyp && this.objektId)
     },
   },
   watch: {
@@ -147,18 +162,31 @@ export default {
     geschaeftNummer() { this.laden_() },
     apiBasis() { this.laden_() },
     praefix() { this.laden_() },
+    objektTyp() { this.laden_() },
+    objektId() { this.laden_() },
   },
   mounted() { this.laden_() },
   methods: {
     async laden_() {
-      if (!this.bereit) {
+      if (!this.bereit && !this.hatLinks) {
         this.dokumente = []
         return
       }
       this.laden = true
       try {
-        const { data } = await axios.get(generateUrl(`${this.basis}/dokumente`))
-        this.dokumente = Array.isArray(data) ? data : []
+        const eintraege = []
+        const gesehen = new Set()
+        if (this.bereit) {
+          const { data } = await axios.get(generateUrl(`${this.basis}/dokumente`))
+          ;(Array.isArray(data) ? data : []).forEach(d => { eintraege.push(d); gesehen.add(d.fileId) })
+        }
+        if (this.hatLinks) {
+          const { data } = await axios.get(generateUrl(`/apps/parlwin/dokument-links/${this.objektTyp}/${this.objektId}`))
+          ;(Array.isArray(data) ? data : []).forEach(d => {
+            if (!gesehen.has(d.fileId)) { eintraege.push({ ...d, verknuepft: true }); gesehen.add(d.fileId) }
+          })
+        }
+        this.dokumente = eintraege
       } catch (e) {
         console.error('parlwin: Dokumente laden fehlgeschlagen', e)
         this.dokumente = []
@@ -172,7 +200,8 @@ export default {
     },
     downloadUrl(d) {
       // Direkter Download via WebDAV-kompatiblem Files-Endpunkt.
-      return generateUrl(`/apps/files/ajax/download.php?dir=${encodeURIComponent('/' + d.pfad.replace(/\/[^/]+$/, ''))}&files=${encodeURIComponent(d.name)}`)
+      const pfad = String(d.pfad || '')
+      return generateUrl(`/apps/files/ajax/download.php?dir=${encodeURIComponent('/' + pfad.replace(/\/[^/]+$/, ''))}&files=${encodeURIComponent(d.name)}`)
     },
     vorlageGewaehlt(t) {
       // NcActions schliesst sich auf NcActionButton-Klicks nicht immer
@@ -262,6 +291,38 @@ export default {
         this.meldung = 'Fehler: ' + (e?.response?.data?.fehler || e.message)
       } finally {
         this.laeuft = false
+      }
+    },
+    // «Verknüpfen»: NC-Standard-Filepicker (öffnet im Startordner, frei
+    // navigierbar); die gewählte Datei wird unabhängig vom Namen verknüpft.
+    async verknuepfenKlick() {
+      let pfad = ''
+      try {
+        const picker = getFilePickerBuilder('Bestehende Datei verknüpfen')
+          .setMultiSelect(false)
+          .allowDirectories(false)
+          .startAt(this.startPfad || '/')
+          .build()
+        pfad = await picker.pick()
+      } catch (e) {
+        return // im Filepicker abgebrochen
+      }
+      if (!pfad) return
+      try {
+        await axios.post(generateUrl(`/apps/parlwin/dokument-links/${this.objektTyp}/${this.objektId}`), { pfad })
+        this.meldung = 'Datei verknüpft'
+        setTimeout(() => { this.meldung = '' }, 2500)
+        await this.laden_()
+      } catch (e) {
+        this.meldung = 'Verknüpfen fehlgeschlagen: ' + (e?.response?.data?.fehler || e?.message || '')
+      }
+    },
+    async linkLoesen(d) {
+      try {
+        await axios.delete(generateUrl(`/apps/parlwin/dokument-links/${this.objektTyp}/${this.objektId}/${d.fileId}`))
+        await this.laden_()
+      } catch (e) {
+        this.meldung = 'Lösen fehlgeschlagen: ' + (e?.response?.data?.fehler || e?.message || '')
       }
     },
   },

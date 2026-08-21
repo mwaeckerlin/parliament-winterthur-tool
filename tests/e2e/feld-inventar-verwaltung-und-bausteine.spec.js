@@ -655,7 +655,7 @@ test.describe('Feld-Inventar: Dokumente', () => {
     await expect(dokumente, 'Dokumente-Baustein fehlt').toBeVisible()
     await expect(dokumente.locator('.pw-dokumente-kopf h4'), 'Überschrift «Dokumente» fehlt').toHaveText('Dokumente')
     await expect(dokumente.locator('.pw-dokumente-kopf code'), 'Pfadhinweis fehlt oder zeigt den falschen Ordner')
-      .toHaveText(/^Fraktion\/40_Vorstösse\/10_Eigene\/V\d+-\*$/)
+      .toHaveText(/^Fraktion\/40_Vorstösse\/10_Eigene\/\d{4}\/\*$/)
 
     // Der NcActions-Auslöser ist das erste beschriftbare Element im PwField-<label>
     // und erbt darum dessen zugänglichen Namen «Dokument» — über den Text ansprechen.
@@ -687,8 +687,8 @@ test.describe('Feld-Inventar: Dokumente', () => {
     await expect(dialog.locator('h3'), 'der Dialog nennt die gewählte Vorlage nicht')
       .toHaveText(`Neues Dokument: ${DOKUMENT_VORLAGEN[0]}`)
     await expect(dialog.locator('label'), 'Beschriftung des Namensfelds fehlt')
-      .toContainText('Dateiname (ohne Präfix und Endung)')
-    await expect(dialog.locator('.pw-dokument-praefix'), 'Präfix fehlt in der Namensvorschau').toHaveText(/^V\d+-$/)
+      .toContainText('Dateiname (ohne Endung)')
+    await expect(dialog.locator('.pw-dokument-praefix'), 'Der interne V-Präfix darf im Vorstoss-Dokumentnamen nicht mehr erscheinen').toHaveCount(0)
     await expect(dialog.locator('.pw-dokument-suffix'), 'Endung fehlt in der Namensvorschau').toHaveText('.docx')
     const nameFeld = dialog.locator('input.pw-input')
     await expect(nameFeld, 'Namensfeld fehlt').toBeVisible()

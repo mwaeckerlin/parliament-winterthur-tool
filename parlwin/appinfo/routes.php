@@ -16,6 +16,9 @@ return [
         ['name' => 'geschaeft#setPrioritaet', 'url' => '/geschaefte/{id}/prioritaet', 'verb' => 'PUT'],
         ['name' => 'geschaeft#verknuepfen', 'url' => '/geschaefte/{id}/verknuepfen', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
         ['name' => 'geschaeft#verknuepfteEigene', 'url' => '/geschaefte/{id}/verknuepfte-eigene', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
+        ['name' => 'dokument_link#index', 'url' => '/dokument-links/{objektTyp}/{objektId}', 'verb' => 'GET', 'requirements' => ['objektId' => '\d+']],
+        ['name' => 'dokument_link#verknuepfe', 'url' => '/dokument-links/{objektTyp}/{objektId}', 'verb' => 'POST', 'requirements' => ['objektId' => '\d+']],
+        ['name' => 'dokument_link#loese', 'url' => '/dokument-links/{objektTyp}/{objektId}/{fileId}', 'verb' => 'DELETE', 'requirements' => ['objektId' => '\d+', 'fileId' => '\d+']],
         ['name' => 'geschaeft#notizen', 'url' => '/geschaefte/{id}/notizen', 'verb' => 'GET'],
         ['name' => 'geschaeft#addNotiz', 'url' => '/geschaefte/{id}/notizen', 'verb' => 'POST'],
         ['name' => 'geschaeft#updateNotiz', 'url' => '/geschaefte/{id}/notizen/{aktionId}', 'verb' => 'PUT'],
@@ -49,6 +52,9 @@ return [
         ['name' => 'sitzung#geschaefte', 'url' => '/sitzungen/{id}/geschaefte', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
         ['name' => 'sitzung#geschaeftVerlinken', 'url' => '/sitzungen/{id}/geschaefte', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
         ['name' => 'sitzung#geschaeftEntlinken', 'url' => '/sitzungen/{id}/geschaefte/{geschaeftId}', 'verb' => 'DELETE', 'requirements' => ['id' => '\d+', 'geschaeftId' => '\d+']],
+        ['name' => 'sitzung#vorstoesse', 'url' => '/sitzungen/{id}/vorstoesse', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
+        ['name' => 'sitzung#vorstossVerlinken', 'url' => '/sitzungen/{id}/vorstoesse', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
+        ['name' => 'sitzung#vorstossEntlinken', 'url' => '/sitzungen/{id}/vorstoesse/{vorstossId}', 'verb' => 'DELETE', 'requirements' => ['id' => '\d+', 'vorstossId' => '\d+']],
         ['name' => 'sitzung#todoErstellen', 'url' => '/sitzungen/{id}/todo', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
 
         // Sitzungs-Vorlagen / Sitzungstypen.

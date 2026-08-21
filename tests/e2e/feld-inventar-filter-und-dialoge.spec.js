@@ -15,7 +15,7 @@ const U1 = { name: process.env.PW_U1 || 'parlwin_praesidium', pass: process.env.
 
 // --- Verbindliches Inventar der Filterbereiche ------------------------------
 
-const FILTER_GESCHAEFTE = ['Entscheidungsbedarf', 'Status', 'Typ', 'Zuständigkeit', 'Beschluss', 'Priorität']
+const FILTER_GESCHAEFTE = ['Entscheidungsbedarf', 'Status', 'Typ', 'Zuständigkeit', 'Beschluss', 'Priorität', 'Einreicher', 'Partei']
 const FILTER_VORSTOESSE = ['Herkunft', 'Status']
 const FILTER_MITGLIEDER = ['Sortieren nach', 'Fraktion', 'Partei', 'Kommission', 'Funktion']
 
@@ -69,8 +69,13 @@ test.describe('Feld-Inventar: Filterbereiche jeder Ansicht', () => {
     for (const f of FILTER_GESCHAEFTE) {
       expect(labels.join(' | '), `Filter «${f}» fehlt`).toContain(f)
     }
-    await expect(page.locator('#pw-filter-slot .checkbox-radio-switch'), 'Schalter «Erledigte anzeigen» fehlt')
-      .toBeVisible()
+    await expect(page.locator('#pw-filter-slot').getByText('Erledigte anzeigen'), 'Schalter «Erledigte anzeigen» fehlt').toBeVisible()
+    // Einreicher-Filter mit Toggle «Nur Ersteinreicher» (standardmässig aus).
+    await expect(page.locator('#pw-filter-slot').getByText('Nur Ersteinreicher'), 'Schalter «Nur Ersteinreicher» fehlt').toBeVisible()
+    await expect(
+      page.locator('#pw-filter-slot .checkbox-radio-switch', { hasText: 'Nur Ersteinreicher' }).locator('input[type="checkbox"]'),
+      '«Nur Ersteinreicher» muss standardmässig aus sein',
+    ).not.toBeChecked()
     await expect(page.getByRole('button', { name: 'Filter zurücksetzen' })).toBeVisible()
 
     // Funktion: Suche grenzt ein, Zurücksetzen stellt wieder her.

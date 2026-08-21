@@ -103,7 +103,10 @@ Nummern werden einmal vergeben und nie wiederverwendet; jeder Test in
   ausgeblendet und per Schalter einblendbar; Suche über Nummer und Titel;
   «Filter zurücksetzen».
 - **F17** Geschäfte mit hoher Priorität sind dezent hervorgehoben, solche mit tiefer
-  abgeschwächt; nicht gesetzte Priorität zählt wie mittel und zeigt «—».
+  abgeschwächt; nicht gesetzte Priorität zählt wie mittel und zeigt «—». Die
+  farbliche Hervorhebung gilt in **allen Ansichten**, in denen ein Geschäft
+  erscheint — in der Geschäfteliste (Tabelle und Karten), bei den Vorstössen und
+  bei den Traktanden einer Sitzung.
 - **F18** Eigene Geschäfte (ausserhalb des Parlamentsregisters) lassen sich anlegen.
   «+ Eigenes Geschäft» öffnet sofort die vollständige Geschäftsmaske — dieselbe
   wie bei jedem anderen Geschäft, mit allen Feldern, Notizen und Dokumenten.
@@ -149,6 +152,43 @@ Nummern werden einmal vergeben und nie wiederverwendet; jeder Test in
   Bei einem Geschäft von der Parlamentswebseite gibt es den Knopf «Mit offiziellem
   Geschäft verknüpfen» nicht (nur eigene Geschäfte lassen sich verknüpfen). Fehler
   beim Verknüpfen: «Verknüpfung fehlgeschlagen: …».
+
+- **F71** In der Geschäfteliste lässt sich zusätzlich nach **Einreicher** filtern —
+  je ein Filter für die **Person** und für die **Partei**, beide als Mehrfachauswahl
+  mit Platzhalter «Alle», im Filterbereich nach dem Prioritäts-Filter.
+    - **Einreicher (Person):** Auswahl aller Personen, die bei irgendeinem Geschäft
+      als Einreicher (Erst- oder Mitunterzeichner) vorkommen, alphabetisch sortiert.
+      Ist mindestens eine Person gewählt, erscheinen nur Geschäfte, bei denen eine
+      der gewählten Personen Einreicher ist.
+    - **Schalter «Nur Ersteinreicher»** (direkt beim Person-Filter, standardmässig
+      aus): eingeschaltet zählt nur der Erstunterzeichner (der erste Einreicher eines
+      Geschäfts) — es erscheinen dann nur Geschäfte, deren Erstunterzeichner eine der
+      gewählten Personen ist; blosse Mitunterzeichnerschaft genügt nicht mehr. Der
+      Schalter wirkt ausschliesslich auf den Person-Filter.
+    - **Partei:** Auswahl aller Parteien, die als Einreicher tatsächlich vorkommen,
+      alphabetisch sortiert. Die Partei eines Einreichers wird über die
+      Parlamentsmitglieder aufgelöst (Personen-ID der Webseite, sonst über den
+      Namen). Ist mindestens eine Partei gewählt, erscheinen nur Geschäfte, bei denen
+      ein Einreicher zu einer der gewählten Parteien gehört.
+    - «Filter zurücksetzen» leert auch diese beiden Filter und schaltet «Nur
+      Ersteinreicher» wieder aus.
+
+- **F72** An jeder Stelle mit Dokumenten (eigenes/offizielles Geschäft, Vorstoss,
+  Sitzung) steht dieselbe Dokument-Komponente. Neben «+ Neues Dokument» und
+  «Hochladen» gibt es den Knopf **«Verknüpfen»**: er öffnet den
+  Nextcloud-Standard-Dateiauswahldialog (startet im Jahres-Ordner des Objekts,
+  frei navigierbar) und nimmt eine **bestehende** Datei — unabhängig von ihrem
+  Namen und Ablageort — in die Dokumentliste auf. Verknüpfte Dokumente sind als
+  solche gekennzeichnet und lassen sich mit «✕» wieder lösen (die Datei selbst
+  bleibt bestehen). Die Dokumente werden jahr-basiert abgelegt (…/{Jahr}/…), nicht
+  mehr nach interner Versionsnummer.
+
+- **F73** Eine Sitzung lässt sich nicht nur mit Geschäften, sondern auch mit
+  **Vorstössen** verknüpfen (eigene wie fremde) — so werden sie an der Sitzung
+  traktandiert. Im aufgeklappten Sitzungsdetail steht dafür direkt unter
+  «Verknüpfte Geschäfte» der Bereich «Verknüpfte Vorstösse» mit der Auswahlliste
+  «Vorstoss verknüpfen…»; bereits verknüpfte Vorstösse werden ausgefiltert und
+  lassen sich je mit «✕» wieder lösen. Jeder Vorstoss erscheint mit Titel und Art.
 - **F19** Ein Klick öffnet das Geschäft mit allen öffentlichen Informationen und der
   fraktionsinternen Bearbeitung:
     - **F20** **Priorität** (hoch/mittel/tief, abwählbar).
@@ -761,7 +801,7 @@ Felder von oben nach unten:
     - Art: Texteingabe mit Vorschlagsliste (freier Text erlaubt), Platzhalter «Motion, Postulat, Interpellation …».
     - Pflichtfeld: nein.
     - Vorbelegung: die gespeicherte Art; bei neuem Vorstoss leer.
-    - Vorschlagswerte in dieser Reihenfolge: «Motion», «Postulat», «Interpellation», «Schriftliche Anfrage», «Dringliche Motion», «Dringliches Postulat», «Budgetmotion», «Fragestunde», «Einzelinitiative», «Parlamentarische Initiative». Die Liste ist fest hinterlegt; jeder andere Text ist ebenfalls zulässig.
+    - Vorschlagswerte in dieser Reihenfolge: «Motion», «Postulat», «Interpellation», «Schriftliche Anfrage», «Beschlussantrag», «Dringliche Motion», «Dringliches Postulat», «Budgetmotion», «Fragestunde», «Einzelinitiative», «Parlamentarische Initiative». Die Liste ist fest hinterlegt; jeder andere Text ist ebenfalls zulässig.
     - Speicherung: sofort bei Auswahl aus der Liste, beim Verlassen des Feldes oder nach fünf Sekunden ohne weitere Eingabe.
 3. **«Herkunft»** (erstes von drei nebeneinanderstehenden Feldern)
     - Art: Auswahlliste, nicht leerbar.

@@ -33,6 +33,7 @@ class SitzungController extends Controller
         private readonly IRootFolder $rootFolder,
         private readonly LoggerInterface $logger,
         private readonly SitzungGeschaeftService $sitzungGeschaeftService,
+        private readonly \OCA\ParliamentWinterthur\Service\SitzungVorstossService $sitzungVorstossService,
         private readonly \OCA\ParliamentWinterthur\Service\DeckService $deckService,
         private readonly \OCP\IConfig $config,
     ) {
@@ -83,6 +84,35 @@ class SitzungController extends Controller
     public function geschaefte(int $id): DataResponse
     {
         return new DataResponse(['geschaeftIds' => $this->sitzungGeschaeftService->geschaeftIdsFuerSitzung($id)]);
+    }
+
+    /** Verknüpft einen Vorstoss (eigen oder fremd) mit einer Sitzung — traktandiert ihn. */
+    #[NoAdminRequired]
+    public function vorstossVerlinken(int $id): DataResponse
+    {
+        $vorstossId = (int) $this->request->getParam('vorstossId', 0);
+        if ($vorstossId <= 0) {
+            return new DataResponse(['fehler' => 'vorstossId fehlt'], Http::STATUS_BAD_REQUEST);
+        }
+        $this->sitzungVorstossService->verlinke($id, $vorstossId);
+        $this->realtimePublisher->publish('sitzungen.updated', ['id' => $id]);
+        return new DataResponse(['vorstossIds' => $this->sitzungVorstossService->vorstossIdsFuerSitzung($id)]);
+    }
+
+    /** Löst die Verknüpfung eines Vorstosses von einer Sitzung. */
+    #[NoAdminRequired]
+    public function vorstossEntlinken(int $id, int $vorstossId): DataResponse
+    {
+        $this->sitzungVorstossService->entlinke($id, $vorstossId);
+        $this->realtimePublisher->publish('sitzungen.updated', ['id' => $id]);
+        return new DataResponse(['vorstossIds' => $this->sitzungVorstossService->vorstossIdsFuerSitzung($id)]);
+    }
+
+    /** Gibt die IDs der mit einer Sitzung verknüpften Vorstösse zurück. */
+    #[NoAdminRequired]
+    public function vorstoesse(int $id): DataResponse
+    {
+        return new DataResponse(['vorstossIds' => $this->sitzungVorstossService->vorstossIdsFuerSitzung($id)]);
     }
 
     /** Relativer Ordner für die Dokumente einer Sitzung (im Jahr der Sitzung). */

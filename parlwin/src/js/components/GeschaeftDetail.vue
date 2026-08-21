@@ -241,6 +241,9 @@
             :geschaeft-id="geschaeftId"
             :geschaeft-nummer="geschaeft.nummer || ''"
             :titel="geschaeft.titel || ''"
+            objekt-typ="geschaeft"
+            :objekt-id="geschaeftId"
+            :start-pfad="'Fraktion/20_Geschäfte/' + ((geschaeft.datum || '').slice(0, 4) || '')"
           />
         </div>
         </template>

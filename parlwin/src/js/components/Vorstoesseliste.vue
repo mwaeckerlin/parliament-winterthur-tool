@@ -161,10 +161,11 @@
             <PwField label="Dokument">
               <GeschaeftDokumente
                 :api-basis="`/apps/parlwin/vorstoesse/${bearbeitung.id}`"
-                :praefix="`V${bearbeitung.id}`"
-                jahr-text=" "
                 :ordner-hinweis="dokumentOrdnerHinweis"
                 :titel="bearbeitung.titel"
+                objekt-typ="vorstoss"
+                :objekt-id="bearbeitung.id"
+                :start-pfad="dokumentStartPfad"
               />
             </PwField>
             <PwField label="Notizen">
@@ -248,6 +249,7 @@ const STATUS = [
 // Bekannte Vorstoss-Arten; im BeschlussWidget frei überschreibbar.
 const VORSTOSS_ARTEN = [
   'Motion', 'Postulat', 'Interpellation', 'Schriftliche Anfrage',
+  'Beschlussantrag',
   'Dringliche Motion', 'Dringliches Postulat', 'Budgetmotion',
   'Fragestunde', 'Einzelinitiative', 'Parlamentarische Initiative',
 ]
@@ -364,7 +366,15 @@ export default {
     dokumentOrdnerHinweis() {
       if (!this.bearbeitung?.id) return ''
       const unter = this.bearbeitung.herkunft === 'fremde' ? '20_Fremde' : '10_Eigene'
-      return `Fraktion/40_Vorstösse/${unter}/V${this.bearbeitung.id}-*`
+      const jahr = (this.bearbeitung.erstelltAm || '').slice(0, 4) || String(new Date().getFullYear())
+      return `Fraktion/40_Vorstösse/${unter}/${jahr}/*`
+    },
+    // Startordner des Verknüpfen-Filepickers: Jahres-Ordner (navigierbar).
+    dokumentStartPfad() {
+      if (!this.bearbeitung?.id) return ''
+      const unter = this.bearbeitung.herkunft === 'fremde' ? '20_Fremde' : '10_Eigene'
+      const jahr = (this.bearbeitung.erstelltAm || '').slice(0, 4) || String(new Date().getFullYear())
+      return `Fraktion/40_Vorstösse/${unter}/${jahr}`
     },
     gefiltert() {
       const q = (this.suche || '').toLowerCase().trim()

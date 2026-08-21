@@ -1,5 +1,18 @@
 # Changelog
 
+- 2026-08-22 **1.8.0**
+    - In der Geschäfteliste lässt sich neu nach Einreicher filtern — je ein Filter für die Person und für die Partei
+        - Beim Person-Filter schaltet «Nur Ersteinreicher» (standardmässig aus) die Auswahl auf den Erstunterzeichner um; sonst zählt jeder Einreicher (Erst- und Mitunterzeichner)
+        - Der Partei-Filter zeigt Geschäfte, bei denen ein Einreicher zur gewählten Partei gehört
+    - Dokumente lassen sich überall gleich verwalten und zusätzlich mit bestehenden Dateien verknüpfen
+        - Neuer Knopf «Verknüpfen» (neben «+ Neues Dokument» und «Hochladen»): eine bestehende Datei über den Dateiauswahldialog einbinden, unabhängig vom Dateinamen; der Dialog startet im Jahres-Ordner, ist aber frei navigierbar
+        - Verknüpfte Dokumente sind gekennzeichnet und lassen sich wieder lösen (die Datei selbst bleibt bestehen)
+        - Dokument-Ordner sind jahr-basiert statt nach interner Versionsnummer (kein «V6-» mehr im Pfad)
+    - Behoben: Änderungen anderer Nutzer liessen die Liste kurz verschwinden und den Scrollbalken/Fokus springen — Sitzungen und Geschäfte aktualisieren sich jetzt an Ort und Stelle, ohne Lade-Flackern
+    - «Beschlussantrag» ist neu als Vorstossart wählbar
+    - Wichtigkeit (Priorität) ist jetzt in allen Ansichten farblich hinterlegt — auch bei den Traktanden einer Sitzung
+    - Eine Sitzung lässt sich jetzt auch mit Vorstössen verknüpfen (eigene wie fremde) — im Sitzungsdetail unter «Verknüpfte Vorstösse», damit sie an der Sitzung traktandiert sind
+
 - 2026-08-10 **1.7.34**
     - Ein selbst angelegtes Geschäft lässt sich jetzt mit dem offiziellen Parlamentsgeschäft verknüpfen — genau wie ein Vorstoss mit einem Geschäft
         - In der Maske eines eigenen Geschäfts öffnet «Mit offiziellem Geschäft verknüpfen» einen Auswahldialog, der die ähnlichsten Geschäfte zuoberst vorschlägt (Suche nach Nummer oder Titel möglich); angeboten werden nur offizielle Geschäfte, erledigte eingeschlossen

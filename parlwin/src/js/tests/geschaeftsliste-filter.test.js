@@ -59,6 +59,20 @@ describe('Geschaeftsliste — Filter, Sortierung, Eigenes Geschäft', () => {
     expect(wrapper.vm.gefilterteGeschaefte.map(g => g.id)).toEqual([1])
   })
 
+  // Bug: Ein fremdes Realtime-Update darf keinen Lade-Zustand auslösen (sonst
+  // verschwindet die Liste kurz und Scrollbalken/Fokus springen bei allen).
+  it('lädt bei einem Realtime-Update ohne Lade-Flackern (kein Scroll-/Fokus-Springen)', async () => {
+    const wrapper = await mountMit(daten)
+    const spy = vi.spyOn(wrapper.vm, 'ladeGeschaefte')
+    wrapper.vm.handleRealtimeEvent({ type: 'geschaefte.updated' })
+    await new Promise(r => setTimeout(r, 300))
+    expect(spy, 'Realtime hat keinen Reload ausgelöst').toHaveBeenCalled()
+    expect(
+      spy.mock.calls.every(c => c[0] === false),
+      'Realtime-Reload lief mit Lade-Zustand (verursacht das Scroll-Springen)',
+    ).toBe(true)
+  })
+
   it('sortiert Nummern natürlich: 2026.9 vor 2026.10', async () => {
     const wrapper = await mountMit([daten[1], daten[0]])
     wrapper.vm.sortFeld = 'nummer'
@@ -105,5 +119,71 @@ describe('Geschaeftsliste — Filter, Sortierung, Eigenes Geschäft', () => {
 
     wrapper.vm.neuAbbrechen()
     expect(wrapper.vm.detailOffen).toBe(false)
+  })
+})
+
+// F71: Filter nach Einreicher (Person, mit Toggle «Nur Ersteinreicher») und nach Partei.
+describe('Geschaeftsliste — Filter nach Einreicher und Partei', () => {
+  beforeEach(() => {
+    axios.post.mockReset()
+    axios.get.mockReset().mockResolvedValue({ data: [] })
+  })
+
+  const mitglieder = [
+    { name: 'Anna Müller', partei: 'SP', externId: '10' },
+    { name: 'Bob Meier', partei: 'FDP', externId: '20' },
+    { name: 'Clara Weiss', partei: 'SP', externId: '30' },
+  ]
+  const daten = [
+    { id: 1, nummer: '2026.1', titel: 'A', status: 'Pendent', datum: '2026-01-01', einreicher: [{ name: 'Anna Müller', rolle: 'Erstunterzeichner', externId: '10' }, { name: 'Bob Meier', rolle: 'Mitunterzeichner', externId: '20' }] },
+    { id: 2, nummer: '2026.2', titel: 'B', status: 'Pendent', datum: '2026-01-02', einreicher: [{ name: 'Bob Meier', rolle: 'Erstunterzeichner', externId: '20' }] },
+    { id: 3, nummer: '2026.3', titel: 'C', status: 'Pendent', datum: '2026-01-03', einreicher: [{ name: 'Clara Weiss', rolle: 'Erstunterzeichner', externId: '30' }] },
+  ]
+
+  const mount = async () => {
+    const wrapper = shallowMount(Geschaeftsliste, { props: { mitglieder } })
+    axios.get.mockResolvedValue({ data: daten })
+    await wrapper.vm.ladeGeschaefte()
+    await wrapper.vm.$nextTick()
+    return wrapper
+  }
+
+  it('bietet die Einreicher-Namen und die vorkommenden Parteien zur Auswahl', async () => {
+    const wrapper = await mount()
+    expect(wrapper.vm.einreicherOptionen).toEqual(['Anna Müller', 'Bob Meier', 'Clara Weiss'])
+    expect(wrapper.vm.parteiOptionen).toEqual(['FDP', 'SP'])
+  })
+
+  it('filtert nach Einreicher-Person: standardmässig zählt jeder Einreicher', async () => {
+    const wrapper = await mount()
+    wrapper.vm.filterEinreicher = ['Bob Meier']
+    // Bob ist Erst- (2) und Mitunterzeichner (1).
+    expect(wrapper.vm.gefilterteGeschaefte.map(g => g.id).sort()).toEqual([1, 2])
+  })
+
+  it('«Nur Ersteinreicher» beschränkt den Person-Filter auf den Erstunterzeichner', async () => {
+    const wrapper = await mount()
+    wrapper.vm.filterEinreicher = ['Bob Meier']
+    wrapper.vm.nurErsteinreicher = true
+    // Nur Geschäft 2 hat Bob als Erstunterzeichner (bei 1 ist Anna die erste).
+    expect(wrapper.vm.gefilterteGeschaefte.map(g => g.id)).toEqual([2])
+  })
+
+  it('filtert nach Partei über die Einreicher (via Mitglieder aufgelöst)', async () => {
+    const wrapper = await mount()
+    wrapper.vm.filterPartei = ['SP']
+    // SP-Einreicher: Anna (1) und Clara (3); Geschäft 2 nur FDP.
+    expect(wrapper.vm.gefilterteGeschaefte.map(g => g.id).sort()).toEqual([1, 3])
+  })
+
+  it('«Filter zurücksetzen» leert Einreicher, Partei und den Ersteinreicher-Schalter', async () => {
+    const wrapper = await mount()
+    wrapper.vm.filterEinreicher = ['Bob Meier']
+    wrapper.vm.filterPartei = ['SP']
+    wrapper.vm.nurErsteinreicher = true
+    wrapper.vm.resetFilter()
+    expect(wrapper.vm.filterEinreicher).toEqual([])
+    expect(wrapper.vm.filterPartei).toEqual([])
+    expect(wrapper.vm.nurErsteinreicher).toBe(false)
   })
 })
