@@ -15,6 +15,14 @@ declare(strict_types=1);
 
 $appDir = dirname(__DIR__);
 
+// Composer-Abhängigkeiten (z.B. smalot/pdfparser), falls lokal vorhanden. Im
+// Image werden sie gebaut; lokal via `docker cp` aus dem Image geholt. Fehlt
+// vendor/, laufen nur die Tests ohne diese Abhängigkeit (die PDF-Parser-Tests
+// sind in der Gruppe «pdf» und werden dann nicht ausgeführt).
+if (is_file($appDir . '/vendor/autoload.php')) {
+    require_once $appDir . '/vendor/autoload.php';
+}
+
 // ── PSR-Stubs ────────────────────────────────────────────────────────────────
 
 if (!interface_exists('Psr\Log\LoggerInterface')) {

@@ -56,6 +56,10 @@
         :mitglieder="mitglieder"
         :fraktionen="fraktionen"
       />
+      <Budgetliste
+        v-else-if="aktiveAnsicht === 'budget'"
+        :kommissionen="kommissionen"
+      />
       <Sitzungstypenliste
         v-else-if="aktiveAnsicht === 'sitzungstypen'"
         :mitglieder="mitglieder"
@@ -82,6 +86,7 @@ import {
   mdiBankOutline,
   mdiBullhornOutline,
   mdiFileDocumentEditOutline,
+  mdiCashMultiple,
   mdiHistory,
 } from '@mdi/js'
 import { subscribeRealtime } from './realtime'
@@ -91,6 +96,7 @@ import Mitgliederliste from './components/Mitgliederliste.vue'
 import Kommissionsliste from './components/Kommissionsliste.vue'
 import Vorstoesseliste from './components/Vorstoesseliste.vue'
 import Sitzungstypenliste from './components/Sitzungstypenliste.vue'
+import Budgetliste from './components/Budgetliste.vue'
 import Changelog from './components/Changelog.vue'
 
 export default {
@@ -107,6 +113,7 @@ export default {
     Kommissionsliste,
     Vorstoesseliste,
     Sitzungstypenliste,
+    Budgetliste,
     Changelog,
   },
   data() {
@@ -121,9 +128,10 @@ export default {
       ansichten: [
         { key: 'geschaefte', bezeichnung: 'Geschäfte', icon: mdiClipboardTextOutline },
         { key: 'sitzungen', bezeichnung: 'Sitzungen', icon: mdiCalendarBlankOutline },
-        { key: 'mitglieder', bezeichnung: 'Mitglieder', icon: mdiAccountGroupOutline },
         { key: 'kommissionen', bezeichnung: 'Kommissionen', icon: mdiBankOutline },
         { key: 'vorstoesse', bezeichnung: 'Vorstösse', icon: mdiBullhornOutline },
+        { key: 'budget', bezeichnung: 'Budget', icon: mdiCashMultiple },
+        { key: 'mitglieder', bezeichnung: 'Mitglieder', icon: mdiAccountGroupOutline },
         { key: 'sitzungstypen', bezeichnung: 'Sitzungstypen', icon: mdiFileDocumentEditOutline },
         { key: 'changelog', bezeichnung: 'Änderungsverlauf', icon: mdiHistory },
       ],

@@ -8,6 +8,16 @@
 # Es gibt absichtlich keine `target:`-Splits mehr — Docker Hub Auto-Builds
 # bauen immer die finale Stage, also genau dieses Image.
 
+# PHP-Composer-Abhängigkeiten (z.B. smalot/pdfparser für den Budget-Import).
+# very-base ist Alpine mit Shell und Paketmanager; Composer kommt als Paket.
+# --ignore-platform-reqs: die PHP-Erweiterungen sind erst im Runtime-Image
+# (nextcloud:php-fpm) vorhanden, hier wird nur heruntergeladen.
+FROM mwaeckerlin/very-base AS php-deps
+WORKDIR /deps
+RUN ${PKG_INSTALL} composer
+COPY parlwin/composer.json ./composer.json
+RUN composer update --no-dev --no-interaction --no-progress --prefer-dist --ignore-platform-reqs
+
 FROM mwaeckerlin/nodejs-build AS app-build
 WORKDIR /build
 COPY --chown=${BUILD_USER} package*.json ./
@@ -26,6 +36,8 @@ RUN npm run build:app \
 
 FROM mwaeckerlin/nextcloud:php-fpm
 COPY --from=app-build /build/parlwin /usr/local/share/nextcloud/seed/custom_apps/parlwin
+# Composer-vendor (smalot/pdfparser) — von Application.php via vendor/autoload.php geladen.
+COPY --from=php-deps /deps/vendor /usr/local/share/nextcloud/seed/custom_apps/parlwin/vendor
 # Bootstrap-Wrapper in PHP, weil die Basis keine Shell hat.
 COPY --chmod=644 docker/parlwin-bootstrap.php /usr/local/bin/parlwin-bootstrap.php
 COPY --chmod=644 docker/parlwin-watcher.php   /usr/local/bin/parlwin-watcher.php

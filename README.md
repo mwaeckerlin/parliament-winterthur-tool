@@ -89,6 +89,14 @@ Eine vollständige, laufend nachgeführte Funktionsliste steht in
   «Fraktion/40_Vorstösse» wählen; von dort werden sie auch automatisch
   übernommen. Ein Vorstoss lässt sich durch Verknüpfung mit einem Geschäft
   abschliessen (Ähnlichkeitssuche über den Titel; die Priorität wird übernommen).
+- **Budget** – ein eigener Bereich für den städtischen Budgetprozess mit vier
+  Tabs (Globalbudgets, Personalbestand, Investitionsrechnung, Steuerfuss),
+  Filtern (Jahr, Kommission/Departement, Kostensteigerung) und einer ständig
+  mitlaufenden Summenzeile. Eigene und fremde Anträge je Produktegruppe;
+  globale Kürzungen werden anteilig zum Aufwand verteilt (Defizit standardmässig
+  zur schwarzen Null); Personal-, Investitions- und Steuerfuss-Anträge; ein
+  Anträge-PDF je Kommission und die Live-Verfolgung der Beschlüsse in der
+  Sitzung. Die Budgetdaten stammen aus den städtischen Budgetbüchern.
 - **Priorität pro Geschäft und Vorstoss** – hoch, mittel oder tief (nicht
   gesetzt wird als «—» angezeigt und wirkt wie mittel); einstellbar in der
   Übersicht wie in der Detailansicht. In den Übersichten werden hohe Einträge

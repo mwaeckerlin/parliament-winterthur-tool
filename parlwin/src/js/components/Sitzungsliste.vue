@@ -608,6 +608,13 @@
               </template>
             </template>
           </div>
+
+          <!-- Budgetdebatte (F93): offizielle Sitzungsanträge werden in die
+               Sitzung gespiegelt, wenn das Budget traktandiert ist. -->
+          <BudgetSitzungsantraege
+            v-if="budgetJahrFuerSitzung(sitzung.id)"
+            :jahr="budgetJahrFuerSitzung(sitzung.id)"
+          />
         </div>
       </div>
       <p v-if="gefilterteSitzungen.length === 0" class="pw-leer">Keine Sitzungen gefunden.</p>
@@ -640,6 +647,7 @@ import { showError } from '@nextcloud/dialogs'
 import '@nextcloud/dialogs/style.css'
 import { subscribeRealtime } from '../realtime'
 import GeschaeftDetail from './GeschaeftDetail.vue'
+import BudgetSitzungsantraege from './BudgetSitzungsantraege.vue'
 import SitzungNotizen from './SitzungNotizen.vue'
 import NotizenListe from './NotizenListe.vue'
 import Aktionszeitleiste from './Aktionszeitleiste.vue'
@@ -657,7 +665,7 @@ import PwDatumInput from './PwDatumInput.vue'
 
 export default {
   name: 'Sitzungsliste',
-  components: { GeschaeftDetail, SitzungNotizen, NotizenListe, Aktionszeitleiste, GeschaeftDokumente, NcActions, NcActionButton, NcButton, NcCheckboxRadioSwitch, NcLoadingIcon, NcSelect, NcTextField, PwMultiSelect, PwField, PwDatumInput },
+  components: { GeschaeftDetail, BudgetSitzungsantraege, SitzungNotizen, NotizenListe, Aktionszeitleiste, GeschaeftDokumente, NcActions, NcActionButton, NcButton, NcCheckboxRadioSwitch, NcLoadingIcon, NcSelect, NcTextField, PwMultiSelect, PwField, PwDatumInput },
   props: {
     mitglieder:   { type: Array, default: () => [] },
     fraktionen:   { type: Array, default: () => [] },
@@ -1240,6 +1248,17 @@ export default {
         const nummer = (t.geschaeft?.nummer || '').toLowerCase()
         return titel.includes(s) || nummer.includes(s)
       })
+    },
+    // Budgetjahr, wenn die (Parlaments-)Sitzung das Budget traktandiert hat (F93):
+    // aus einem Traktandum-Titel «Budget <Jahr>». 0, wenn kein Budget traktandiert.
+    budgetJahrFuerSitzung(sitzungId) {
+      const sitzung = this.sitzungen.find(s => s.id === sitzungId)
+      if (!sitzung || sitzung.typId > 0) { return 0 }
+      for (const t of (this.traktanden[sitzungId] || [])) {
+        const m = String((t.geschaeft?.titel || t.titel) || '').match(/Budget\s*(20\d\d)/i)
+        if (m) { return Number(m[1]) }
+      }
+      return 0
     },
     async speichereTraktandumNotizen(traktandum, notizen) {
       const tId = traktandum.id

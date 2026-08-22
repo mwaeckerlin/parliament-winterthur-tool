@@ -47,7 +47,8 @@ class SyncJobTest extends TestCase {
         $timeFactory = $this->createStub(ITimeFactory::class);
         $fraktionsraumService = $this->createStub(FraktionsraumService::class);
         $vorstossImport = $this->createStub(\OCA\ParliamentWinterthur\Service\VorstossImportService::class);
-        return new class($timeFactory, $syncCommand, $logger, $fraktionsraumService, $config, $vorstossImport, $jetztTs) extends SyncJob {
+        $budgetImport = $this->createStub(\OCA\ParliamentWinterthur\Service\BudgetImportService::class);
+        return new class($timeFactory, $syncCommand, $logger, $fraktionsraumService, $config, $vorstossImport, $budgetImport, $jetztTs) extends SyncJob {
             public function __construct(
                 ITimeFactory $time,
                 SyncCommand $syncCommand,
@@ -55,9 +56,10 @@ class SyncJobTest extends TestCase {
                 FraktionsraumService $fraktionsraumService,
                 IConfig $config,
                 \OCA\ParliamentWinterthur\Service\VorstossImportService $vorstossImport,
+                \OCA\ParliamentWinterthur\Service\BudgetImportService $budgetImport,
                 private readonly int $fakeJetzt,
             ) {
-                parent::__construct($time, $syncCommand, $logger, $fraktionsraumService, $config, $vorstossImport);
+                parent::__construct($time, $syncCommand, $logger, $fraktionsraumService, $config, $vorstossImport, $budgetImport);
             }
 
             protected function jetztTs(): int {

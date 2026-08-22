@@ -146,6 +146,34 @@ Diese Regeln stehen nur im Code — sie sind hier autoritativ dokumentiert, dami
 das Verhalten ohne Code-Zugriff exakt reproduzierbar ist. Bei jeder Änderung an
 einer dieser Stellen wird der zugehörige Abschnitt nachgeführt.
 
+### Ansichts-Gerüst (verbindlich für JEDE Hauptansicht)
+
+Jede Ansicht (Geschäfte, Sitzungen, Kommissionen, Vorstösse, Budget, Mitglieder,
+Sitzungstypen, Änderungsverlauf) nutzt **dasselbe Gerüst** — nie ein eigenes:
+
+- **Suche und Filter** werden per `<Teleport to="#pw-search-slot">` bzw.
+  `<Teleport to="#pw-filter-slot">` in die Navigationsspalte gehängt (Filter in
+  `<div class="pw-filter-body">`), gesteuert über ein `filterReady`-Flag, das in
+  `mounted()` per `$nextTick` gesetzt wird. **Filter erscheinen nie als eigenes
+  Band im Seiteninhalt.**
+- **Rahmen:** `<section class="pw-view-content pw-<name>">` mit
+  `<header class="pw-view-header">` aus `<h2 class="pw-view-title">`,
+  `<span class="pw-view-count">` und dem Neu-Knopf. Der Neu-Knopf folgt dem
+  Bestand: `NcButton type="primary"` mit Text, oder — bei mehreren Typen —
+  `NcActions`/`NcActionButton` (NC-Standard, wie «+ Neue Sitzung»).
+- **Zustände:** `<div class="pw-laden"><NcLoadingIcon :size="32"/></div>` beim
+  Laden, `NcEmptyContent` beim Leerzustand.
+- **Karten/Listen** über `pw-card-grid`/`pw-data-card` (`pw-data-card-header`,
+  `pw-data-card-kicker`, `pw-data-pair`), **Dialoge** über das geteilte
+  `pw-modal-overlay`/`pw-modal`-Muster. Eingabefelder über die vorhandenen
+  Widgets (`PwMultiSelect`, `PwSelect`-Ableitungen, `BeschlussWidget`,
+  `GeschaeftDokumente`), rohe Inputs nur, wenn nachweislich kein Widget existiert.
+
+Der schnelle Wächter `parlwin/src/js/tests/view-shell-konsistenz.test.js` erzwingt
+dies (jede Ansicht muss `pw-view-content`/`pw-view-header`/`pw-view-title` haben,
+kein eigenes Filterband). Hintergrund: Post-Mortem 2026-08-22 (Budget-Seite mit
+selbst erfundenem Gerüst), Wiederholung von 2026-06-24.
+
 ### Fraktionsbeschlüsse: Codes, Labels und Zuordnung je Typ
 
 Zwei zusammengehörende Quellen: `GeschaeftWorkflow::CATEGORY_DECISIONS`
@@ -520,6 +548,206 @@ Doppellauf verhindert; die erste Prüfung nach Aktivierung initialisiert nur.
 Ohne konfigurierten Zeitplan gilt `SyncZeitplan::standard()`: zwei Einträge an
 allen Wochentagen um 10:00 und 18:00 Uhr; die Admin-API liefert diesen Standard
 vorbelegt (`mitStandard`), sodass er im UI editierbar erscheint.
+
+### Budget: Datenmodell, Import und Engines
+
+Fachlicher Hintergrund: [doc/budget-prozess-und-parlwin.md](doc/budget-prozess-und-parlwin.md).
+Die Budgetbücher der Stadt Winterthur sind die Datenquelle: **Teil B**
+(Produktegruppen-Globalbudgets) gliedert `Departement → Produktegruppe (Code) →
+Produkt`; die Produktegruppe trägt das beschlussfähige **Globalbudget (Nettokosten)**,
+das Produkt ist Informationsteil. **Teil A** enthält Beschluss, Steuerertrag/Steuerfuss,
+Erfolgsrechnung-Übersichten und den Investitionsplan. Die PDF tragen sauberen,
+eingebetteten Text (keine Scans) — die Extraktion erfolgt server-seitig in PHP.
+
+#### Datenmodell (Tabellen `pw_budget_*`)
+
+- **`pw_budget_jahr`** — ein importiertes Budgetjahr: `jahr` (PK), `steuerfuss_geltend`
+  (Prozent, z.B. 125), `steuerertrag` (CHF, aus Teil A «Steuerertrag und Steuerfuss»),
+  `personalsteuer_pro_person`, `weisung_quelle` (URL/fileId), `novemberbrief_quelle`,
+  `novemberbrief_importiert` (bool), `erstellt_am`. `wert_pro_steuerprozent` wird
+  berechnet: `steuerertrag / steuerfuss_geltend` (nicht gespeichert).
+- **`pw_budget_departement`** — `jahr`, `code`, `name`, `reihenfolge` (Buchreihenfolge).
+- **`pw_budget_produktegruppe`** — je `(jahr, code)`: `departement_code`, `name`,
+  `reihenfolge`, `auftrag` (Text), Zielvorgaben-Block (Text). Zahlen je Spalte des
+  Buches (`ist` = Jahr−2, `soll_vorjahr` = Jahr−1, `soll` = Budgetjahr, `plan1..plan3`
+  = FAP): `globalkredit_*` (Nettokosten, die beschlussfähige Zahl), `aufwand_*`
+  (Total effektive Kosten — Verteilbasis), `ertrag_*` (Total effektive Erlöse),
+  `stellen_*` (Stelleneinheiten), `auszubildende_*`. Texte: `erlaeuterung_stellen`,
+  `begruendung_abweichung`, `begruendung_fap`, `massnahmen`.
+- **`pw_budget_produkt`** — `produktegruppe_id`, `nummer`, `name`, `leistungen` (Text),
+  `kosten_*`/`erloes_*`/`nettokosten_*` (Ist/Soll_Vorjahr/Soll), `leistungsmengen`
+  (Text). Reine Information, nicht beschlussfähig.
+- **`pw_budget_investition`** — `jahr`, `departement_code`, `cluster`, `projekt`,
+  `bu` (Budgetjahr), `fap1..fap3`, `gesamtkosten`, `bereits_getaetigt`,
+  `planungskosten`, `reihenfolge`. Investitionen sind **nicht** nach Produktegruppe
+  gegliedert, sondern nach Departement/Cluster/Projekt.
+- **`pw_budget_antrag`** — ein Antrag: `jahr`, `bereich`
+  (`globalbudget|personal|investition|steuerfuss`), `ziel_typ`
+  (`produktegruppe|investition|steuerfuss`), `ziel_ref` (Produktegruppen-Code bzw.
+  Investitions-Id bzw. leer), `betrag_delta` (CHF, negativ = Kürzung), `stellen_delta`
+  (nur Personal), `betrag_pro_stelle`, `quelle` (`manuell|pauschal|steuerfuss`),
+  `antragsteller` (Fraktion/Person; eigene wie fremde), `begruendung`,
+  `verteilung_id` (gesetzt bei automatisch erzeugten Anträgen aus einer
+  Verteilrechnung → erkennbar und filterbar, F85), `reihenfolge`, `erstellt_von`,
+  `erstellt_am`. Anträge nur auf Produktegruppen (F81), Personal (F86), Investitionen
+  (F87) und Steuerfuss (F88, ans Ende der Liste).
+- **`pw_budget_verteilung`** — Zustand der automatischen Verteilung je `jahr`:
+  `automatik_ein` (Default true, F84), `ziel_modus` (`schwarze_null|defizit|ertrag`),
+  `ziel_betrag` (bei Defizit/Ertrag). Bei jeder Neuberechnung werden die
+  `pw_budget_antrag`-Zeilen mit passender `verteilung_id` erzeugt/angepasst/gelöscht.
+- **`pw_budget_antrag_entscheid`** — Live-Verfolgung (F93): `antrag_id`, `status`
+  (`offen|angenommen|abgelehnt`, Default `offen`), `geaendert_von`, `geaendert_am`.
+  Der Entscheid hängt am Antrag (nicht an einer einzelnen Sitzung) und erscheint
+  darum in **allen** Sitzungen, die dasselbe Budget traktandieren — analog zur
+  Sitzungsnotiz zum Geschäft (F39), über denselben geteilten Mechanismus
+  (Budget-Geschäft ↔ Sitzungen via `SitzungGeschaeftService`/`SitzungVorstossService`,
+  siehe «Verknüpfen mit einem Geschäft»).
+
+#### Import-Pipeline (`BudgetImportService`)
+
+- **Text-Extraktion:** PHP-Bibliothek `smalot/pdfparser` (rein PHP, läuft im
+  shell-losen Runtime-Image). Kein `pdftotext`-Shell-Aufruf im Auslieferungs-Image.
+- **Teil-B-Parser** (Anker, positionsunabhängig — F89-Toleranz):
+  - **Inhaltsverzeichnis:** `Departement <Name>` als Gruppenkopf, darunter Zeilen
+    `<Produktegruppenname> (<Code>) …… <Seite>` → Departement→Produktegruppe(Code)-Baum
+    und Reihenfolge.
+  - **Je Produktegruppe:** Überschrift `<Name> (<Code>)`; die **Globalkredit**-Zeile
+    `Nettokosten / Globalkredit` mit sechs Zahlenspalten (Ist/Soll_Vorjahr/Soll/Plan×3)
+    → `globalkredit_*`; im **Informationsteil** die Zeilen `Total effektive Kosten`
+    → `aufwand_*`, `Total effektive Erlöse` → `ertrag_*`; die **Stellenplan**-Zeilen
+    `Stelleneinheiten` → `stellen_*`, `Auszubildende` → `auszubildende_*`; die
+    Textblöcke `Erläuterungen zum Stellenplan`, `Begründung Abweichung …`,
+    `Begründung FAP`, `Wesentliche Massnahmen …`; die **Produkte** `Produkt <N> <Name>`
+    mit ihren `Nettokosten`/`Leistungsmengen`.
+  - **Marker** «Zum Beschluss» / «Informationsteil» kommen als gesperrter Text
+    (`▼Z u m  B e s c h l u s s …`) → vor dem Matchen Leerzeichen zwischen
+    Einzelbuchstaben zusammenziehen.
+  - **Zahlen:** Schweizer Format `1'234'567` (Apostroph als Tausendertrenner) →
+    normalisieren; leere Zellen = 0; Prozent-Spalten (`in%`) ignorieren.
+- **Teil-A-Parser:** Beschluss (`Der Steuerfuss … auf <N> Prozent`, Personalsteuer);
+  der **Gesamt-Steuerertrag** aus dem Fliesstext `Die erwarteten Steuererträge belaufen
+  sich auf <N> Millionen Franken` → `steuerertrag` (Millionen → ganze Franken; die
+  frühere Anker-Zeile «Steuerertrag und Steuerfuss» war eine Inhaltsverzeichnis-Zeile
+  und lieferte die Seitenzahl statt des Betrags).
+- **Investitionen je Projekt** aus dem Anhang «Investitionsplanung Verwaltungsvermögen»
+  (`BudgetBuchParser::parseInvestitionen`): Die Tabelle trägt pro Zeile `<Nr>
+  <Bezeichnung> <Budget Vorjahr> <Budget Budgetjahr> <Plan+1> <Plan+2> <Plan+3>`,
+  gruppiert nach `Departement <Name>` und Produktegruppe `<Name> (PG)`. Zeilen mit
+  mindestens 6-stelliger Konto-Nr (z.B. 5001750) sind Projekte; ein- bis dreistellige
+  Nr sind Total-/Bereichs-/Produktegruppen-Summen und werden übersprungen. **Robust
+  gegen Jahreszahlen IM Bezeichnungstext** (z.B. „… 2028“): die fünf Wertspalten sind
+  immer die LETZTEN fünf Zahlen der Zeile, die Konto-Nr die erste — nie über feste
+  Spaltenpositionen. Gemappt: `departement`, `cluster` (Produktegruppe), `projekt`
+  (`<Nr> <Bezeichnung>`), `bu` (Budgetjahr = zweite Wertspalte), `fap1..fap3` (Planjahre).
+  Die Sektion endet an der nächsten Investitionsplanung (Eigenwirtschaftsbetriebe/
+  Finanzvermögen) — über den Steuerhaushalt entscheidet das Parlament. `gesamtkosten`/
+  `bereits_getaetigt`/`planungskosten` stehen in dieser Tabelle nicht und bleiben 0
+  (die Tabelle führt Budget-/Planwerte je Jahr, keine kumulierten Projektkosten). Der
+  Parser ist projektweise gegen das Buch validiert (`BudgetBuchParserTest`).
+- **Novemberbrief-Parser (F90):** kleineres PDF mit Anpassungen je Produktegruppe →
+  Deltas auf die bestehenden `pw_budget_produktegruppe`-Zahlen; setzt
+  `novemberbrief_importiert = true`.
+- **Auslöser:** automatisch über `SyncJob` (`BudgetImportService::automatischerImport`):
+  im geplanten Hintergrundlauf wird das neueste verfügbare Budgetjahr eingelesen, sobald
+  dessen Weisung vorliegt und es noch nicht importiert ist; ein vorhandener, noch nicht
+  eingelesener Novemberbrief wird nachgezogen. Vergangene Jahre bleiben dem manuellen
+  Import über «Neu» vorbehalten (Jahr wählen, nur Budget oder mit Novemberbrief) plus
+  dem Novemberbrief-Nachlese-Knopf (F91). **Verfügbarkeitsregeln (F75):** ein
+  Jahr existiert nur, wenn importiert; ein neues Jahr entsteht Ende des Vorjahres;
+  nach dem 1. Dezember des Vorjahres wird ein nicht erzeugtes Budgetjahr ignoriert
+  (kein Nachladen). Das Jahr-Auswahlmenü listet nur DB-vorhandene Jahre, neuestes
+  vorbelegt.
+- **Test-Fixtures und ausgelieferte Daten:** die Budgetbücher der Jahre 2022–2026
+  liegen als PDF in `tests/fixtures/budget/<jahr>/` (Git-eingecheckt, damit Parser-Tests
+  reproduzierbar sind; **nicht** ins Image kopiert). Daraus erzeugt der Generator
+  (`npm run test:budget-data`, Gruppe `generate`) die **ausgelieferten**
+  `parlwin/reference/budget/<jahr>/budget.json` — kleine strukturierte Dateien, die ins
+  Image gelangen und beim Import gelesen werden. `BudgetImportService.verfuegbareJahre()`
+  listet die Jahre mit `budget.json` (oder PDF), neuestes zuerst. Neue Bücher: PDF nach
+  `tests/fixtures/budget/<jahr>/` legen, `npm run test:budget-data` laufen lassen, die
+  erzeugte `budget.json` committen.
+- **Composer-Abhängigkeit:** `parlwin/vendor/` (smalot) wird im Image-Build (Dockerfile
+  `php-deps`-Stage) erzeugt und ist git-ignoriert; lokal für `npm run test:pdf`/
+  `test:budget-data` via `composer install` bereitstellen. Der schnelle Host-Lauf
+  (`npm run test:unit`, `run-all.sh`) schliesst die Gruppen `pdf` und `generate` aus, die
+  vendor brauchen bzw. Dateien erzeugen.
+
+#### Engines (`BudgetRechnung`)
+
+- **Summen (F79):** je aktivem Filter (Departement/Kommission) — Ausgaben = Σ
+  `aufwand_soll`, Einnahmen = Σ `ertrag_soll` (zzgl. Steuern), Ertrag/Defizit =
+  Einnahmen − Ausgaben, Total Stellen = Σ `stellen_soll`, jeweils mit Differenz zum
+  Vorjahr (`*_soll_vorjahr`). Alle Anträge (manuell + pauschal + Personal + Steuerfuss)
+  fliessen live in das angepasste Ergebnis ein.
+- **Anteilige Verteilung (F83/F85):** Zielbetrag `benoetigte_kuerzung =
+  aktuelles_ergebnis − ziel` (ziel = 0 bei schwarzer Null, sonst gewünschtes
+  Defizit/Ertrag). Verteilung **proportional zum Aufwand** über die nach Filter
+  beschlussfähigen Produktegruppen: `delta_i = benoetigte_kuerzung · aufwand_i /
+  Σ aufwand`. Rundung Schweizer Franken; Rundungsrest auf die grösste Gruppe. Erzeugt/
+  aktualisiert/löscht idempotent die `pw_budget_antrag`-Zeilen mit `quelle=pauschal`
+  und gemeinsamer `verteilung_id`.
+- **Automatik (F84):** Default `automatik_ein=true` → Überschuss bleibt 1:1 (nur
+  Einsparungen werden verteilt, keine automatischen Mehrausgaben); ein Defizit wird
+  automatisch als Pauschalkürzung verteilt. Bei `automatik_ein=false` erscheint der
+  explizite Verteil-Knopf.
+- **Steuerfuss (F88):** `wert_pro_prozent = steuerertrag / steuerfuss_geltend`. Bei
+  Überschuss und Automatik: `neuer_steuerfuss = steuerfuss_geltend −
+  floor(überschuss / wert_pro_prozent)` (ganze Prozent, abgerundet); der Überschuss
+  sinkt um `gesenkte_prozente · wert_pro_prozent`. Manuelle Bearbeitung nur bei
+  abgeschalteter Automatik; jede Steuerfuss-Änderung erzeugt einen `pw_budget_antrag`
+  mit `bereich=steuerfuss` ans Ende der Antragsliste.
+
+#### API und Frontend
+
+- **`BudgetController`** (Routen in `appinfo/routes.php`): `jahre`,
+  `produktegruppen/{jahr}`, `investitionen/{jahr}`, `steuerfuss/{jahr}`, Anträge-CRUD,
+  `verteilung/{jahr}` (Ziel setzen/neu rechnen), Import-Trigger (`neu`,
+  `novemberbrief`), `antraege-pdf` (F92), Entscheid setzen (F93). Realtime-Events
+  `budget.updated` über den bestehenden Broker (F53-Mechanik).
+- **Frontend `Budgetliste.vue`** mit vier Untertabs, gemeinsamer Filterleiste
+  (Jahr/Kommission/Departement/Kostensteigerung) und sticky Summenzeile. Wiederverwendet
+  `PwMultiSelect`, den Beschluss-/Antrags-Workflow und die Echtzeit-Aktualisierung.
+- **Anträge-PDF (F92):** wiederverwendung des Votum-PDF-Mechanismus (siehe
+  «Votum-PDF») — eine eigenständige Druckseite `TemplateResponse('budget_antraege_pdf',
+  …, 'blank')` aus `templates/budget_antraege_pdf.php`, die sich per Browser-Druck
+  als PDF speichern lässt. Kein serverseitiges PDF, keine zusätzliche Bibliothek.
+  Gesamt oder je Kommission (Departement) gruppiert.
+- **PDF-Import (F89):** die einzige zusätzliche Laufzeit-Abhängigkeit ist die reine
+  PHP-Bibliothek `smalot/pdfparser` (Textextraktion), im Image-Build via Composer
+  installiert; `BudgetBuchParser` lädt sie erst zur Laufzeit. Der Parser ist gegen die
+  echten Bücher 2022–2026 justiert (`BudgetBuchParserTest`, Gruppe `pdf`) und erzeugt
+  die ausgelieferten `budget.json`. Zur Laufzeit liest der Import bevorzugt die
+  strukturierte `budget.json`; liegt für ein Jahr nur das PDF vor, parst er es direkt —
+  beide Wege ergeben dieselbe DB-Befüllung (identische Struktur `BudgetBuchParser::struktur`).
+
+#### Zuständige Kommission (F76)
+
+- Die Zuordnung Departement→Sachkommission steht **nicht** in den gescrapten Daten und
+  ist darum verwaltungsseitig konfigurierbar: App-Config `budget_kommission_zuordnung`
+  (JSON `[{departement, kommission}]`), Editor im Admin (`admin.php` +
+  `admin.js`), Endpunkte `settings#get/setBudgetKommissionZuordnung`. `BudgetService::
+  ansicht` liefert die Zuordnung mit; ein gewählter `kommission`-Filter wird über
+  `erlaubteDepartemente()` auf die zugeordneten Departemente aufgelöst. Frontend: zwei
+  verknüpfte NcSelect (Kommission + Departement); ohne Zuordnung erscheint nur der
+  Departement-Filter.
+
+#### Phasen und Sitzungsmodus (F93)
+
+- **`pw_budget_antrag.phase`** (Migration Version000039): `fraktion` = interne
+  Vorbereitung (eigene und abgesprochene fremde Anträge, auto-verteilt), `sitzung` =
+  offizielle Sitzungsanträge der Budgetdebatte. Der **Sitzungsmodus**-Schalter (unten im
+  Budget-Filter) sendet `phase` an `ansicht`: dort fliessen nur Anträge der Phase in die
+  Summen ein, in der Sitzungsphase zusätzlich nur die **angenommenen** (Live-Entscheid);
+  die automatische Pauschalverteilung berücksichtigt nur Fraktions-Anträge.
+- **Spiegelung in die Sitzung:** `BudgetSitzungsantraege.vue` (Prop `jahr`) lädt die
+  Sitzungsanträge (`phase=sitzung`) und rendert dieselben Antrags-/Entscheid-Elemente
+  wie die Budget-Ansicht, cross-session per Realtime. `Sitzungsliste` bindet sie ein,
+  wenn eine Parlamentssitzung ein Budget-Traktandum trägt (`budgetJahrFuerSitzung` liest
+  das Jahr aus dem Traktandum-Titel «Budget <Jahr>»).
+- **Annahme (dokumentiert):** Die offiziellen Sitzungsanträge werden in der
+  Sitzungsphase erfasst (aus den Einladungs-/Traktandendokumenten) und live verfolgt;
+  ein automatisches Auslesen der Anträge aus beliebigen Einladungs-PDF ist nicht möglich
+  und darum nicht implementiert.
 
 ## Weitere Regeln
 

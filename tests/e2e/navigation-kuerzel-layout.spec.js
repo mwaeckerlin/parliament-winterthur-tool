@@ -178,10 +178,11 @@ test.describe('Navigation: aktiver Eintrag und App-Version', () => {
     await expect(version).toBeVisible()
     await expect(version).toHaveText(/^v\d+\.\d+\.\d+/)
 
-    // Es gibt (mindestens) die sieben Ansichts-Einträge.
-    await expect(page.locator('.app-navigation-entry')).toHaveCount(ANSICHTEN.length)
+    // Die sieben Standard-Listenansichten plus «Budget» (getabbte Sonderansicht,
+    // im Detail in budget-datenfluss.spec.js geprüft) = acht Navigationseinträge.
+    await expect(page.locator('.app-navigation-entry')).toHaveCount(ANSICHTEN.length + 1)
 
-    for (const { name } of ANSICHTEN) {
+    for (const { name } of [...ANSICHTEN, { name: 'Budget' }]) {
       await gotoView(page, name)
       // Genau ein aktiver Eintrag, und zwar der gerade geöffnete.
       await expect(page.locator('.app-navigation-entry.active')).toHaveCount(1)

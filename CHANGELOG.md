@@ -1,5 +1,22 @@
 # Changelog
 
+- 2026-08-22 **1.8.1**
+    - Neuer Bereich «Budget» zur Unterstützung des städtischen Budgetprozesses
+        - Budget-Seite mit vier Tabs: Globalbudgets (Teil B), Personalbestand, Investitionsrechnung und Steuerfuss
+        - Filter nach Budgetjahr (nur vorhandene Jahre, neuestes zuvorderst), zuständiger Kommission bzw. Departement sowie nach Kostensteigerung in Prozent und in Franken
+        - Ständig sichtbare Summenzeile (Total Stellen, Ausgaben, Einnahmen, Ertrag bzw. Defizit, Steuerfuss) mit Differenz zum Vorjahr; sie richtet sich immer nach den gesetzten Filtern
+        - Eigene und fremde Anträge je Produktegruppe erfassen; globale Kürzungen werden anteilig zum Aufwand automatisch auf die Produktegruppen verteilt — ein Defizit wird standardmässig zur schwarzen Null ausgeglichen, ein Überschuss bleibt erhalten, das Ziel (Defizit/Ertrag) ist einstellbar
+        - Personalanträge (Stellen mit Betrag, Standardbetrag pro Stelle im Verwaltungsbereich konfigurierbar), Investitionsanträge je Projekt und automatische Steuerfuss-Senkung bei Überschuss
+        - Anträge der Fraktion als PDF erzeugen (gesamt oder je Kommission) und Beschlüsse in der Sitzung live mitverfolgen
+        - Budgetdaten werden aus den städtischen Budgetbüchern (Teil A und Teil B als PDF) eingelesen; über «+ Neu» lässt sich ein vergangenes Budgetjahr aus der Liste der Jahre mit vorhandenen Unterlagen importieren und der Novemberbrief nachträglich einlesen
+        - Beim Import werden je Produktegruppe Globalkredit, Aufwand, Ertrag und Stellen, der vollständige Produktegruppenname, der Auftragstext, die einzelnen Produkte (mit Nettokosten) sowie die Erläuterungen und Begründungen (Stellenplan, Abweichung, Finanzplan, Massnahmen), dazu der Steuerfuss, der Gesamt-Steuerertrag und die Investitionen je einzelnem Projekt (mit Departement, Produktegruppe, Budget- und Planwerten) aus den Büchern übernommen; das Einlesen ist gegenüber dem genauen Seitenaufbau tolerant und wurde gegen die Budgetbücher 2022 bis 2026 geprüft
+        - Automatisch erzeugte Kürzungsanträge lassen sich in der Antragsliste eigens filtern (alle, nur manuelle, nur automatische)
+        - Filter «Zuständige Kommission»: im Verwaltungsbereich lässt sich jedem Departement seine Sachkommission zuordnen; der Filter engt die Ansicht auf die Departemente der gewählten Kommission ein und ist mit dem Departement-Filter verknüpft
+        - Sitzungsmodus (Schalter unten im Budget-Filter): trennt die internen Fraktionsanträge der Vorbereitung von den offiziellen Sitzungsanträgen der Budgetdebatte; im Sitzungsmodus zählen für die Summen nur die angenommenen Sitzungsanträge, und die automatische Verteilung entfällt
+        - Die offiziellen Sitzungsanträge werden in die Sitzung mit Budgetdebatte gespiegelt: dort erscheinen dieselben Anträge mit Live-Entscheid (angenommen/abgelehnt/offen), sobald das Budget traktandiert ist
+        - Ein neues Budgetjahr wird automatisch eingelesen, sobald dessen Weisung vorliegt; ein vorhandener Novemberbrief wird dabei nachgezogen
+        - Beschlüsse zu Budgetanträgen (angenommen/abgelehnt/offen) werden während der Sitzung laufend und für alle gleichzeitig sichtbar mitverfolgt
+
 - 2026-08-22 **1.8.0**
     - In der Geschäfteliste lässt sich neu nach Einreicher filtern — je ein Filter für die Person und für die Partei
         - Beim Person-Filter schaltet «Nur Ersteinreicher» (standardmässig aus) die Auswahl auf den Erstunterzeichner um; sonst zählt jeder Einreicher (Erst- und Mitunterzeichner)

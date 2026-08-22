@@ -170,6 +170,20 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
                 </section>
 
                 <section class="pw-admin-card">
+                    <h3><?php p($l->t('Budget: Departement → zuständige Kommission')); ?></h3>
+                    <p class="settings-hint">
+                        <?php p($l->t('Ordne jedem Departement seine zuständige Sachkommission zu. Der Budget-Filter «Zuständige Kommission» nutzt diese Zuordnung; ohne Zuordnung erscheint nur der Departement-Filter.')); ?>
+                    </p>
+                    <div id="pw-budget-kommission-liste"></div>
+                    <datalist id="pw-budget-departemente"></datalist>
+                    <datalist id="pw-budget-kommissionen"></datalist>
+                    <button type="button" id="pw-budget-kommission-hinzufuegen" class="button">
+                        <?php p($l->t('+ Zuordnung hinzufügen')); ?>
+                    </button>
+                    <span id="pw-budget-kommission-status" class="pw-sync-status"></span>
+                </section>
+
+                <section class="pw-admin-card">
                     <h3><?php p($l->t('E-Mail-Einladungen')); ?></h3>
 
                     <div class="pw-admin-grid">

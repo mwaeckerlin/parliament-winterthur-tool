@@ -281,10 +281,119 @@ export function ladeZeitplan() {
     })
 }
 
+// ── Budget: Departement → zuständige Kommission (F76) ──────────────────────
+let budgetKommissionSaveTimer = null
+
+function budgetKommissionZeileErstellen(departement = '', kommission = '') {
+  const liste = document.getElementById('pw-budget-kommission-liste')
+  if (!liste) return null
+  const row = document.createElement('div')
+  row.className = 'pw-kuerzel-row pw-budget-kommission-row'
+  row.innerHTML = `
+    <input type="text" class="pw-bk-departement" value="${escapeHtml(departement)}" placeholder="Departement" list="pw-budget-departemente" />
+    <input type="text" class="pw-bk-kommission" value="${escapeHtml(kommission)}" placeholder="Zuständige Kommission" list="pw-budget-kommissionen" />
+    <button type="button" class="button pw-bk-delete" title="Löschen">×</button>
+  `
+  liste.appendChild(row)
+  row.querySelector('.pw-bk-delete').addEventListener('click', (e) => {
+    e.preventDefault()
+    row.remove()
+    budgetKommissionAutoSpeichern()
+  })
+  row.querySelectorAll('input').forEach((input) => {
+    input.addEventListener('change', budgetKommissionAutoSpeichern)
+    input.addEventListener('blur', budgetKommissionAutoSpeichern)
+    input.addEventListener('input', budgetKommissionAutoSpeichern)
+  })
+  return row
+}
+
+// Sammelt die Zuordnungszeilen zu einer Liste {departement, kommission}.
+export function sammleBudgetKommission() {
+  const eintraege = []
+  document.querySelectorAll('#pw-budget-kommission-liste .pw-budget-kommission-row').forEach((row) => {
+    const departement = row.querySelector('.pw-bk-departement').value.trim()
+    const kommission = row.querySelector('.pw-bk-kommission').value.trim()
+    if (departement && kommission) { eintraege.push({ departement, kommission }) }
+  })
+  return eintraege
+}
+
+function budgetKommissionAutoSpeichern() {
+  clearTimeout(budgetKommissionSaveTimer)
+  showStatusMessage('pw-budget-kommission-status', 'Speichern...', false)
+  budgetKommissionSaveTimer = setTimeout(() => {
+    axios
+      .post(generateUrl('/apps/parlwin/settings/budget-kommission-zuordnung'), { budget_kommission_zuordnung: sammleBudgetKommission() })
+      .then(() => showStatusMessage('pw-budget-kommission-status', 'Gespeichert', false))
+      .catch((err) => {
+        console.error('Fehler beim Speichern der Kommissionszuordnung:', err)
+        showStatusMessage('pw-budget-kommission-status', 'Fehler beim Speichern', true)
+      })
+  }, KURZEL_SAVE_DELAY)
+}
+
+export function ladeBudgetKommission() {
+  const liste = document.getElementById('pw-budget-kommission-liste')
+  if (!liste) return Promise.resolve()
+  return axios
+    .get(generateUrl('/apps/parlwin/settings/budget-kommission-zuordnung'))
+    .then((response) => {
+      const eintraege = Array.isArray(response.data) ? response.data : []
+      liste.innerHTML = ''
+      eintraege.forEach((e) => budgetKommissionZeileErstellen(e.departement || '', e.kommission || ''))
+    })
+    .catch((err) => console.error('Fehler beim Laden der Kommissionszuordnung:', err))
+}
+
+// Vorschläge: Departemente aus dem neuesten Budgetjahr, Kommissionen aus der Liste.
+export function ladeBudgetKommissionVorschlaege() {
+  const deptListe = document.getElementById('pw-budget-departemente')
+  const kommListe = document.getElementById('pw-budget-kommissionen')
+  if (!deptListe && !kommListe) return Promise.resolve()
+  const fuellen = (datalist, werte) => {
+    if (!datalist) return
+    datalist.innerHTML = ''
+    const seen = new Set()
+    werte.forEach((w) => {
+      if (!w || seen.has(w)) return
+      seen.add(w)
+      const opt = document.createElement('option')
+      opt.value = w
+      datalist.appendChild(opt)
+    })
+  }
+  return Promise.all([
+    axios.get(generateUrl('/apps/parlwin/budget/jahre'))
+      .then((r) => {
+        const jahre = Array.isArray(r.data) ? r.data : []
+        if (!jahre.length) return
+        return axios.get(generateUrl('/apps/parlwin/budget/' + jahre[0].jahr))
+          .then((a) => fuellen(deptListe, Array.isArray(a.data.departemente) ? a.data.departemente : []))
+      })
+      .catch((err) => console.error('Fehler beim Laden der Budget-Departemente:', err)),
+    axios.get(generateUrl('/apps/parlwin/kommissionen'))
+      .then((r) => fuellen(kommListe, (Array.isArray(r.data) ? r.data : []).filter((k) => k.aktiv !== false).map((k) => k.name)))
+      .catch((err) => console.error('Fehler beim Laden der Kommissionen:', err)),
+  ])
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   // Kürzel: Initial-Laden und Auto-Save
   kuerzeleRendern()
   ladeVorschlagswerte()
+
+  // Budget: Departement → Kommission
+  ladeBudgetKommission()
+  ladeBudgetKommissionVorschlaege()
+  const bkBtn = document.getElementById('pw-budget-kommission-hinzufuegen')
+  if (bkBtn) {
+    bkBtn.addEventListener('click', (e) => {
+      e.preventDefault()
+      const row = budgetKommissionZeileErstellen('', '')
+      if (row) row.querySelector('.pw-bk-departement').focus()
+    })
+  }
 
   const hinzufuegenBtn = document.getElementById('pw-kuerzel-hinzufuegen')
   if (hinzufuegenBtn) {

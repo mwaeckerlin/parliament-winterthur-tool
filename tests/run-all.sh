@@ -36,7 +36,11 @@ ensure_junit() {
 }
 
 section "Unit-Tests (PHPUnit)"
+# Gruppe «pdf» (Budget-Parser, braucht vendor/smalot) läuft separat über
+# `npm run test:pdf`, «generate» (Referenzdaten schreiben) über
+# `npm run test:budget-data` — beide sind nicht Teil des Host-Regressionslaufs.
 ( cd "${ROOT}/parlwin" && phpunit "${PHPUNIT_FLAGS[@]}" --exclude-group live \
+    --exclude-group pdf --exclude-group generate \
     --log-junit "${JUNIT_DIR}/php-unit.xml" tests )
 ensure_junit "php-unit" "${JUNIT_DIR}/php-unit.xml" "$?"
 

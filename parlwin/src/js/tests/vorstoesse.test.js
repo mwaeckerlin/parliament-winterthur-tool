@@ -56,9 +56,9 @@ describe('Vorstoesseliste', () => {
     expect(calls[0][1].titel).toBe('Mehr Velowege')
   })
 
-  it('App bietet ein Vorstösse-Tab zwischen Kommissionen und Sitzungstypen', () => {
+  it('App bietet ein Vorstösse-Tab zwischen Kommissionen und Budget', () => {
     const keys = App.data().ansichten.map(a => a.key)
     expect(keys.indexOf('vorstoesse')).toBe(keys.indexOf('kommissionen') + 1)
-    expect(keys.indexOf('sitzungstypen')).toBe(keys.indexOf('vorstoesse') + 1)
+    expect(keys.indexOf('budget')).toBe(keys.indexOf('vorstoesse') + 1)
   })
 })

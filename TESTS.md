@@ -17,6 +17,11 @@ Gestartet wird die Gesamtsuite vom Projektroot mit `npm run test`.
 Vollständige Nutzerpfade im echten Browser (Chromium/Firefox) gegen den realen
 Compose-Stack; ausgeführt aus `tests/e2e/run-compose-e2e.sh` heraus.
 
+- **F74, F75, F76, F77, F79** `tests/e2e/budget-datenfluss.spec.js` › Budget-Ansicht mit vier Tabs, Filterleiste im Nav-Slot und Summenzeile; Kostensteigerungs-Filter grenzt ein — die Budget-Seite zeigt die vier Tabs, die Filter (Budgetjahr/Departement/Kostensteigerung) liegen im gemeinsamen `#pw-filter-slot` (kein eigenes Band), die Summenzeile führt alle Kennzahlen, und der Kostensteigerungs-Filter reduziert die Produktegruppen.
+- **F80, F81, F82, F83, F84, F93** `tests/e2e/budget-datenfluss.spec.js` › Antrag auf eine Produktegruppe stellen und den Entscheid live setzen; Produkte und Auftrag als Information; Automatik/Zielmodus bedienbar — ein Kürzungsantrag erscheint an der Produktegruppe, der Entscheid «angenommen» wird live gesetzt, Produkte- und Auftrags-Information sind aufklappbar, Automatik-Schalter und Zielmodus der anteiligen Verteilung sind bedienbar.
+- **F86, F87** `tests/e2e/budget-datenfluss.spec.js` › Personalbestand zeigt Stellen und nimmt einen Personalantrag an; Investitionsrechnung listet Projekte mit Budgetwert — Personalantrag mit Stellendelta, Investitionsprojekte je Departement mit Budgetwert und Antrag.
+- **F93** `tests/e2e/budget-datenfluss.spec.js` › Sitzungsmodus trennt Fraktions- von Sitzungsanträgen — ein Fraktionsantrag verschwindet beim Umschalten in den Sitzungsmodus, ein dort erfasster Sitzungsantrag erscheint nur dort, und beim Zurückschalten kehrt sich das um.
+- **F88, F89, F91, F92** `tests/e2e/budget-datenfluss.spec.js` › Steuerfuss-Tab (geltender Fuss, Wert je Prozent, Automatik schaltbar); «+ Neu» öffnet den Import-Dialog; «Anträge als PDF» öffnet die Druckansicht — Steuerfuss-Automatik umschaltbar mit manuellem Antrag, Import-Dialog mit vorhandenen Jahren, PDF-Druckansicht als Popup.
 - **F1, F14** `tests/e2e/multi-user-sharing.spec.js` › 0: Geschäfteliste zeigt die synchronisierten Geschäfte — prüft, dass die real synchronisierten Geschäfte in der Liste erscheinen (Gutfall).
 - **F4, F5** `tests/e2e/layout-consistency.spec.js` › jede Ansicht nutzt dieselbe pw-view-Struktur mit eigenem Titel — jede Ansicht rendert die gemeinsame `pw-view`-Struktur mit eigenem Titel (Konsistenz).
 - **F4** `tests/e2e/navigation-kuerzel-layout.spec.js` › genau ein Navigationseintrag ist aktiv; Footer zeigt «v<semver>» — je Ansicht ist genau ein Navigationseintrag aktiv und der Footer zeigt die App-Version.
@@ -576,6 +581,31 @@ Sie ergänzen die Playwright-e2e-Tests, ersetzen sie aber nicht.
 - **F64** `parlwin/src/js/tests/changelog-minor-offen.test.js` › klappt jeden Eintrag der aktuellen Minor-Version auf — die aktuelle Minor-Version ist aufgeklappt.
 - **F64** `parlwin/src/js/tests/changelog-minor-offen.test.js` › lässt ältere Minor-Versionen zugeklappt — ältere Minor-Versionen bleiben zugeklappt.
 
+### Budget (vitest, Komponente Budgetliste)
+
+- **F74** `parlwin/src/js/tests/budget.test.js` › App bietet ein Budget-Tab und lädt die Jahre beim Mount — die Ansichtenliste enthält «budget» und die Komponente lädt beim Mounten die Jahre.
+- **F75** `parlwin/src/js/tests/budget.test.js` › bietet die vorhandenen Jahre als Auswahl, neuestes zuerst — das Jahr-Auswahlmenü zeigt die vorhandenen Jahre absteigend.
+- **F76** `parlwin/src/js/tests/budget.test.js` › lädt beim Departementswechsel neu und übergibt den Filter — der Departement-/Kommissionsfilter wird an die API übergeben.
+- **F77** `parlwin/src/js/tests/budget.test.js` › übergibt Kostensteigerungs-Filter (Prozent und absolut) — beide Schwellen werden als Filterparameter übergeben.
+- **F78** `parlwin/src/js/tests/budget.test.js` › gruppiert Produktegruppen nach Departement in Listenreihenfolge — die Gruppierung erhält die Buchreihenfolge.
+- **F79** `parlwin/src/js/tests/budget.test.js` › zeigt die Summen aus der Ansicht und formatiert Franken schweizerisch — die Summenzeile übernimmt die berechneten Werte, Franken mit Apostroph.
+- **F80** `parlwin/src/js/tests/budget.test.js` › listet je Produktegruppe den Globalkredit und die Produkte mit Nettokosten; zeigt Auftragstext sowie alle Erläuterungen/Begründungen als Information — Globalkredit, Produkte (Name + Nettokosten), Auftrag, Erläuterungen zum Stellenplan, Begründung Abweichung/FAP und Massnahmen erscheinen.
+- **F84** `parlwin/src/js/tests/budget.test.js` › filtert Anträge nach Art (alle / nur manuelle / nur automatische) — automatisch erzeugte Anträge sind eigens filterbar.
+- **F76** `parlwin/src/js/tests/budget.test.js` › bietet den Kommission-Filter aus der Zuordnung und verknüpft ihn mit dem Departement — die Kommissionsauswahl engt die Departemente ein, leert die Departementwahl und lädt mit dem kommission-Parameter neu.
+- **F93** `parlwin/src/js/tests/budget.test.js` › schaltet in den Sitzungsmodus und zeigt nur Sitzungsanträge; stellt im Sitzungsmodus einen Sitzungsantrag (phase=sitzung) — der Umschalter trennt Fraktions- von Sitzungsanträgen und lädt mit phase=sitzung neu.
+- **F93** `parlwin/src/js/tests/budget-sitzung.test.js` › BudgetSitzungsantraege lädt die Sitzungsanträge (phase=sitzung) und zeigt nur diese; setzt einen Entscheid live — die in die Sitzung gespiegelten offiziellen Anträge mit Live-Entscheid.
+- **F81, F82** `parlwin/src/js/tests/budget.test.js` › stellt Anträge nur auf Produktegruppen und ordnet sie ihr zu — ein Antrag geht auf die Produktegruppe (Bereich globalbudget) und wird ihr zugeordnet.
+- **F83, F84, F85** `parlwin/src/js/tests/budget.test.js` › setzt die Pauschalverteilung mit Automatik und Zielmodus — Automatik und Zielmodus (schwarze Null/Defizit/Ertrag) werden gesetzt.
+- **F86, F87** `parlwin/src/js/tests/budget.test.js` › listet Personal- und Investitionsanträge je Ziel — die je Produktegruppe/Projekt gestellten Anträge erscheinen mit Entscheid, ohne Übergriff auf andere Bereiche.
+- **F86** `parlwin/src/js/tests/budget.test.js` › stellt Personalanträge mit Stellen und (Default-)Betrag — Personalantrag mit Stellendelta.
+- **F87** `parlwin/src/js/tests/budget.test.js` › stellt Investitionsanträge je Projekt — Änderungsantrag auf ein Investitionsprojekt.
+- **F88** `parlwin/src/js/tests/budget.test.js` › leitet den Steuerprozent-Wert ab und stellt einen Steuerfuss-Antrag — Wert pro Prozent = Steuerertrag/Steuerfuss; ein Steuerfuss-Antrag verändert die Einnahmen entsprechend.
+- **F89, F91** `parlwin/src/js/tests/budget.test.js` › legt ein Budgetjahr über den Import an — «+ Neu» löst den Import (optional mit Novemberbrief) aus.
+- **F90** `parlwin/src/js/tests/budget.test.js` › liest den Novemberbrief ein — der Novemberbrief-Knopf löst den Nachlese-Import aus.
+- **F92** `parlwin/src/js/tests/budget.test.js` › öffnet das Anträge-PDF — die Druckansicht wird geöffnet.
+- **F93** `parlwin/src/js/tests/budget.test.js` › trägt einen Entscheid für die Live-Verfolgung ein — ein Antrag wird angenommen/abgelehnt/zurückgesetzt.
+- **F93** `parlwin/src/js/tests/budget.test.js` › lädt bei einem budget.updated-Realtime-Ereignis neu; ignoriert fremde Ereignisse — cross-session Live-Verfolgung: Beschlüsse aus einer anderen Sitzung erscheinen sofort, fremde Ereignisse lösen keine Neuladung aus.
+
 ## Modul-/Unit-Tests — Backend (PHPUnit)
 
 PHP-AppFramework-Services, Mapper, Controller und Commands (ein Eintrag je Testklasse,
@@ -625,3 +655,15 @@ mit den wesentlichen Methoden). Die Live-Gruppe läuft gegen echte Endpunkte.
 - **F53, F54** `parlwin/tests/Service/RealtimePublisherServiceTest.php` — `publish` mit AppConfig-URL und Secret, Umgebungsvariablen haben Vorrang, Default-Publish-URL wenn nichts konfiguriert ist.
 - **F60** `parlwin/tests/BackgroundJob/SyncJobTest.php` — der Zeitplan-Pfad läuft im Fenster und nicht ausserhalb; die erste Prüfung initialisiert ohne Lauf; ohne Zeitplan gilt der Standard 10:00/18:00.
 - **F60** `parlwin/tests/Service/SyncZeitplanTest.php` — `parse` normalisiert Gültiges und verwirft Ungültiges; fällig im Fenster und über Mitternacht; leerer Plan ist nie fällig (Leerfall); Standard sind zwei Einträge 10:00/18:00, `mitStandard` greift nur bei leerem Plan.
+- **F79, F83, F85, F88** `parlwin/tests/Service/BudgetRechnungTest.php` — Summen mit Anträgen (Global-/Personal-/Steuerfuss-Wirkung auf Ausgaben/Einnahmen/Stellen inkl. Vorjahresdifferenz); benötigter Verteil-Delta je Zielmodus (schwarze Null/Defizit/Ertrag, Überschuss bleibt positiv); Pauschalverteilung anteilig zum Aufwand mit exakter Summe und Rundungsrest an die grösste Gruppe; Steuerfuss-Senkung in ganzen Prozent (Wert pro Prozent = Steuerertrag/Steuerfuss), keine Senkung ohne Überschuss (Leerfall).
+- **F80, F82** `parlwin/tests/Db/BudgetEntitiesTest.php` — Produktegruppe serialisiert verschachtelt (Globalkredit/Aufwand/Stellen, Produkte aus JSON); ein Antrag ist als automatisch gekennzeichnet, sobald er eine Verteilung trägt; die Verteilung hat den Standard «schwarze Null» mit eingeschalteter Automatik.
+- **F74** `parlwin/tests/Service/BudgetKlassenLadenTest.php` — alle Budget-Backend-Klassen (Entities, Mapper, Services, Parser, Controller, Migration) laden und parsen fehlerfrei.
+- **F76, F93** `parlwin/tests/Service/BudgetServiceTest.php` — der Kommission-Filter löst über die Departement→Kommission-Zuordnung auf die betroffenen Departemente auf (ohne Filter alle); die Phase trennt die Summen (Vorbereitung vs. Sitzung), und in der Sitzungsphase zählen nur angenommene Sitzungsanträge.
+
+### Budget-Buchparser (PHPUnit, Gruppe `pdf`, `npm run test:pdf`)
+
+Parst die echten, im Repo liegenden Budgetbücher (`tests/fixtures/budget/<jahr>/teil-a.pdf`, `teil-b.pdf`) mit smalot/pdfparser und prüft die extrahierten Werte gegen die im Buch gemessenen Zahlen. Braucht `vendor/` (smalot) und läuft darum separat, nicht im Host-Regressionslauf.
+
+- **F80, F87, F88, F89** `parlwin/tests/Service/BudgetBuchParserTest.php` — Teil B: Produktegruppe Personalamt (121) mit Globalkredit/Aufwand/Ertrag/Stellen, vollständigem Namen aus dem Inhaltsverzeichnis (mehrzeilige Überschrift), Departement, Auftragstext, den einzelnen Produkten (Nummer, Name, Nettokosten-Soll je Produkt) und den Erläuterungs-/Begründungstexten (Erläuterungen zum Stellenplan, Begründung Abweichung, Begründung FAP, Massnahmen — sauber abgegrenzt, ohne Tabellen-/Label-Reste); Teil A: Steuerfuss (125) und Gesamt-Steuerertrag (521,2 Mio.); Investitionen JE PROJEKT aus dem Anhang «Investitionsplanung Verwaltungsvermögen» (>100 Projekte, Departement/Produktegruppe/BU/Planjahre, projektweise gegen das Buch validiert inkl. Jahreszahl-im-Namen-Kante); Generalisierung über alle Jahrgänge 2022–2026 (je >20 Produktegruppen) mit buchübergreifender Invariante (Soll eines Jahres = Vorjahres-Soll des Folgejahres).
+- **F89** `parlwin/tests/Service/BudgetImportServiceTest.php` — automatischer Import (F89-Auslöser): das neueste verfügbare Budgetjahr wird eingelesen, wenn es noch nicht vorhanden ist; ein bereits vorhandenes wird nicht erneut importiert (Idempotenz). Nutzt die echte `reference/budget`-Quelle über den JSON-Pfad (ohne PDF-Parser).
+- **F89** `parlwin/tests/Service/BudgetDatenGeneratorTest.php` (Gruppe `generate`, `npm run test:budget-data`) — erzeugt aus den Büchern die ausgelieferten `reference/budget/<jahr>/budget.json`; nur explizit auszuführen, wenn neue Bücher eingespielt wurden.

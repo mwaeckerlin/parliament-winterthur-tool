@@ -1,0 +1,27 @@
+{
+  "_quelle": "Gemessen aus Budget 2026 Teil A/Teil B (Stadt Winterthur). Bis der PDF-Parser gegen den realen Extraktionstext justiert ist, speist diese strukturierte Fassung die DB-Befüllung; sie hat dieselbe Struktur wie BudgetBuchParser::struktur(). Weitere Produktegruppen ergänzt der Parser.",
+  "steuerfuss": 125,
+  "steuerertrag": 0,
+  "personalsteuer": 24,
+  "produktegruppen": [
+    {
+      "code": "121",
+      "name": "Personalamt",
+      "departement": "Präsidiales",
+      "globalkredit": { "ist": 4061060, "sollVorjahr": 4395510, "soll": 4866124, "plan1": 4775393, "plan2": 4460954, "plan3": 4321549 },
+      "aufwand": { "ist": 6514117, "sollVorjahr": 6863996, "soll": 7428985 },
+      "ertrag": { "ist": 2453057, "sollVorjahr": 2468486, "soll": 2562862 },
+      "stellen": { "ist": 17.20, "sollVorjahr": 16.85, "soll": 19.50 },
+      "auszubildendeSoll": 1.0,
+      "auftrag": "Das Personalamt der Stadt Winterthur bearbeitet die personalrechtlichen Fragen für den Stadtrat und bereitet die personalrechtlichen Erlasse vor.",
+      "begruendungAbweichung": "Die Kosten steigen hauptsächlich aufgrund des Aufbaus von 3.35 Stellen im Vergleich zum Vorjahresbudget (505'000 Franken).",
+      "erlaeuterungStellen": "In der Produktegruppe Personalamt ergibt sich gesamthaft eine Differenz von + 2.65 Stellen im Vergleich zum Budget 2025.",
+      "produkte": [
+        { "nummer": 1, "name": "Personalpolitik / Personalrecht", "nettokostenSoll": 1135916 },
+        { "nummer": 2, "name": "Zentrales Personalmanagement", "nettokostenSoll": 1318580 },
+        { "nummer": 3, "name": "Personalentwicklung und Beratung", "nettokostenSoll": 2191871 }
+      ]
+    }
+  ],
+  "investitionen": []
+}

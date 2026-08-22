@@ -47,6 +47,13 @@ class Application extends App implements IBootstrap
 
     public function __construct(array $urlParams = [])
     {
+        // Composer-Abhängigkeiten (z.B. smalot/pdfparser für den Budget-Import)
+        // werden im Image-Build nach parlwin/vendor installiert. Guard, damit
+        // Umgebungen ohne vendor (lokale Unit-Tests) nicht fatal abbrechen.
+        $autoload = __DIR__ . '/../../vendor/autoload.php';
+        if (is_file($autoload)) {
+            require_once $autoload;
+        }
         parent::__construct(self::APP_ID, $urlParams);
     }
 

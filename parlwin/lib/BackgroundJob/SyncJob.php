@@ -6,6 +6,7 @@ namespace OCA\ParliamentWinterthur\BackgroundJob;
 
 use OCA\ParliamentWinterthur\AppInfo\Application;
 use OCA\ParliamentWinterthur\Command\SyncCommand;
+use OCA\ParliamentWinterthur\Service\BudgetImportService;
 use OCA\ParliamentWinterthur\Service\FraktionsraumService;
 use OCA\ParliamentWinterthur\Service\SyncZeitplan;
 use OCA\ParliamentWinterthur\Service\VorstossImportService;
@@ -31,6 +32,7 @@ class SyncJob extends TimedJob {
         private readonly FraktionsraumService $fraktionsraumService,
         private readonly IConfig $config,
         private readonly VorstossImportService $vorstossImport,
+        private readonly BudgetImportService $budgetImport,
     ) {
         parent::__construct($time);
         // Kurzes Intervall: die Fälligkeit entscheidet der Zeitplan, nicht das
@@ -76,6 +78,23 @@ class SyncJob extends TimedJob {
         $importiert = $this->vorstossImport->importiere();
         if ($importiert > 0) {
             $this->logger->info('Parlament Winterthur: ' . $importiert . ' Vorstösse aus 40_Vorstösse übernommen');
+        }
+
+        // Budget: neues Budgetjahr automatisch einlesen, sobald die Weisung
+        // vorliegt, und einen vorhandenen Novemberbrief nachziehen (F89).
+        try {
+            $budget = $this->budgetImport->automatischerImport();
+            if ($budget !== null && ($budget['importiert'] || $budget['novemberbrief'])) {
+                $this->logger->info(
+                    'Parlament Winterthur: Budgetjahr ' . $budget['jahr'] . ' automatisch eingelesen'
+                    . ($budget['novemberbrief'] ? ' (inkl. Novemberbrief)' : '')
+                );
+            }
+        } catch (\Throwable $e) {
+            $this->logger->error(
+                'Parlament Winterthur: Fehler beim automatischen Budget-Import: ' . $e->getMessage(),
+                ['exception' => $e]
+            );
         }
 
         $this->logger->info('Parlament Winterthur: Starte Datensynchronisation (BackgroundJob)');

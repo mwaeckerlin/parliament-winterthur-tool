@@ -2080,6 +2080,60 @@ class SettingsController extends Controller
     }
 
     /**
+     * Zuordnung Departement → zuständige (Sach-)Kommission für den Budget-Filter
+     * (F76). Format: [{departement: "...", kommission: "..."}].
+     */
+    #[AuthorizedAdminSetting(settings: \OCA\ParliamentWinterthur\Settings\AdminSettings::class)]
+    public function getBudgetKommissionZuordnung(): DataResponse
+    {
+        $raw = $this->config->getAppValue(Application::APP_ID, 'budget_kommission_zuordnung', '[]');
+        return new DataResponse(self::normalisiereBudgetKommission(json_decode($raw, true)));
+    }
+
+    /**
+     * Speichert die Departement→Kommission-Zuordnung (komplette Liste ersetzen).
+     * Body: { "budget_kommission_zuordnung": [ { "departement": "...", "kommission": "..." }, … ] }
+     */
+    #[AuthorizedAdminSetting(settings: \OCA\ParliamentWinterthur\Settings\AdminSettings::class)]
+    public function setBudgetKommissionZuordnung(): DataResponse
+    {
+        $body = $this->request->getParam('budget_kommission_zuordnung', []);
+        if (!is_array($body)) {
+            return new DataResponse(['fehler' => 'Ungültiges Format'], Http::STATUS_BAD_REQUEST);
+        }
+        $bereinigt = self::normalisiereBudgetKommission($body);
+        $this->config->setAppValue(Application::APP_ID, 'budget_kommission_zuordnung', (string) json_encode($bereinigt));
+        return new DataResponse($bereinigt);
+    }
+
+    /**
+     * Normalisiert die Departement→Kommission-Zuordnung: nur Einträge mit
+     * nicht-leerem Departement und Kommission, je Departement der letzte Eintrag.
+     *
+     * @param mixed $roh
+     * @return list<array{departement: string, kommission: string}>
+     */
+    private static function normalisiereBudgetKommission($roh): array
+    {
+        if (!is_array($roh)) {
+            return [];
+        }
+        $nachDept = [];
+        foreach ($roh as $eintrag) {
+            if (!is_array($eintrag)) {
+                continue;
+            }
+            $departement = trim((string) ($eintrag['departement'] ?? ''));
+            $kommission = trim((string) ($eintrag['kommission'] ?? ''));
+            if ($departement === '' || $kommission === '') {
+                continue;
+            }
+            $nachDept[$departement] = ['departement' => $departement, 'kommission' => $kommission];
+        }
+        return array_values($nachDept);
+    }
+
+    /**
      * Der wirksame Typen-Katalog: der gepflegte, sonst der bisherige Standard.
      *
      * @return list<string>

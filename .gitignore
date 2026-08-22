@@ -6,6 +6,11 @@ node_modules/
 npm-debug.log*
 yarn-error.log*
 
+# Composer-Abhängigkeiten (smalot/pdfparser): im Image gebaut (Dockerfile
+# php-deps-Stage), lokal via `composer install`, nie committet.
+parlwin/vendor/
+parlwin/composer.lock
+
 .DS_Store
 Thumbs.db
 

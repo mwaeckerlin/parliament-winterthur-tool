@@ -475,6 +475,156 @@ Nummern werden einmal vergeben und nie wiederverwendet; jeder Test in
 - **F64** Ein eigener Bereich zeigt, was in welcher Version dazugekommen ist — als
   aufklappbare Liste, die Neuerungen der aktuellen Version bereits geöffnet.
 
+## Budget
+
+Der Budget-Bereich unterstützt die Fraktion durch den städtischen Budgetprozess:
+er erleichtert die Vorarbeit in der Fraktion, hilft bei der Koordination mit
+anderen Parteien, erfasst eigene und fremde Anträge geordnet nach Produktegruppen,
+unterstützt globale Kürzungsanträge mit automatischer Verteilung und erlaubt die
+Live-Verfolgung der Beschlüsse während der Budgetsitzung.
+
+Grundlage sind die städtischen Budgetbücher: Teil B (Produktegruppen-Globalbudgets)
+gliedert das Budget nach **Departement → Produktegruppe → Produkt**; die
+Produktegruppe trägt das beschlussfähige Globalbudget (Nettokosten), das Produkt ist
+reine Information. Teil A enthält die Investitionsrechnung, den Steuerfuss und die
+Gesamt-Erfolgsrechnung.
+
+### Seite, Tabs und Filter
+
+- **F74** Ein neuer Bereich «Budget» in der Seitenleiste öffnet eine eigene
+  Budget-Seite. Sie besteht aus vier Untertabs (Globalbudgets, Personalbestand,
+  Investitionsrechnung, Steuerfuss); die Filter und die Summenzeile gelten für alle
+  Tabs gemeinsam.
+- **F75** Ein Filter wählt das **Budgetjahr** aus einem Auswahlmenü der tatsächlich
+  vorhandenen Jahre (nur Jahre, für die Daten in der Datenbank liegen); vorbelegt ist
+  das neueste Jahr. Für vergangene Jahre (aktuell alle vor 2027) wird nichts mehr neu
+  erzeugt; nach dem 1. Dezember des Vorjahres werden nicht bereits erzeugte
+  Budgetjahre ignoriert und keine Daten mehr nachgeladen, die nicht schon in der
+  Datenbank sind. Ein Budgetjahr wird jeweils Ende des Vorjahres für das kommende
+  Jahr erstellt (Ende 2026 entsteht das Budget 2027).
+- **F76** Zwei weitere Filter auf der Budget-Seite: **zuständige Kommission** und
+  **Departement**. Jedes Departement hat eine zuständige Sachkommission; die beiden
+  Filter hängen entsprechend zusammen. Die Auswahl schränkt alle Tabs und die
+  Summenzeile auf das gewählte Departement bzw. die gewählte Kommission ein.
+- **F77** Filter nach **Kostensteigerung** gegenüber dem Vorjahr, in Prozent und in
+  absoluten Franken, kombinierbar (z.B. «alles über 5% gestiegen» und/oder «alles
+  über 1 Mio gestiegen»).
+- **F78** Sortiert wird überall in der Reihenfolge des Buches: **Departement →
+  Produktegruppe → Produkt** (im Investitions-Tab: Departement → Projekt).
+- **F79** Auf **allen** Tabs steht zuoberst eine Summenzeile, die bei jeder Anpassung
+  neu berechnet wird und sich immer nach den aktiven Filtern richtet (zeigt also nur
+  das gefilterte Departement/die Kommission, nicht zwingend die ganze Stadt).
+  Enthalten sind: Total Stellen mit Zu-/Abnahme, Einnahmen, Ausgaben, Ertrag bzw.
+  Defizit und Steuerfuss — jeweils mit der Differenz zum Vorjahr. Auf breiten
+  Bildschirmen mit genügend Platz bleibt die Summenzeile beim Scrollen oben stehen
+  (sticky).
+
+### Tab «Globalbudgets» (Teil B)
+
+- **F80** Der erste Tab zeigt die **Globalbudgets** aus Teil B: je Produktegruppe das
+  beschlussfähige Globalbudget (Nettokosten) mit den Werten des Budgetjahres, des
+  Vorjahres und des Rechnungsjahres. Die zugehörigen **Produkte** stehen zur
+  Information darunter, die **Erläuterungen und Begründungen** aus dem Buch werden an
+  der richtigen Stelle mit ihren Zahlen angezeigt.
+- **F81** **Anträge sind nur auf Produktegruppen möglich** — sie sind im Buch klar als
+  «Zum Beschluss» gekennzeichnet. Produkte gehören zum Informationsteil und lassen
+  sich nicht beantragen.
+- **F82** Eigene und fremde **Anträge** werden erfasst und nach Produktegruppen
+  geordnet dargestellt. Zu jeder Produktegruppe sind die daran gestellten Anträge
+  (Betrag, Antragsteller, Begründung) sichtbar.
+
+### Globale Kürzungsanträge und automatische Verteilung
+
+- **F83** Ein **globaler Kürzungsantrag** verteilt einen festgelegten Betrag anteilig
+  auf alle verfügbaren (nach aktuellem Filter beschlussfähigen) Produktegruppen —
+  **anteilig zum Aufwand** (grössere Budgets tragen absolut mehr). Die dafür nötigen
+  Einzelanträge werden dabei automatisch erzeugt.
+- **F84** Eine **automatische Verteilung** ist standardmässig eingeschaltet: Auch ohne
+  ausdrücklichen Knopfdruck (der Knopf ist dann gar nicht sichtbar) wird bei jeder
+  Budgetanpassung ein Überschuss 1:1 beibehalten — es werden also nur Einsparungen
+  automatisch verteilt, keine Mehrausgaben —, während ein Defizit automatisch als
+  Pauschalkürzung auf die Produktegruppen verteilt wird. Ist die automatische
+  Verteilung ausgeschaltet, erscheint stattdessen ein Knopf, um ein Defizit auf
+  Knopfdruck als Pauschalkürzung zu verteilen.
+- **F85** **Pauschalkürzungen** addieren sich zu den manuellen Kürzungen und werden
+  separat verfolgt. Das Verteilziel lässt sich in der Diskussion jederzeit manuell
+  festlegen: neben dem Standard «schwarze Null» auch auf ein gewünschtes akzeptiertes
+  Defizit oder einen gewünschten Ertrag. Danach wird automatisch neu gerechnet und
+  alle dafür nötigen Einzelanträge werden auf den Produktegruppen erstellt, angepasst
+  oder — wenn nicht mehr nötig — wieder gelöscht. Automatisch aus der Verteilfunktion
+  erzeugte Anträge sind als solche erkennbar und im Frontend eigens filterbar.
+
+### Tab «Personalbestand»
+
+- **F86** Der zweite Tab zeigt ausschliesslich den **Personalbestand**: vom
+  Gesamttotal heruntergebrochen nach Departement und Produktegruppe (bis auf die
+  Produkte nur, soweit das Buch die Stellen dort ausweist — im Regelfall endet die
+  Aufschlüsselung bei der Produktegruppe). Es sind **Anträge auf Personalkürzung oder
+  -aufstockung** möglich: angegeben werden die Zahl der Stellen (Kürzung oder
+  Erweiterung) und der entsprechende Betrag. Wird kein Betrag angegeben, gilt ein im
+  Verwaltungsbereich konfigurierbarer Standardbetrag pro Stelle (anfänglich
+  200'000 CHF).
+
+### Tab «Investitionsrechnung»
+
+- **F87** Der dritte Tab zeigt die **Investitionsrechnung**. Auch hier lassen sich
+  Anträge (Änderungsanträge) stellen. Sortiert wird nach **Departement und Projekt**
+  (Investitionen sind nicht nach Produktegruppe/Produkt gegliedert, sondern nach
+  Departement/Investitionscluster und Einzelprojekt). Zuoberst stehen die Summen. Je
+  Projekt werden zusätzlich angezeigt: bereits getätigte und in den künftigen Jahren
+  noch folgende Investitionen zum selben Projekt, die Gesamtkosten sowie — soweit
+  verfügbar — laufende oder bereits getätigte Planungskosten. Hier gibt es **keinen**
+  automatischen Verteilmechanismus.
+
+### Tab «Steuerfuss»
+
+- **F88** Der vierte Tab zeigt den **Steuerfuss**. Standardmässig wird bei einem
+  Überschuss der Steuerfuss in abgerundeten Prozent-Schritten automatisch entsprechend
+  gesenkt und der Überschuss dadurch reduziert. Dieses Verhalten muss auf dem
+  Steuerfuss-Tab ausdrücklich abgeschaltet werden; erst dann lässt sich der Steuerfuss
+  von Hand bearbeiten. Der Wert eines Steuerprozents wird aus dem Budgetbuch
+  abgeleitet (Steuerertrag geteilt durch den geltenden Steuerfuss). Eine Anpassung des
+  Steuerfusses erzeugt ebenfalls einen Antrag — ganz am Ende der Antragsliste.
+
+### Import der Budgetbücher
+
+- **F89** Die Informationen aus dem Budgetbuch werden besser lesbar und systematisch
+  extrahiert und in die Datenbank geschrieben — mindestens alle vom Parlament
+  festlegbaren Budgets (Produktegruppen) einzeln. Hinweise und Erklärungen werden an
+  die richtige Stelle kopiert und mit den dazugehörigen Zahlen angezeigt. Alles wird
+  automatisch angelegt, sobald eine neue Budgetweisung veröffentlicht und gescannt
+  wurde. Der Import ist gegenüber Formatanpassungen der Bücher so tolerant wie
+  möglich.
+- **F90** Erscheint der **Novemberbrief** (nachträgliche Anpassungen des Stadtrats zum
+  Budgetentwurf), werden dessen Anpassungen automatisch gescannt und an den richtigen
+  Stellen übernommen.
+- **F91** Für die manuelle Nutzung und für Tests: Über «+ Neu» lässt sich ein
+  vergangenes Budgetjahr **importieren** — die Auswahl bietet die Jahre an, für die
+  Budgetunterlagen vorliegen und die noch nicht importiert sind (kein Freitext),
+  wahlweise nur das Budget oder zusammen mit dem Novemberbrief. Ist für ein Jahr nur das Budget in der Datenbank, existiert aber ein
+  Novemberbrief, der noch nicht eingelesen wurde, lässt er sich von Hand einlesen. Der
+  dafür nötige Knopf erscheint nur dann — oben rechts neben «+ Neu» — wenn für das
+  betreffende Jahr ein Budget in der Datenbank liegt und zusätzlich ein mindestens
+  zwei Tage alter Novemberbrief vorliegt, der noch nicht in der Datenbank ist.
+  Andernfalls ist der Knopf nicht vorhanden.
+
+### Anträge einreichen und Live-Verfolgung
+
+- **F92** Ein **PDF mit allen Anträgen der Fraktion** lässt sich erzeugen — insgesamt
+  oder getrennt nach Kommission —, damit die Fraktion in der Kommission ein fertiges
+  Antrags-PDF einreichen kann.
+- **F93** In den Sitzungen, in denen das Budget traktandiert ist, ist eine
+  **Live-Verfolgung** der Beschlüsse möglich: Jeder gestellte Antrag (eigene wie
+  fremde) wird aus der Einladung bzw. den Dokumenten übernommen und angezeigt. Zu
+  Beginn sind alle Anträge «noch nicht entschieden». Während der Sitzung trägt ein
+  Fraktionsmitglied ein, ob ein Antrag angenommen oder abgelehnt wurde; ein Antrag
+  lässt sich auch wieder auf «noch nicht entschieden» zurücksetzen. Spontane Anträge
+  lassen sich in der Sitzung erfassen. Anträge, die in einer Sitzung erfasst wurden,
+  erscheinen auch in vorhergehenden und folgenden Sitzungen, in denen dasselbe Budget
+  behandelt wird — analog zu den Sitzungsnotizen an einem Geschäft, die bei
+  Verschiebungen oder mehreren Sitzungen zum selben Thema überall verfügbar sind (und
+  über denselben Mechanismus).
+
 ## Bedienelemente im Detail
 
 Dieser Abschnitt beschreibt jedes einzelne Bedienelement jeder Ansicht und jedes
