@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OCA\ParliamentWinterthur\Controller;
 
 use OCA\ParliamentWinterthur\AppInfo\Application;
+use OCA\ParliamentWinterthur\Service\NotizService;
 use OCA\ParliamentWinterthur\Service\RealtimePublisherService;
 use OCA\ParliamentWinterthur\Service\SitzungService;
 use OCA\ParliamentWinterthur\Service\SitzungGeschaeftService;
@@ -24,6 +25,9 @@ use Psr\Log\LoggerInterface;
  */
 class SitzungController extends Controller
 {
+    /** Objekttyp für Sitzungs-Notizen im geteilten NotizService. */
+    private const NOTIZ_OBJEKT_TYP = 'sitzung';
+
     public function __construct(
         IRequest $request,
         private readonly SitzungService $service,
@@ -36,8 +40,87 @@ class SitzungController extends Controller
         private readonly \OCA\ParliamentWinterthur\Service\SitzungVorstossService $sitzungVorstossService,
         private readonly \OCA\ParliamentWinterthur\Service\DeckService $deckService,
         private readonly \OCP\IConfig $config,
+        private readonly NotizService $notizService,
     ) {
         parent::__construct(Application::APP_ID, $request);
+    }
+
+    // ── Sitzungs-Notizen: geteilter NotizService, wie überall (eine Lösung) ─────
+
+    #[NoAdminRequired]
+    public function notizen(int $id): DataResponse
+    {
+        return new DataResponse($this->notizService->liste(self::NOTIZ_OBJEKT_TYP, $id));
+    }
+
+    #[NoAdminRequired]
+    public function addNotiz(int $id): DataResponse
+    {
+        $text = (string) $this->request->getParam('text', '');
+        try {
+            $aktion = $this->notizService->hinzufuegen(self::NOTIZ_OBJEKT_TYP, $id, $text);
+            $this->realtimePublisher->publish('sitzungen.updated', ['id' => $id, 'aktionTyp' => 'notiz']);
+            return new DataResponse($aktion);
+        } catch (\InvalidArgumentException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+        } catch (\RuntimeException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_FORBIDDEN);
+        }
+    }
+
+    #[NoAdminRequired]
+    public function updateNotiz(int $id, int $aktionId): DataResponse
+    {
+        $text = (string) $this->request->getParam('text', '');
+        try {
+            $aktion = $this->notizService->aktualisieren(self::NOTIZ_OBJEKT_TYP, $id, $aktionId, $text);
+            $this->realtimePublisher->publish('sitzungen.updated', ['id' => $id, 'aktionTyp' => 'notiz']);
+            return new DataResponse($aktion);
+        } catch (\InvalidArgumentException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+        } catch (\RuntimeException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_FORBIDDEN);
+        }
+    }
+
+    #[NoAdminRequired]
+    public function deleteNotiz(int $id, int $aktionId): DataResponse
+    {
+        try {
+            $this->notizService->loeschen(self::NOTIZ_OBJEKT_TYP, $id, $aktionId);
+            $this->realtimePublisher->publish('sitzungen.updated', ['id' => $id, 'aktionTyp' => 'notiz']);
+            return new DataResponse([]);
+        } catch (\InvalidArgumentException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+        } catch (\RuntimeException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_FORBIDDEN);
+        }
+    }
+
+    #[NoAdminRequired]
+    public function restoreNotiz(int $id, int $aktionId): DataResponse
+    {
+        try {
+            $aktion = $this->notizService->wiederherstellen(self::NOTIZ_OBJEKT_TYP, $id, $aktionId);
+            $this->realtimePublisher->publish('sitzungen.updated', ['id' => $id, 'aktionTyp' => 'notiz']);
+            return new DataResponse($aktion);
+        } catch (\InvalidArgumentException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+        } catch (\RuntimeException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_FORBIDDEN);
+        }
+    }
+
+    #[NoAdminRequired]
+    public function notizRevisionen(int $id, int $aktionId): DataResponse
+    {
+        try {
+            return new DataResponse($this->notizService->revisionen(self::NOTIZ_OBJEKT_TYP, $id, $aktionId));
+        } catch (\InvalidArgumentException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+        } catch (\RuntimeException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_FORBIDDEN);
+        }
     }
 
     /** Legt aus einer Sitzung ein To-do als Deck-Karte im Fraktions-Board an. */
@@ -309,13 +392,11 @@ class SitzungController extends Controller
     #[NoAdminRequired]
     public function update(int $id): DataResponse
     {
+        // Notizen zur Sitzung laufen über den geteilten NotizService (siehe
+        // notizen()/addNotiz() oben) — nicht mehr als JSON auf der Sitzung.
         $felder = [];
         if ($this->request->offsetExists('bemerkungen')) {
             $felder['bemerkungen'] = $this->request->getParam('bemerkungen', '');
-        }
-        if ($this->request->offsetExists('notizen')) {
-            $rohwert = $this->request->getParam('notizen', '[]');
-            $felder['notizen'] = $this->normalisiereNotizen($rohwert);
         }
 
         try {
@@ -371,52 +452,4 @@ class SitzungController extends Controller
         }
     }
 
-    /**
-     * Stellt sicher, dass jede Notiz `datum`, `uid`, `displayName` und `text`
-     * trägt. Fehlende Audit-Felder werden mit der aktuellen Session
-     * befüllt. Eingaben können ein JSON-String oder ein Array sein.
-     */
-    private function normalisiereNotizen(mixed $rohwert): string
-    {
-        if (is_string($rohwert)) {
-            $arr = json_decode($rohwert, true);
-        } elseif (is_array($rohwert)) {
-            $arr = $rohwert;
-        } else {
-            $arr = [];
-        }
-        if (!is_array($arr)) {
-            $arr = [];
-        }
-        $user = $this->userSession->getUser();
-        $aktUid = $user?->getUID() ?? '';
-        $aktName = $user?->getDisplayName() ?? $aktUid;
-        $jetzt = (new \DateTime())->format('d.m.Y H:i');
-        $ergebnis = [];
-        foreach ($arr as $eintrag) {
-            if (!is_array($eintrag)) {
-                continue;
-            }
-            $text = (string) ($eintrag['text'] ?? '');
-            if ($text === '') {
-                continue;
-            }
-            $datum = (string) ($eintrag['datum'] ?? '');
-            $uid = (string) ($eintrag['uid'] ?? '');
-            $name = (string) ($eintrag['displayName'] ?? '');
-            if ($datum === '')
-                $datum = $jetzt;
-            if ($uid === '')
-                $uid = $aktUid;
-            if ($name === '')
-                $name = $aktName !== '' ? $aktName : $uid;
-            $ergebnis[] = [
-                'datum' => $datum,
-                'uid' => $uid,
-                'displayName' => $name,
-                'text' => $text,
-            ];
-        }
-        return json_encode($ergebnis, JSON_UNESCAPED_UNICODE);
-    }
 }

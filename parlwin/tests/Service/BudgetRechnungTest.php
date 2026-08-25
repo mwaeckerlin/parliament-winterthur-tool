@@ -47,6 +47,26 @@ class BudgetRechnungTest extends TestCase {
         $this->assertSame(27.5, $s['stellen']);       // 29.5 - 2
     }
 
+    public function testMehrereAntraegeAufSelberPositionSummierenSich(): void {
+        // F99: zwei Anträge auf dieselbe Produktegruppe addieren sich.
+        $antraege = [
+            ['bereich' => 'globalbudget', 'zielRef' => '121', 'betragDelta' => -500000, 'stellenDelta' => 0.0],
+            ['bereich' => 'globalbudget', 'zielRef' => '121', 'betragDelta' => -300000, 'stellenDelta' => 0.0],
+        ];
+        $s = BudgetRechnung::summen(self::gruppen(), $antraege);
+        $this->assertSame(9200000, $s['ausgaben']); // 10.0M - 0.5M - 0.3M
+    }
+
+    public function testAusnahmeVerteiltDenGesamtbetragNeu(): void {
+        // F101: wird eine Position ausgenommen, verteilt sich derselbe Gesamt-
+        // betrag vollständig auf die übrigen — die eingesparte Summe bleibt gleich.
+        $ohne = BudgetRechnung::verteileAnteiligAufwand(-7000000, self::gruppen());
+        $this->assertSame(-7000000, array_sum($ohne));
+        $nurEine = BudgetRechnung::verteileAnteiligAufwand(-7000000, [self::gruppen()[0]]);
+        $this->assertSame(-7000000, $nurEine['121'], 'alles geht auf die verbleibende Position');
+        $this->assertSame(-7000000, array_sum($nurEine));
+    }
+
     public function testSteuerfussAntragWirktAufEinnahmen(): void {
         $antraege = [['bereich' => 'steuerfuss', 'zielRef' => '', 'betragDelta' => -2000000, 'stellenDelta' => 0.0]];
         $s = BudgetRechnung::summen(self::gruppen(), $antraege);

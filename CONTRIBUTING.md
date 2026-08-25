@@ -423,6 +423,40 @@ oder aktuelle Zeit); Abschnitt «Wortlaut» mit dem TipTap-HTML des Votums
 entfernt) oder «— Noch kein Votum erfasst —»; Fusszeile mit Geschäftsnummer und
 Ausdruckdatum.
 
+### Filter-Grundprinzip: nur vorkommende Werte anbieten (verbindlich für JEDEN Filter)
+
+Ein Werte-Filter (Auswahlliste/Mehrfachauswahl, die eine Liste einengt) bietet
+**genau die Werte an, die im zugrunde liegenden Datenbestand für dieses Feld
+tatsächlich vorkommen** — nie die ganze Domäne. Eine Option, die keinen einzigen
+Treffer ergäbe, ist unnützer Ballast und führt zu leeren Trefferlisten; sie wird
+weggelassen. Der neutrale Eintrag «Alle»/`''` (kein Filter) ist kein Datenwert und
+bleibt immer.
+
+- **Herleitung aus den geladenen Daten**, nicht aus einer Stammdaten- oder
+  Konstantenliste: die Optionen entstehen als `new Set(...)` über die sichtbare
+  Datenmenge (bzw. über die vom Server gelieferte Ansicht bei serverseitigen
+  Filtern). Beispiele: `alleStatus`/`alleTypen`/`einreicherOptionen`/
+  `parteiOptionen`/`alleBeschluesse` in `Geschaeftsliste.vue`,
+  `jahrOptionen`/`kommissionOptionen`/`departementOptionen` in `Budgetliste.vue`.
+- **Feste Reihenfolge bleibt erhalten:** wo eine Domänenliste eine sinnvolle
+  Reihenfolge vorgibt (Prioritätsstufen, Vorstoss-Status), wird über diese Liste
+  **gefiltert** (`DOMAENE.filter(o => vorhanden.has(o.value))`), statt die
+  vorkommenden Werte neu zu sortieren.
+- **Gegen dasselbe Feld gründen, gegen das gefiltert wird:** der
+  Zuständigkeitsfilter bietet nur `hauptZustaendigePerson`-Werte, die an einem
+  Geschäft gesetzt sind (nicht jedes Mitglied); der Mitglieder-Kommissionsfilter
+  nur Kommissionen, denen ein sichtbares Mitglied angehört (nicht jede
+  Kommission); der Funktionsfilter nur Funktionen, die ein Mitglied wirklich hat.
+- **Abhängigkeit von vorgeschalteten Schaltern:** hängt die Datenmenge an einem
+  Schalter (z.B. «Nur aktive Mitglieder» → `basisMitglieder`), gründen die
+  Filteroptionen auf **dieser** Menge, nicht auf dem Rohbestand.
+- **Nur für FILTER, nicht für Eingabe-/Bearbeitungsfelder:** ein Feld, das einen
+  Wert **setzt** (Zuständigkeit/Beschluss/Herkunft im Bearbeiten-Dialog), bietet
+  weiterhin die ganze zulässige Domäne an — dort geht es nicht ums Einengen.
+- Jeder Filter wird mit einem npnp-Test festgenagelt, der ohne die Gründung rot
+  ist (eine nicht vorkommende Option erscheint). Hintergrund: die Zuständigkeits-
+  Filterliste bot alle Mitglieder an — post-mortems/2026-08-24-filter-bietet-nicht-vorhandene-werte.md.
+
 ### Standard-Sortierungen und Filter-Grundzustände (aus `data()`)
 
 - **Geschäfte** (`Geschaeftsliste.vue`): `sortFeld='datum'`,
@@ -748,6 +782,51 @@ eingebetteten Text (keine Scans) — die Extraktion erfolgt server-seitig in PHP
   Sitzungsphase erfasst (aus den Einladungs-/Traktandendokumenten) und live verfolgt;
   ein automatisches Auslesen der Anträge aus beliebigen Einladungs-PDF ist nicht möglich
   und darum nicht implementiert.
+
+#### Antragsmodell: Herkunft, Betrag, Haltung, Unterstützung, Pauschal, Verknüpfung (F94–F104)
+
+Erweiterungen an `pw_budget_antrag` (Migration Version000040) und `pw_budget_verteilung`
+(Version000041):
+
+- **Herkunft (F94):** `herkunft` (`eigene|fremde`), wie beim Vorstoss. Der Antragsteller
+  wird im Frontend aus einer Liste gewählt: bei eigenen die aktiven Mitglieder (vorbelegt
+  mit dem aktuellen Nutzer via `getCurrentUser()`), bei fremden die aktiven Fraktionen
+  zuoberst. Gespeichert wird der angezeigte Name in `antragsteller`. Die
+  Antragsteller-/Fraktionslisten kommen als Props (`mitglieder`, `fraktionen`) aus `App.vue`.
+- **Betrag in CHF und Prozent (F95):** `betrag_delta` (CHF, vorzeichenbehaftet) UND
+  `prozent_delta` (Prozent). Die Richtung ist das Vorzeichen (Reduktion −, Mehrausgabe +);
+  im Frontend steuert der Umschalter das Vorzeichen (`BudgetAntragForm`). Fehlt einer der
+  Werte, berechnet ihn `BudgetService::betragSetzen` aus dem **Budgetwert der Position**
+  (`basisFuerPosition`: Globalkredit-Soll der Produktegruppe bzw. `bu` des Projekts). Die
+  Live-Rechnung CHF↔% erfolgt zusätzlich im Formular (`betragGeaendert`/`prozentGeaendert`).
+- **Steuerfuss in Prozentpunkten (F96):** für `bereich=steuerfuss` sind `prozent_delta`
+  Prozentpunkte; der CHF-Effekt = `Ertrag × Prozentpunkte / geltender Steuerfuss`
+  (`betragSetzen`). Das Frontend sendet nur `prozentDelta`.
+- **Haltung (F97):** `haltung`, getrennt vom Sitzungs-Beschluss. Eigene: `einreichen`
+  (Standard) | `nicht_einreichen`; fremde: `unterstuetzen` | `nicht_unterstuetzen` |
+  `offen` (Standard). `BudgetAntrag::haltungOderStandard()` liefert den Herkunfts-Standard,
+  `wirdUnterstuetzt()` = «einreichen» oder «unterstuetzen».
+- **Unterstützende Fraktionen (F98):** `unterstuetzer` (JSON `[{key,name}]`). Bei
+  Zustimmung ist die eigene Fraktion automatisch dabei (`unterstuetzerMit`).
+- **Übersicht zählt nur Unterstütztes (F102):** `BudgetService::ansicht` nimmt in der
+  Vorbereitungsphase nur Anträge mit `wirdUnterstuetzt()` in die Summen; in der
+  Sitzungsphase nur die angenommenen. Auch die Automatik (`pauschalNeu`) rechnet nur mit
+  unterstützten manuellen Anträgen.
+- **Pauschalantrag (F100/F101):** `pw_budget_verteilung.haltung` (Einreichen-Entscheid,
+  vererbt sich auf die je Position erzeugten Kinder) und `ausnahmen` (JSON-Liste
+  `zielRef`). `pauschalNeu` verteilt den Delta nur über die nicht ausgenommenen Gruppen —
+  die Umverteilung auf die übrigen erledigt `verteileAnteiligAufwand` von selbst (Summe
+  bleibt exakt). Frontend: Schalter «Pauschalantrag einreichen» und Checkbox «Ausnahme vom
+  Pauschalantrag» je Produktegruppe.
+- **Notizen (F103):** über den geteilten `NotizService` mit Objekttyp `budget-antrag`
+  (Versionen/Soft-Delete/Undo wie bei Geschäft/Vorstoss). `ansicht` hängt die Notizen je
+  Antrag als `aktionen` an (`listeGruppiert`); das Frontend bindet sie an `NotizenListe`.
+  Endpunkte `budget#notizen/addNotiz/updateNotiz/deleteNotiz/restoreNotiz/notizRevisionen`.
+- **Verknüpfung Vorbereitung↔Sitzung (F104):** `verknuepft_mit_id`.
+  `verknuepfungenAktualisieren` (in `nachAenderung`) verknüpft automatisch, wenn auf beiden
+  Seiten genau ein freier Kandidat mit gleichem `bereich/zielRef/betragDelta` besteht, und
+  überträgt die Haltung in die Sitzung; Mehrdeutiges bleibt frei. `verknuepfungSetzen`
+  (Endpunkt `budget#verknuepfen`) setzt/löst von Hand.
 
 ## Weitere Regeln
 

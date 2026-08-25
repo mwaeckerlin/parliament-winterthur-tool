@@ -291,10 +291,16 @@ export default {
       return getCurrentUser()?.uid || ''
     },
     herkunftOptionen() {
-      return [{ label: 'Alle', value: '' }, ...HERKUENFTE.map(h => ({ label: h.label, value: h.code }))]
+      // Grundprinzip: nur die Herkünfte anbieten, die in den Vorstössen wirklich
+      // vorkommen (feste Reihenfolge aus HERKUENFTE bleibt erhalten). «Alle» ist
+      // kein Datenwert, sondern «kein Filter».
+      const vorhanden = new Set(this.vorstoesse.map(v => v.herkunft).filter(Boolean))
+      return [{ label: 'Alle', value: '' }, ...HERKUENFTE.filter(h => vorhanden.has(h.code)).map(h => ({ label: h.label, value: h.code }))]
     },
     statusOptionen() {
-      return [{ label: 'Alle', value: '' }, ...STATUS.map(s => ({ label: s.label, value: s.code }))]
+      // Grundprinzip: nur die Status anbieten, die in den Vorstössen wirklich vorkommen.
+      const vorhanden = new Set(this.vorstoesse.map(v => v.status).filter(Boolean))
+      return [{ label: 'Alle', value: '' }, ...STATUS.filter(s => vorhanden.has(s.code)).map(s => ({ label: s.label, value: s.code }))]
     },
     herkunftWahlOptionen() {
       return HERKUENFTE.map(h => ({ label: h.label, value: h.code }))

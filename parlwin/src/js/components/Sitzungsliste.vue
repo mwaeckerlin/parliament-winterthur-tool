@@ -238,10 +238,11 @@
           <!-- Notizen zur Sitzung (ersetzt frühere „Bemerkungen zur Sitzung“). -->
           <div class="pw-sitzung-notizen">
             <h4>Notizen zur Sitzung</h4>
-            <SitzungNotizen
-              :model-value="sitzungNotizen[sitzung.id] || []"
-              placeholder="Notiz zur Sitzung hinzufügen…"
-              @update:model-value="speichereSitzungNotizen(sitzung, $event)"
+            <NotizenListe
+              :basis-url="'sitzungen/' + sitzung.id"
+              :notizen="sitzungNotizenNs[sitzung.id] || []"
+              :aktuelle-uid="aktuelleUid"
+              @geaendert="v => sitzungNotizenNs = { ...sitzungNotizenNs, [sitzung.id]: v }"
             />
           </div>
 
@@ -319,7 +320,12 @@
             </div>
             <div v-for="vs in (verknuepfteSitzungen[sitzung.id] || [])" :key="vs.id" class="pw-verknuepfte-sitzung">
               <h5>{{ formatieredatum(vs.datum) }} – {{ vs.titel }}</h5>
-              <SitzungNotizen :model-value="parseNotizen(vs.notizen)" :readonly="true" />
+              <NotizenListe
+                :basis-url="'sitzungen/' + vs.id"
+                :notizen="sitzungNotizenNs[vs.id] || []"
+                :aktuelle-uid="aktuelleUid"
+                :readonly="true"
+              />
             </div>
           </div>
 
@@ -366,12 +372,15 @@
                               @notiz-wiederhergestellt="v => onSitzungsnotizWiederhergestellt(geschaeftIdVon(t), v)"
                             />
                           </template>
-                          <SitzungNotizen
-                            v-else
-                            :model-value="parseTraktandumNotizen(t.id)"
-                            placeholder="Notiz zum Traktandum hinzufügen…"
-                            @update:model-value="speichereTraktandumNotizen(t, $event)"
-                          />
+                          <template v-else>
+                            <div class="pw-sitzungsnotiz-hinweis">Notiz zum Traktandum</div>
+                            <NotizenListe
+                              :basis-url="'sitzungen/' + t.sitzungId + '/traktanden/' + t.id"
+                              :notizen="traktandumNotizenNs[t.id] || []"
+                              :aktuelle-uid="aktuelleUid"
+                              @geaendert="v => traktandumNotizenNs = { ...traktandumNotizenNs, [t.id]: v }"
+                            />
+                          </template>
                         </td>
                       </tr>
                     </template>
@@ -484,12 +493,15 @@
                                 @notiz-wiederhergestellt="v => onSitzungsnotizWiederhergestellt(geschaeftIdVon(t), v)"
                               />
                             </template>
-                            <SitzungNotizen
-                              v-else
-                              :model-value="parseTraktandumNotizen(t.id)"
-                              placeholder="Notiz zum Traktandum hinzufügen…"
-                              @update:model-value="speichereTraktandumNotizen(t, $event)"
-                            />
+                            <template v-else>
+                              <div class="pw-sitzungsnotiz-hinweis">Notiz zum Traktandum</div>
+                              <NotizenListe
+                                :basis-url="'sitzungen/' + t.sitzungId + '/traktanden/' + t.id"
+                                :notizen="traktandumNotizenNs[t.id] || []"
+                                :aktuelle-uid="aktuelleUid"
+                                @geaendert="v => traktandumNotizenNs = { ...traktandumNotizenNs, [t.id]: v }"
+                              />
+                            </template>
                           </td>
                         </tr>
                       </template>
@@ -593,12 +605,15 @@
                           @notiz-wiederhergestellt="v => onSitzungsnotizWiederhergestellt(geschaeftIdVon(t), v)"
                         />
                       </template>
-                      <SitzungNotizen
-                        v-else
-                        :model-value="parseTraktandumNotizen(t.id)"
-                        placeholder="Notiz zum Traktandum hinzufügen…"
-                        @update:model-value="speichereTraktandumNotizen(t, $event)"
-                      />
+                      <template v-else>
+                        <div class="pw-sitzungsnotiz-hinweis">Notiz zum Traktandum</div>
+                        <NotizenListe
+                          :basis-url="'sitzungen/' + t.sitzungId + '/traktanden/' + t.id"
+                          :notizen="traktandumNotizenNs[t.id] || []"
+                          :aktuelle-uid="aktuelleUid"
+                          @geaendert="v => traktandumNotizenNs = { ...traktandumNotizenNs, [t.id]: v }"
+                        />
+                      </template>
                     </div>
                   </div>
                 </div>
@@ -648,7 +663,6 @@ import '@nextcloud/dialogs/style.css'
 import { subscribeRealtime } from '../realtime'
 import GeschaeftDetail from './GeschaeftDetail.vue'
 import BudgetSitzungsantraege from './BudgetSitzungsantraege.vue'
-import SitzungNotizen from './SitzungNotizen.vue'
 import NotizenListe from './NotizenListe.vue'
 import Aktionszeitleiste from './Aktionszeitleiste.vue'
 import GeschaeftDokumente from './GeschaeftDokumente.vue'
@@ -665,7 +679,7 @@ import PwDatumInput from './PwDatumInput.vue'
 
 export default {
   name: 'Sitzungsliste',
-  components: { GeschaeftDetail, BudgetSitzungsantraege, SitzungNotizen, NotizenListe, Aktionszeitleiste, GeschaeftDokumente, NcActions, NcActionButton, NcButton, NcCheckboxRadioSwitch, NcLoadingIcon, NcSelect, NcTextField, PwMultiSelect, PwField, PwDatumInput },
+  components: { GeschaeftDetail, BudgetSitzungsantraege, NotizenListe, Aktionszeitleiste, GeschaeftDokumente, NcActions, NcActionButton, NcButton, NcCheckboxRadioSwitch, NcLoadingIcon, NcSelect, NcTextField, PwMultiSelect, PwField, PwDatumInput },
   props: {
     mitglieder:   { type: Array, default: () => [] },
     fraktionen:   { type: Array, default: () => [] },
@@ -681,8 +695,13 @@ export default {
       offeneSitzungen: [],
       traktanden: {},
       ladenTraktanden: {},
-      sitzungNotizen: {},
+      // Sitzungs-Notizen über den geteilten NotizService (objekt_typ «sitzung»):
+      // sitzungId -> Array von Notiz-Aktionen. Dieselbe Komponente/Optik wie überall.
+      sitzungNotizenNs: {},
       traktandumNotizen: {},
+      // Traktandum-Notizen (geschäftslose Traktanden) über den geteilten
+      // NotizService — dieselbe Komponente/Optik wie überall.
+      traktandumNotizenNs: {},
       // Sitzungsnotizen: geschaeftId -> Array von Notiz-Aktionen. Am Geschäft
       // haftende, in einer Sitzung erfasste Notizen (kategorie «sitzungsnotiz»).
       sitzungsnotizen: {},
@@ -907,7 +926,7 @@ export default {
         }
         this.sitzungen.push(neueSitzung)
         this.sitzungen.sort((a, b) => (a.datum || '').localeCompare(b.datum || ''))
-        this.sitzungNotizen[neueSitzung.id] = []
+        this.sitzungNotizenNs[neueSitzung.id] = []
         this.offeneSitzungen.push(neueSitzung.id)
         await this.ladeTraktandenFuerSitzung(neueSitzung.id)
         this.gewaehlterTyp = null
@@ -1008,15 +1027,13 @@ export default {
       }
       const reihenfolge = new Map(neu.map((s, i) => [s.id, i]))
       this.sitzungen.sort((a, b) => (reihenfolge.get(a.id) ?? 0) - (reihenfolge.get(b.id) ?? 0))
-      for (const n of neu) {
-        this.sitzungNotizen[n.id] = this.parseNotizen(n.notizen)
-      }
     },
     async toggleSitzung(id) {
       if (this.offeneSitzungen.includes(id)) {
         this.offeneSitzungen = this.offeneSitzungen.filter(i => i !== id)
       } else {
         this.offeneSitzungen.push(id)
+        await this.ladeSitzungNotizen(id)
         await this.ladeTraktandenFuerSitzung(id)
         await this.ladeVerknuepfteSitzungen(id)
         await this.ladeGeschaefteAlle()
@@ -1143,6 +1160,9 @@ export default {
         const { data } = await axios.get(generateUrl(`/apps/parlwin/sitzungen/${id}/verknuepft`))
         const andere = (Array.isArray(data) ? data : []).filter(s => s.id !== id)
         this.verknuepfteSitzungen = { ...this.verknuepfteSitzungen, [id]: andere }
+        // Notizen der verknüpften Sitzungen über denselben NotizService nachladen
+        // (readonly-Anzeige) — dieselbe Komponente/Optik wie die eigene Sitzung.
+        for (const vs of andere) { this.ladeSitzungNotizen(vs.id) }
       } catch (e) {
         this.verknuepfteSitzungen = { ...this.verknuepfteSitzungen, [id]: [] }
       }
@@ -1167,9 +1187,10 @@ export default {
         const notizen = { ...this.traktandumNotizen }
         data.forEach(t => {
           notizen[t.id] = this.parseNotizen(t.notizen)
-          // Für verknüpfte Geschäfte die am Geschäft haftenden Sitzungsnotizen laden.
+          // Für verknüpfte Geschäfte die am Geschäft haftenden Sitzungsnotizen laden;
+          // für geschäftslose Traktanden die am Traktandum haftenden Notizen.
           const gid = this.geschaeftIdVon(t)
-          if (gid > 0) this.ladeSitzungsnotizen(gid)
+          if (gid > 0) { this.ladeSitzungsnotizen(gid) } else { this.ladeTraktandumNotizen(sitzungId, t.id) }
         })
         this.traktandumNotizen = notizen
         // Wenn aktive Suche Treffer ergibt, Sitzung automatisch aufklappen.
@@ -1227,6 +1248,18 @@ export default {
         this.sitzungsnotizen = { ...this.sitzungsnotizen, [gid]: [] }
       }
     },
+    // Lädt die am (geschäftslosen) Traktandum haftenden Notizen über den
+    // geteilten NotizService — dieselbe Mechanik/Optik wie bei Geschäft/Vorstoss.
+    async ladeTraktandumNotizen(sitzungId, traktandumId) {
+      const tid = Number(traktandumId || 0)
+      if (tid <= 0) return
+      try {
+        const { data } = await axios.get(generateUrl(`/apps/parlwin/sitzungen/${sitzungId}/traktanden/${tid}/notizen`))
+        this.traktandumNotizenNs = { ...this.traktandumNotizenNs, [tid]: Array.isArray(data) ? data : [] }
+      } catch (e) {
+        this.traktandumNotizenNs = { ...this.traktandumNotizenNs, [tid]: [] }
+      }
+    },
     // Eine in der Aktionszeitleiste der Traktandenliste wiederhergestellte
     // Sitzungsnotiz zurück in die Notizliste übernehmen (geloescht=false).
     onSitzungsnotizWiederhergestellt(geschaeftId, data) {
@@ -1274,16 +1307,18 @@ export default {
         console.error('Fehler beim Speichern der Traktandum-Notizen:', e)
       }
     },
-    async speichereSitzungNotizen(sitzung, notizen) {
-      const liste = Array.isArray(notizen) ? notizen : []
-      this.sitzungNotizen = { ...this.sitzungNotizen, [sitzung.id]: liste }
+    // Lädt die an der Sitzung haftenden Notizen über den geteilten NotizService
+    // (objekt_typ «sitzung») — dieselbe Mechanik/Optik wie bei Geschäft/Vorstoss/
+    // Traktandum. Persistiert wird direkt von NotizenListe über die REST-Endpunkte
+    // unter `sitzungen/{id}/notizen`; hier wird nur die Startliste geholt.
+    async ladeSitzungNotizen(id) {
+      const sid = Number(id || 0)
+      if (sid <= 0) return
       try {
-        await axios.put(
-          generateUrl(`/apps/parlwin/sitzungen/${sitzung.id}`),
-          { notizen: JSON.stringify(liste) }
-        )
+        const { data } = await axios.get(generateUrl(`/apps/parlwin/sitzungen/${sid}/notizen`))
+        this.sitzungNotizenNs = { ...this.sitzungNotizenNs, [sid]: Array.isArray(data) ? data : [] }
       } catch (e) {
-        console.error('Fehler beim Speichern der Sitzungs-Notizen:', e)
+        this.sitzungNotizenNs = { ...this.sitzungNotizenNs, [sid]: [] }
       }
     },
     zustaendigOptionenFuer(geschaeft) {

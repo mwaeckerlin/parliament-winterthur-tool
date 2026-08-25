@@ -6,9 +6,11 @@ namespace OCA\ParliamentWinterthur\Controller;
 
 use OCA\ParliamentWinterthur\AppInfo\Application;
 use OCA\ParliamentWinterthur\Service\FraktionsarbeitService;
+use OCA\ParliamentWinterthur\Service\NotizService;
 use OCA\ParliamentWinterthur\Service\RealtimePublisherService;
 use OCA\ParliamentWinterthur\Service\SitzungService;
 use OCP\AppFramework\Controller;
+use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\DataResponse;
 use OCP\AppFramework\Http;
@@ -21,15 +23,98 @@ use Psr\Log\LoggerInterface;
  */
 class TraktandumController extends Controller
 {
+    /** Objekttyp für Traktandum-Notizen im geteilten NotizService. */
+    private const NOTIZ_OBJEKT_TYP = 'traktandum';
+
     public function __construct(
         IRequest $request,
         private readonly SitzungService $service,
         private readonly FraktionsarbeitService $fraktionsarbeitService,
         private readonly RealtimePublisherService $realtimePublisher,
         private readonly IUserSession $userSession,
+        private readonly NotizService $notizService,
         private readonly LoggerInterface $logger,
     ) {
         parent::__construct(Application::APP_ID, $request);
+    }
+
+    // ── Traktandum-Notizen (geschäftslose Traktanden): geteilter NotizService,
+    //    identisch zu Geschäft/Vorstoss/Budget-Antrag ────────────────────────────
+
+    #[NoAdminRequired]
+    public function notizen(int $sitzungId, int $id): DataResponse
+    {
+        return new DataResponse($this->notizService->liste(self::NOTIZ_OBJEKT_TYP, $id));
+    }
+
+    #[NoAdminRequired]
+    public function addNotiz(int $sitzungId, int $id): DataResponse
+    {
+        $text = (string) $this->request->getParam('text', '');
+        try {
+            $aktion = $this->notizService->hinzufuegen(self::NOTIZ_OBJEKT_TYP, $id, $text);
+            $this->realtimePublisher->publish('traktanden.updated', ['id' => $id, 'sitzungId' => $sitzungId, 'aktionTyp' => 'notiz']);
+            return new DataResponse($aktion);
+        } catch (\InvalidArgumentException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+        } catch (\RuntimeException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_FORBIDDEN);
+        }
+    }
+
+    #[NoAdminRequired]
+    public function updateNotiz(int $sitzungId, int $id, int $aktionId): DataResponse
+    {
+        $text = (string) $this->request->getParam('text', '');
+        try {
+            $aktion = $this->notizService->aktualisieren(self::NOTIZ_OBJEKT_TYP, $id, $aktionId, $text);
+            $this->realtimePublisher->publish('traktanden.updated', ['id' => $id, 'sitzungId' => $sitzungId, 'aktionTyp' => 'notiz']);
+            return new DataResponse($aktion);
+        } catch (\InvalidArgumentException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+        } catch (\RuntimeException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_FORBIDDEN);
+        }
+    }
+
+    #[NoAdminRequired]
+    public function deleteNotiz(int $sitzungId, int $id, int $aktionId): DataResponse
+    {
+        try {
+            $this->notizService->loeschen(self::NOTIZ_OBJEKT_TYP, $id, $aktionId);
+            $this->realtimePublisher->publish('traktanden.updated', ['id' => $id, 'sitzungId' => $sitzungId, 'aktionTyp' => 'notiz']);
+            return new DataResponse([]);
+        } catch (\InvalidArgumentException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+        } catch (\RuntimeException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_FORBIDDEN);
+        }
+    }
+
+    #[NoAdminRequired]
+    public function restoreNotiz(int $sitzungId, int $id, int $aktionId): DataResponse
+    {
+        try {
+            $aktion = $this->notizService->wiederherstellen(self::NOTIZ_OBJEKT_TYP, $id, $aktionId);
+            $this->realtimePublisher->publish('traktanden.updated', ['id' => $id, 'sitzungId' => $sitzungId, 'aktionTyp' => 'notiz']);
+            return new DataResponse($aktion);
+        } catch (\InvalidArgumentException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+        } catch (\RuntimeException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_FORBIDDEN);
+        }
+    }
+
+    #[NoAdminRequired]
+    public function notizRevisionen(int $sitzungId, int $id, int $aktionId): DataResponse
+    {
+        try {
+            return new DataResponse($this->notizService->revisionen(self::NOTIZ_OBJEKT_TYP, $id, $aktionId));
+        } catch (\InvalidArgumentException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+        } catch (\RuntimeException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_FORBIDDEN);
+        }
     }
 
     /**

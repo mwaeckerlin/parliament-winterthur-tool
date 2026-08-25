@@ -130,8 +130,9 @@ Compose-Stack; ausgeführt aus `tests/e2e/run-compose-e2e.sh` heraus.
 - **F38** `tests/e2e/sitzungen-sitzungstypen.spec.js` › Verknüpfte Geschäfte hinzufügen und wieder lösen — verknüpfte Geschäfte hinzufügen und wieder lösen.
 - **F73** `tests/e2e/sitzungen-sitzungstypen.spec.js` › Verknüpfte Vorstösse hinzufügen und wieder lösen — ein Vorstoss lässt sich an eine Sitzung verknüpfen (traktandieren) und wieder lösen.
 - **F38, F50** `tests/e2e/sitzungen-sitzungstypen.spec.js` › To-do zu Deck: nach dem Hinzufügen ist das Eingabefeld leer bzw. es erscheint ein Fehler-Toast — ein To-do landet im Deck-Board, das Feld leert sich bzw. es kommt ein Fehler-Toast.
-- **F40** `tests/e2e/sitzungen-sitzungstypen.spec.js` › Verknüpfte Sitzungen zeigen fremde Notizen nur lesend; Entkoppeln entfernt den Block — verknüpfte Sitzungen zeigen fremde Notizen nur lesend, Entkoppeln entfernt den Block.
-- **F39** `tests/e2e/sitzungen-sitzungstypen.spec.js` › Traktandum ohne Geschäft nutzt die Inline-SitzungNotizen; leerer Blur erzeugt nichts — Traktandum ohne Geschäftsbezug nutzt die Inline-Notiz, leerer Blur erzeugt nichts (Leerfall).
+- **F38** `tests/e2e/sitzungen-sitzungstypen.spec.js` › Notizen zur Sitzung nutzen die geteilte NotizenListe (einheitlich, F38): schreiben und persistieren — die Sitzungs-Notizen nutzen die geteilte NotizenListe (Überschrift «Notizen zur Sitzung», «+ Neue Notiz»); eine Notiz erscheint und persistiert an der Sitzung.
+- **F40** `tests/e2e/sitzungen-sitzungstypen.spec.js` › Verknüpfte Sitzungen zeigen fremde Notizen nur lesend; Entkoppeln entfernt den Block — verknüpfte Sitzungen zeigen fremde Notizen nur lesend (kein «+ Neue Notiz», kein Löschen), Entkoppeln entfernt den Block.
+- **F39** `tests/e2e/sitzungen-sitzungstypen.spec.js` › Traktandum ohne Geschäft nutzt dieselbe NotizenListe wie überall (einheitlich) — das geschäftslose Traktandum zeigt die geteilte NotizenListe (Hinweis «Notiz zum Traktandum», «+ Neue Notiz»), nicht mehr den früheren Inline-Editor; eine Notiz erscheint und persistiert am Traktandum.
 - **F25, F39** `tests/e2e/sitzungen-sitzungstypen.spec.js` › Traktandum mit Geschäft: NotizenListe «Sitzungsnotiz zum Geschäft», persistiert, erscheint im Geschäft (ausklappbar) und nicht in den normalen Notizen; folgt dem Geschäft — Traktandum-Notiz mit Geschäftsbezug wird zur Sitzungsnotiz am Geschäft und folgt ihm über Sitzungen hinweg (Datenfluss).
 - **F25, F39** `tests/e2e/sitzungen-sitzungstypen.spec.js` › Sitzungsnotiz löschen (Soft-Delete) und wiederherstellen — die gelöschte Sitzungsnotiz erscheint als Vermerk in der geteilten Aktionszeitleiste der Traktandenliste und lässt sich dort wiederherstellen.
 - **F44** `tests/e2e/mitglieder-kommissionen.spec.js` › Karten zeigen Name, Partei, Fraktion, Fraktionsrolle, Kommission und E-Mail; Zähler = Kartenzahl — die Karten zeigen alle Felder, der Zähler stimmt.
@@ -278,6 +279,7 @@ zusammenspielen können.
 
 - **F1** `parlwin/tests/Migration/MigrationSchemaTest.php` › testKeineNotNullSpalteMitLeeremOderNullDefault — keine NOT-NULL-Spalte hat einen leeren oder NULL-Default (Schema-Integritäts-Guard über alle Migrationen).
 - **F1** `parlwin/tests/Migration/Version000016Test.php` › testPostSchemaChangeNutztKonfiguriertesPrefixOhneGetTablePrefix — die Migration nutzt das konfigurierte Tabellen-Prefix ohne `getTablePrefix()`.
+- **F38, F39** `parlwin/tests/Migration/Version000043Test.php` › konvertiereDatum — die Notiz-Vereinheitlichungs-Migration wandelt Notiz-Daten robust ins MySQL-datetime: Schweizer Locale-Format «21.5.2026, 10:34:56» und weitere Formate korrekt, ein unparsbarer/leerer Wert ergibt IMMER ein gültiges datetime (nie den Rohstring) — npnp gegen den Wert, der das Nextcloud-Upgrade mit SQLSTATE 22007 abbrach.
 
 ## Modul-/Komponententests — Frontend (vitest)
 
@@ -322,10 +324,15 @@ Sie ergänzen die Playwright-e2e-Tests, ersetzen sie aber nicht.
 - **F71** `parlwin/src/js/tests/geschaeftsliste-filter.test.js` › «Nur Ersteinreicher» beschränkt den Person-Filter auf den Erstunterzeichner — der Schalter schränkt auf den ersten Einreicher ein (Gutfall).
 - **F71** `parlwin/src/js/tests/geschaeftsliste-filter.test.js` › filtert nach Partei über die Einreicher (via Mitglieder aufgelöst) — der Partei-Filter trifft Geschäfte mit einem Einreicher der gewählten Partei.
 - **F71** `parlwin/src/js/tests/geschaeftsliste-filter.test.js` › «Filter zurücksetzen» leert Einreicher, Partei und den Ersteinreicher-Schalter — Zurücksetzen leert die neuen Filter (Schlechtfall-Absicherung).
+- **F16** `parlwin/src/js/tests/geschaeftsliste-filter.test.js` › Zuständigkeitsfilter: zugewiesene Personen plus «Nicht zugewiesen», kein unzugewiesenes Mitglied — nur die vorkommenden Hauptzuständigen, plus «Nicht zugewiesen» wenn es leere gibt (Grundprinzip inkl. Leerwert).
+- **F16** `parlwin/src/js/tests/geschaeftsliste-filter.test.js` › Zuständigkeitsfilter «Nicht zugewiesen» trifft genau die Geschäfte ohne Zuständige — der Leerwert-Filter trifft die unzugewiesenen Geschäfte.
+- **F16** `parlwin/src/js/tests/geschaeftsliste-filter.test.js` › Zuständigkeitsfilter bietet KEIN «Nicht zugewiesen», wenn alle Geschäfte zugewiesen sind — der Leer-Eintrag entfällt ohne leere Werte (Grundprinzip).
+- **F16** `parlwin/src/js/tests/geschaeftsliste-filter.test.js` › Prioritätsfilter: vorkommende Stufen plus «Undefiniert» für Geschäfte ohne Priorität — nur die gesetzten Stufen, plus «Undefiniert» wenn es leere gibt; der Leerwert trifft die Geschäfte ohne Priorität.
+- **F16** `parlwin/src/js/tests/geschaeftsliste-filter.test.js` › Prioritätsfilter bietet KEIN «Undefiniert», wenn alle Geschäfte eine Priorität haben — der Leer-Eintrag entfällt ohne leere Werte.
 - **F72** `parlwin/src/js/tests/geschaeft-dokumente-verknuepfen.test.js` › zeigt «Verknüpfen» nur, wenn Objekttyp und -ID gesetzt sind — der Verknüpfen-Knopf erscheint nur im konfigurierten Modus (Gut-/Schlechtfall).
 - **F72** `parlwin/src/js/tests/geschaeft-dokumente-verknuepfen.test.js` › lädt die verknüpften Dateien und markiert sie als verknüpft — die explizit verknüpften Dokumente erscheinen in der Liste, als verknüpft gekennzeichnet.
 - **F72** `parlwin/src/js/tests/geschaeft-dokumente-verknuepfen.test.js` › linkLoesen ruft den DELETE-Endpunkt mit Objekttyp/-ID/File-ID — das Lösen einer Verknüpfung ruft den richtigen Endpunkt.
-- **F16, F17** `parlwin/src/js/tests/prioritaet-uebersicht.test.js` › filtert nach Priorität; nicht gesetzt zählt als «mittel» — der Prioritätsfilter zählt «nicht gesetzt» wie mittel (Randfall).
+- **F16, F17** `parlwin/src/js/tests/prioritaet-uebersicht.test.js` › filtert nach Priorität nach dem Rohwert; «Undefiniert» (leer) ist von «Mittel» getrennt — «Mittel» trifft nur gesetzte, «Undefiniert» genau die Geschäfte ohne Priorität (Randfall).
 - **F17** `parlwin/src/js/tests/prioritaet-uebersicht.test.js` › markiert hohe Priorität mit pw-prio-hoch und tiefe mit pw-prio-tief; mittel/nicht gesetzt ohne Prio-Klasse — hohe/tiefe Priorität wird markiert, mittel/nicht gesetzt nicht.
 - **F17** `parlwin/src/js/tests/prioritaet-uebersicht.test.js` › zeigt bei nicht gesetzter Priorität KEINE Auswahl (Default undefiniert, nicht «Mittel») — ohne gesetzte Priorität ist keine Auswahl vorbelegt (Randfall).
 - **F17** `parlwin/src/js/tests/prioritaet-uebersicht.test.js` › definiert die Prioritäts-Stile (Hervorhebung hoch, Abschwächung tief) — die Prioritäts-Stile sind definiert.
@@ -419,7 +426,7 @@ Sie ergänzen die Playwright-e2e-Tests, ersetzen sie aber nicht.
 - **F24** `parlwin/src/js/tests/notizen-markdown.test.js` › rendert Markdown nach HTML — `markdownZuHtml` rendert Markdown nach HTML.
 - **F24** `parlwin/src/js/tests/notizen-markdown.test.js` › säubert gefährliches HTML (XSS-Schutz) — gefährliches HTML wird gesäubert (Schlechtfall/Security).
 - **F24** `parlwin/src/js/tests/notizen-markdown.test.js` › liefert leeren String für leere Eingabe — leere Eingabe ergibt leeren String (Leerfall).
-- **F24, F38** `parlwin/src/js/tests/notizen-markdown.test.js` › rendert eine Markdown-Notiz formatiert (nicht als Rohtext) — SitzungNotizen rendert Markdown-Notizen formatiert.
+- **F24, F38** `parlwin/src/js/tests/notizen-markdown.test.js` › rendert eine Markdown-Notiz formatiert (nicht als Rohtext) — die geteilte NotizenListe rendert Markdown-Notizen formatiert (auch für Sitzungs-/Traktandum-Notizen).
 - **F24** `parlwin/src/js/tests/pw-wysiwyg-md.test.js` › rendert Markdown-Eingabe als formatiertes HTML — der Editor rendert Markdown-Eingabe als HTML.
 - **F24** `parlwin/src/js/tests/pw-wysiwyg-md.test.js` › emittiert Markdown statt HTML beim Setzen von formatiertem Inhalt — der Editor emittiert Markdown, nicht HTML.
 - **F24** `parlwin/src/js/tests/pw-wysiwyg-eingabe.test.js` › rendert die Eingabefläche ohne zusätzlichen Container — die Eingabefläche kommt ohne zusätzlichen Wrapper (minimale Struktur).
@@ -471,6 +478,7 @@ Sie ergänzen die Playwright-e2e-Tests, ersetzen sie aber nicht.
 - **F30, F32** `parlwin/src/js/tests/vorstoss-uebersicht.test.js` › lädt die Priorität beim Bearbeiten (Default undefiniert) — beim Bearbeiten wird die Priorität geladen (Default undefiniert).
 - **F30** `parlwin/src/js/tests/vorstoesse.test.js` › lädt die Vorstösse beim Mount — die Vorstösse laden beim Mount.
 - **F30** `parlwin/src/js/tests/vorstoesse.test.js` › filtert nach Herkunft und Status — die Liste filtert nach Herkunft und Status.
+- **F30** `parlwin/src/js/tests/vorstoesse.test.js` › Herkunft- und Status-Filter bieten nur tatsächlich vorkommende Werte — die Filter bieten nur die in den Vorstössen vorkommenden Herkünfte/Status (Grundprinzip; npnp: mit der ganzen Domäne rot).
 - **F8, F30** `parlwin/src/js/tests/vorstoesse.test.js` › das Neu-Anlegen öffnet die Maske, legt aber noch nichts an — «+ Neuer Vorstoss» öffnet die vollständige Maske, ohne etwas anzulegen.
 - **F8, F30** `parlwin/src/js/tests/vorstoss-sofort-speichern.test.js` › Neu-Anlegen öffnet dieselbe Maske und legt noch nichts an — die Neu-Maske sammelt nur die Eingaben, ID-gebundene Bereiche fehlen mit Hinweis.
 - **F8, F31** `parlwin/src/js/tests/vorstoss-sofort-speichern.test.js` › erst «Speichern» legt den Vorstoss an und öffnet die Bearbeitung — erst der Speichern-Klick legt an, danach zeigt dieselbe Maske die Bearbeitung (Gutfall).
@@ -513,16 +521,7 @@ Sie ergänzen die Playwright-e2e-Tests, ersetzen sie aber nicht.
 - **F37** `parlwin/src/js/tests/neue-sitzung-button.test.js` › das Formular übernimmt die Vorgaben des gewählten Sitzungstyps — Titel, Ort, Zeit und Zweck werden aus dem gewählten Typ vorbelegt.
 - **F37** `parlwin/src/js/tests/sitzung-button.test.js` › jeder Sitzungstyp erscheint als eigener Menüeintrag — bei mehreren Sitzungstypen erhält jeder einen eigenen Menüeintrag.
 - **F37** `parlwin/src/js/tests/sitzung-button.test.js` › ein Menüeintrag startet direkt das Formular für seinen Typ — ein Klick auf einen Menüeintrag startet direkt das Formular für diesen Typ.
-- **F38** `parlwin/src/js/tests/SitzungNotizen.test.js` › nutzt einen PwWysiwyg-Editor (kein einfaches input) für neue Notizen — neue Traktandum-Notizen nutzen den WYSIWYG-Editor.
-- **F38** `parlwin/src/js/tests/SitzungNotizen.test.js` › hat keinen + Button im Template — die Komponente hat keinen +-Knopf.
-- **F38** `parlwin/src/js/tests/SitzungNotizen.test.js` › emittiert update:modelValue bei blur mit Text — Blur mit Text emittiert das Update.
-- **F38** `parlwin/src/js/tests/SitzungNotizen.test.js` › emittiert nichts bei blur mit leerem Feld — Blur mit leerem Feld emittiert nichts (Leerfall).
-- **F38** `parlwin/src/js/tests/SitzungNotizen.test.js` › leert das Eingabefeld nach Blur-Speicherung — nach der Blur-Speicherung leert das Feld.
-- **F38** `parlwin/src/js/tests/SitzungNotizen.test.js` › speichert nach 5 Sekunden ohne weiteren Input — der Debounce speichert nach 5s.
-- **F38** `parlwin/src/js/tests/SitzungNotizen.test.js` › bricht den Timer ab wenn Blur früher kommt — ein früher Blur bricht den Timer ab.
-- **F38** `parlwin/src/js/tests/SitzungNotizen.test.js` › öffnet Bearbeitungsmodus bei Klick auf eigene Notiz — ein Klick auf die eigene Notiz öffnet den Bearbeitungsmodus.
-- **F38** `parlwin/src/js/tests/SitzungNotizen.test.js` › emittiert geänderten Text bei ✓ — ✓ emittiert den geänderten Text.
-- **F38** `parlwin/src/js/tests/SitzungNotizen.test.js` › emittiert Liste ohne Eintrag bei Löschen — Löschen emittiert die Liste ohne den Eintrag.
+- **F38** `parlwin/src/js/tests/sitzung-aggregiert.test.js` › lädt die Notizen jeder verknüpften Sitzung über den geteilten NotizService — Sitzungs-Notizen laufen über den geteilten NotizService, auch für verknüpfte Sitzungen (einheitliche Notiz-Komponente).
 - **F38** `parlwin/src/js/tests/geschaeft-verlink.test.js` › lädt die verknüpften Geschäft-IDs — die verknüpften Geschäft-IDs werden geladen.
 - **F38** `parlwin/src/js/tests/geschaeft-verlink.test.js` › verlinkt ein Geschäft und übernimmt die neue Liste — ein Geschäft wird verlinkt, die Liste übernommen.
 - **F38** `parlwin/src/js/tests/geschaeft-verlink.test.js` › blendet bereits verknüpfte Geschäfte aus den Auswahl-Optionen aus — bereits verknüpfte Geschäfte fehlen in den Optionen.
@@ -531,8 +530,8 @@ Sie ergänzen die Playwright-e2e-Tests, ersetzen sie aber nicht.
 - **F38** `parlwin/src/js/tests/sitzung-todo.test.js` › leert das Eingabefeld nach erfolgreichem Senden — nach dem Senden leert das Feld.
 - **F40** `parlwin/src/js/tests/sitzung-verknuepfen.test.js` › verknüpft nach dem Erstellen, wenn eine Zielsitzung gewählt ist — bei gewählter Zielsitzung wird nach dem Erstellen verknüpft.
 - **F40** `parlwin/src/js/tests/sitzung-verknuepfen.test.js` › verknüpft NICHT, wenn keine Zielsitzung gewählt ist — ohne Zielsitzung wird nicht verknüpft (Schlechtfall).
-- **F40** `parlwin/src/js/tests/sitzung-aggregiert.test.js` › zeigt im readonly-Modus kein Eingabefeld — readonly-Notizen zeigen kein Eingabefeld.
-- **F40** `parlwin/src/js/tests/sitzung-aggregiert.test.js` › zeigt ohne readonly ein Eingabefeld — ohne readonly erscheint ein Eingabefeld.
+- **F38, F40** `parlwin/src/js/tests/sitzung-aggregiert.test.js` › zeigt im readonly-Modus keinen «+ Neue Notiz»-Knopf und kein Löschen — die geteilte NotizenListe blendet im Nur-Lese-Modus «+ Neue Notiz», Löschen und Bearbeiten aus (verknüpfte Sitzungen).
+- **F38, F40** `parlwin/src/js/tests/sitzung-aggregiert.test.js` › zeigt ohne readonly den «+ Neue Notiz»-Knopf — ohne readonly erscheint der Neu-Knopf.
 - **F40** `parlwin/src/js/tests/sitzung-aggregiert.test.js` › lädt die verknüpften Sitzungen und filtert die Sitzung selbst heraus — die verknüpften Sitzungen werden geladen, die eigene herausgefiltert.
 - **F40** `parlwin/src/js/tests/sitzung-aggregiert.test.js` › lädt nichts, wenn die Sitzung nicht verknüpft ist — ohne Verknüpfung wird nichts geladen (Leerfall).
 - **F7, F42** `parlwin/src/js/tests/sitzungstyp-sofort-speichern.test.js` › Bearbeitungs-Dialog hat KEINE Abbrechen/Speichern-Buttons (kein Modal-Footer) — der Sitzungstyp-Dialog hat keinen Modal-Footer.
@@ -554,6 +553,9 @@ Sie ergänzen die Playwright-e2e-Tests, ersetzen sie aber nicht.
 - **F45** `parlwin/src/js/tests/Mitgliederliste.test.js` › zeigt mit Funktion=Fraktionspräsident nur Fraktionspräsidenten (nicht Stellvertreter) — der Filter zeigt nur Fraktionspräsidenten.
 - **F45** `parlwin/src/js/tests/Mitgliederliste.test.js` › zeigt mit Funktion=Kommissionspräsident nur Kommissionspräsidenten — der Filter zeigt nur Kommissionspräsidenten.
 - **F45** `parlwin/src/js/tests/Mitgliederliste.test.js` › zeigt mit Kommissions-Filter nur Mitglieder dieser Kommission — der Kommissions-Filter grenzt auf deren Mitglieder ein.
+- **F45** `parlwin/src/js/tests/Mitgliederliste.test.js` › bietet «Kommissionspräsident» nicht an, wenn es keinen gibt — der Funktionsfilter bietet nur vorkommende Funktionen (Grundprinzip; npnp: fest rot).
+- **F45** `parlwin/src/js/tests/Mitgliederliste.test.js` › bietet «Fraktionspräsident» nicht an, wenn es keinen gibt — der Funktionsfilter lässt eine fehlende Funktion weg (Grundprinzip).
+- **F45** `parlwin/src/js/tests/Mitgliederliste.test.js` › bietet als Kommissionsfilter nur Kommissionen, denen ein Mitglied angehört — der Kommissionsfilter lässt leere Kommissionen weg (Grundprinzip; npnp: mit allen Kommissionen rot).
 - **F46** `parlwin/src/js/tests/Kommissionsliste.test.js` › schliesst das Popup NICHT nach dem Speichern — das Geschäfts-Popup bleibt nach dem Speichern offen.
 - **F46** `parlwin/src/js/tests/Kommissionsliste.test.js` › ruft ladeGeschaefte auf — das Speichern lädt die Geschäfte neu.
 - **F46** `parlwin/src/js/tests/Kommissionsliste.test.js` › emittiert aktualisiert — die Komponente emittiert das Aktualisiert-Ereignis.
@@ -570,6 +572,7 @@ Sie ergänzen die Playwright-e2e-Tests, ersetzen sie aber nicht.
 - **F53, F54** `parlwin/src/js/tests/realtime.test.js` › calls handler when parlwin:realtime-event fires — der Handler wird bei einem Realtime-Event aufgerufen.
 - **F53** `parlwin/src/js/tests/realtime.test.js` › returns unsubscribe function that removes listener — die Abmelde-Funktion entfernt den Listener.
 - **F53** `parlwin/src/js/tests/realtime.test.js` › passes empty object when event has no detail — ohne Detail wird ein leeres Objekt übergeben (Randfall).
+- **F105** `parlwin/src/js/tests/axios-retry.test.js` › wiederholt Netzwerkfehler ohne Response; Serverfehler nur bei GET; 4xx nie; Laden unbegrenzt, Mutationen begrenzt; wachsende gedeckelte Wartezeit; der Interceptor wartet und wiederholt eine fehlgeschlagene GET-Anfrage und gibt 4xx ohne Wiederholung weiter — robustes Nachladen bei schlechter Leitung (F105).
 - **F60** `parlwin/src/js/tests/sync-zeitplan-admin.test.js` › die Admin-Seite enthält den Zeitplan-Bereich (Liste + Hinzufügen) — die Admin-Seite zeigt den Zeitplan-Bereich.
 - **F60** `parlwin/src/js/tests/sync-zeitplan-admin.test.js` › lädt den gespeicherten Zeitplan und rendert Wochentage als Checkboxen und die Uhrzeit — der gespeicherte Zeitplan wird als Checkboxen und Uhrzeit gerendert.
 - **F60** `parlwin/src/js/tests/sync-zeitplan-admin.test.js` › der Wochentag steht senkrecht zur Checkbox (Spalten-Layout, nicht daneben) — Wochentag und Checkbox stehen im Spalten-Layout.
@@ -605,6 +608,15 @@ Sie ergänzen die Playwright-e2e-Tests, ersetzen sie aber nicht.
 - **F92** `parlwin/src/js/tests/budget.test.js` › öffnet das Anträge-PDF — die Druckansicht wird geöffnet.
 - **F93** `parlwin/src/js/tests/budget.test.js` › trägt einen Entscheid für die Live-Verfolgung ein — ein Antrag wird angenommen/abgelehnt/zurückgesetzt.
 - **F93** `parlwin/src/js/tests/budget.test.js` › lädt bei einem budget.updated-Realtime-Ereignis neu; ignoriert fremde Ereignisse — cross-session Live-Verfolgung: Beschlüsse aus einer anderen Sitzung erscheinen sofort, fremde Ereignisse lösen keine Neuladung aus.
+- **F94, F97** `parlwin/src/js/tests/budget.test.js` › sendet Herkunft und Haltung eines Antrags mit — Herkunft «eigen/fremd» und die zugehörige Haltung gehen an den Server.
+- **F95** `parlwin/src/js/tests/budget.test.js` › kehrt bei Mehrausgabe das Vorzeichen von CHF und Prozent um — der Umschalter Reduktion/Mehrausgabe steuert das Vorzeichen.
+- **F95** `parlwin/src/js/tests/budget-antrag-form.test.js` › rechnet CHF↔Prozent wechselseitig aus dem Budgetwert der Position, leert das Gegenfeld bei leerer Eingabe, und meldet den Herkunftswechsel (F94) an die Elternkomponente.
+- **F96** `parlwin/src/js/tests/budget.test.js` › stellt einen Steuerfuss-Antrag in Prozentpunkten — es werden Prozentpunkte gesendet, den CHF-Effekt rechnet der Server.
+- **F98** `parlwin/src/js/tests/budget.test.js` › nimmt die eigene Fraktion automatisch in die Unterstützer auf — bei beschlossener Zustimmung ist die eigene Fraktion vorausgewählt.
+- **F100** `parlwin/src/js/tests/budget.test.js` › schaltet den Einreichen-Entscheid des Pauschalantrags — «nicht einreichen» wird an die Verteilung gesendet.
+- **F101** `parlwin/src/js/tests/budget.test.js` › nimmt eine Position vom Pauschalantrag aus — die Position landet in der Ausnahmenliste der Verteilung.
+- **F100** `parlwin/src/js/tests/budget.test.js` › listet weitere Pauschalanträge, legt einen neuen an, ändert und löscht ihn — mehrere unabhängige Pauschalanträge werden verwaltet.
+- **F100, F101** `parlwin/src/js/tests/budget-pauschal-form.test.js` › der Pauschalantrag-Editor meldet Einsparungen in CHF oder Prozent (immer negativ, Prozent hat Vorrang), den Einreichen-Entscheid und die ausgenommenen Produktegruppen.
 
 ## Modul-/Unit-Tests — Backend (PHPUnit)
 
@@ -642,10 +654,10 @@ mit den wesentlichen Methoden). Die Live-Gruppe läuft gegen echte Endpunkte.
 - **F30, F32** `parlwin/tests/Db/VorstossTest.php` — `jsonSerialize` liefert Listen/Herkunftsfraktion, Legacy-String-Zuständigkeit wird zur Liste, ist `JsonSerializable`, `json_encode` liefert alle Felder; NULL-Notizen/-Listenfelder/-Textfelder aus der DB brechen nicht (Randfall/NULL).
 - **F32** `parlwin/tests/Service/VorstossNotizenTest.php` — Notiz als Vorstoss-Aktion; Bearbeiten archiviert eine Version wie beim Geschäft; jede Speicherung legt eine Version an; Löschen ist Soft-Delete mit Undo; nur der Autor darf bearbeiten (Schlechtfall); Liste liefert aktive und gelöschte.
 - **F34** `parlwin/tests/Service/VorstossImportServiceTest.php` — Titel aus dem Dateinamen (Endung entfernt); Import legt ein neues Dokument als eigenen Vorstoss an, setzt alle Spalten dirty und überspringt bereits Importierte (keine Duplikate).
-- **F37, F38** `parlwin/tests/Controller/SitzungControllerTest.php` — To-do 201 bzw. 400 ohne Titel / ohne Deck (Schlechtfälle); `create` 201, 400 ohne TypId/Datum, 404 wenn Typ nicht gefunden; `index` liest Limit/Offset.
+- **F37, F38** `parlwin/tests/Controller/SitzungControllerTest.php` — To-do 201 bzw. 400 ohne Titel / ohne Deck (Schlechtfälle); `create` 201, 400 ohne TypId/Datum, 404 wenn Typ nicht gefunden; `index` liest Limit/Offset; Sitzungs-Notizen delegieren an den geteilten NotizService mit dem Objekttyp «sitzung» (einheitliche Notiz-Mechanik, F38).
 - **F73** `parlwin/tests/Controller/SitzungControllerTest.php` — `vorstossVerlinken` gibt 400 ohne vorstossId (Schlechtfall), delegiert sonst an den Dienst und gibt die vorstossIds zurück; `vorstossEntlinken` löst die Verknüpfung und gibt die verbleibenden vorstossIds zurück.
 - **F37, F42** `parlwin/tests/Service/SitzungstypServiceTest.php` — Speichern übernimmt Kommissionen; `erstelleAusTyp` speichert korrekte Felder, nutzt Vorlagenwerte als Fallback, speichert Traktanden und ruft den KalenderService je nach Konfiguration.
-- **F38** `parlwin/tests/Controller/TraktandumControllerTest.php` — `update` speichert Bemerkungen, Notizen ohne Bemerkungen und beides gleichzeitig.
+- **F38, F39** `parlwin/tests/Controller/TraktandumControllerTest.php` — `update` speichert Bemerkungen, Notizen ohne Bemerkungen und beides gleichzeitig; Traktandum-Notizen delegieren an den geteilten NotizService mit dem Objekttyp «traktandum» (F39, einheitliche Notiz-Mechanik).
 - **F40** `parlwin/tests/Service/SitzungVerknuepfungTest.php` — Verknüpfen setzt eine gemeinsame Gruppe bzw. nutzt die der Zielsitzung; Entkoppeln setzt die Gruppe auf null; verknüpfte Sitzungen liefern ihre Gruppe bzw. nur sich selbst (Leerfall).
 - **F42** `parlwin/tests/Db/SitzungstypNullToleranzTest.php` — NULL-Kommissionen aus der Datenbank werfen keinen Fehler, gültige Kommissionen bleiben erhalten (Randfall/NULL).
 - **F43** `parlwin/tests/Service/KommissionsVerknuepfungServiceTest.php` — Geschäfte einer Kommission matchen über Status und Tokens; ein Status ohne Kommission wird ignoriert (Randfall).
@@ -655,10 +667,12 @@ mit den wesentlichen Methoden). Die Live-Gruppe läuft gegen echte Endpunkte.
 - **F53, F54** `parlwin/tests/Service/RealtimePublisherServiceTest.php` — `publish` mit AppConfig-URL und Secret, Umgebungsvariablen haben Vorrang, Default-Publish-URL wenn nichts konfiguriert ist.
 - **F60** `parlwin/tests/BackgroundJob/SyncJobTest.php` — der Zeitplan-Pfad läuft im Fenster und nicht ausserhalb; die erste Prüfung initialisiert ohne Lauf; ohne Zeitplan gilt der Standard 10:00/18:00.
 - **F60** `parlwin/tests/Service/SyncZeitplanTest.php` — `parse` normalisiert Gültiges und verwirft Ungültiges; fällig im Fenster und über Mitternacht; leerer Plan ist nie fällig (Leerfall); Standard sind zwei Einträge 10:00/18:00, `mitStandard` greift nur bei leerem Plan.
-- **F79, F83, F85, F88** `parlwin/tests/Service/BudgetRechnungTest.php` — Summen mit Anträgen (Global-/Personal-/Steuerfuss-Wirkung auf Ausgaben/Einnahmen/Stellen inkl. Vorjahresdifferenz); benötigter Verteil-Delta je Zielmodus (schwarze Null/Defizit/Ertrag, Überschuss bleibt positiv); Pauschalverteilung anteilig zum Aufwand mit exakter Summe und Rundungsrest an die grösste Gruppe; Steuerfuss-Senkung in ganzen Prozent (Wert pro Prozent = Steuerertrag/Steuerfuss), keine Senkung ohne Überschuss (Leerfall).
+- **F79, F83, F85, F88, F99, F101** `parlwin/tests/Service/BudgetRechnungTest.php` — Summen mit Anträgen (Global-/Personal-/Steuerfuss-Wirkung auf Ausgaben/Einnahmen/Stellen inkl. Vorjahresdifferenz); mehrere Anträge auf dieselbe Position summieren sich (F99); benötigter Verteil-Delta je Zielmodus (schwarze Null/Defizit/Ertrag, Überschuss bleibt positiv); Pauschalverteilung anteilig zum Aufwand mit exakter Summe und Rundungsrest an die grösste Gruppe; eine ausgenommene Position verteilt denselben Gesamtbetrag neu auf die übrigen (F101); Steuerfuss-Senkung in ganzen Prozent (Wert pro Prozent = Steuerertrag/Steuerfuss), keine Senkung ohne Überschuss (Leerfall).
 - **F80, F82** `parlwin/tests/Db/BudgetEntitiesTest.php` — Produktegruppe serialisiert verschachtelt (Globalkredit/Aufwand/Stellen, Produkte aus JSON); ein Antrag ist als automatisch gekennzeichnet, sobald er eine Verteilung trägt; die Verteilung hat den Standard «schwarze Null» mit eingeschalteter Automatik.
 - **F74** `parlwin/tests/Service/BudgetKlassenLadenTest.php` — alle Budget-Backend-Klassen (Entities, Mapper, Services, Parser, Controller, Migration) laden und parsen fehlerfrei.
-- **F76, F93** `parlwin/tests/Service/BudgetServiceTest.php` — der Kommission-Filter löst über die Departement→Kommission-Zuordnung auf die betroffenen Departemente auf (ohne Filter alle); die Phase trennt die Summen (Vorbereitung vs. Sitzung), und in der Sitzungsphase zählen nur angenommene Sitzungsanträge.
+- **F76, F93, F102, F104** `parlwin/tests/Service/BudgetServiceTest.php` — der Kommission-Filter löst über die Departement→Kommission-Zuordnung auf die betroffenen Departemente auf (ohne Filter alle); die Phase trennt die Summen (Vorbereitung vs. Sitzung), und in der Sitzungsphase zählen nur angenommene Sitzungsanträge; in der Vorbereitung zählt nur von der Fraktion Unterstütztes (eingereicht/unterstützt), nicht Offenes oder Abgelehntes (F102); ein eindeutiger Sitzungsantrag (gleiche Position, gleicher Betrag) wird automatisch verknüpft und übernimmt die Haltung, mehrdeutige bleiben unverknüpft (F104).
+- **F94, F95, F96, F97, F98, F103** `parlwin/tests/Service/BudgetAntragErstellenTest.php` — beim Anlegen eines Antrags werden CHF und Prozent wechselseitig aus dem Budgetwert der Position berechnet (F95); der Steuerfuss-Antrag rechnet Prozentpunkte in den anteiligen Ertrag-Effekt um (F96); Herkunft (F94) und Haltung nach Herkunft mit Bereinigung (F97) werden gesetzt; die unterstützenden Fraktionen werden als Liste gespeichert (F98); Notizen delegieren an den geteilten Dienst mit Objekttyp «budget-antrag» (F103).
+- **F100, F101** `parlwin/tests/Service/BudgetPauschalTest.php` — der Einreichen-Entscheid des Pauschalantrags vererbt sich auf die je Position erzeugten Einzelanträge (nicht eingereicht ⇒ zählt nicht, F100); eine ausgenommene Position bekommt keinen Antrag, der volle Betrag geht auf die übrigen (F101); eine feste Pauschalverteilung verteilt genau ihren CHF-Betrag; eine Prozentangabe bezieht sich auf den ursprünglichen Aufwand (10% von 10M = 1M); mehrere unabhängige Pauschalverteilungen kumulieren (F100).
 
 ### Budget-Buchparser (PHPUnit, Gruppe `pdf`, `npm run test:pdf`)
 

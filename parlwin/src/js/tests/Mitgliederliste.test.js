@@ -124,3 +124,33 @@ describe('Mitgliederliste — Filter nach Kommission', () => {
     expect(ids(wrapper).sort()).toEqual(['3', '4'])
   })
 })
+
+// Grundprinzip: ein Filter bietet nur die Werte an, die in den Daten wirklich
+// vorkommen — hier nur Funktionen/Kommissionen, die ein sichtbares Mitglied hat.
+describe('Mitgliederliste — Filter bieten nur tatsächlich vorkommende Werte', () => {
+  it('bietet «Kommissionspräsident» nicht an, wenn es keinen gibt', () => {
+    // Fraktion mit Präsident, aber keine Kommissionen → nur «Fraktionspräsident».
+    const wrapper = mount(MITGLIEDER, FRAKTIONEN, [])
+    const werte = wrapper.vm.funktionFilterOptions.map((o) => o.value)
+    expect(werte).toEqual(['', 'fraktionspraesident'])
+    expect(werte).not.toContain('kommissionspraesident')
+  })
+
+  it('bietet «Fraktionspräsident» nicht an, wenn es keinen gibt', () => {
+    // Kommission mit Präsident, aber keine Fraktionsrollen → nur «Kommissionspräsident».
+    const wrapper = mount(MITGLIEDER, [], KOMMISSIONEN)
+    const werte = wrapper.vm.funktionFilterOptions.map((o) => o.value)
+    expect(werte).toEqual(['', 'kommissionspraesident'])
+    expect(werte).not.toContain('fraktionspraesident')
+  })
+
+  it('bietet als Kommissionsfilter nur Kommissionen, denen ein Mitglied angehört', () => {
+    const kommissionen = [
+      { name: 'RPK', aktiv: true, mitglieder: JSON.stringify([{ externId: '3', funktion: 'Präsident' }, { externId: '4', funktion: 'Mitglied' }]) },
+      { name: 'Leer-Kommission', aktiv: true, mitglieder: JSON.stringify([]) },
+    ]
+    const wrapper = mount(MITGLIEDER, FRAKTIONEN, kommissionen)
+    expect(wrapper.vm.alleKommissionen).toEqual(['RPK'])
+    expect(wrapper.vm.kommissionOptions.map((o) => o.value)).not.toContain('Leer-Kommission')
+  })
+})

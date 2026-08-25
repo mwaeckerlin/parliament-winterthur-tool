@@ -12,7 +12,7 @@
         <span class="pw-notiz-autor">{{ n.autorName || n.autorUid }}</span>
         <span class="pw-notiz-datum">{{ formatieredatum(n.erstelltAm) }} {{ formatiereUhrzeit(n.erstelltAm) }}</span>
         <button
-          v-if="istEigeneAktion(n) && aktiveNotizId !== n.id"
+          v-if="!readonly && istEigeneAktion(n) && aktiveNotizId !== n.id"
           type="button"
           class="button pw-btn-mini pw-btn-loeschen"
           title="Notiz löschen"
@@ -35,12 +35,12 @@
       <div
         v-else
         class="pw-notiz-inhalt"
-        :class="{ 'pw-notiz-text-klickbar': istEigeneAktion(n) }"
-        :role="istEigeneAktion(n) ? 'button' : null"
-        :tabindex="istEigeneAktion(n) ? 0 : null"
-        :title="istEigeneAktion(n) ? 'Klicken zum Bearbeiten' : ''"
-        @click="istEigeneAktion(n) && notizBearbeitenStarten(n, $event)"
-        @keydown.enter.prevent="istEigeneAktion(n) && notizBearbeitenStarten(n)"
+        :class="{ 'pw-notiz-text-klickbar': darfBearbeiten(n) }"
+        :role="darfBearbeiten(n) ? 'button' : null"
+        :tabindex="darfBearbeiten(n) ? 0 : null"
+        :title="darfBearbeiten(n) ? 'Klicken zum Bearbeiten' : ''"
+        @click="darfBearbeiten(n) && notizBearbeitenStarten(n, $event)"
+        @keydown.enter.prevent="darfBearbeiten(n) && notizBearbeitenStarten(n)"
         v-html="markdownZuHtml(n.text)"
       />
     </div>
@@ -60,6 +60,7 @@
       </div>
     </div>
     <button
+      v-if="!readonly"
       type="button"
       class="button pw-btn-neue-notiz"
       title="Neue Notiz"
@@ -110,6 +111,11 @@ export default {
      * Sitzungsnotizen desselben Objekts getrennt verwaltet.
      */
     kategorie: { type: String, default: 'notiz' },
+    /**
+     * Nur-Lese-Modus: zeigt die Notizen an, blendet aber «+ Neue Notiz»,
+     * Löschen und das Bearbeiten aus (z.B. Notizen verknüpfter Sitzungen).
+     */
+    readonly: { type: Boolean, default: false },
   },
   emits: ['geaendert'],
   data() {
@@ -176,6 +182,10 @@ export default {
     istEigeneAktion(a) {
       const uid = (this.aktuelleUid || '').toLowerCase()
       return !!uid && (a.autorUid || '').toLowerCase() === uid
+    },
+    /** Der Nutzer darf eine eigene Notiz bearbeiten — ausser im Nur-Lese-Modus. */
+    darfBearbeiten(a) {
+      return !this.readonly && this.istEigeneAktion(a)
     },
     // Fügt eine Notiz zur lokalen Arbeitskopie hinzu und meldet die neue Liste.
     _lokalHinzufuegen(aktion) {

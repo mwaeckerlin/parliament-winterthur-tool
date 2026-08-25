@@ -7,6 +7,7 @@ namespace OCA\ParliamentWinterthur\Controller;
 use OCA\ParliamentWinterthur\AppInfo\Application;
 use OCA\ParliamentWinterthur\Service\BudgetImportService;
 use OCA\ParliamentWinterthur\Service\BudgetService;
+use OCA\ParliamentWinterthur\Service\RealtimePublisherService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Http;
@@ -26,8 +27,90 @@ class BudgetController extends Controller {
         private readonly BudgetService $service,
         private readonly BudgetImportService $import,
         private readonly LoggerInterface $logger,
+        private readonly RealtimePublisherService $realtime,
     ) {
         parent::__construct(Application::APP_ID, $request);
+    }
+
+    // ── Notizen an Anträgen (F103): geteilter NotizService wie beim Vorstoss ────
+
+    /** Alle Notizen eines Antrags (aktiv und gelöscht) — für die shared Komponente. */
+    #[NoAdminRequired]
+    public function notizen(int $id): DataResponse {
+        try {
+            return new DataResponse($this->service->notizen($id));
+        } catch (DoesNotExistException) {
+            return new DataResponse(['fehler' => 'Antrag nicht gefunden'], Http::STATUS_NOT_FOUND);
+        }
+    }
+
+    #[NoAdminRequired]
+    public function addNotiz(int $id): DataResponse {
+        $text = (string) $this->request->getParam('text', '');
+        try {
+            $aktion = $this->service->notizHinzufuegen($id, $text);
+            $this->realtime->publish('budget.updated', ['aktionTyp' => 'notiz']);
+            return new DataResponse($aktion);
+        } catch (DoesNotExistException) {
+            return new DataResponse(['fehler' => 'Antrag nicht gefunden'], Http::STATUS_NOT_FOUND);
+        } catch (\InvalidArgumentException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+        } catch (\RuntimeException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_FORBIDDEN);
+        }
+    }
+
+    #[NoAdminRequired]
+    public function updateNotiz(int $id, int $aktionId): DataResponse {
+        $text = (string) $this->request->getParam('text', '');
+        try {
+            $aktion = $this->service->notizAktualisieren($id, $aktionId, $text);
+            $this->realtime->publish('budget.updated', ['aktionTyp' => 'notiz']);
+            return new DataResponse($aktion);
+        } catch (\InvalidArgumentException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+        } catch (\RuntimeException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_FORBIDDEN);
+        }
+    }
+
+    #[NoAdminRequired]
+    public function deleteNotiz(int $id, int $aktionId): DataResponse {
+        try {
+            $this->service->notizLoeschen($id, $aktionId);
+            $this->realtime->publish('budget.updated', ['aktionTyp' => 'notiz']);
+            return new DataResponse([]);
+        } catch (\InvalidArgumentException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+        } catch (\RuntimeException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_FORBIDDEN);
+        }
+    }
+
+    /** Macht das Löschen einer Notiz rückgängig (Undo) — nur der Autor darf das. */
+    #[NoAdminRequired]
+    public function restoreNotiz(int $id, int $aktionId): DataResponse {
+        try {
+            $aktion = $this->service->notizWiederherstellen($id, $aktionId);
+            $this->realtime->publish('budget.updated', ['aktionTyp' => 'notiz']);
+            return new DataResponse($aktion);
+        } catch (\InvalidArgumentException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+        } catch (\RuntimeException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_FORBIDDEN);
+        }
+    }
+
+    /** Archivierte Vorversionen einer Notiz (älteste zuerst). */
+    #[NoAdminRequired]
+    public function notizRevisionen(int $id, int $aktionId): DataResponse {
+        try {
+            return new DataResponse($this->service->notizRevisionen($id, $aktionId));
+        } catch (\InvalidArgumentException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+        } catch (\RuntimeException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_FORBIDDEN);
+        }
     }
 
     /** Vorhandene Budgetjahre (neuestes zuerst). */
@@ -100,7 +183,10 @@ class BudgetController extends Controller {
         $automatik = (bool) $this->request->getParam('automatikEin', true);
         $modus = (string) $this->request->getParam('zielModus', 'schwarze_null');
         $betrag = (int) $this->request->getParam('zielBetrag', 0);
-        $this->service->verteilungSetzen($jahr, $automatik, $modus, $betrag);
+        $haltung = (string) $this->request->getParam('haltung', 'einreichen');
+        $ausnahmen = $this->request->getParam('ausnahmen', []);
+        $ausnahmen = is_array($ausnahmen) ? array_values(array_map(static fn ($x) => (string) $x, $ausnahmen)) : [];
+        $this->service->verteilungSetzen($jahr, $automatik, $modus, $betrag, $haltung, $ausnahmen);
         return new DataResponse($this->service->ansicht($jahr));
     }
 
@@ -153,9 +239,66 @@ class BudgetController extends Controller {
         return new TemplateResponse(Application::APP_ID, 'budget_antraege_pdf', $daten, 'blank');
     }
 
+    /** Setzt oder löst eine Verknüpfung Vorbereitung↔Sitzung von Hand (F104). */
+    #[NoAdminRequired]
+    public function verknuepfen(int $id): DataResponse {
+        $zielId = (int) $this->request->getParam('zielId', 0);
+        try {
+            $this->service->verknuepfungSetzen($id, $zielId);
+            return new DataResponse([]);
+        } catch (DoesNotExistException) {
+            return new DataResponse(['fehler' => 'Antrag nicht gefunden'], Http::STATUS_NOT_FOUND);
+        }
+    }
+
+    // ── Weitere Pauschalanträge (F100) ────────────────────────────────────────
+
+    #[NoAdminRequired]
+    public function pauschalErstellen(int $jahr): DataResponse {
+        $this->service->pauschalErstellen($jahr, $this->pauschalDaten());
+        return new DataResponse($this->service->ansicht($jahr), Http::STATUS_CREATED);
+    }
+
+    #[NoAdminRequired]
+    public function pauschalAendern(int $id): DataResponse {
+        try {
+            $v = $this->service->pauschalAendern($id, $this->pauschalDaten());
+            return new DataResponse($this->service->ansicht((int) $v->getJahr()));
+        } catch (DoesNotExistException) {
+            return new DataResponse(['fehler' => 'Pauschalantrag nicht gefunden'], Http::STATUS_NOT_FOUND);
+        }
+    }
+
+    #[NoAdminRequired]
+    public function pauschalLoeschen(int $id): DataResponse {
+        try {
+            $this->service->pauschalLoeschen($id);
+            return new DataResponse([]);
+        } catch (DoesNotExistException) {
+            return new DataResponse(['fehler' => 'Pauschalantrag nicht gefunden'], Http::STATUS_NOT_FOUND);
+        }
+    }
+
+    /** @return array<string, mixed> */
+    private function pauschalDaten(): array {
+        $felder = ['betrag', 'prozent', 'haltung', 'herkunft', 'antragsteller', 'begruendung', 'ausnahmen'];
+        $daten = [];
+        foreach ($felder as $f) {
+            $wert = $this->request->getParam($f);
+            if ($wert !== null) {
+                $daten[$f] = $wert;
+            }
+        }
+        return $daten;
+    }
+
     /** @return array<string, mixed> */
     private function antragDaten(): array {
-        $felder = ['bereich', 'zielTyp', 'zielRef', 'betragDelta', 'stellenDelta', 'betragProStelle', 'quelle', 'antragsteller', 'begruendung', 'phase'];
+        $felder = [
+            'bereich', 'zielTyp', 'zielRef', 'betragDelta', 'prozentDelta', 'stellenDelta',
+            'betragProStelle', 'quelle', 'herkunft', 'haltung', 'unterstuetzer',
+            'pauschalAusnahme', 'antragsteller', 'begruendung', 'phase',
+        ];
         $daten = [];
         foreach ($felder as $f) {
             $wert = $this->request->getParam($f);

@@ -38,6 +38,17 @@ export const PRIORITAETEN = [
   { value: 'tief', label: 'Tief' },
 ]
 
+/**
+ * Grundprinzip für ALLE Wertefilter: ein leerer/undefinierter Wert ist ebenfalls
+ * ein realer Wert in den Daten. Kommt er vor, wird er als eigene Filteroption
+ * `{ value: '', label }` vorangestellt — genau wie der «—»-Eintrag beim
+ * Beschluss-Filter. EIN gemeinsamer Mechanismus, damit das nicht pro Filter neu
+ * erfunden wird; `optionen` sind die aus den Daten gegründeten Nicht-Leer-Werte.
+ */
+export function mitLeerOption(optionen, hatLeer, leerLabel) {
+  return hatLeer ? [{ value: '', label: leerLabel }, ...optionen] : optionen
+}
+
 // Anzeigetext einer Prioritätsstufe (der EINE Ort für die Wert→Text-Umrechnung).
 export function prioritaetLabel(value) {
   return (PRIORITAETEN.find(p => p.value === value) || {}).label || ''

@@ -75,11 +75,28 @@
           <NcCheckboxRadioSwitch :model-value="verteilung.automatikEin" type="switch" @update:model-value="verteilungAendern('automatikEin', $event)">
             Defizit automatisch als Pauschalkürzung verteilen
           </NcCheckboxRadioSwitch>
+          <NcCheckboxRadioSwitch v-if="verteilung.automatikEin" :model-value="pauschalEinreichen" type="switch" @update:model-value="pauschalEinreichenUmschalten">
+            Pauschalantrag einreichen
+          </NcCheckboxRadioSwitch>
           <div class="pw-verteilung-ziel">
             <NcSelect :model-value="zielModusOption" :options="zielModusOptionen" :clearable="false" input-label="Ziel" @update:model-value="verteilungAendern('zielModus', $event ? $event.value : 'schwarze_null')" />
             <NcTextField v-if="verteilung.zielModus !== 'schwarze_null'" v-model="zielBetrag" type="number" label="Zielbetrag CHF" />
             <NcButton v-if="!verteilung.automatikEin" type="secondary" @click="pauschalVerteilen">Defizit verteilen</NcButton>
           </div>
+        </div>
+
+        <!-- Weitere, voneinander unabhängige Pauschalanträge (F100) -->
+        <div v-if="!sitzungsmodus" class="pw-data-card pw-pauschalantraege">
+          <h3 class="pw-pauschal-titel">Weitere Pauschalanträge</h3>
+          <BudgetPauschalForm
+            v-for="p in pauschalantraege"
+            :key="p.id"
+            :pauschal="p"
+            :produktegruppen="ansicht.produktegruppen"
+            @save="felder => pauschalAendern(p.id, felder)"
+            @delete="pauschalLoeschen(p.id)"
+          />
+          <NcButton type="secondary" @click="pauschalErstellen">+ Pauschalantrag</NcButton>
         </div>
 
         <div v-for="dep in gruppenNachDepartement" :key="dep.name" class="pw-budget-departement">
@@ -101,20 +118,37 @@
                   <span class="pw-antrag-betrag" :class="diffKlasse(a.betragDelta)">{{ fr(a.betragDelta) }}</span>
                   <span class="pw-antrag-steller">{{ a.antragsteller || (a.automatisch ? 'automatisch' : '') }}</span>
                   <span class="pw-antrag-begruendung">{{ a.begruendung }}</span>
+                  <NcSelect v-if="!a.automatisch" :model-value="haltungOptFor(a)" :options="haltungOptionen(a.herkunft)" :clearable="false" aria-label="Unsere Haltung" class="pw-antrag-haltung" @update:model-value="antragHaltung(a.id, $event ? $event.value : a.haltung)" />
                   <span class="pw-antrag-entscheid" :class="'pw-entscheid-' + a.entscheid">{{ entscheidLabel(a.entscheid) }}</span>
                   <span class="pw-entscheid-knoepfe">
                     <NcButton type="tertiary" :aria-label="'Antrag angenommen'" @click="entscheidSetzen(a.id, a.entscheid === 'angenommen' ? 'offen' : 'angenommen')">✓</NcButton>
                     <NcButton type="tertiary" :aria-label="'Antrag abgelehnt'" @click="entscheidSetzen(a.id, a.entscheid === 'abgelehnt' ? 'offen' : 'abgelehnt')">✕</NcButton>
                   </span>
                   <NcButton v-if="!a.automatisch" type="tertiary" aria-label="Antrag löschen" @click="antragLoeschen(a.id)">🗑</NcButton>
+                  <NcSelect v-if="sitzungsmodus" :model-value="verknuepfungOpt(a)" :options="verknuepfungsKandidaten(a)" input-label="Verknüpft mit" placeholder="nicht verknüpft" class="pw-antrag-verknuepfen" @update:model-value="verknuepfungWaehlen(a.id, $event ? $event.value : 0)" />
+                  <details class="pw-antrag-notizen" @toggle="notizenToggle(a.id, $event)">
+                    <summary>Notizen</summary>
+                    <NotizenListe v-if="offeneNotizen[a.id]" :basis-url="'budget/antraege/' + a.id" :notizen="a.aktionen || []" :aktuelle-uid="aktuelleUid" @geaendert="ladeAnsicht(false)" />
+                  </details>
                 </li>
               </ul>
-              <div class="pw-budget-neu-antrag">
-                <NcTextField v-model="neu[g.code].betrag" type="number" label="Betrag (− kürzen)" />
-                <NcTextField v-model="neu[g.code].antragsteller" label="Antragsteller" />
-                <NcTextField v-model="neu[g.code].begruendung" label="Begründung" />
-                <NcButton type="secondary" @click="antragGlobalbudget(g.code)">Antrag</NcButton>
-              </div>
+              <NcCheckboxRadioSwitch
+                v-if="!sitzungsmodus && verteilung.automatikEin"
+                :model-value="pauschalAusnahmen.includes(g.code)"
+                type="checkbox"
+                @update:model-value="ausnahmeUmschalten(g.code, $event)"
+              >Ausnahme vom Pauschalantrag</NcCheckboxRadioSwitch>
+              <BudgetAntragForm
+                v-if="formOffen['g' + g.code]"
+                :form="neu[g.code]"
+                :antragsteller-optionen="antragstellerOptionen(neu[g.code].herkunft)"
+                :haltung-optionen="haltungOptionen(neu[g.code].herkunft)"
+                :fraktion-optionen="fraktionOptionen"
+                :basis="g.globalkredit.soll"
+                @herkunft="herkunftGewechselt(neu[g.code], $event)"
+                @save="antragGlobalbudget(g.code)"
+              />
+              <NcButton v-else type="tertiary" @click="formOeffnen('g' + g.code)">+ Antrag</NcButton>
               <details v-if="g.auftrag" class="pw-budget-info">
                 <summary>Auftrag</summary>
                 <p>{{ g.auftrag }}</p>
@@ -174,19 +208,31 @@
                   <span class="pw-antrag-betrag" :class="diffKlasse(a.betragDelta)">{{ fr(a.betragDelta) }}</span>
                   <span class="pw-antrag-steller">{{ a.antragsteller }}</span>
                   <span class="pw-antrag-begruendung">{{ a.begruendung }}</span>
+                  <NcSelect v-if="!a.automatisch" :model-value="haltungOptFor(a)" :options="haltungOptionen(a.herkunft)" :clearable="false" aria-label="Unsere Haltung" class="pw-antrag-haltung" @update:model-value="antragHaltung(a.id, $event ? $event.value : a.haltung)" />
                   <span class="pw-antrag-entscheid" :class="'pw-entscheid-' + a.entscheid">{{ entscheidLabel(a.entscheid) }}</span>
                   <span class="pw-entscheid-knoepfe">
                     <NcButton type="tertiary" aria-label="Antrag angenommen" @click="entscheidSetzen(a.id, a.entscheid === 'angenommen' ? 'offen' : 'angenommen')">✓</NcButton>
                     <NcButton type="tertiary" aria-label="Antrag abgelehnt" @click="entscheidSetzen(a.id, a.entscheid === 'abgelehnt' ? 'offen' : 'abgelehnt')">✕</NcButton>
                   </span>
                   <NcButton type="tertiary" aria-label="Antrag löschen" @click="antragLoeschen(a.id)">🗑</NcButton>
+                  <NcSelect v-if="sitzungsmodus" :model-value="verknuepfungOpt(a)" :options="verknuepfungsKandidaten(a)" input-label="Verknüpft mit" placeholder="nicht verknüpft" class="pw-antrag-verknuepfen" @update:model-value="verknuepfungWaehlen(a.id, $event ? $event.value : 0)" />
+                  <details class="pw-antrag-notizen" @toggle="notizenToggle(a.id, $event)">
+                    <summary>Notizen</summary>
+                    <NotizenListe v-if="offeneNotizen[a.id]" :basis-url="'budget/antraege/' + a.id" :notizen="a.aktionen || []" :aktuelle-uid="aktuelleUid" @geaendert="ladeAnsicht(false)" />
+                  </details>
                 </li>
               </ul>
-              <div class="pw-budget-neu-antrag">
-                <NcTextField v-model="neuPersonal[g.code].stellen" type="number" label="Stellen (− kürzen)" />
-                <NcTextField v-model="neuPersonal[g.code].betrag" type="number" :label="'Betrag (Vorgabe ' + fr(standardBetragProStelle) + '/Stelle)'" />
-                <NcButton type="secondary" @click="antragPersonal(g.code)">Antrag</NcButton>
-              </div>
+              <BudgetAntragForm
+                v-if="formOffen['p' + g.code]"
+                :form="neuPersonal[g.code]"
+                :antragsteller-optionen="antragstellerOptionen(neuPersonal[g.code].herkunft)"
+                :haltung-optionen="haltungOptionen(neuPersonal[g.code].herkunft)"
+                :fraktion-optionen="fraktionOptionen"
+                mit-stellen
+                @herkunft="herkunftGewechselt(neuPersonal[g.code], $event)"
+                @save="antragPersonal(g.code)"
+              />
+              <NcButton v-else type="tertiary" @click="formOeffnen('p' + g.code)">+ Antrag</NcButton>
             </article>
           </div>
         </div>
@@ -216,19 +262,31 @@
                   <span class="pw-antrag-betrag" :class="diffKlasse(a.betragDelta)">{{ fr(a.betragDelta) }}</span>
                   <span class="pw-antrag-steller">{{ a.antragsteller }}</span>
                   <span class="pw-antrag-begruendung">{{ a.begruendung }}</span>
+                  <NcSelect v-if="!a.automatisch" :model-value="haltungOptFor(a)" :options="haltungOptionen(a.herkunft)" :clearable="false" aria-label="Unsere Haltung" class="pw-antrag-haltung" @update:model-value="antragHaltung(a.id, $event ? $event.value : a.haltung)" />
                   <span class="pw-antrag-entscheid" :class="'pw-entscheid-' + a.entscheid">{{ entscheidLabel(a.entscheid) }}</span>
                   <span class="pw-entscheid-knoepfe">
                     <NcButton type="tertiary" aria-label="Antrag angenommen" @click="entscheidSetzen(a.id, a.entscheid === 'angenommen' ? 'offen' : 'angenommen')">✓</NcButton>
                     <NcButton type="tertiary" aria-label="Antrag abgelehnt" @click="entscheidSetzen(a.id, a.entscheid === 'abgelehnt' ? 'offen' : 'abgelehnt')">✕</NcButton>
                   </span>
                   <NcButton type="tertiary" aria-label="Antrag löschen" @click="antragLoeschen(a.id)">🗑</NcButton>
+                  <NcSelect v-if="sitzungsmodus" :model-value="verknuepfungOpt(a)" :options="verknuepfungsKandidaten(a)" input-label="Verknüpft mit" placeholder="nicht verknüpft" class="pw-antrag-verknuepfen" @update:model-value="verknuepfungWaehlen(a.id, $event ? $event.value : 0)" />
+                  <details class="pw-antrag-notizen" @toggle="notizenToggle(a.id, $event)">
+                    <summary>Notizen</summary>
+                    <NotizenListe v-if="offeneNotizen[a.id]" :basis-url="'budget/antraege/' + a.id" :notizen="a.aktionen || []" :aktuelle-uid="aktuelleUid" @geaendert="ladeAnsicht(false)" />
+                  </details>
                 </li>
               </ul>
-              <div class="pw-budget-neu-antrag">
-                <NcTextField v-model="neuInv[i.id].betrag" type="number" label="Betrag (− kürzen)" />
-                <NcTextField v-model="neuInv[i.id].begruendung" label="Begründung" />
-                <NcButton type="secondary" @click="antragInvestition(i)">Antrag</NcButton>
-              </div>
+              <BudgetAntragForm
+                v-if="formOffen['i' + i.id]"
+                :form="neuInv[i.id]"
+                :antragsteller-optionen="antragstellerOptionen(neuInv[i.id].herkunft)"
+                :haltung-optionen="haltungOptionen(neuInv[i.id].herkunft)"
+                :fraktion-optionen="fraktionOptionen"
+                :basis="i.bu"
+                @herkunft="herkunftGewechselt(neuInv[i.id], $event)"
+                @save="antragInvestition(i)"
+              />
+              <NcButton v-else type="tertiary" @click="formOeffnen('i' + i.id)">+ Antrag</NcButton>
             </article>
           </div>
         </div>
@@ -282,6 +340,7 @@
 
 <script>
 import { generateUrl } from '@nextcloud/router'
+import { getCurrentUser } from '@nextcloud/auth'
 import axios from '@nextcloud/axios'
 import NcButton from '@nextcloud/vue/components/NcButton'
 import NcSelect from '@nextcloud/vue/components/NcSelect'
@@ -289,6 +348,10 @@ import NcTextField from '@nextcloud/vue/components/NcTextField'
 import NcCheckboxRadioSwitch from '@nextcloud/vue/components/NcCheckboxRadioSwitch'
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 import NcEmptyContent from '@nextcloud/vue/components/NcEmptyContent'
+import PwMultiSelect from './PwMultiSelect.vue'
+import BudgetAntragForm from './BudgetAntragForm.vue'
+import BudgetPauschalForm from './BudgetPauschalForm.vue'
+import NotizenListe from './NotizenListe.vue'
 import { subscribeRealtime } from '../realtime'
 
 const ZIEL_MODI = [
@@ -297,15 +360,33 @@ const ZIEL_MODI = [
   { value: 'ertrag', label: 'Gewünschter Ertrag' },
 ]
 
+// Haltung je Herkunft (F97): eigene Anträge reichen wir ein, fremde unterstützen wir.
+const HALTUNG_EIGEN = [
+  { value: 'einreichen', label: 'Reichen wir ein' },
+  { value: 'nicht_einreichen', label: 'Reichen wir nicht ein' },
+]
+const HALTUNG_FREMD = [
+  { value: 'unterstuetzen', label: 'Unterstützen wir' },
+  { value: 'nicht_unterstuetzen', label: 'Unterstützen wir nicht' },
+  { value: 'offen', label: 'Offen' },
+]
+
 export default {
   name: 'Budgetliste',
-  components: { NcButton, NcSelect, NcTextField, NcCheckboxRadioSwitch, NcLoadingIcon, NcEmptyContent },
+  components: { NcButton, NcSelect, NcTextField, NcCheckboxRadioSwitch, NcLoadingIcon, NcEmptyContent, PwMultiSelect, BudgetAntragForm, BudgetPauschalForm, NotizenListe },
   props: {
     kommissionen: { type: Array, default: () => [] },
+    mitglieder: { type: Array, default: () => [] },
+    fraktionen: { type: Array, default: () => [] },
   },
   data() {
     return {
       filterReady: false,
+      // Lazy gerenderte Antragsformulare und Notizen je Position/Antrag —
+      // erst bei Bedarf gemountet, damit die Seite bei vielen Produktegruppen
+      // leicht bleibt (sonst Dutzende NcSelects/NotizenListen auf einmal).
+      formOffen: {},
+      offeneNotizen: {},
       jahre: [],
       jahrOption: null,
       departementOption: null,
@@ -353,6 +434,24 @@ export default {
     aktivePhase() {
       return this.sitzungsmodus ? 'sitzung' : 'fraktion'
     },
+    eigenerName() {
+      const u = getCurrentUser()
+      return u ? (u.displayName || u.uid || '') : ''
+    },
+    aktuelleUid() {
+      const u = getCurrentUser()
+      return u ? u.uid : ''
+    },
+    // Fraktionen für die Mehrfachauswahl «unterstützende Fraktionen» (F98).
+    fraktionOptionen() {
+      return (this.fraktionen || [])
+        .filter(f => f && f.aktiv !== false && f.name)
+        .map(f => ({ value: f.name, label: f.name }))
+    },
+    eigeneFraktionName() {
+      const f = (this.fraktionen || []).find(x => x && x.eigene)
+      return f ? f.name : ''
+    },
     kommissionZuordnung() {
       return this.ansicht && Array.isArray(this.ansicht.kommissionZuordnung) ? this.ansicht.kommissionZuordnung : []
     },
@@ -382,7 +481,19 @@ export default {
     },
     summen() { return this.ansicht ? this.ansicht.summen : {} },
     verteilung() {
-      return this.ansicht ? this.ansicht.verteilung : { automatikEin: true, zielModus: 'schwarze_null', zielBetrag: 0 }
+      return this.ansicht ? this.ansicht.verteilung : { automatikEin: true, zielModus: 'schwarze_null', zielBetrag: 0, haltung: 'einreichen', ausnahmen: [] }
+    },
+    // F100: wird der Pauschalantrag eingereicht?
+    pauschalEinreichen() {
+      return (this.verteilung.haltung || 'einreichen') !== 'nicht_einreichen'
+    },
+    // F101: Positionen, die vom Pauschalantrag ausgenommen sind.
+    pauschalAusnahmen() {
+      return Array.isArray(this.verteilung.ausnahmen) ? this.verteilung.ausnahmen : []
+    },
+    // F100: weitere (feste) Pauschalanträge neben dem automatischen Ausgleich.
+    pauschalantraege() {
+      return this.ansicht && Array.isArray(this.ansicht.pauschalantraege) ? this.ansicht.pauschalantraege : []
     },
     zielModusOption() {
       return ZIEL_MODI.find(m => m.value === this.verteilung.zielModus) || ZIEL_MODI[0]
@@ -408,7 +519,8 @@ export default {
       const j = this.ansicht ? this.ansicht.jahr : null
       if (!j) { return 0 }
       if (this.steuerfussAntrag) {
-        return this.steuerfussManuell !== '' ? Number(this.steuerfussManuell) : j.steuerfuss
+        // F96: die Prozentpunkte des Antrags ergeben den effektiven Steuerfuss.
+        return this.steuerfussManuell !== '' ? Number(this.steuerfussManuell) : j.steuerfuss + (this.steuerfussAntrag.prozentDelta || 0)
       }
       const ueberschuss = this.summen.ergebnis || 0
       if (ueberschuss > 0 && this.wertProProzent > 0) {
@@ -514,18 +626,60 @@ export default {
         if (zeigeLaden) { this.laden = false }
       }
     },
+    // Leeres Antragsformular (F94/F95/F97/F98): Herkunft «eigen», Antragsteller
+    // vorbelegt mit dem aktuellen Nutzer, Richtung «Reduktion».
+    leererAntrag(zusatz = {}) {
+      return {
+        betrag: '', prozent: '', mehrausgabe: false,
+        herkunft: 'eigene', antragsteller: this.eigenerName,
+        haltung: 'einreichen', unterstuetzer: [], begruendung: '',
+        ...zusatz,
+      }
+    },
     initEingaben() {
       const neu = {}
       const neuPersonal = {}
       for (const g of this.ansicht.produktegruppen) {
-        neu[g.code] = { betrag: '', antragsteller: '', begruendung: '' }
-        neuPersonal[g.code] = { stellen: '', betrag: '' }
+        neu[g.code] = this.leererAntrag()
+        neuPersonal[g.code] = this.leererAntrag({ stellen: '' })
       }
       const neuInv = {}
-      for (const i of this.ansicht.investitionen) { neuInv[i.id] = { betrag: '', begruendung: '' } }
+      for (const i of this.ansicht.investitionen) { neuInv[i.id] = this.leererAntrag() }
       this.neu = neu
       this.neuPersonal = neuPersonal
       this.neuInv = neuInv
+    },
+    // Antragsteller-Auswahl (F94): bei eigenen Anträgen die aktiven Mitglieder,
+    // bei fremden die aktiven Fraktionen zuoberst, dann Mitglieder.
+    antragstellerOptionen(herkunft) {
+      const personen = (this.mitglieder || [])
+        .filter(m => m && m.aktiv !== false && m.name)
+        .map(m => ({ value: m.name, label: m.name }))
+      const fraktionen = (this.fraktionen || [])
+        .filter(f => f && f.aktiv !== false && f.name)
+        .map(f => ({ value: f.name, label: f.name }))
+      return herkunft === 'fremde' ? [...fraktionen, ...personen] : personen
+    },
+    haltungOptionen(herkunft) {
+      return herkunft === 'fremde' ? HALTUNG_FREMD : HALTUNG_EIGEN
+    },
+    // Wechsel der Herkunft setzt die Haltung auf den passenden Standard zurück.
+    herkunftGewechselt(form, wert) {
+      form.herkunft = wert
+      form.haltung = wert === 'fremde' ? 'offen' : 'einreichen'
+      if (wert === 'fremde') { form.antragsteller = '' }
+    },
+    formOeffnen(key) {
+      this.formOffen = { ...this.formOffen, [key]: true }
+    },
+    formSchliessen(key) {
+      const o = { ...this.formOffen }
+      delete o[key]
+      this.formOffen = o
+    },
+    // Notizen erst mounten, wenn der Nutzer sie aufklappt (Performance).
+    notizenToggle(id, event) {
+      this.offeneNotizen = { ...this.offeneNotizen, [id]: !!(event && event.target && event.target.open) }
     },
     ladeVerzoegert() {
       if (this.ladeTimer) { clearTimeout(this.ladeTimer) }
@@ -548,30 +702,61 @@ export default {
     handleRealtime(event) {
       if ((event?.type || '') === 'budget.updated') { this.ladeAnsicht(false) }
     },
+    // Gemeinsame Antragsfelder aus dem Formular (F94/F97/F98).
+    gemeinsameFelder(form) {
+      return {
+        herkunft: form.herkunft,
+        haltung: form.haltung,
+        antragsteller: form.antragsteller,
+        begruendung: form.begruendung,
+        unterstuetzer: this.unterstuetzerMit(form),
+      }
+    },
+    // F98: unterstützen wir den Antrag (eigen «einreichen» / fremd «unterstuetzen»),
+    // ist die eigene Fraktion automatisch in der Liste der Unterstützer.
+    unterstuetzerMit(form) {
+      const liste = Array.isArray(form.unterstuetzer) ? form.unterstuetzer.map(u => (u && u.value) || u) : []
+      const unterstuetzt = form.haltung === 'einreichen' || form.haltung === 'unterstuetzen'
+      if (unterstuetzt && this.eigeneFraktionName && !liste.includes(this.eigeneFraktionName)) {
+        liste.unshift(this.eigeneFraktionName)
+      }
+      return liste
+    },
+    // Vorzeichenbehafteter CHF- und Prozentwert aus dem Formular (F95): die
+    // Richtung kommt vom Umschalter (Reduktion −, Mehrausgabe +).
+    signierterBetrag(form) {
+      const sign = form.mehrausgabe ? 1 : -1
+      const out = {}
+      if (form.betrag !== '' && form.betrag !== null) { out.betragDelta = sign * Math.round(Math.abs(Number(form.betrag))) }
+      if (form.prozent !== '' && form.prozent !== null) { out.prozentDelta = sign * Math.abs(Number(form.prozent)) }
+      return out
+    },
     async antragGlobalbudget(code) {
       const e = this.neu[code]
-      const betrag = Number(e.betrag)
-      if (!betrag) { return }
-      await this.antragSenden({ bereich: 'globalbudget', zielTyp: 'produktegruppe', zielRef: code, betragDelta: Math.round(betrag), antragsteller: e.antragsteller, begruendung: e.begruendung })
+      const betrag = this.signierterBetrag(e)
+      if (betrag.betragDelta === undefined && betrag.prozentDelta === undefined) { return }
+      await this.antragSenden({ bereich: 'globalbudget', zielTyp: 'produktegruppe', zielRef: code, ...betrag, ...this.gemeinsameFelder(e) })
     },
     async antragPersonal(code) {
       const e = this.neuPersonal[code]
       const stellen = Number(e.stellen)
       if (!stellen) { return }
-      const daten = { bereich: 'personal', zielTyp: 'produktegruppe', zielRef: code, stellenDelta: stellen }
-      if (e.betrag !== '') { daten.betragDelta = Math.round(Number(e.betrag)) }
+      const daten = { bereich: 'personal', zielTyp: 'produktegruppe', zielRef: code, stellenDelta: stellen, ...this.gemeinsameFelder(e) }
+      const betrag = this.signierterBetrag(e)
+      if (betrag.betragDelta !== undefined) { daten.betragDelta = betrag.betragDelta }
       await this.antragSenden(daten)
     },
     async antragInvestition(inv) {
       const e = this.neuInv[inv.id]
-      const betrag = Number(e.betrag)
-      if (!betrag) { return }
-      await this.antragSenden({ bereich: 'investition', zielTyp: 'investition', zielRef: String(inv.id), betragDelta: Math.round(betrag), begruendung: e.begruendung })
+      const betrag = this.signierterBetrag(e)
+      if (betrag.betragDelta === undefined && betrag.prozentDelta === undefined) { return }
+      await this.antragSenden({ bereich: 'investition', zielTyp: 'investition', zielRef: String(inv.id), ...betrag, ...this.gemeinsameFelder(e) })
     },
     async antragSenden(daten) {
       try {
         // In der Sitzung entstehen offizielle Sitzungsanträge (F93), sonst Fraktionsanträge.
         await axios.post(generateUrl('/apps/parlwin/budget/' + this.jahrOption.value + '/antraege'), { ...daten, phase: this.aktivePhase })
+        this.formOffen = {}
         await this.ladeAnsicht(false)
       } catch (f) {
         console.error('Antrag speichern fehlgeschlagen', f)
@@ -596,13 +781,52 @@ export default {
     async pauschalVerteilen() {
       await this.verteilungSenden(true, this.verteilung.zielModus, Number(this.zielBetrag) || 0)
     },
-    async verteilungSenden(automatikEin, zielModus, zielBetrag) {
+    async verteilungSenden(automatikEin, zielModus, zielBetrag, extra = {}) {
+      const haltung = extra.haltung !== undefined ? extra.haltung : (this.verteilung.haltung || 'einreichen')
+      const ausnahmen = extra.ausnahmen !== undefined ? extra.ausnahmen : this.pauschalAusnahmen
       try {
-        const { data } = await axios.put(generateUrl('/apps/parlwin/budget/' + this.jahrOption.value + '/verteilung'), { automatikEin, zielModus, zielBetrag })
+        const { data } = await axios.put(generateUrl('/apps/parlwin/budget/' + this.jahrOption.value + '/verteilung'), { automatikEin, zielModus, zielBetrag, haltung, ausnahmen })
         this.ansicht = data
         this.initEingaben()
       } catch (f) {
         console.error('Verteilung setzen fehlgeschlagen', f)
+      }
+    },
+    // F100: den Einreichen-Entscheid des Pauschalantrags umschalten.
+    async pauschalEinreichenUmschalten(einreichen) {
+      await this.verteilungSenden(this.verteilung.automatikEin, this.verteilung.zielModus, Number(this.zielBetrag) || 0, { haltung: einreichen ? 'einreichen' : 'nicht_einreichen' })
+    },
+    // F101: eine Position vom Pauschalantrag ausnehmen oder wieder aufnehmen.
+    async ausnahmeUmschalten(code, aus) {
+      const ausnahmen = [...this.pauschalAusnahmen]
+      const i = ausnahmen.indexOf(code)
+      if (aus && i < 0) { ausnahmen.push(code) }
+      if (!aus && i >= 0) { ausnahmen.splice(i, 1) }
+      await this.verteilungSenden(this.verteilung.automatikEin, this.verteilung.zielModus, Number(this.zielBetrag) || 0, { ausnahmen })
+    },
+    // F100: einen weiteren (festen) Pauschalantrag anlegen, ändern, löschen.
+    async pauschalErstellen() {
+      try {
+        await axios.post(generateUrl('/apps/parlwin/budget/' + this.jahrOption.value + '/pauschal'), {})
+        await this.ladeAnsicht(false)
+      } catch (f) {
+        console.error('Pauschalantrag anlegen fehlgeschlagen', f)
+      }
+    },
+    async pauschalAendern(id, felder) {
+      try {
+        await axios.put(generateUrl('/apps/parlwin/budget/pauschal/' + id), felder)
+        await this.ladeAnsicht(false)
+      } catch (f) {
+        console.error('Pauschalantrag ändern fehlgeschlagen', f)
+      }
+    },
+    async pauschalLoeschen(id) {
+      try {
+        await axios.delete(generateUrl('/apps/parlwin/budget/pauschal/' + id))
+        await this.ladeAnsicht(false)
+      } catch (f) {
+        console.error('Pauschalantrag löschen fehlgeschlagen', f)
       }
     },
     async entscheidSetzen(id, status) {
@@ -611,6 +835,40 @@ export default {
         await this.ladeAnsicht(false)
       } catch (f) {
         console.error('Entscheid setzen fehlgeschlagen', f)
+      }
+    },
+    haltungOptFor(a) {
+      return this.haltungOptionen(a.herkunft).find(o => o.value === a.haltung) || this.haltungOptionen(a.herkunft)[0]
+    },
+    // Unsere Haltung an einem bestehenden Antrag ändern (F97), getrennt vom
+    // Sitzungs-Beschluss.
+    async antragHaltung(id, haltung) {
+      try {
+        await axios.put(generateUrl('/apps/parlwin/budget/antraege/' + id), { haltung })
+        await this.ladeAnsicht(false)
+      } catch (f) {
+        console.error('Haltung ändern fehlgeschlagen', f)
+      }
+    },
+    // Mögliche Verknüpfungen eines Sitzungsantrags: Vorbereitungsanträge auf
+    // derselben Position (F104).
+    verknuepfungsKandidaten(a) {
+      const alle = this.ansicht ? this.ansicht.antraege : []
+      return alle
+        .filter(x => (x.phase || 'fraktion') === 'fraktion' && x.bereich === a.bereich && String(x.zielRef) === String(a.zielRef))
+        .map(x => ({ value: x.id, label: (x.antragsteller || 'Antrag') + ' ' + this.fr(x.betragDelta) }))
+    },
+    verknuepfungOpt(a) {
+      if (!a.verknuepftMitId) { return null }
+      return this.verknuepfungsKandidaten(a).find(o => o.value === a.verknuepftMitId) || { value: a.verknuepftMitId, label: 'verknüpft' }
+    },
+    // Verknüpfung von Hand setzen oder lösen (F104).
+    async verknuepfungWaehlen(antragId, zielId) {
+      try {
+        await axios.put(generateUrl('/apps/parlwin/budget/antraege/' + antragId + '/verknuepfung'), { zielId: zielId || 0 })
+        await this.ladeAnsicht(false)
+      } catch (f) {
+        console.error('Verknüpfung setzen fehlgeschlagen', f)
       }
     },
     steuerfussAutomatikUmschalten(ein) {
@@ -627,13 +885,15 @@ export default {
     async steuerfussAntragStellen() {
       const neuerFuss = Number(this.steuerfussManuell)
       const j = this.ansicht.jahr
-      if (!neuerFuss || !this.wertProProzent) { return }
-      const betragDelta = Math.round((neuerFuss - j.steuerfuss) * this.wertProProzent)
+      if (!neuerFuss || !j.steuerfuss) { return }
+      // F96: der Steuerfuss-Antrag wird in Prozentpunkten gestellt; den CHF-Effekt
+      // auf den Ertrag rechnet der Server (Ertrag × Prozentpunkte / Steuerfuss).
+      const prozentDelta = neuerFuss - j.steuerfuss
       try {
         if (this.steuerfussAntrag) {
-          await axios.put(generateUrl('/apps/parlwin/budget/antraege/' + this.steuerfussAntrag.id), { betragDelta })
+          await axios.put(generateUrl('/apps/parlwin/budget/antraege/' + this.steuerfussAntrag.id), { prozentDelta })
         } else {
-          await axios.post(generateUrl('/apps/parlwin/budget/' + this.jahrOption.value + '/antraege'), { bereich: 'steuerfuss', zielTyp: 'steuerfuss', betragDelta, begruendung: 'Steuerfuss auf ' + neuerFuss + '%' })
+          await axios.post(generateUrl('/apps/parlwin/budget/' + this.jahrOption.value + '/antraege'), { bereich: 'steuerfuss', zielTyp: 'steuerfuss', prozentDelta, begruendung: 'Steuerfuss auf ' + neuerFuss + '%' })
         }
         await this.ladeAnsicht(false)
       } catch (f) {
@@ -732,7 +992,11 @@ export default {
 .pw-entscheid-abgelehnt { background: var(--color-error, #c0392b); color: #fff; }
 .pw-entscheid-offen { background: var(--color-background-dark); }
 .pw-entscheid-knoepfe { display: flex; gap: 0.15rem; }
-.pw-budget-neu-antrag, .pw-verteilung-ziel { display: flex; gap: 0.5rem; align-items: flex-end; flex-wrap: wrap; margin-block-start: 0.4rem; }
+.pw-antrag-haltung { min-inline-size: 10rem; max-inline-size: 14rem; }
+.pw-antrag-verknuepfen { min-inline-size: 12rem; max-inline-size: 16rem; }
+.pw-antrag-notizen { flex-basis: 100%; font-size: 0.85rem; margin-block-start: 0.2rem; }
+.pw-antrag-notizen > summary { cursor: pointer; color: var(--color-text-maxcontrast); }
+.pw-verteilung-ziel { display: flex; gap: 0.5rem; align-items: flex-end; flex-wrap: wrap; margin-block-start: 0.4rem; }
 .pw-verteilung { display: flex; flex-direction: column; gap: 0.5rem; }
 .pw-steuerfuss { display: flex; flex-direction: column; gap: 0.6rem; max-inline-size: 32rem; }
 .pw-budget-info { font-size: 0.9rem; color: var(--color-text-maxcontrast); }

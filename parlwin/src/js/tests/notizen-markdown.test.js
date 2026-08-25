@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { shallowMount } from '@vue/test-utils'
 import { markdownZuHtml } from '../utils'
-import SitzungNotizen from '../components/SitzungNotizen.vue'
+import NotizenListe from '../components/NotizenListe.vue'
 
 describe('markdownZuHtml', () => {
   it('rendert Markdown nach HTML', () => {
@@ -21,12 +21,19 @@ describe('markdownZuHtml', () => {
   })
 })
 
-describe('SitzungNotizen zeigt Notizen als gerendertes Markdown', () => {
+// Die EINE geteilte Notiz-Komponente (NotizenListe) zeigt Notizen überall gleich
+// — inkl. Sitzungs-/Traktandum-Notizen seit der Vereinheitlichung. Der Text wird
+// als gerendertes Markdown angezeigt, nie als Rohtext.
+describe('NotizenListe zeigt Notizen als gerendertes Markdown', () => {
   it('rendert eine Markdown-Notiz formatiert (nicht als Rohtext)', () => {
-    const wrapper = mount(SitzungNotizen, {
-      props: { modelValue: [{ text: '**wichtig**', uid: 'other', displayName: 'Andere' }] },
+    const wrapper = shallowMount(NotizenListe, {
+      props: {
+        basisUrl: 'sitzungen/1',
+        notizen: [{ id: 1, text: '**wichtig**', autorUid: 'other', autorName: 'Andere' }],
+        aktuelleUid: 'me',
+      },
     })
-    const html = wrapper.find('.pw-notiz-text').html()
+    const html = wrapper.find('.pw-notiz-inhalt').html()
     expect(html).toContain('<strong>wichtig</strong>')
   })
 })

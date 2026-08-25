@@ -51,4 +51,13 @@ class BudgetAntragMapper extends QBMapper {
             ->where($qb->expr()->eq('verteilung_id', $qb->createNamedParameter($verteilungId, IQueryBuilder::PARAM_INT)));
         $qb->executeStatement();
     }
+
+    /** Alle automatisch erzeugten Pauschal-Kinder eines Jahres entfernen. */
+    public function deletePauschalByJahr(int $jahr): void {
+        $qb = $this->db->getQueryBuilder();
+        $qb->delete($this->getTableName())
+            ->where($qb->expr()->eq('jahr', $qb->createNamedParameter($jahr, IQueryBuilder::PARAM_INT)))
+            ->andWhere($qb->expr()->eq('quelle', $qb->createNamedParameter('pauschal')));
+        $qb->executeStatement();
+    }
 }

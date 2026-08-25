@@ -129,11 +129,13 @@ export default {
       set(v) { this.sortierModus = v ? v.value : 'funktion' },
     },
     alleKommissionen() {
-      const namen = (this.kommissionen || [])
-        .filter(k => k?.aktiv !== false)
-        .map(k => k?.name)
-        .filter(Boolean)
-      return [...new Set(namen)].sort((a, b) => a.localeCompare(b, 'de'))
+      // Grundprinzip: nur Kommissionen anbieten, denen mindestens ein sichtbares
+      // Mitglied tatsächlich angehört — eine leere Kommission wäre unnützer Ballast.
+      const namen = new Set()
+      this.basisMitglieder.forEach((m) => this.kommissionenVon(m).forEach((k) => {
+        if (k?.name) namen.add(k.name)
+      }))
+      return [...namen].sort((a, b) => a.localeCompare(b, 'de'))
     },
     kommissionOptions() {
       return [{ label: 'Alle Kommissionen', value: '' }, ...this.alleKommissionen.map(k => ({ label: kuerze(k), value: k }))]
@@ -143,11 +145,16 @@ export default {
       set(v) { this.filterKommission = v ? v.value : '' },
     },
     funktionFilterOptions() {
-      return [
-        { label: 'Alle Funktionen', value: '' },
-        { label: 'Fraktionspräsident', value: 'fraktionspraesident' },
-        { label: 'Kommissionspräsident', value: 'kommissionspraesident' },
-      ]
+      // Grundprinzip: nur die Funktionen anbieten, die unter den sichtbaren
+      // Mitgliedern tatsächlich vorkommen.
+      const optionen = [{ label: 'Alle Funktionen', value: '' }]
+      if (this.basisMitglieder.some((m) => this.fraktionsRolle(m) === 'Fraktionspräsident')) {
+        optionen.push({ label: 'Fraktionspräsident', value: 'fraktionspraesident' })
+      }
+      if (this.basisMitglieder.some((m) => this.kommissionenVon(m).some((k) => k.rolle === 'Präsident'))) {
+        optionen.push({ label: 'Kommissionspräsident', value: 'kommissionspraesident' })
+      }
+      return optionen
     },
     funktionFilterOption: {
       get() { return this.funktionFilterOptions.find(o => o.value === this.filterFunktion) || this.funktionFilterOptions[0] },

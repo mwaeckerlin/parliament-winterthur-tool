@@ -1,5 +1,21 @@
 # Changelog
 
+- 2026-08-24 **1.8.2**
+    - Budget-Anträge erhalten Herkunft, Haltung, Prozentwert, unterstützende Fraktionen und Notizen
+        - Jeder Antrag hat eine Herkunft «eigen» oder «fremd» — wie beim Vorstoss; der Antragsteller wird aus einer Liste gewählt (eigene Anträge: eine Person, vorbelegt mit der eintragenden Person; fremde: eine Fraktion oder Person)
+        - Der Betrag lässt sich in CHF oder in Prozent des Budgetwerts der Position eingeben; das jeweils andere Feld wird sofort nachgerechnet, ein Umschalter wechselt zwischen Reduktion (Standard) und Mehrausgabe
+        - Steuerfuss-Anträge werden in Prozentpunkten gestellt; der Einfluss auf die erwarteten Steuereinnahmen wird anteilig berechnet
+        - Zu jedem Antrag lässt sich unsere Haltung festhalten (eigene: einreichen/nicht einreichen; fremde: unterstützen/nicht/offen) und mit einer Mehrfachauswahl, welche Fraktionen ihn unterstützen — die eigene Fraktion ist bei Zustimmung automatisch dabei
+        - Anträge können Notizen tragen, mit demselben Editor wie überall (Versionen, Löschen mit Undo)
+        - In der Übersicht zählt nur, was die Fraktion unterstützt; im Sitzungsmodus nur die vom Parlament angenommenen Anträge
+        - Ein Pauschalantrag hat einen Einreichen-Entscheid; einzelne Positionen lassen sich davon ausnehmen, der eingesparte Betrag verteilt sich dann neu auf die übrigen
+        - Beliebig viele, voneinander unabhängige Pauschalanträge lassen sich anlegen (Einsparung in CHF oder in Prozent des ursprünglichen Aufwands); ihre Kürzungen kumulieren, der automatische Ausgleich auf ein Ziel wird zuletzt gerechnet
+        - Vorbereitungs- und Sitzungsanträge werden bei Eindeutigkeit (gleiche Position, gleicher Betrag) automatisch verknüpft und übernehmen die Haltung; im Sitzungsmodus ist der Verknüpfungsstand sichtbar
+    - Alle Notizen nutzen jetzt dieselbe Notiz-Komponente und dasselbe Aussehen wie überall (aufklappbare Liste, «+ Neue Notiz», Versionen, Löschen mit Undo) — auch die Notizen zur Sitzung, die Notizen an einem Traktandum ohne Geschäftsbezug und die nur lesend gezeigten Notizen verknüpfter Sitzungen; der frühere abweichende Editor entfällt vollständig, bestehende Notizen werden automatisch übernommen
+    - Filter bieten überall nur noch die Werte an, die tatsächlich vorkommen: der Zuständigkeitsfilter der Geschäfte zeigt nur Personen, die wirklich zuständig sind (nicht jedes Mitglied), der Prioritätsfilter nur vorkommende Stufen, die Vorstoss-Filter nur vorkommende Herkünfte und Status, und bei den Mitgliedern bieten die Kommissions- und Funktionsfilter nur an, was es auch gibt — keine leeren Auswahlmöglichkeiten mehr
+        - Ein leerer/undefinierter Wert ist ebenfalls ein echter Wert: gibt es Geschäfte ohne Zuständige, lässt sich nach «Nicht zugewiesen» filtern; gibt es Geschäfte ohne gesetzte Priorität, nach «Undefiniert» (getrennt von «Mittel»)
+    - Robustes Nachladen bei schlechter Leitung: kann etwas nicht geladen werden, wird es automatisch immer wieder versucht, bis es klappt (mit wachsender Wartezeit); nichts bleibt mehr dauerhaft «hängen»
+
 - 2026-08-22 **1.8.1**
     - Neuer Bereich «Budget» zur Unterstützung des städtischen Budgetprozesses
         - Budget-Seite mit vier Tabs: Globalbudgets (Teil B), Personalbestand, Investitionsrechnung und Steuerfuss

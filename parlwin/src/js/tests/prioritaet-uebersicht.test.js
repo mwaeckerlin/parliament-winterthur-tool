@@ -39,7 +39,7 @@ describe('Geschaeftsliste — Priorität', () => {
     expect(rows[3].classes()).not.toContain('pw-prio-tief')
   })
 
-  it('filtert nach Priorität; nicht gesetzt zählt als «mittel»', async () => {
+  it('filtert nach Priorität nach dem Rohwert; «Undefiniert» (leer) ist von «Mittel» getrennt', async () => {
     const wrapper = shallowMount(Geschaeftsliste, { props: { mitglieder: [] } })
     axios.get.mockResolvedValue({ data: [
       { id: 1, status: 'Pendent', prioritaet: 'hoch' },
@@ -49,9 +49,15 @@ describe('Geschaeftsliste — Priorität', () => {
     ] })
     await wrapper.vm.ladeGeschaefte()
 
+    // «Mittel» trifft NUR ausdrücklich gesetzte Priorität, nicht mehr die leeren.
     wrapper.vm.filterPrioritaet = ['mittel']
     await wrapper.vm.$nextTick()
-    expect(wrapper.vm.gefilterteGeschaefte.map(g => g.id).sort()).toEqual([2, 3])
+    expect(wrapper.vm.gefilterteGeschaefte.map(g => g.id)).toEqual([2])
+
+    // «Undefiniert» (leerer Wert) trifft genau die Geschäfte ohne gesetzte Priorität.
+    wrapper.vm.filterPrioritaet = ['']
+    await wrapper.vm.$nextTick()
+    expect(wrapper.vm.gefilterteGeschaefte.map(g => g.id)).toEqual([3])
 
     wrapper.vm.filterPrioritaet = ['hoch']
     await wrapper.vm.$nextTick()

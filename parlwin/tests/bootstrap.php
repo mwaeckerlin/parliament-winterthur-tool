@@ -86,7 +86,7 @@ if (!class_exists('Symfony\Component\Console\Input\InputOption')) {
 
 if (!interface_exists('OCP\AppFramework\Utility\ITimeFactory')) {
     // phpcs:ignore
-    eval ('namespace OCP\AppFramework\Utility; interface ITimeFactory {}');
+    eval ('namespace OCP\AppFramework\Utility; interface ITimeFactory { public function getTime(): int; }');
 }
 
 if (!class_exists('OCP\BackgroundJob\TimedJob')) {

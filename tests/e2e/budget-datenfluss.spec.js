@@ -83,6 +83,9 @@ function fehlerWaechter(page) {
 }
 
 async function tabOeffnen(page, label) {
+  // Vor dem Klick nach oben scrollen: der sticky Summen-Balken darf den Tab nicht
+  // überlagern (sonst wird der Klick abgefangen).
+  await page.evaluate(() => window.scrollTo(0, 0))
   await page.locator('.pw-budget-tabs .pw-budget-tab', { hasText: label }).click()
 }
 
@@ -161,8 +164,9 @@ test.describe('Budget: Globalbudgets — Anträge und Live-Entscheid (F80, F81, 
 
     // F81/F82: einen Kürzungsantrag stellen.
     const begruendung = eindeutig('Kürzung')
-    await karte.locator('.pw-budget-neu-antrag input[type="number"]').fill('-50000')
-    await karte.locator('.pw-budget-neu-antrag input[type="text"]').last().fill(begruendung)
+    await karte.getByRole('button', { name: '+ Antrag' }).click()
+    await karte.locator('.pw-antrag-form input[type="number"]').first().fill('-50000')
+    await karte.locator('.pw-antrag-form').getByLabel('Begründung').fill(begruendung)
     await karte.getByRole('button', { name: 'Antrag', exact: true }).click()
     await page.waitForLoadState('networkidle')
 
@@ -243,7 +247,8 @@ test.describe('Budget: Personalbestand und Investitionen (F86, F87)', () => {
     await expect(karte.locator('.pw-budget-betrag', { hasText: 'Stellen' })).toBeVisible()
 
     // Personalkürzung: Stellen − und Betrag (Vorgabe-Betrag ist vorbelegt).
-    await karte.locator('.pw-budget-neu-antrag input[type="number"]').first().fill('-1')
+    await karte.getByRole('button', { name: '+ Antrag' }).click()
+    await karte.locator('.pw-antrag-form input[type="number"]').first().fill('-1')
     await karte.getByRole('button', { name: 'Antrag', exact: true }).click()
     await page.waitForLoadState('networkidle')
     await expect(karte.locator('.pw-budget-antraege li').first(), 'Personalantrag erscheint nicht').toBeVisible({ timeout: 15_000 })
@@ -263,7 +268,8 @@ test.describe('Budget: Personalbestand und Investitionen (F86, F87)', () => {
     await expect(projekt.locator('.pw-budget-betrag')).toBeVisible()
 
     // Einen Investitionsantrag stellen.
-    await projekt.locator('.pw-budget-neu-antrag input[type="number"]').fill('-10000')
+    await projekt.getByRole('button', { name: '+ Antrag' }).click()
+    await projekt.locator('.pw-antrag-form input[type="number"]').first().fill('-10000')
     await projekt.getByRole('button', { name: 'Antrag', exact: true }).click()
     await page.waitForLoadState('networkidle')
   })
@@ -316,8 +322,9 @@ test.describe('Budget: Steuerfuss, Import und PDF (F88, F89, F91, F92)', () => {
     const karte = page.locator('.pw-budget-tabpanel .pw-data-card', { has: page.locator('.pw-data-card-kicker', { hasText: 'Produktegruppe' }) }).first()
     await karte.waitFor({ state: 'visible', timeout: 30_000 })
     const fraktionText = eindeutig('Fraktion')
-    await karte.locator('.pw-budget-neu-antrag input[type="number"]').fill('-11000')
-    await karte.locator('.pw-budget-neu-antrag input[type="text"]').last().fill(fraktionText)
+    await karte.getByRole('button', { name: '+ Antrag' }).click()
+    await karte.locator('.pw-antrag-form input[type="number"]').first().fill('-11000')
+    await karte.locator('.pw-antrag-form').getByLabel('Begründung').fill(fraktionText)
     await karte.getByRole('button', { name: 'Antrag', exact: true }).click()
     await page.waitForLoadState('networkidle')
     await expect(karte.locator('.pw-budget-antraege li', { hasText: fraktionText })).toBeVisible({ timeout: 15_000 })
@@ -336,8 +343,9 @@ test.describe('Budget: Steuerfuss, Import und PDF (F88, F89, F91, F92)', () => {
     const karteS = page.locator('.pw-budget-tabpanel .pw-data-card', { has: page.locator('.pw-data-card-kicker', { hasText: 'Produktegruppe' }) }).first()
     await karteS.waitFor({ state: 'visible', timeout: 30_000 })
     const sitzungText = eindeutig('Sitzung')
-    await karteS.locator('.pw-budget-neu-antrag input[type="number"]').fill('-12000')
-    await karteS.locator('.pw-budget-neu-antrag input[type="text"]').last().fill(sitzungText)
+    await karteS.getByRole('button', { name: '+ Antrag' }).click()
+    await karteS.locator('.pw-antrag-form input[type="number"]').first().fill('-12000')
+    await karteS.locator('.pw-antrag-form').getByLabel('Begründung').fill(sitzungText)
     await karteS.getByRole('button', { name: 'Antrag', exact: true }).click()
     await page.waitForLoadState('networkidle')
     await expect(page.locator('.pw-budget-tabpanel .pw-budget-antraege li', { hasText: sitzungText }), 'Sitzungsantrag nicht sichtbar').toBeVisible({ timeout: 15_000 })
@@ -363,5 +371,51 @@ test.describe('Budget: Steuerfuss, Import und PDF (F88, F89, F91, F92)', () => {
       await popup.waitForLoadState('domcontentloaded').catch(() => {})
       await popup.close().catch(() => {})
     }
+  })
+})
+
+test.describe('Budget: Antragsmodell — Herkunft, Betrag, Haltung, Pauschal, Notizen (F94–F104)', () => {
+  test('Antragsform und Pauschal-Bedienung zeigen die neuen Felder und sind bedienbar', async ({ page }) => {
+    const jsFehler = fehlerWaechter(page)
+    await login(page, USERS.u1)
+    await gotoBudget(page)
+    await sorgeFuerBudgetjahr(page, JAHR)
+    await gotoBudget(page)
+
+    const karte = page.locator('.pw-budget-tabpanel .pw-data-card', { has: page.locator('.pw-data-card-kicker', { hasText: 'Produktegruppe' }) }).first()
+    await karte.waitFor({ state: 'visible', timeout: 30_000 })
+
+    // Das Antragsformular ist lazy — erst über «+ Antrag» einblenden.
+    await karte.getByRole('button', { name: '+ Antrag' }).click()
+    const form = karte.locator('.pw-antrag-form')
+    await form.waitFor({ state: 'visible', timeout: 15_000 })
+
+    // F94/F95/F97/F98: die neuen Formularfelder sind vorhanden.
+    await expect(form.getByText('Herkunft', { exact: true }), 'Herkunft-Auswahl fehlt (F94)').toBeVisible()
+    await expect(form.getByLabel('Betrag CHF'), 'CHF-Feld fehlt (F95)').toBeVisible()
+    await expect(form.getByLabel('Betrag %'), 'Prozent-Feld fehlt (F95)').toBeVisible()
+    await expect(form.getByText('Unsere Haltung', { exact: true }), 'Haltung-Auswahl fehlt (F97)').toBeVisible()
+    await expect(form.getByText('Unterstützende Fraktionen', { exact: true }), 'Unterstützer-Auswahl fehlt (F98)').toBeVisible()
+
+    // F100: der Einreichen-Entscheid des Pauschalantrags ist bedienbar. Die
+    // Automatik kann durch einen früheren Test aus sein → nötigenfalls einschalten
+    // (der Schalter erscheint nur bei eingeschalteter Automatik).
+    const verteilung = page.locator('.pw-verteilung')
+    if (await verteilung.getByText('Pauschalantrag einreichen').count() === 0) {
+      await verteilung.locator('.checkbox-radio-switch__content').first().click()
+      await page.waitForLoadState('networkidle')
+    }
+    await expect(verteilung.getByText('Pauschalantrag einreichen'), 'Einreichen-Schalter fehlt (F100)').toBeVisible()
+
+    // F101: die Ausnahme-Checkbox ist an der Produktegruppe vorhanden.
+    await expect(karte.getByText('Ausnahme vom Pauschalantrag'), 'Ausnahme-Checkbox fehlt (F101)').toBeVisible()
+
+    // F103: die Notizen lassen sich an einem (automatisch erzeugten) Antrag öffnen.
+    const antrag = karte.locator('.pw-budget-antraege li').first()
+    await antrag.waitFor({ state: 'visible', timeout: 15_000 })
+    await antrag.locator('.pw-antrag-notizen summary').click()
+    await expect(antrag.locator('.pw-antrag-notizen[open]'), 'Notiz-Bereich öffnet nicht (F103)').toBeVisible()
+
+    expect(jsFehler, `JS-Fehler: ${jsFehler.join(' | ')}`).toEqual([])
   })
 })

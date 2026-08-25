@@ -187,3 +187,81 @@ describe('Geschaeftsliste — Filter nach Einreicher und Partei', () => {
     expect(wrapper.vm.nurErsteinreicher).toBe(false)
   })
 })
+
+// Grundprinzip: ein Filter bietet GENAU die Werte an, die in den Daten tatsächlich
+// vorkommen — nicht die ganze Domäne. Alles andere ist unnützer Ballast und führt
+// zu leeren Filtertreffern.
+describe('Geschaeftsliste — Filter bieten nur tatsächlich vorkommende Werte', () => {
+  beforeEach(() => {
+    axios.post.mockReset()
+    axios.get.mockReset().mockResolvedValue({ data: [] })
+  })
+
+  const mitglieder = [
+    { name: 'Anna Müller', aktiv: true },
+    { name: 'Bob Meier', aktiv: true },
+    { name: 'Nie Zugewiesen', aktiv: true },
+  ]
+
+  const mountMit = async (liste, mgl = mitglieder) => {
+    const wrapper = shallowMount(Geschaeftsliste, { props: { mitglieder: mgl } })
+    axios.get.mockResolvedValue({ data: liste })
+    await wrapper.vm.ladeGeschaefte()
+    await wrapper.vm.$nextTick()
+    return wrapper
+  }
+
+  it('Zuständigkeitsfilter: zugewiesene Personen plus «Nicht zugewiesen», kein unzugewiesenes Mitglied', async () => {
+    const wrapper = await mountMit([
+      { id: 1, nummer: '2026.1', titel: 'A', status: 'Pendent', datum: '2026-01-01', hauptZustaendigePerson: 'Anna Müller' },
+      { id: 2, nummer: '2026.2', titel: 'B', status: 'Pendent', datum: '2026-01-02', hauptZustaendigePerson: 'Bob Meier' },
+      { id: 3, nummer: '2026.3', titel: 'C', status: 'Pendent', datum: '2026-01-03', hauptZustaendigePerson: '' },
+    ])
+    const werte = wrapper.vm.zustaendigeOptionen.map(o => o.value)
+    const labels = wrapper.vm.zustaendigeOptionen.map(o => o.label)
+    // Zugewiesene Personen UND «Nicht zugewiesen» (leerer Wert = value '') — der
+    // leere Wert kommt in den Daten vor (id 3) und ist ein echter Filterwert.
+    expect(werte).toEqual(['', 'Anna Müller', 'Bob Meier'])
+    expect(labels).toContain('Nicht zugewiesen')
+    // «Nie Zugewiesen» ist Mitglied, aber an keinem Geschäft zuständig → NICHT im Filter.
+    expect(labels).not.toContain('Nie Zugewiesen')
+  })
+
+  it('Zuständigkeitsfilter «Nicht zugewiesen» trifft genau die Geschäfte ohne Zuständige', async () => {
+    const wrapper = await mountMit([
+      { id: 1, nummer: '2026.1', titel: 'A', status: 'Pendent', datum: '2026-01-01', hauptZustaendigePerson: 'Anna Müller' },
+      { id: 2, nummer: '2026.2', titel: 'B', status: 'Pendent', datum: '2026-01-02', hauptZustaendigePerson: '' },
+    ])
+    wrapper.vm.filterZustaendige = ['']
+    expect(wrapper.vm.gefilterteGeschaefte.map(g => g.id)).toEqual([2])
+  })
+
+  it('Zuständigkeitsfilter bietet KEIN «Nicht zugewiesen», wenn alle Geschäfte zugewiesen sind', async () => {
+    const wrapper = await mountMit([
+      { id: 1, nummer: '2026.1', titel: 'A', status: 'Pendent', datum: '2026-01-01', hauptZustaendigePerson: 'Anna Müller' },
+    ])
+    expect(wrapper.vm.zustaendigeOptionen.map(o => o.value)).toEqual(['Anna Müller'])
+  })
+
+  it('Prioritätsfilter: vorkommende Stufen plus «Undefiniert» für Geschäfte ohne Priorität', async () => {
+    const wrapper = await mountMit([
+      { id: 1, nummer: '2026.1', titel: 'A', status: 'Pendent', datum: '2026-01-01' }, // keine Priorität
+      { id: 2, nummer: '2026.2', titel: 'B', status: 'Pendent', datum: '2026-01-02', prioritaet: 'hoch' },
+    ])
+    // «Undefiniert» (value '') + «hoch»; «mittel»/«tief» kommen nicht vor.
+    expect(wrapper.vm.prioritaetOptionen.map(o => o.value)).toEqual(['', 'hoch'])
+    expect(wrapper.vm.prioritaetOptionen.map(o => o.label)).toContain('Undefiniert')
+    expect(wrapper.vm.prioritaetOptionen.map(o => o.value)).not.toContain('tief')
+    // «Undefiniert» trifft genau das Geschäft ohne gesetzte Priorität.
+    wrapper.vm.filterPrioritaet = ['']
+    expect(wrapper.vm.gefilterteGeschaefte.map(g => g.id)).toEqual([1])
+  })
+
+  it('Prioritätsfilter bietet KEIN «Undefiniert», wenn alle Geschäfte eine Priorität haben', async () => {
+    const wrapper = await mountMit([
+      { id: 1, nummer: '2026.1', titel: 'A', status: 'Pendent', datum: '2026-01-01', prioritaet: 'hoch' },
+      { id: 2, nummer: '2026.2', titel: 'B', status: 'Pendent', datum: '2026-01-02', prioritaet: 'tief' },
+    ])
+    expect(wrapper.vm.prioritaetOptionen.map(o => o.value)).toEqual(['hoch', 'tief'])
+  })
+})

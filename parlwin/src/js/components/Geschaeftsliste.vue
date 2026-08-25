@@ -7,7 +7,7 @@
       <NcSelect v-model="entscheidungsbedarfOption" :options="entscheidungsbedarfOptions" :clearable="false" input-label="Entscheidungsbedarf" />
       <PwMultiSelect :model-value="filterStatus" :options="alleStatus" input-label="Status" placeholder="Alle" @update:model-value="filterStatus = $event || []" />
       <PwMultiSelect :model-value="filterTyp" :options="alleTypen" input-label="Typ" placeholder="Alle" @update:model-value="filterTyp = $event || []" />
-      <PwMultiSelect :model-value="filterZustaendige" :options="zustaendigeLabels" input-label="Zuständigkeit" placeholder="Alle" @update:model-value="filterZustaendige = $event || []" />
+      <PwMultiSelect :model-value="filterZustaendigeOptions" :options="zustaendigeOptionen" input-label="Zuständigkeit" placeholder="Alle" @update:model-value="filterZustaendige = ($event || []).map(o => o.value)" />
       <PwMultiSelect :model-value="filterBeschlussOptions" :options="beschlussOptionsList" input-label="Beschluss" placeholder="Alle" @update:model-value="filterBeschluss = ($event || []).map(o => o.value)" />
       <PwMultiSelect :model-value="filterPrioritaetOptions" :options="prioritaetOptionen" input-label="Priorität" placeholder="Alle" @update:model-value="filterPrioritaet = ($event || []).map(o => o.value)" />
       <PwMultiSelect :model-value="filterEinreicher" :options="einreicherOptionen" input-label="Einreicher" placeholder="Alle" @update:model-value="filterEinreicher = $event || []" />
@@ -190,7 +190,7 @@ import axios from '@nextcloud/axios'
 import { showError } from '@nextcloud/dialogs'
 import '@nextcloud/dialogs/style.css'
 import { subscribeRealtime } from '../realtime'
-import { vollerName, personKey, PRIORITAETEN, kuerze } from '../utils'
+import { vollerName, personKey, PRIORITAETEN, kuerze, mitLeerOption } from '../utils'
 import GeschaeftDetail from './GeschaeftDetail.vue'
 import NcTextField from '@nextcloud/vue/components/NcTextField'
 import NcSelect from '@nextcloud/vue/components/NcSelect'
@@ -287,12 +287,24 @@ export default {
       return { byExtern, byName }
     },
     prioritaetOptionen() {
-      return PRIORITAETEN
+      // Grundprinzip (wie Beschluss): nur die tatsächlich gesetzten Stufen (feste
+      // Reihenfolge) — plus «Undefiniert», wenn Geschäfte ohne gesetzte Priorität
+      // vorkommen. Auch die undefinierte Priorität ist ein realer Wert der Daten.
+      const vorhanden = new Set()
+      let hatUndefiniert = false
+      this.geschaefte.forEach((g) => {
+        const p = (g.prioritaet || '').trim()
+        if (p === '') { hatUndefiniert = true } else { vorhanden.add(p) }
+      })
+      const stufen = PRIORITAETEN.filter((o) => vorhanden.has(o.value))
+      return mitLeerOption(stufen, hatUndefiniert, 'Undefiniert')
     },
     filterPrioritaetOptions() {
-      return PRIORITAETEN.filter(o => this.filterPrioritaet.includes(o.value))
+      return this.prioritaetOptionen.filter(o => this.filterPrioritaet.includes(o.value))
     },
     alleBeschluesse() {
+      // Gleiches Grundprinzip wie überall, derselbe Helfer: die vorkommenden
+      // Beschlüsse plus «—» für Geschäfte ohne erfassten Beschluss (leerer Wert).
       const seen = new Map()
       let hatOhneBeschluss = false
       this.geschaefte.forEach(g => {
@@ -303,50 +315,46 @@ export default {
           return
         }
         if (!seen.has(code)) {
-          seen.set(code, { code, label: b.titel || code })
+          seen.set(code, { value: code, label: b.titel || code })
         }
       })
       const liste = [...seen.values()].sort((a, b) => a.label.localeCompare(b.label))
-      if (hatOhneBeschluss) {
-        // Spezialeintrag für Geschäfte ohne erfassten Beschluss: matcht den
-        // Leerstring-Vergleich in `gefilterteGeschaefte`.
-        liste.unshift({ code: '', label: '—' })
-      }
-      return liste
+      return mitLeerOption(liste, hatOhneBeschluss, '—')
     },
     zustaendigeOptionen() {
+      // Grundprinzip (wie Beschluss): GENAU die Hauptzuständigen anbieten, die an
+      // mindestens einem Geschäft gesetzt sind (nicht jedes Mitglied) — plus
+      // «Nicht zugewiesen», wenn es Geschäfte ohne Zuständige gibt. Auch der leere
+      // Wert ist ein realer Wert der Daten.
       const map = new Map()
-      this.mitglieder.forEach((mitglied) => {
-        const label = this.vollerName(mitglied)
-        if (!label) {
-          return
-        }
-        map.set(label, {
-          value: label,
-          label,
-          aktiv: mitglied.aktiv !== false,
-        })
-      })
+      let hatUnzugewiesen = false
       this.geschaefte.forEach((geschaeft) => {
         const label = (geschaeft.hauptZustaendigePerson || '').trim()
-        if (!label || map.has(label)) {
+        if (label === '') {
+          hatUnzugewiesen = true
           return
         }
+        if (map.has(label)) {
+          return
+        }
+        const mitglied = this.mitglieder.find((m) => this.vollerName(m) === label)
         map.set(label, {
           value: label,
           label,
-          aktiv: false,
+          // Aktiv-Kennzeichen (falls das Mitglied auffindbar ist) nur für die Sortierung.
+          aktiv: mitglied ? mitglied.aktiv !== false : false,
         })
       })
-      return [...map.values()].sort((a, b) => {
+      const personen = [...map.values()].sort((a, b) => {
         if (a.aktiv !== b.aktiv) {
           return a.aktiv ? -1 : 1
         }
         return a.label.localeCompare(b.label)
       })
+      return mitLeerOption(personen, hatUnzugewiesen, 'Nicht zugewiesen')
     },
-    zustaendigeLabels() {
-      return this.zustaendigeOptionen.map((p) => p.label)
+    filterZustaendigeOptions() {
+      return this.zustaendigeOptionen.filter((o) => this.filterZustaendige.includes(o.value))
     },
     zustaendigeOptionenFuerSelect() {
       return this.mitglieder
@@ -360,7 +368,8 @@ export default {
         .sort((a, b) => a.label.localeCompare(b.label))
     },
     beschlussOptionsList() {
-      return this.alleBeschluesse.map((b) => ({ label: b.label, value: b.code }))
+      // alleBeschluesse liefert bereits {value,label} (wie die anderen Filter).
+      return this.alleBeschluesse
     },
     filterBeschlussOptions() {
       return this.beschlussOptionsList.filter((o) => this.filterBeschluss.includes(o.value))
@@ -401,7 +410,9 @@ export default {
         liste = liste.filter(g => this.filterBeschluss.includes(g.letzterBeschluss?.aktionCode || ''))
       }
       if (this.filterPrioritaet.length > 0) {
-        liste = liste.filter(g => this.filterPrioritaet.includes(this.prioritaetEffektiv(g)))
+        // Gegen den ROHwert filtern, damit «Undefiniert» (leerer Wert) genau die
+        // Geschäfte ohne gesetzte Priorität trifft — getrennt von «Mittel».
+        liste = liste.filter(g => this.filterPrioritaet.includes((g.prioritaet || '').trim()))
       }
       // Einreicher-Person: standardmässig trifft jeder Einreicher; mit «Nur
       // Ersteinreicher» nur der erste (Erstunterzeichner) eines Geschäfts.

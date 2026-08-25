@@ -86,14 +86,6 @@ async function apiPost(page, pfad, form) {
   })
 }
 
-async function apiPut(page, pfad, form) {
-  const token = await ocToken(page)
-  return page.request.put(`${API}${pfad}`, {
-    headers: { 'OCS-APIRequest': 'true', requesttoken: token, 'Content-Type': 'application/x-www-form-urlencoded' },
-    form,
-  })
-}
-
 async function apiDelete(page, pfad) {
   const token = await ocToken(page)
   return page.request.delete(`${API}${pfad}`, {
@@ -1020,6 +1012,33 @@ test.describe('Sitzungen: Verknüpfungen und To-do', () => {
     expect(jsFehler, `JS-Fehler: ${jsFehler.join(' | ')}`).toEqual([])
   })
 
+  test('Notizen zur Sitzung nutzen die geteilte NotizenListe (einheitlich, F38): schreiben und persistieren', async ({ page }) => {
+    const stamp = Date.now()
+    const name = `E2E-SNotiz-Typ ${stamp}`
+    const titel = `E2E-SNotiz-Sitzung ${stamp}`
+    const notiz = `E2E-Sitzungsnotiz ${stamp}`
+    await login(page, USER)
+    const typId = await createSitzungstyp(page, { name })
+    const s = await createSitzung(page, { typId, datum: inEinerWoche(), titel })
+    await gotoView(page, 'Sitzungen')
+    const karte = await oeffneSitzung(page, s.id)
+
+    // Der Sitzungs-Notizbereich zeigt die geteilte NotizenListe (kein eigener Editor mehr).
+    const bereich = karte.locator('.pw-sitzung-notizen')
+    await expect(bereich.locator('h4', { hasText: 'Notizen zur Sitzung' })).toBeVisible({ timeout: 30_000 })
+    const nl = bereich.locator('.pw-notizen-liste')
+    await expect(nl, 'geteilte NotizenListe fehlt bei den Sitzungs-Notizen').toBeVisible()
+
+    // Notiz über die geteilte Liste schreiben → erscheint und persistiert an der Sitzung.
+    await notizenListeSchreiben(page, nl, notiz)
+    await expect(nl.getByText(notiz, { exact: false }).first()).toBeVisible({ timeout: 15_000 })
+    await gotoView(page, 'Sitzungen')
+    const karte2 = await oeffneSitzung(page, s.id)
+    const nl2 = karte2.locator('.pw-sitzung-notizen .pw-notizen-liste')
+    await expect(nl2.getByText(notiz, { exact: false }).first(), 'Sitzungs-Notiz nicht persistiert').toBeVisible({ timeout: 15_000 })
+    expect(jsFehler, `JS-Fehler: ${jsFehler.join(' | ')}`).toEqual([])
+  })
+
   test('Verknüpfte Sitzungen zeigen fremde Notizen nur lesend; Entkoppeln entfernt den Block', async ({ page }) => {
     const stamp = Date.now()
     const name = `E2E-Link-Typ ${stamp}`
@@ -1030,10 +1049,10 @@ test.describe('Sitzungen: Verknüpfungen und To-do', () => {
     const typId = await createSitzungstyp(page, { name, verknuepfen: true })
     const a = await createSitzung(page, { typId, datum: inEinerWoche(), titel: titelA })
     const b = await createSitzung(page, { typId, datum: inEinerWoche(), titel: titelB })
-    // A eine Sitzungs-Notiz geben (REST), dann B mit A verknüpfen.
-    await apiPut(page, `/sitzungen/${a.id}`, {
-      notizen: JSON.stringify([{ text: notizA, datum: '01.01.2026 10:00', uid: USER.name, displayName: USER.name }]),
-    })
+    // A eine Sitzungs-Notiz geben (über den geteilten NotizService, wie überall),
+    // dann B mit A verknüpfen.
+    const notizResp = await apiPost(page, `/sitzungen/${a.id}/notizen`, { text: notizA })
+    expect(notizResp.ok(), 'Sitzungs-Notiz konnte nicht angelegt werden').toBeTruthy()
     const vk = await apiPost(page, `/sitzungen/${b.id}/verknuepfen`, { zielId: a.id })
     expect(vk.ok(), 'Verknüpfen fehlgeschlagen').toBeTruthy()
 
@@ -1041,9 +1060,10 @@ test.describe('Sitzungen: Verknüpfungen und To-do', () => {
     const karteB = await oeffneSitzung(page, b.id)
     const block = karteB.locator('.pw-verknuepfte-sitzungen')
     await expect(block).toBeVisible({ timeout: 30_000 })
-    // Fremde Notiz erscheint, aber nur lesend (kein Neu-Editor).
+    // Fremde Notiz erscheint, aber nur lesend (kein «+ Neue Notiz», kein Löschen).
     await expect(block.getByText(notizA, { exact: false }).first()).toBeVisible({ timeout: 15_000 })
-    await expect(block.locator('.pw-neue-notiz')).toHaveCount(0)
+    await expect(block.locator('.pw-btn-neue-notiz')).toHaveCount(0)
+    await expect(block.locator('.pw-btn-loeschen')).toHaveCount(0)
 
     // Entkoppeln entfernt den Block.
     await block.getByRole('button', { name: 'Entkoppeln' }).click()
@@ -1059,38 +1079,34 @@ test.describe('Sitzungsnotiz: haftet am Geschäft', () => {
   // Breites Viewport erzwingt die Traktanden-Tabellendarstellung (siehe oben).
   test.use({ viewport: { width: 1600, height: 1000 } })
 
-  test('Traktandum ohne Geschäft nutzt die Inline-SitzungNotizen; leerer Blur erzeugt nichts', async ({ page }) => {
+  test('Traktandum ohne Geschäft nutzt dieselbe NotizenListe wie überall (einheitlich, F39)', async ({ page }) => {
     const stamp = Date.now()
     const name = `E2E-Inline-Typ ${stamp}`
     const titel = `E2E-Inline-Sitzung ${stamp}`
     const trTitel = `E2E-Inline-Traktandum ${stamp}`
-    const notiz = `E2E-Inline-Notiz ${stamp}`
+    const notiz = `E2E-Traktandum-Notiz ${stamp}`
     await login(page, USER)
     const typId = await createSitzungstyp(page, { name })
     const s = await createSitzung(page, { typId, datum: inEinerWoche(), titel, traktanden: [{ titel: trTitel, beschreibung: '' }] })
     await gotoView(page, 'Sitzungen')
     const karte = await oeffneSitzung(page, s.id)
 
-    // Interne Sitzung: Traktandum ohne Geschäft → Inline-SitzungNotizen (kein «+ Neue Notiz»).
+    // Vereinheitlicht: geschäftsloses Traktandum nutzt dieselbe geteilte NotizenListe
+    // wie überall (Hinweis «Notiz zum Traktandum», «+ Neue Notiz»), NICHT mehr einen
+    // eigenen, daueroffenen Inline-Editor.
     const notizZelle = karte.locator('table.pw-tabelle-intern tr.pw-traktandum-notizen-zeile').first()
-    const inlineEditor = notizZelle.locator('.pw-neue-notiz .ProseMirror')
-    await expect(inlineEditor).toBeVisible({ timeout: 15_000 })
-    // Kein NotizenListe-Knopf (das ist die Nur-Geschäft-Variante).
-    await expect(notizZelle.locator('.pw-btn-neue-notiz')).toHaveCount(0)
-    await expect(notizZelle.locator('.pw-sitzungsnotiz-hinweis')).toHaveCount(0)
+    await expect(notizZelle.locator('.pw-sitzungsnotiz-hinweis', { hasText: 'Notiz zum Traktandum' })).toBeVisible({ timeout: 15_000 })
+    await expect(notizZelle.locator('.pw-neue-notiz .ProseMirror'), 'der alte Inline-Editor darf nicht mehr da sein').toHaveCount(0)
+    const nl = notizZelle.locator('.pw-notizen-liste')
+    await expect(nl, 'geteilte NotizenListe fehlt am geschäftslosen Traktandum').toBeVisible()
 
-    // Leerer Blur erzeugt nichts.
-    await inlineEditor.click()
-    await page.waitForTimeout(300)
-    await inlineEditor.blur()
-    await expect(notizZelle.locator('.pw-notiz-zeile')).toHaveCount(0)
-
-    // Text tippen → Notiz erscheint und wird gespeichert.
-    await inlineEditor.click()
-    await page.waitForTimeout(300)
-    await inlineEditor.pressSequentially(notiz, { delay: 25 })
-    await inlineEditor.blur()
-    await expect(notizZelle.getByText(notiz, { exact: false }).first()).toBeVisible({ timeout: 15_000 })
+    // Notiz über die geteilte Liste schreiben → erscheint und persistiert am Traktandum.
+    await notizenListeSchreiben(page, nl, notiz)
+    await expect(nl.getByText(notiz, { exact: false }).first()).toBeVisible({ timeout: 15_000 })
+    await gotoView(page, 'Sitzungen')
+    const karte2 = await oeffneSitzung(page, s.id)
+    const nl2 = karte2.locator('table.pw-tabelle-intern tr.pw-traktandum-notizen-zeile').first().locator('.pw-notizen-liste')
+    await expect(nl2.getByText(notiz, { exact: false }).first(), 'Traktandum-Notiz nicht persistiert').toBeVisible({ timeout: 15_000 })
     expect(jsFehler, `JS-Fehler: ${jsFehler.join(' | ')}`).toEqual([])
   })
 

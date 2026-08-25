@@ -46,6 +46,7 @@ class SitzungControllerTest extends TestCase
         ?SitzungstypService $sitzungstypService = null,
         ?\OCA\ParliamentWinterthur\Service\DeckService $deckService = null,
         ?\OCA\ParliamentWinterthur\Service\SitzungVorstossService $sitzungVorstossService = null,
+        ?\OCA\ParliamentWinterthur\Service\NotizService $notizService = null,
     ): SitzungController {
         return new SitzungController(
             $request,
@@ -59,6 +60,7 @@ class SitzungControllerTest extends TestCase
             $sitzungVorstossService ?? $this->createStub(\OCA\ParliamentWinterthur\Service\SitzungVorstossService::class),
             $deckService ?? $this->createStub(\OCA\ParliamentWinterthur\Service\DeckService::class),
             $this->createStub(\OCP\IConfig::class),
+            $notizService ?? $this->createStub(\OCA\ParliamentWinterthur\Service\NotizService::class),
         );
     }
 
@@ -206,10 +208,39 @@ class SitzungControllerTest extends TestCase
             $this->createStub(\OCA\ParliamentWinterthur\Service\SitzungVorstossService::class),
             $this->createStub(\OCA\ParliamentWinterthur\Service\DeckService::class),
             $this->createStub(\OCP\IConfig::class),
+            $this->createStub(\OCA\ParliamentWinterthur\Service\NotizService::class),
         );
 
         $response = $controller->index();
 
         $this->assertCount(1, $response->getData());
+    }
+
+    // Sitzungs-Notizen laufen über den geteilten NotizService (objekt_typ
+    // «sitzung») — dieselbe Lösung wie bei Geschäft/Vorstoss/Traktandum.
+    public function testNotizenDelegiertAnNotizServiceMitObjekttypSitzung(): void
+    {
+        $notiz = $this->createMock(\OCA\ParliamentWinterthur\Service\NotizService::class);
+        $notiz->expects($this->once())
+            ->method('liste')
+            ->with('sitzung', 5)
+            ->willReturn([['id' => 9, 'text' => 'Hallo']]);
+
+        $response = $this->makeController($this->makeRequest([]), null, null, null, $notiz)->notizen(5);
+
+        $this->assertSame([['id' => 9, 'text' => 'Hallo']], $response->getData());
+    }
+
+    public function testAddNotizDelegiertAnNotizServiceMitObjekttypSitzung(): void
+    {
+        $notiz = $this->createMock(\OCA\ParliamentWinterthur\Service\NotizService::class);
+        $notiz->expects($this->once())
+            ->method('hinzufuegen')
+            ->with('sitzung', 5, 'Neue Notiz')
+            ->willReturn(['id' => 1, 'text' => 'Neue Notiz']);
+
+        $response = $this->makeController($this->makeRequest(['text' => 'Neue Notiz']), null, null, null, $notiz)->addNotiz(5);
+
+        $this->assertSame(['id' => 1, 'text' => 'Neue Notiz'], $response->getData());
     }
 }

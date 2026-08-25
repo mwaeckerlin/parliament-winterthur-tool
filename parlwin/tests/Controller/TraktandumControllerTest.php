@@ -7,6 +7,7 @@ namespace OCA\ParliamentWinterthur\Tests\Controller;
 use OCA\ParliamentWinterthur\Controller\TraktandumController;
 use OCA\ParliamentWinterthur\Db\Traktandum;
 use OCA\ParliamentWinterthur\Service\FraktionsarbeitService;
+use OCA\ParliamentWinterthur\Service\NotizService;
 use OCA\ParliamentWinterthur\Service\RealtimePublisherService;
 use OCA\ParliamentWinterthur\Service\SitzungService;
 use OCP\IRequest;
@@ -47,7 +48,7 @@ class TraktandumControllerTest extends TestCase
         return $t;
     }
 
-    private function makeController(IRequest $request, SitzungService $service, ?IUserSession $session = null): TraktandumController
+    private function makeController(IRequest $request, SitzungService $service, ?IUserSession $session = null, ?NotizService $notiz = null): TraktandumController
     {
         return new TraktandumController(
             $request,
@@ -55,8 +56,24 @@ class TraktandumControllerTest extends TestCase
             $this->createStub(FraktionsarbeitService::class),
             $this->createStub(RealtimePublisherService::class),
             $session ?? $this->createStub(IUserSession::class),
+            $notiz ?? $this->createStub(NotizService::class),
             $this->createStub(LoggerInterface::class),
         );
+    }
+
+    public function testTraktandumNotizDelegiertMitTraktandumTyp(): void
+    {
+        // Traktandum-Notizen laufen über den geteilten NotizService mit dem
+        // Objekttyp «traktandum» — dieselbe Mechanik wie bei Geschäft/Vorstoss/Budget.
+        $notiz = $this->createStub(NotizService::class);
+        $erfasst = [];
+        $notiz->method('hinzufuegen')->willReturnCallback(function ($typ, $id, $text) use (&$erfasst) {
+            $erfasst = [$typ, $id, $text];
+            return ['id' => 1];
+        });
+        $request = $this->makeRequest(['text' => 'Meine Notiz']);
+        $this->makeController($request, $this->createStub(SitzungService::class), null, $notiz)->addNotiz(5, 42);
+        $this->assertSame(['traktandum', 42, 'Meine Notiz'], $erfasst);
     }
 
     public function testUpdateSpeichertBemerkungen(): void

@@ -14,6 +14,7 @@ use OCA\ParliamentWinterthur\Db\BudgetProduktegruppeMapper;
 use OCA\ParliamentWinterthur\Db\BudgetVerteilung;
 use OCA\ParliamentWinterthur\Db\BudgetVerteilungMapper;
 use OCA\ParliamentWinterthur\Service\BudgetService;
+use OCA\ParliamentWinterthur\Service\NotizService;
 use OCA\ParliamentWinterthur\Service\RealtimePublisherService;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\IConfig;
@@ -66,6 +67,7 @@ class BudgetServiceTest extends TestCase {
         $entscheide->method('statusFuer')->willReturn($statusMap);
         $verteilungen = $this->createStub(BudgetVerteilungMapper::class);
         $verteilungen->method('findeOderStandard')->willReturn(new BudgetVerteilung());
+        $verteilungen->method('alleFuerJahr')->willReturn([]);
 
         $config = $this->createStub(IConfig::class);
         $config->method('getAppValue')->willReturnCallback(
@@ -75,10 +77,11 @@ class BudgetServiceTest extends TestCase {
         $time = $this->createStub(ITimeFactory::class);
         $userSession = $this->createStub(IUserSession::class);
         $realtime = $this->createStub(RealtimePublisherService::class);
+        $notiz = $this->createStub(NotizService::class);
 
         return new BudgetService(
             $jahre, $gruppen, $investitionen, $antraege, $verteilungen,
-            $entscheide, $config, $time, $userSession, $realtime,
+            $entscheide, $config, $time, $userSession, $realtime, $notiz,
         );
     }
 
@@ -100,7 +103,7 @@ class BudgetServiceTest extends TestCase {
         self::assertSame(['121', '221'], $codes, 'ohne Filter alle Produktegruppen');
     }
 
-    private function antrag(int $id, string $zielRef, int $betragDelta, string $phase): \OCA\ParliamentWinterthur\Db\BudgetAntrag {
+    private function antrag(int $id, string $zielRef, int $betragDelta, string $phase, string $herkunft = 'eigene', string $haltung = ''): \OCA\ParliamentWinterthur\Db\BudgetAntrag {
         $a = new \OCA\ParliamentWinterthur\Db\BudgetAntrag();
         $a->setId($id);
         $a->setJahr(2026);
@@ -110,7 +113,59 @@ class BudgetServiceTest extends TestCase {
         $a->setBetragDelta($betragDelta);
         $a->setStellenDelta(0.0);
         $a->setPhase($phase);
+        $a->setHerkunft($herkunft);
+        $a->setHaltung($haltung);
         return $a;
+    }
+
+    public function testNichtUnterstuetzterFraktionsantragZaehltNichtInSumme(): void {
+        // F102: ein eigener Antrag «nicht einreichen» beeinflusst die korrigierte
+        // Summe nicht — nur Unterstütztes zählt.
+        $mit = $this->service('[]', [$this->antrag(1, '121', -100000, 'fraktion', 'eigene', 'nicht_einreichen')], [])
+            ->ansicht(2026, null, null, null, null, 'fraktion')['summen'];
+        $ohne = $this->service('[]', [], [])->ansicht(2026, null, null, null, null, 'fraktion')['summen'];
+        self::assertSame($ohne['ausgaben'], $mit['ausgaben'], 'nicht eingereichte eigene Anträge zählen nicht (F102)');
+    }
+
+    public function testUnterstuetzterFraktionsantragZaehltInSumme(): void {
+        // F102: ein eigener Antrag «einreichen» und ein fremder «unterstuetzen» zählen.
+        $eigen = $this->service('[]', [$this->antrag(1, '121', -100000, 'fraktion', 'eigene', 'einreichen')], [])
+            ->ansicht(2026, null, null, null, null, 'fraktion')['summen'];
+        $fremd = $this->service('[]', [$this->antrag(1, '121', -100000, 'fraktion', 'fremde', 'unterstuetzen')], [])
+            ->ansicht(2026, null, null, null, null, 'fraktion')['summen'];
+        $ohne = $this->service('[]', [], [])->ansicht(2026, null, null, null, null, 'fraktion')['summen'];
+        self::assertSame($ohne['ausgaben'] - 100000, $eigen['ausgaben'], 'eingereichter eigener Antrag senkt die Ausgaben (F102)');
+        self::assertSame($ohne['ausgaben'] - 100000, $fremd['ausgaben'], 'unterstützter fremder Antrag senkt die Ausgaben (F102)');
+    }
+
+    public function testOffenerFremderAntragZaehltNicht(): void {
+        // F102: ein fremder Antrag ohne Haltung (offen) zählt nicht.
+        $mit = $this->service('[]', [$this->antrag(1, '121', -100000, 'fraktion', 'fremde', '')], [])
+            ->ansicht(2026, null, null, null, null, 'fraktion')['summen'];
+        $ohne = $this->service('[]', [], [])->ansicht(2026, null, null, null, null, 'fraktion')['summen'];
+        self::assertSame($ohne['ausgaben'], $mit['ausgaben'], 'offene fremde Anträge zählen nicht (F102)');
+    }
+
+    public function testVerknuepfungAutomatischBeiEindeutigkeit(): void {
+        // F104: gleiche Position und gleicher Betrag, je genau ein freier Kandidat
+        // → automatische Verknüpfung, Haltung wandert in die Sitzung.
+        $f = $this->antrag(1, '121', -100000, 'fraktion', 'eigene', 'einreichen');
+        $s = $this->antrag(2, '121', -100000, 'sitzung', 'eigene', '');
+        $service = $this->service('[]', [$f, $s], []);
+        $service->verteilungSetzen(2026, false, 'schwarze_null', 0); // löst nachAenderung aus
+        self::assertSame(1, $s->getVerknuepftMitId(), 'Sitzungsantrag verweist auf den Vorbereitungsantrag (F104)');
+        self::assertSame(2, $f->getVerknuepftMitId(), 'Gegenrichtung ebenfalls gesetzt');
+        self::assertSame('einreichen', $s->getHaltung(), 'Haltung wird in die Sitzung übernommen (F104)');
+    }
+
+    public function testKeineVerknuepfungBeiMehrdeutigkeit(): void {
+        // F104: zwei gleich passende Vorbereitungsanträge → nicht eindeutig, keine Verknüpfung.
+        $f1 = $this->antrag(1, '121', -100000, 'fraktion', 'eigene', 'einreichen');
+        $f2 = $this->antrag(3, '121', -100000, 'fraktion', 'eigene', 'einreichen');
+        $s = $this->antrag(2, '121', -100000, 'sitzung', 'eigene', '');
+        $service = $this->service('[]', [$f1, $f2, $s], []);
+        $service->verteilungSetzen(2026, false, 'schwarze_null', 0);
+        self::assertSame(0, $s->getVerknuepftMitId(), 'mehrdeutige Kandidaten bleiben unverknüpft (F104)');
     }
 
     public function testPhaseTrenntDieSummen(): void {

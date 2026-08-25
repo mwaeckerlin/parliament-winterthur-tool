@@ -38,6 +38,20 @@ describe('Vorstoesseliste', () => {
     expect(wrapper.vm.gefiltert.map(v => v.id)).toEqual([1])
   })
 
+  // Grundprinzip: ein Filter bietet nur die Werte an, die in den Daten wirklich
+  // vorkommen — keine leeren Kategorien als Ballast.
+  it('Herkunft- und Status-Filter bieten nur tatsächlich vorkommende Werte', () => {
+    const wrapper = shallowMount(Vorstoesseliste)
+    wrapper.vm.vorstoesse = [
+      { id: 1, titel: 'A', herkunft: 'eigene', status: 'neu' },
+      { id: 2, titel: 'B', herkunft: 'eigene', status: 'eingereicht' },
+    ]
+    // Nur «eigene» kommt vor → «fremde» ist Ballast (nur «Alle» + «Eigene»).
+    expect(wrapper.vm.herkunftOptionen.map(o => o.value)).toEqual(['', 'eigene'])
+    // Nur «neu» und «eingereicht» kommen vor (feste Reihenfolge bleibt erhalten).
+    expect(wrapper.vm.statusOptionen.map(o => o.value)).toEqual(['', 'neu', 'eingereicht'])
+  })
+
   it('das Neu-Anlegen öffnet die Maske, legt aber noch nichts an', async () => {
     const wrapper = shallowMount(Vorstoesseliste)
     wrapper.vm.neuerVorstoss()

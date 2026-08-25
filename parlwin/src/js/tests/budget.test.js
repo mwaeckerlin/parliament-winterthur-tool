@@ -45,7 +45,10 @@ function ansichtFixture() {
       { id: 13, bereich: 'personal', zielRef: '121', betragDelta: -200000, stellenDelta: -1, antragsteller: 'Fraktion X', begruendung: 'Stelle kürzen', automatisch: false, entscheid: 'offen', phase: 'fraktion' },
       { id: 14, bereich: 'investition', zielRef: '5', betragDelta: -100000, stellenDelta: 0, antragsteller: 'Fraktion X', begruendung: 'Projekt kürzen', automatisch: false, entscheid: 'offen', phase: 'fraktion' },
     ],
-    verteilung: { automatikEin: true, zielModus: 'schwarze_null', zielBetrag: 0 },
+    verteilung: { automatikEin: true, zielModus: 'schwarze_null', zielBetrag: 0, haltung: 'einreichen', ausnahmen: [] },
+    pauschalantraege: [
+      { id: 30, betrag: -500000, prozent: 0, haltung: 'einreichen', herkunft: 'eigene', antragsteller: '', begruendung: 'Sparpaket', ausnahmen: [] },
+    ],
     summen: { ausgaben: 8428985, einnahmen: 6562862, ergebnis: -1866123, stellen: 19.5, ausgabenDiff: 500000, einnahmenDiff: 100000, ergebnisDiff: -400000, stellenDiff: 2.65 },
     standardBetragProStelle: 200000,
     kommissionZuordnung: [
@@ -264,14 +267,102 @@ describe('Budgetliste', () => {
     expect(call[1].betragDelta).toBe(-1000000)
   })
 
-  // F88
-  it('leitet den Steuerprozent-Wert ab und stellt einen Steuerfuss-Antrag', async () => {
+  // F88 + F96: der Steuerfuss-Antrag wird in Prozentpunkten gestellt
+  it('leitet den Steuerprozent-Wert ab und stellt einen Steuerfuss-Antrag in Prozentpunkten', async () => {
     const w = await mitAnsicht()
     expect(w.vm.wertProProzent).toBe(2000000) // 250M / 125
     w.vm.steuerfussManuell = '123'
     await w.vm.steuerfussAntragStellen()
     const call = axios.post.mock.calls.find(c => c[1] && c[1].bereich === 'steuerfuss')
-    expect(call[1].betragDelta).toBe(-4000000) // (123-125) * 2M
+    expect(call[1].prozentDelta).toBe(-2) // 123 − 125 = −2 Prozentpunkte (F96); den CHF-Effekt rechnet der Server
+  })
+
+  // F94 + F97: Herkunft und Haltung werden mitgesendet
+  it('sendet Herkunft und Haltung eines Antrags mit', async () => {
+    const w = await mitAnsicht()
+    w.vm.neu['121'].betrag = '10000'
+    w.vm.neu['121'].herkunft = 'fremde'
+    w.vm.neu['121'].haltung = 'unterstuetzen'
+    await w.vm.antragGlobalbudget('121')
+    const call = axios.post.mock.calls.find(c => String(c[0]).includes('/budget/2026/antraege'))
+    expect(call[1].herkunft).toBe('fremde')
+    expect(call[1].haltung).toBe('unterstuetzen')
+    expect(call[1].betragDelta).toBe(-10000) // Standard ist Reduktion (−)
+  })
+
+  // F95: der Umschalter Mehrausgabe kehrt das Vorzeichen um
+  it('kehrt bei Mehrausgabe das Vorzeichen von CHF und Prozent um', async () => {
+    const w = await mitAnsicht()
+    w.vm.neu['121'].betrag = '10000'
+    w.vm.neu['121'].prozent = '5'
+    w.vm.neu['121'].mehrausgabe = true
+    await w.vm.antragGlobalbudget('121')
+    const call = axios.post.mock.calls.find(c => String(c[0]).includes('/budget/2026/antraege'))
+    expect(call[1].betragDelta).toBe(10000)
+    expect(call[1].prozentDelta).toBe(5)
+  })
+
+  // F98: unterstützen wir den Antrag, ist die eigene Fraktion automatisch dabei
+  it('nimmt die eigene Fraktion automatisch in die Unterstützer auf', async () => {
+    const w = await mitAnsicht()
+    await w.setProps({ fraktionen: [{ name: 'Grüne', eigene: true, aktiv: true }] })
+    w.vm.neu['121'].betrag = '5000'
+    w.vm.neu['121'].haltung = 'einreichen'
+    await w.vm.antragGlobalbudget('121')
+    const call = axios.post.mock.calls.find(c => String(c[0]).includes('/budget/2026/antraege'))
+    expect(call[1].unterstuetzer).toContain('Grüne')
+  })
+
+  // F100: den Einreichen-Entscheid des Pauschalantrags umschalten
+  it('schaltet den Einreichen-Entscheid des Pauschalantrags', async () => {
+    const w = await mitAnsicht()
+    await w.vm.pauschalEinreichenUmschalten(false)
+    const call = axios.put.mock.calls.find(c => String(c[0]).includes('/budget/2026/verteilung'))
+    expect(call[1].haltung).toBe('nicht_einreichen')
+  })
+
+  // F101: eine Position vom Pauschalantrag ausnehmen
+  it('nimmt eine Position vom Pauschalantrag aus', async () => {
+    const w = await mitAnsicht()
+    await w.vm.ausnahmeUmschalten('121', true)
+    const call = [...axios.put.mock.calls].reverse().find(c => String(c[0]).includes('/budget/2026/verteilung'))
+    expect(call[1].ausnahmen).toContain('121')
+  })
+
+  // F97: die Haltung eines bestehenden Antrags ändern (getrennt vom Sitzungs-Beschluss)
+  it('ändert die Haltung eines bestehenden Antrags', async () => {
+    const w = await mitAnsicht()
+    await w.vm.antragHaltung(10, 'nicht_einreichen')
+    const call = axios.put.mock.calls.find(c => String(c[0]).includes('/budget/antraege/10'))
+    expect(call[1].haltung).toBe('nicht_einreichen')
+  })
+
+  // F104: eine Verknüpfung von Hand setzen
+  it('setzt eine Verknüpfung von Hand', async () => {
+    const w = await mitAnsicht()
+    await w.vm.verknuepfungWaehlen(12, 10)
+    const call = axios.put.mock.calls.find(c => String(c[0]).includes('/budget/antraege/12/verknuepfung'))
+    expect(call[1].zielId).toBe(10)
+  })
+
+  // F100: weitere, unabhängige Pauschalanträge
+  it('listet weitere Pauschalanträge und legt einen neuen an', async () => {
+    const w = await mitAnsicht()
+    expect(w.vm.pauschalantraege.map(p => p.id)).toEqual([30])
+    await w.vm.pauschalErstellen()
+    const call = axios.post.mock.calls.find(c => String(c[0]).includes('/budget/2026/pauschal'))
+    expect(call, 'Pauschalantrag wird nicht angelegt').toBeTruthy()
+  })
+
+  it('ändert und löscht einen Pauschalantrag', async () => {
+    const w = await mitAnsicht()
+    await w.vm.pauschalAendern(30, { prozent: -10, betrag: 0, haltung: 'einreichen', ausnahmen: ['121'] })
+    const put = axios.put.mock.calls.find(c => String(c[0]).includes('/budget/pauschal/30'))
+    expect(put[1].prozent).toBe(-10)
+    expect(put[1].ausnahmen).toContain('121')
+    await w.vm.pauschalLoeschen(30)
+    const del = axios.delete.mock.calls.find(c => String(c[0]).includes('/budget/pauschal/30'))
+    expect(del, 'Pauschalantrag wird nicht gelöscht').toBeTruthy()
   })
 
   // F88: die Automatik muss ausdrücklich abgeschaltet werden, dann erscheint das manuelle Feld

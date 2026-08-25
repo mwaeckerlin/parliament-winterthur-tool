@@ -5,6 +5,10 @@
 import { createApp } from 'vue'
 import App from './App.vue'
 import { startRealtimeBridge } from './realtime'
+import { installiereRetry } from './axios-retry'
+
+// Nachladen bei schlechter Leitung so lange wiederholen, bis es klappt.
+installiereRetry()
 
 const app = createApp(App)
 app.mount('#parlwin-root')

@@ -59,6 +59,8 @@
       <Budgetliste
         v-else-if="aktiveAnsicht === 'budget'"
         :kommissionen="kommissionen"
+        :mitglieder="mitglieder"
+        :fraktionen="fraktionen"
       />
       <Sitzungstypenliste
         v-else-if="aktiveAnsicht === 'sitzungstypen'"

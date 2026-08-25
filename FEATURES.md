@@ -101,7 +101,10 @@ Nummern werden einmal vergeben und nie wiederverwendet; jeder Test in
 - **F16** Filter: Entscheidungsbedarf, Status, Typ, Zuständigkeit, Beschluss und
   Priorität (jeweils mehrfach wählbar); erledigte Geschäfte sind standardmässig
   ausgeblendet und per Schalter einblendbar; Suche über Nummer und Titel;
-  «Filter zurücksetzen».
+  «Filter zurücksetzen». **Grundprinzip für jeden Filter (überall in der App):**
+  ein Filter bietet genau die Werte zur Auswahl an, die in den Daten tatsächlich
+  vorkommen — keine leeren Kategorien, keine nie zugewiesenen Personen; alles
+  andere wäre unnützer Ballast und führte zu leeren Trefferlisten.
 - **F17** Geschäfte mit hoher Priorität sind dezent hervorgehoben, solche mit tiefer
   abgeschwächt; nicht gesetzte Priorität zählt wie mittel und zeigt «—». Die
   farbliche Hervorhebung gilt in **allen Ansichten**, in denen ein Geschäft
@@ -275,9 +278,10 @@ Nummern werden einmal vergeben und nie wiederverwendet; jeder Test in
 
 - **F30** Eigene und fremde politische Vorstösse als klickbare Karten mit Herkunft,
   Art, Status, Zuständigkeit und — bei fremden — Herkunftsfraktion und eigener
-  Haltung; Filter nach Herkunft (Alle / Eigene / Fremde) und Status (Alle /
-  Neu / Entwurf / Bereit / Eingereicht / Erledigt / Pausiert), beide
-  standardmässig auf «Alle»; Suche über Titel, Art und Zuständigkeit;
+  Haltung; Filter nach Herkunft und Status, beide standardmässig auf «Alle» und
+  je nur mit den Werten, die bei den geladenen Vorstössen tatsächlich vorkommen
+  (Grundprinzip; feste Reihenfolge Eigene/Fremde bzw. Neu/Entwurf/Bereit/
+  Eingereicht/Erledigt/Pausiert); Suche über Titel, Art und Zuständigkeit;
   Prioritäts-Hervorhebung wie bei den Geschäften. Ohne Treffer erscheint
   «Keine Vorstösse vorhanden».
 - **F31** Beim Erfassen ist man selbst als zuständige Person vorausgewählt; Herkunft
@@ -338,12 +342,19 @@ Nummern werden einmal vergeben und nie wiederverwendet; jeder Test in
 - **F38** In jeder Sitzung: Notizen, Dokumente (im Jahresordner, nach Datum benannt),
   verknüpfte Geschäfte (hinzufügen und lösen), To-dos direkt aufs
   Fraktions-Aufgabenboard, und die Traktanden mit Dokument-Links, Bemerkungen
-  und eigenen Notizen; Traktanden mit Geschäftsbezug öffnen das Geschäft.
+  und eigenen Notizen; Traktanden mit Geschäftsbezug öffnen das Geschäft. Die
+  Notizen zur Sitzung nutzen **dieselbe Notiz-Komponente und dasselbe Aussehen**
+  wie überall (aufklappbare Liste, «+ Neue Notiz», Versionsverlauf, Löschen mit
+  Undo über die Aktionszeitleiste); es gibt kein davon abweichendes, eigenes
+  Notizfeld.
 - **F39** Bei einem Traktandum mit Geschäftsbezug wird die Notiz nicht an der Sitzung,
   sondern als Sitzungsnotiz am Geschäft gespeichert. Sie erscheint dadurch bei
   jeder aktuellen und künftigen Sitzung, an der dieses Geschäft hängt (und im
-  Geschäft selbst, siehe Abschnitt Geschäfte). Traktanden ohne Geschäftsbezug
-  behalten ihre eigene Traktandum-Notiz.
+  Geschäft selbst, siehe Abschnitt Geschäfte). Traktanden ohne Geschäftsbezug haben
+  ihre eigene Traktandum-Notiz — mit **derselben Notiz-Komponente und demselben
+  Aussehen** wie überall (aufklappbare Liste, «+ Neue Notiz», Versionen, Löschen mit
+  Undo); die Notiz haftet dann am Traktandum. Es gibt kein davon abweichendes,
+  eigenes Notizfeld.
 - **F40** Sitzungen lassen sich verknüpfen (z.B. Kommissions- mit der vorbereitenden
   Fraktionssitzung): Die Notizen der verknüpften Sitzungen erscheinen
   gesammelt; Entkoppeln lässt alle Notizen an ihrem Platz.
@@ -422,6 +433,15 @@ Nummern werden einmal vergeben und nie wiederverwendet; jeder Test in
 - **F54** Das gilt für Geschäfte, Beschlüsse, Notizen, Sitzungen, Traktanden,
   Vorstösse, Rollen und den Fortschritt der Datenaktualisierung.
 - **F55** Nur angemeldete Fraktionsmitglieder empfangen diese Aktualisierungen.
+- **F105** **Robustes Nachladen bei schlechter Leitung:** Kann etwas nicht geladen
+  werden (Netzwerk-/Timeout-Fehler, überlasteter Server), wird es automatisch immer
+  wieder versucht, bis es klappt — nichts bleibt dauerhaft «hängen». Die Wartezeit
+  zwischen den Versuchen wächst schrittweise (gedeckelt), damit der Server nicht
+  überlastet wird. Ladevorgänge (Anzeigen) werden unbegrenzt wiederholt; Speicher-
+  und Löschaktionen nur wenige Male und nur bei echten Netzwerkfehlern, damit keine
+  Aktion doppelt ausgeführt wird. Client-Fehler (etwa fehlende Berechtigung) werden
+  nicht wiederholt. Ladeanzeigen erscheinen sofort, damit auch bei schlechter Leitung
+  sichtbar ist, dass etwas geschieht.
 
 ## Rollen und Fraktionssitzungsmodus
 
@@ -625,6 +645,69 @@ Gesamt-Erfolgsrechnung.
   Verschiebungen oder mehreren Sitzungen zum selben Thema überall verfügbar sind (und
   über denselben Mechanismus).
 
+### Anträge: Herkunft, Betrag, Haltung und Unterstützung
+
+- **F94** Jeder Antrag hat eine **Herkunft**: «eigen» (Standard) oder «fremd» — mit
+  demselben Bedienmuster wie beim Vorstoss (F19/F20). Der **Antragsteller** wird immer
+  aus einer Liste gewählt, nie als Freitext: bei eigenen Anträgen eine **Person aus der
+  eigenen Fraktion**, vorbelegt mit der eintragenden Person; bei fremden Anträgen eine
+  **Fraktion** (zuoberst in der Liste) oder eine Person. Die Liste der Personen und
+  Fraktionen stammt aus denselben Quellen wie beim Vorstoss (aktive Mitglieder der
+  eigenen Fraktion, aktive Fraktionen).
+- **F95** Ein Antrag trägt seinen Betrag **in CHF und in Prozent**, mit einem
+  **Umschalter Reduktion/Mehrausgabe**: Standard ist eine Reduktion (Kürzung),
+  umgeschaltet eine Mehrausgabe. Die Richtung ist allein das **Vorzeichen** (kein
+  eigenes Richtungsfeld). Prozent bezieht sich auf den **Budgetwert der Position**
+  (Beispiel: Kürzung um 20'000 bei einem Budget von 100'000 = −20%). Wird der Betrag in
+  **Prozent** eingegeben, wird der CHF-Betrag berechnet; eine Eingabe im **CHF**-Feld
+  rechnet sofort den Prozentwert nach. Führend ist der zuletzt eingegebene Wert; ändert
+  sich später die Basis (z.B. durch den Novemberbrief), bleibt der CHF-Betrag fix.
+- **F96** Der **Steuerfuss-Antrag** wird in **Prozentpunkten** gestellt (Senkung oder
+  Steigerung), bezogen auf 100% = kantonaler Steuersatz. Der Steuerfuss wirkt direkt auf
+  die erwarteten Steuereinnahmen, die sich im selben Verhältnis ändern: bei einer
+  Änderung von X auf Y Prozentpunkte gilt «neuer Ertrag = bisheriger Ertrag × Y/X».
+  −2 Prozentpunkte bei einem Steuerfuss von 125% bedeuten also 123% und einen Ertrag von
+  bisher × 123/125. In CHF ist das nur eine Schätzung; massgeblich ist der Prozentpunkt-Wert.
+- **F97** Jeder Antrag trägt **unsere Haltung**, getrennt vom Sitzungs-Beschluss
+  (F93): Bei eigenen Anträgen «reichen wir ein» (Standard) oder «reichen wir nicht ein» —
+  nur die einzureichenden erscheinen im Antrags-PDF (F92). Bei fremden Anträgen
+  «unterstützen wir», «unterstützen wir nicht» oder offen (Standard: offen).
+- **F98** Zu jeder Antragsposition lässt sich mit einer **Mehrfachauswahl** festhalten,
+  **welche Fraktionen den Antrag unterstützen**. Haben wir für den Antrag Zustimmung
+  beschlossen (F97), ist die eigene Fraktion automatisch ausgewählt.
+- **F99** Auf jede Position (Produktegruppe, Projekt) lassen sich **beliebig viele
+  Anträge** stellen; ihre Beträge **summieren sich**. Spezifische Anträge und
+  Pauschalanträge mischen sich in beliebiger Zahl und Kombination.
+- **F103** Jeder Antrag kann **Notizen** tragen — mit demselben Editor, derselben
+  Bedienung und derselben Speicherung wie Notizen an allen anderen Objekten (F27).
+
+### Pauschalanträge, Übersicht und Sitzungsverknüpfung
+
+- **F100** Ein **Pauschalantrag** verteilt einen Betrag anteilig zum Aufwand auf die
+  Positionen und erzeugt je Position einen Einzelantrag. Der Betrag lässt sich in **CHF**
+  oder in **Prozent** angeben; ein Prozentsatz («10% einsparen») bezieht sich immer auf
+  den **ursprünglichen** Aufwand, nie auf einen bereits gekürzten. Auch der Pauschalantrag
+  hat einen **Einreichen-Entscheid** (F97): wird er eingereicht, erscheint je nicht
+  ausgenommene Position ein Einzelantrag im Antrags-PDF; wird er nicht eingereicht, keiner.
+  **Beliebig viele, voneinander unabhängige** Pauschalanträge lassen sich anlegen; ihre
+  Kürzungen kumulieren. Neben diesen frei angelegten gibt es den automatischen Ausgleich
+  auf ein Ziel (schwarze Null usw., F84/F85), der zuletzt gerechnet wird — auf dem bereits
+  durch die übrigen Pauschalanträge gekürzten Stand.
+- **F101** Bei einer einzelnen Position lässt sich ein Pauschalantrag über eine Checkbox
+  **«Ausnahme vom Pauschalantrag»** lokal deaktivieren; dort wird er als nicht aktiv
+  angezeigt und es entsteht kein Einzelantrag ins PDF. Der einzusparende **Gesamtbetrag
+  bleibt gleich**: er verteilt sich neu auf die verbleibenden Positionen.
+- **F102** In der **Übersicht** (Einsparung/Mehrkosten und korrigierte Gesamtsumme)
+  zählt nur, **was die Fraktion unterstützt**; unentschiedene oder abgelehnte Anträge
+  zählen nicht. Im **Sitzungsmodus** zählen stattdessen die vom Parlament **angenommenen**
+  (beschlossenen) Anträge — so ist laufend sichtbar, wieviel das eigene korrigierte
+  Budget bringt bzw. was in der Sitzung tatsächlich beschlossen wurde.
+- **F104** Ein Vorbereitungs-Antrag wird mit dem tatsächlich eingereichten
+  **Sitzungsantrag verknüpft**: **automatisch, wenn eindeutig** (gleiche Position und
+  gleicher Betrag), sonst nicht — und immer **manuell korrigierbar**. Über die Verknüpfung
+  wird die Haltung bzw. der Entscheid in die Sitzung übernommen; für alle nicht
+  verknüpften Sitzungsanträge bleibt offen, ob wir sie unterstützen, bis wir entscheiden.
+
 ## Bedienelemente im Detail
 
 Dieser Abschnitt beschreibt jedes einzelne Bedienelement jeder Ansicht und jedes
@@ -676,7 +759,7 @@ verändert — sowie der genaue Zeitpunkt, zu dem eine Eingabe gespeichert wird.
     - Art: Mehrfachauswahl.
     - Pflichtfeld: nein.
     - Vorbelegung: nichts gewählt.
-    - Auswahlwerte: alle Fraktionsmitglieder (Vorname und Name) sowie zusätzlich jede in einem Geschäft eingetragene hauptzuständige Person, die nicht (mehr) in der Mitgliederliste steht. Reihenfolge: zuerst alle **aktiven** Mitglieder alphabetisch, danach alle inaktiven bzw. nicht mehr vorhandenen Personen alphabetisch.
+    - Auswahlwerte: **nur die Personen, die an mindestens einem geladenen Geschäft tatsächlich als hauptzuständig eingetragen sind** — nicht jedes Mitglied (Grundprinzip: der Filter bietet genau die vorkommenden Werte, sonst führte eine Wahl ins Leere). Reihenfolge: zuerst alle **aktiven** Mitglieder alphabetisch, danach alle inaktiven bzw. nicht mehr vorhandenen Personen alphabetisch. Gibt es Geschäfte **ohne** Hauptzuständige, steht zusätzlich **«Nicht zugewiesen»** an erster Stelle und wählt genau diese Geschäfte aus (auch der leere Wert ist ein realer Wert der Daten).
     - Dynamisches Verhalten: Es wird gegen die hauptzuständige Person des Geschäfts verglichen; mehrere gewählte Personen wirken als «oder».
     - Speicherung: keine.
     - Gesperrt: nie.
@@ -692,8 +775,8 @@ verändert — sowie der genaue Zeitpunkt, zu dem eine Eingabe gespeichert wird.
     - Art: Mehrfachauswahl.
     - Pflichtfeld: nein.
     - Vorbelegung: nichts gewählt.
-    - Auswahlwerte, fest in dieser Reihenfolge: «Hoch», «Mittel», «Tief».
-    - Dynamisches Verhalten: Geschäfte ohne gesetzte Priorität gelten beim Filtern als «Mittel» — die Wahl «Mittel» zeigt also auch alle Geschäfte ohne Prioritätsangabe.
+    - Auswahlwerte: **nur die Prioritätsstufen, die bei den geladenen Geschäften tatsächlich gesetzt sind**, in der festen Reihenfolge «Hoch», «Mittel», «Tief» — Stufen ohne ein einziges Geschäft entfallen. Gibt es Geschäfte **ohne** gesetzte Priorität, steht zusätzlich **«Undefiniert»** an erster Stelle und wählt genau diese aus (auch die fehlende Priorität ist ein realer Wert der Daten).
+    - Dynamisches Verhalten: Der Filter unterscheidet «Undefiniert» (keine Priorität gesetzt) von «Mittel» (ausdrücklich gesetzt) — gefiltert wird nach dem gespeicherten Rohwert. (Für die farbliche Hervorhebung der Zeile gilt eine fehlende Priorität weiterhin als «Mittel».)
     - Speicherung: keine.
     - Gesperrt: nie.
 7. **Erledigte anzeigen** — Beschriftung «Erledigte anzeigen».
@@ -891,12 +974,12 @@ Siehe «Geteilte Bausteine → Aktionszeitleiste». Sie ist in der Detailmaske i
 1. **Herkunft** — Beschriftung «Herkunft».
     - Art: Auswahlliste, nicht leerbar.
     - Vorbelegung: «Alle».
-    - Auswahlwerte in dieser Reihenfolge: «Alle», «Eigene», «Fremde».
+    - Auswahlwerte: «Alle» und danach — in der festen Reihenfolge «Eigene», «Fremde» — **nur die Herkünfte, die bei den geladenen Vorstössen tatsächlich vorkommen** (Grundprinzip: keine leere Kategorie als Ballast).
     - Wirkung: sofort, ohne Neuladen.
 2. **Status** — Beschriftung «Status».
     - Art: Auswahlliste, nicht leerbar.
     - Vorbelegung: «Alle».
-    - Auswahlwerte in dieser Reihenfolge: «Alle», «Neu», «Entwurf», «Bereit», «Eingereicht», «Erledigt», «Pausiert».
+    - Auswahlwerte: «Alle» und danach — in der festen Reihenfolge «Neu», «Entwurf», «Bereit», «Eingereicht», «Erledigt», «Pausiert» — **nur die Status, die bei den geladenen Vorstössen tatsächlich vorkommen**.
     - Wirkung: sofort, ohne Neuladen.
 
 Ein Knopf «Filter zurücksetzen» existiert in dieser Ansicht nicht; die Filter werden über den Wert «Alle» aufgehoben.
@@ -1334,8 +1417,7 @@ Dynamisches Verhalten beim Aufklappen: es werden die Traktanden der Sitzung, die
 #### Aufgeklappter Detailbereich — Notizen zur Sitzung
 
 1. **Bereichsüberschrift «Notizen zur Sitzung»**.
-2. **Notizenliste der Sitzung** — Aufbau jeder Zeile siehe Abschnitt «Notizzeile». Platzhalter des Eingabefeldes: «Notiz zur Sitzung hinzufügen…».
-    - Speichern: jede Änderung an der Liste (neue Notiz, Bearbeitung, Löschen, Umsortieren) wird sofort an der Sitzung gespeichert.
+2. **Notizenliste der Sitzung** — dieselbe geteilte Notizenliste wie überall (Aufbau und Bedienung siehe «Geteilte Bausteine → Notizenliste»): «+ Neue Notiz», Speichern ausschliesslich über «✓», Versionsverlauf, Löschen mit Undo über die Aktionszeitleiste. Die Notizen haften an der Sitzung; es gibt kein davon abweichendes, eigenes Notizfeld.
 
 #### Aufgeklappter Detailbereich — Dokumente
 
@@ -1392,7 +1474,7 @@ Dynamisches Verhalten beim Aufklappen: es werden die Traktanden der Sitzung, die
 3. **Hinweis «Keine weiteren Sitzungen in dieser Verknüpfung.»** — erscheint, wenn ausser dieser Sitzung keine weitere in der Gruppe ist.
 4. **Je verknüpfte Sitzung:**
     1. Unterüberschrift «ausgeschriebenes Datum – Titel».
-    2. **Notizenliste der anderen Sitzung — reine Ansicht:** kein Eingabefeld für neue Notizen, kein Bearbeiten, kein Löschen; die Ziehgriffe sind zwar sichtbar, ein Umsortieren bleibt hier ohne Wirkung.
+    2. **Notizenliste der anderen Sitzung — reine Ansicht:** dieselbe geteilte Notizenliste (siehe «Geteilte Bausteine → Notizenliste»), jedoch im Nur-Lese-Modus: kein «+ Neue Notiz», kein Bearbeiten, kein Löschen.
 
 #### Aufgeklappter Detailbereich — Traktanden einer internen Sitzung
 
@@ -1405,7 +1487,7 @@ Dynamisches Verhalten beim Aufklappen: es werden die Traktanden der Sitzung, die
     2. Spalte «Titel» — Titel des Traktandums und darunter, sofern vorhanden, die Beschreibung.
 4. **Notizzeile unter jedem Traktandum** — zwei Varianten:
     - **Ist dem Traktandum ein Geschäft zugeordnet:** Hinweistext «Sitzungsnotiz zum Geschäft», darunter die Notizenliste des Geschäfts in der Kategorie Sitzungsnotiz (Aufbau siehe Abschnitt «Notizen am Geschäft»). Diese Notizen haften am Geschäft und erscheinen daher an jeder Sitzung, in der dasselbe Geschäft traktandiert ist.
-    - **Sonst:** die einfache Notizenliste mit dem Platzhalter «Notiz zum Traktandum hinzufügen…»; jede Änderung wird sofort am Traktandum gespeichert.
+    - **Sonst:** Hinweistext «Notiz zum Traktandum», darunter dieselbe geteilte Notizenliste wie überall (siehe «Geteilte Bausteine → Notizenliste»). Die Notiz haftet am Traktandum.
 5. **Leermeldung «Keine Traktanden vorhanden.»** — wenn die Sitzung keine Traktanden hat (bzw. die Suche keine übrig lässt).
 
 #### Aufgeklappter Detailbereich — Traktanden einer Parlamentssitzung (Tabellendarstellung)
@@ -1431,7 +1513,7 @@ Dynamisches Verhalten beim Aufklappen: es werden die Traktanden der Sitzung, die
         - Speichern: **sofort**. Die Wahl eines Wertes erfasst den Beschluss am Geschäft; das Leeren des Feldes entfernt den zuletzt erfassten Beschluss. Danach werden die Traktanden im Hintergrund neu geladen.
         - Ein Klick in diese Zelle öffnet **nicht** das Geschäft.
     6. **Zeilenaktion** — die ganze Zeile (ausser den beiden Auswahlspalten und den Pfeil-Links) ist anklickbar und auch per Tastatur mit Eingabe- oder Leertaste auslösbar; Vorlese-Bezeichnung «Traktandum ‹Nummer› öffnen». Sie öffnet das zugeordnete Geschäft im Detailfenster. Ohne zugeordnetes Geschäft passiert nichts. Zeilen gelöschter Geschäfte werden durchgestrichen bzw. abgesetzt dargestellt.
-    7. **Notizzeile unter dem Traktandum** — identisch zur internen Sitzung: bei zugeordnetem Geschäft der Hinweis «Sitzungsnotiz zum Geschäft» mit der Notizenliste des Geschäfts, sonst die einfache Notizenliste mit dem Platzhalter «Notiz zum Traktandum hinzufügen…».
+    7. **Notizzeile unter dem Traktandum** — identisch zur internen Sitzung: bei zugeordnetem Geschäft der Hinweis «Sitzungsnotiz zum Geschäft» mit der Notizenliste des Geschäfts, sonst der Hinweis «Notiz zum Traktandum» mit derselben geteilten Notizenliste.
 4. **Leermeldung «Keine Traktanden gefunden.»**.
 
 #### Aufgeklappter Detailbereich — Traktanden einer Parlamentssitzung (Kartendarstellung bei schmaler Ansicht)
@@ -1444,7 +1526,7 @@ Inhaltlich dieselben Bedienelemente wie in der Tabelle, anders angeordnet. Je Tr
 4. **Kartenkopf als Aktion** — Klick, Eingabe- oder Leertaste öffnet das Geschäft; Vorlese-Bezeichnung «Traktandum ‹Nummer› öffnen».
 5. **Beschriftung «Zuständig»** mit derselben Mehrfachauswahl wie in der Tabelle (nur bei zugeordnetem Geschäft).
 6. **Beschriftung «Beschluss»** mit derselben Auswahlliste wie in der Tabelle (nur bei zugeordnetem Geschäft).
-7. **Notizbereich** — bei zugeordnetem Geschäft «Sitzungsnotiz zum Geschäft» mit der Notizenliste des Geschäfts, sonst die einfache Notizenliste mit «Notiz zum Traktandum hinzufügen…».
+7. **Notizbereich** — bei zugeordnetem Geschäft «Sitzungsnotiz zum Geschäft» mit der Notizenliste des Geschäfts, sonst der Hinweis «Notiz zum Traktandum» mit derselben geteilten Notizenliste.
 
 #### Detailfenster eines Geschäfts
 
@@ -1556,61 +1638,17 @@ Die beim Anlegen gesetzten Einstellungen «Kalender anlegen» und «Einladung ve
 
 ---
 
-### Notizzeile (Notizen zu Sitzung und Traktandum)
+### Notizen zu Sitzung, Traktandum und verknüpfter Sitzung
 
-Dieselbe Notizenliste wird an drei Stellen verwendet: für die Notizen zur Sitzung, für die Notizen zu einem Traktandum ohne zugeordnetes Geschäft und — in reiner Ansicht — für die Notizen verknüpfter Sitzungen. Unterschiedlich ist allein der Platzhaltertext des Eingabefeldes.
+Für Notizen an einer Sitzung, an einem geschäftslosen Traktandum und — in reiner Ansicht — an verknüpften Sitzungen wird **dieselbe geteilte Notizenliste** verwendet wie bei Geschäften und Vorstössen (Aufbau, Bedienung, Formatierungsleiste und Versionsverlauf siehe «Geteilte Bausteine → Notizenliste» und «Geteilte Bausteine → Formatierter Textbereich»). Es gibt keine davon abweichende, eigene Notiz-Komponente und kein abweichendes Aussehen.
 
-#### Bestehende Notizzeile (Anzeigezustand)
+Unterschiede je Ort:
 
-Von links nach rechts:
+- **Notizen zur Sitzung** — Bereichsüberschrift «Notizen zur Sitzung»; die Notizen haften an der Sitzung.
+- **Notiz zum Traktandum (ohne Geschäft)** — Hinweistext «Notiz zum Traktandum»; die Notiz haftet am Traktandum.
+- **Verknüpfte Sitzung — reine Ansicht** — die Notizenliste erscheint im Nur-Lese-Modus: kein «+ Neue Notiz», kein Bearbeiten, kein Löschen. Auch eigene Notizen sind hier nicht anklickbar.
 
-1. **Ziehgriff «⠿»** — Hinweistext «Verschieben».
-    - Art: Ziehgriff.
-    - Dynamisches Verhalten: die Notiz lässt sich aufnehmen und über einer anderen Notiz fallen lassen; die Zielzeile wird während des Ziehens hervorgehoben. Beim Loslassen wird die Notiz an der Zielposition eingefügt.
-    - Speichern: **sofort** nach dem Umsortieren (die ganze Liste wird an der Sitzung bzw. am Traktandum gespeichert).
-    - In der reinen Ansicht (verknüpfte Sitzungen) ist der Griff zwar sichtbar, ein Umsortieren bleibt aber wirkungslos.
-2. **Datum** — Erstellungszeitpunkt der Notiz im Schweizer Format (Datum und Uhrzeit), wie er beim Erfassen festgehalten wurde; reine Anzeige, nicht änderbar.
-3. **Autor** — Anzeigename des Verfassers, ersatzweise dessen Benutzerkennung; reine Anzeige.
-4. **Notiztext** — Art: formatierter Text (Fett, Kursiv, Listen, Überschriften, Zitate, Code, Links werden dargestellt).
-    - **Eigene Notizen** sind anklickbar (Hinweistext «Klicken zum Bearbeiten») und auch per Eingabetaste auslösbar; sie wechseln damit in den Bearbeitungszustand.
-    - **Notizen anderer Verfasser** sind reine Anzeige — nicht anklickbar, nicht bearbeitbar.
-    - In der reinen Ansicht gilt jede Notiz als fremd; nichts ist anklickbar.
-5. **Löschknopf «✕»** — Hinweistext «Notiz löschen».
-    - Bedingte Sichtbarkeit: **nur bei eigenen Notizen** und nicht in der reinen Ansicht.
-    - Speichern: entfernt die Notiz sofort und speichert die neue Liste.
-
-#### Notizzeile im Bearbeitungszustand
-
-Nur für eigene Notizen erreichbar. Datum und Autor bleiben stehen, an die Stelle des Textes tritt:
-
-1. **Texteditor** — Platzhalter «Notiz bearbeiten…».
-    - Art: formatierter Text mit Formatierungsleiste (siehe unten).
-    - Vorbelegung: der bisherige Notiztext.
-2. **Knopf «✓»** — Hinweistext «Speichern». Übernimmt den Text sofort in die Liste und speichert sie. **Ist der Text leer, wird die Notiz stattdessen gelöscht.**
-3. **Knopf «✕»** — Hinweistext «Abbrechen». Verwirft die Änderung; der ursprüngliche Text bleibt bestehen.
-
-#### Eingabefeld für eine neue Notiz
-
-**Bedingte Sichtbarkeit: fehlt vollständig in der reinen Ansicht (verknüpfte Sitzungen).**
-
-1. **Texteditor** — Platzhalter je nach Ort: «Notiz zur Sitzung hinzufügen…», «Notiz zum Traktandum hinzufügen…»; ohne besondere Angabe «Notiz hinzufügen…».
-    - Art: formatierter Text mit Formatierungsleiste.
-    - Pflichtfeld: nein; leerer Text erzeugt nie eine Notiz.
-    - Vorbelegung: leer.
-    - **Speichern: fünf Sekunden nach dem letzten Tastendruck automatisch, ausserdem sofort beim Verlassen des Feldes.** Ein Klick auf die eigene Formatierungsleiste gilt dabei nicht als Verlassen und löst weder ein Speichern noch einen Verlust des Textes aus.
-    - Beim Übernehmen entsteht ein neuer Eintrag am Ende der Liste mit dem aktuellen Datum, der Uhrzeit und dem angemeldeten Benutzer als Autor; das Eingabefeld wird geleert.
-
-#### Formatierungsleiste des Texteditors
-
-Sie steht über jedem bearbeitbaren Notizfeld; Vorlese-Bezeichnung «Formatierung». Die Knöpfe erscheinen in fünf Gruppen in dieser Reihenfolge; ein aktiver Knopf ist hervorgehoben, solange die Schreibmarke im entsprechenden Format steht:
-
-1. Gruppe Schriftschnitt: «Fett (Ctrl+B)», «Kursiv (Ctrl+I)», «Unterstrichen (Ctrl+U)», «Durchgestrichen».
-2. Gruppe Absatzformat: «Absatz», «Überschrift 2», «Überschrift 3».
-3. Gruppe Blockformat: «Aufzählung», «Nummerierte Liste», «Zitat», «Code (verbatim)», «Code-Block (verbatim)».
-4. Gruppe Verweise: «Link einfügen / bearbeiten» — öffnet eine Eingabeaufforderung «Link-URL (leer = entfernen)», vorbelegt mit der bestehenden Adresse; eine leere Eingabe entfernt den Link, Abbrechen ändert nichts. Daneben «Link entfernen» — **gesperrt, solange die Schreibmarke nicht in einem Link steht**.
-5. Gruppe Verlauf: «Rückgängig (Ctrl+Z)» und «Wiederholen (Ctrl+Shift+Z)» — **jeweils gesperrt, wenn es nichts rückgängig zu machen bzw. zu wiederholen gibt** — sowie «Formatierung entfernen».
-
-In den Notizen zu Sitzung und Traktandum werden keine früheren Fassungen mitgeführt; die Knöpfe zum Blättern in Vorversionen erscheinen dort nicht.
+Wie überall gilt: Speichern ausschliesslich über «✓» (kein automatisches Zwischenspeichern, kein Speichern beim Verlassen des Feldes), Löschen über den Papierkorb (Soft-Delete mit Wiederherstellen über die Aktionszeitleiste), und der Versionsverlauf steht auch hier zur Verfügung.
 
 ---
 
@@ -1706,11 +1744,11 @@ Diese Liste tritt in beiden Traktandendarstellungen an die Stelle der einfachen 
     - Auswahlwerte: «Alle Parteien», danach alle Parteinamen aus derselben zugrunde liegenden Mitgliedermenge, ohne Doppelte, alphabetisch; leere Angaben entfallen; Anzeige gekürzt, Filterung nach Originalnamen.
     - Hängt ebenfalls vom Schalter «Nur aktive Mitglieder» ab. Wirkt sofort, keine Speicherung.
 4. **Auswahlliste «Kommission»** — Art: einfache Auswahlliste, nicht leerbar. Vorbelegung: «Alle Kommissionen».
-    - Auswahlwerte: «Alle Kommissionen», danach alle Namen der **aktiven** Kommissionen — aufgelöste oder inaktive Kommissionen werden ausgefiltert —, ohne Doppelte, alphabetisch nach deutschen Sortierregeln; Anzeige gekürzt.
+    - Auswahlwerte: «Alle Kommissionen», danach **nur die Kommissionen, denen mindestens ein sichtbares Mitglied tatsächlich angehört** — eine Kommission ohne Mitglied in der zugrunde liegenden Menge entfällt (Grundprinzip: keine Kommission als Ballast, die keinen Treffer ergäbe) —, ohne Doppelte, alphabetisch nach deutschen Sortierregeln; Anzeige gekürzt.
     - Wirkung: zeigt nur Mitglieder, die in der gewählten Kommission sitzen.
-    - Unabhängig vom Schalter «Nur aktive Mitglieder». Wirkt sofort, keine Speicherung.
+    - Hängt vom Schalter «Nur aktive Mitglieder» ab (er bestimmt die zugrunde liegende Mitgliedermenge). Wirkt sofort, keine Speicherung.
 5. **Auswahlliste «Funktion»** — Art: einfache Auswahlliste, nicht leerbar. Vorbelegung: «Alle Funktionen».
-    - Auswahlwerte, fest in dieser Reihenfolge: «Alle Funktionen», «Fraktionspräsident», «Kommissionspräsident».
+    - Auswahlwerte: «Alle Funktionen» und danach — in der festen Reihenfolge «Fraktionspräsident», «Kommissionspräsident» — **nur die Funktionen, die unter den sichtbaren Mitgliedern tatsächlich vorkommen** (gibt es keinen Kommissionspräsidenten, entfällt der Eintrag).
     - Wirkung «Fraktionspräsident»: nur Mitglieder, deren Fraktionsfunktion als Präsidium erkannt wurde (Stellvertretungen zählen hier nicht).
     - Wirkung «Kommissionspräsident»: nur Mitglieder, die in mindestens einer Kommission das Präsidium innehaben (Vizepräsidien zählen nicht).
     - Wirkt sofort, keine Speicherung.
