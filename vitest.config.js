@@ -12,6 +12,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@changelog': '/home/marc/git/mwaeckerlin/parliament-winterthur-tool/parlwin/src/js/tests/__mocks__/changelog.js',
+      '@readme': '/home/marc/git/mwaeckerlin/parliament-winterthur-tool/parlwin/src/js/tests/__mocks__/readme.js',
       '@nextcloud/router': '/home/marc/git/mwaeckerlin/parliament-winterthur-tool/parlwin/src/js/tests/__mocks__/@nextcloud/router.js',
       '@nextcloud/auth': '/home/marc/git/mwaeckerlin/parliament-winterthur-tool/parlwin/src/js/tests/__mocks__/@nextcloud/auth.js',
       '@nextcloud/axios': '/home/marc/git/mwaeckerlin/parliament-winterthur-tool/parlwin/src/js/tests/__mocks__/@nextcloud/axios.js',

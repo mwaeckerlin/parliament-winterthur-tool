@@ -1,13 +1,20 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import BudgetPauschalForm from '../components/BudgetPauschalForm.vue'
+import PwLoeschen from '../components/PwLoeschen.vue'
 
 // F100/F101: ein einzelner Pauschalantrag — Einsparung in CHF oder Prozent
 // (immer negativ), Einreichen-Entscheid, ausgenommene Produktegruppen.
-function mounted(pauschal) {
+function mounted(pauschal, extra = {}) {
   return mount(BudgetPauschalForm, {
-    props: { pauschal, produktegruppen: [{ code: '121', name: 'Personalamt' }] },
-    global: { stubs: { NcButton: true, NcTextField: true, NcCheckboxRadioSwitch: true, PwMultiSelect: true } },
+    props: {
+      pauschal,
+      produktegruppen: [{ code: '121', name: 'Personalamt' }],
+      fraktionOptionen: [{ value: 'GLP', label: 'GLP' }, { value: 'SP', label: 'SP' }],
+      eigeneFraktion: 'GLP',
+      ...extra,
+    },
+    global: { stubs: { NcButton: true, NcSelect: true, NcTextField: true, NcCheckboxRadioSwitch: true, PwMultiSelect: true } },
   })
 }
 
@@ -33,5 +40,71 @@ describe('BudgetPauschalForm', () => {
     const f = w.emitted().save[0][0]
     expect(f.haltung).toBe('nicht_einreichen')
     expect(f.ausnahmen).toContain('121')
+  })
+
+  it('belegt den Antragsteller mit der eigenen Fraktion vor und meldet ihn (F94)', () => {
+    const w = mounted({ id: 1, betrag: -100, prozent: 0, haltung: 'einreichen', ausnahmen: [] })
+    expect(w.vm.antragsteller).toBe('GLP')
+    w.vm.speichern()
+    expect(w.emitted().save[0][0].antragsteller).toBe('GLP')
+  })
+
+  it('übernimmt einen abweichend gewählten Antragsteller (F94)', () => {
+    const w = mounted({ id: 1, betrag: -100, prozent: 0, haltung: 'einreichen', ausnahmen: [], antragsteller: 'SP' })
+    expect(w.vm.antragsteller).toBe('SP')
+    w.vm.antragsteller = 'GLP'
+    w.vm.speichern()
+    expect(w.emitted().save[0][0].antragsteller).toBe('GLP')
+  })
+
+  // F84/F85: Ziel-Typ «fester Ertrag» meldet einen positiven Zielbetrag, ohne
+  // Einsparungs-Betrag/-Prozent.
+  it('meldet ein absolutes Ziel «fester Ertrag» mit positivem Zielbetrag', () => {
+    const w = mounted({ id: 1, zielTyp: 'einsparungen', betrag: 0, prozent: 0, haltung: 'einreichen', ausnahmen: [] })
+    w.vm.zielTyp = 'fester_ertrag'
+    w.vm.zielBetragMag = '2000000'
+    w.vm.speichern()
+    expect(w.emitted().save[0][0]).toMatchObject({ zielModus: 'fester_ertrag', zielBetrag: 2000000, betrag: 0, prozent: 0 })
+  })
+
+  // F84/F85: «festes Defizit» meldet einen negativen Zielbetrag.
+  it('meldet ein absolutes Ziel «festes Defizit» mit negativem Zielbetrag', () => {
+    const w = mounted({ id: 1, zielTyp: 'einsparungen', betrag: 0, prozent: 0, haltung: 'einreichen', ausnahmen: [] })
+    w.vm.zielTyp = 'festes_defizit'
+    w.vm.zielBetragMag = '300000'
+    w.vm.speichern()
+    expect(w.emitted().save[0][0]).toMatchObject({ zielModus: 'festes_defizit', zielBetrag: -300000 })
+  })
+
+  // Schwarze Null: kein Betrag, kein Zielbetrag.
+  it('meldet «schwarze Null» ohne Betrag', () => {
+    const w = mounted({ id: 1, zielTyp: 'schwarze_null', betrag: 0, prozent: 0, haltung: 'einreichen', ausnahmen: [] })
+    w.vm.speichern()
+    expect(w.emitted().save[0][0]).toMatchObject({ zielModus: 'schwarze_null', zielBetrag: 0, betrag: 0, prozent: 0 })
+  })
+
+  // Kein «Übernehmen»-Knopf mehr: eine Änderung wird automatisch (entprellt) übernommen.
+  it('speichert automatisch nach einer Änderung (entprellt), ohne «Übernehmen»-Knopf', () => {
+    vi.useFakeTimers()
+    try {
+      const w = mounted({ id: 1, betrag: -100, prozent: 0, haltung: 'einreichen', ausnahmen: [] })
+      w.vm.betragMag = '250000'
+      w.vm.autoSpeichern()
+      expect(w.emitted().save).toBeUndefined() // entprellt: noch nicht gemeldet
+      vi.advanceTimersByTime(600)
+      expect(w.emitted().save[0][0]).toMatchObject({ betrag: -250000 })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  // Löschen ist überall der einheitliche ✕-Knopf (PwLoeschen), kein Text/kein Papierkorb.
+  it('nutzt für Löschen den einheitlichen ✕-Knopf (PwLoeschen)', () => {
+    const w = mounted({ id: 1, betrag: -100, prozent: 0, haltung: 'einreichen', ausnahmen: [] })
+    const loeschen = w.findComponent(PwLoeschen)
+    expect(loeschen.exists()).toBe(true)
+    expect(loeschen.props('label')).toBe('Pauschalantrag löschen')
+    loeschen.vm.$emit('click')
+    expect(w.emitted().delete).toBeTruthy()
   })
 })

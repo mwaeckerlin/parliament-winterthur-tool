@@ -26,6 +26,21 @@ class BudgetAntragEntscheidMapper extends QBMapper {
     }
 
     /**
+     * Löscht die Entscheide der angegebenen Anträge hart (Purge eines Budgets).
+     *
+     * @param int[] $antragIds
+     */
+    public function deleteByAntraege(array $antragIds): void {
+        if ($antragIds === []) {
+            return;
+        }
+        $qb = $this->db->getQueryBuilder();
+        $qb->delete($this->getTableName())
+            ->where($qb->expr()->in('antrag_id', $qb->createNamedParameter($antragIds, IQueryBuilder::PARAM_INT_ARRAY)));
+        $qb->executeStatement();
+    }
+
+    /**
      * Entscheid-Status je Antrag-Id für ein ganzes Jahr (für die Live-Verfolgung).
      *
      * @param int[] $antragIds

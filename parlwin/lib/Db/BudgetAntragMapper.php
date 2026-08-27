@@ -52,6 +52,14 @@ class BudgetAntragMapper extends QBMapper {
         $qb->executeStatement();
     }
 
+    /** Alle Anträge eines Jahres entfernen (voller Clean-Slate beim Re-Import). */
+    public function deleteByJahr(int $jahr): void {
+        $qb = $this->db->getQueryBuilder();
+        $qb->delete($this->getTableName())
+            ->where($qb->expr()->eq('jahr', $qb->createNamedParameter($jahr, IQueryBuilder::PARAM_INT)));
+        $qb->executeStatement();
+    }
+
     /** Alle automatisch erzeugten Pauschal-Kinder eines Jahres entfernen. */
     public function deletePauschalByJahr(int $jahr): void {
         $qb = $this->db->getQueryBuilder();

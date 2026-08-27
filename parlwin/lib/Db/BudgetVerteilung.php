@@ -102,6 +102,9 @@ class BudgetVerteilung extends Entity implements JsonSerializable {
             'automatikEin' => (bool) $this->automatikEin,
             'modus' => $this->modusOderStandard(),
             'zielModus' => $this->zielModus,
+            // Einheitlicher Ziel-Typ fürs Frontend (F84/F85/F100): «einsparungen»
+            // (relativ) oder ein absolutes Ziel (schwarze_null/fester_ertrag/festes_defizit).
+            'zielTyp' => $this->modusOderStandard() === 'fest' ? 'einsparungen' : $this->zielModus,
             'zielBetrag' => $this->zielBetrag,
             'betrag' => $this->betrag,
             'prozent' => $this->prozent,

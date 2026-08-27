@@ -103,6 +103,35 @@ class BudgetServiceTest extends TestCase {
         self::assertSame(['121', '221'], $codes, 'ohne Filter alle Produktegruppen');
     }
 
+    public function testFilterAnstiegNutztGlobalkreditNichtAufwand(): void {
+        // «Anstieg ab CHF/%» filtert auf den ANGEZEIGTEN Globalkredit-Anstieg
+        // (soll − sollVorjahr), nicht auf den Aufwand: negative und zu kleine
+        // Anstiege werden ausgeschlossen, auch wenn der Aufwand kräftig steigt.
+        $svc = $this->service('[]');
+        $filter = new \ReflectionMethod($svc, 'trifftFilter');
+        $mach = static function (int $vorjahr, int $soll): BudgetProduktegruppe {
+            $g = new BudgetProduktegruppe();
+            $g->setGlobalkreditSollVorjahr($vorjahr);
+            $g->setGlobalkreditSoll($soll);
+            // Aufwand bewusst stark steigend, um zu beweisen, dass er NICHT zählt.
+            $g->setAufwandSollVorjahr(0);
+            $g->setAufwandSoll(1_000_000);
+            return $g;
+        };
+
+        // Absolut: +555'318 ≥ 100'000 → sichtbar.
+        self::assertTrue($filter->invoke($svc, $mach(4395510, 4950828), null, null, 100000));
+        // Negativer Anstieg (−699'192) → NICHT sichtbar (Informatikdienste-Fall).
+        self::assertFalse($filter->invoke($svc, $mach(2018000, 1318808), null, null, 100000));
+        // Zu kleiner Anstieg (+52'172 < 100'000) → NICHT sichtbar (Schutz-Fall).
+        self::assertFalse($filter->invoke($svc, $mach(11543188, 11595360), null, null, 100000));
+
+        // Prozentual: +12.6% ≥ 10% sichtbar; negativ und zu klein nicht.
+        self::assertTrue($filter->invoke($svc, $mach(4395510, 4950828), null, 10.0, null));
+        self::assertFalse($filter->invoke($svc, $mach(2018000, 1318808), null, 10.0, null));
+        self::assertFalse($filter->invoke($svc, $mach(1000000, 1050000), null, 10.0, null));
+    }
+
     private function antrag(int $id, string $zielRef, int $betragDelta, string $phase, string $herkunft = 'eigene', string $haltung = ''): \OCA\ParliamentWinterthur\Db\BudgetAntrag {
         $a = new \OCA\ParliamentWinterthur\Db\BudgetAntrag();
         $a->setId($id);
@@ -189,5 +218,37 @@ class BudgetServiceTest extends TestCase {
         $ohneAntrag = $this->service('[]', [], [])
             ->ansicht(2026, null, null, null, null, 'sitzung')['summen'];
         self::assertSame($ohneAntrag['ausgaben'], $mitAntrag['ausgaben'], 'nur angenommene Sitzungsanträge zählen');
+    }
+
+    public function testBudgetFraktionsdatenLeerenLoeschtAllesUnwiederbringlich(): void {
+        // Frontend-Re-Import (F91): löscht Anträge samt Notizen und Entscheiden
+        // sowie Pauschalanträge des Jahres hart.
+        $antraege = $this->createMock(BudgetAntragMapper::class);
+        $antraege->method('findByJahr')->willReturn([
+            $this->antrag(1, '121', -100000, 'fraktion'),
+            $this->antrag(2, '221', -50000, 'fraktion'),
+        ]);
+        $antraege->expects(self::once())->method('deleteByJahr')->with(2026);
+        $verteilungen = $this->createMock(BudgetVerteilungMapper::class);
+        $verteilungen->expects(self::once())->method('deleteByJahr')->with(2026);
+        $entscheide = $this->createMock(BudgetAntragEntscheidMapper::class);
+        $entscheide->expects(self::once())->method('deleteByAntraege')->with([1, 2]);
+        $notiz = $this->createMock(NotizService::class);
+        $notiz->expects(self::once())->method('alleLoeschen')->with('budget-antrag', [1, 2]);
+
+        $service = new BudgetService(
+            $this->createStub(BudgetJahrMapper::class),
+            $this->createStub(BudgetProduktegruppeMapper::class),
+            $this->createStub(BudgetInvestitionMapper::class),
+            $antraege,
+            $verteilungen,
+            $entscheide,
+            $this->createStub(IConfig::class),
+            $this->createStub(ITimeFactory::class),
+            $this->createStub(IUserSession::class),
+            $this->createStub(RealtimePublisherService::class),
+            $notiz,
+        );
+        $service->budgetFraktionsdatenLeeren(2026);
     }
 }

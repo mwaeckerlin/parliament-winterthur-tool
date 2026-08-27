@@ -44,6 +44,11 @@ Diese Regeln gelten für JEDE Ansicht und JEDES Element der App — ohne Ausnahm
    der Parlamentsquelle sind NICHT löschbar — ihr Lebenszyklus läuft über den
    Status (z.B. «erledigt»), weil sie beim nächsten Abgleich zurückkämen.
    Notizen-Löschen bleibt ein Soft-Delete mit Undo.
+   **Einheitlicher Löschknopf überall:** jedes Löschen (Antrag, Pauschalantrag,
+   Notiz, Vorstoss, Sitzungstyp, …) nutzt die EINE geteilte Komponente
+   `components/PwLoeschen.vue` — ein tertiäres «✕» (kein Papierkorb, kein
+   «Löschen»-Text), platziert am Ende/oben rechts des Elements. Nie einen eigenen
+   Löschknopf bauen; immer `<PwLoeschen label="… löschen" @click="…" />`.
 5. **Neu-Anlegen nutzt DIESELBE Maske wie das Bearbeiten** (geteilter Code, kein
    zweites Formular). Ein reduziertes «Neu»-Formular ist verboten. Unterschiede
    zum Bearbeiten:
@@ -307,6 +312,16 @@ auch Vorstösse nutzen denselben Code:
   Doctrine-`createTable` in V29/V30 behoben. Raw-SQL in `postSchemaChange` nur
   noch für reine DATEN-Migrationen bestehender Instanzen (z.B. V32:
   JSON-Notizen → Aktionen).
+
+  **Jede neue Migration erfordert eine höhere App-Version** in
+  `appinfo/info.xml` (mindestens PATCH). Nextcloud prüft ausstehende Migrationen
+  nur bei einem Upgrade, also wenn die installierte Version kleiner als die
+  Image-Version ist. Wird eine Migration innerhalb derselben Versionsnummer
+  hinzugefügt und die Instanz hat diese Version bereits registriert, läuft die
+  Migration NIE — die Spalte fehlt, und der erste Zugriff wirft z.B.
+  «Unknown column 'total_aufwand'». Das trifft besonders die Dev-Schleife
+  (`npm run start` mehrfach ohne Versionswechsel): beim Hinzufügen einer
+  Migration die Version hochzählen, sonst greift sie beim Rebuild nicht.
 - **Semantik:** jede bewusste Speicherung (✓) archiviert die bisherige Fassung
   als Revision (unveränderter Text erzeugt keine Revision); Löschen setzt nur
   `geloescht=true` (Text/History bleiben); Undo setzt es zurück. Nur der Autor
@@ -583,6 +598,28 @@ Ohne konfigurierten Zeitplan gilt `SyncZeitplan::standard()`: zwei Einträge an
 allen Wochentagen um 10:00 und 18:00 Uhr; die Admin-API liefert diesen Standard
 vorbelegt (`mitStandard`), sodass er im UI editierbar erscheint.
 
+### Ereignis-Protokoll (F108)
+
+Persistente Historie der Synchronisationen und Budget-Importe (inkl. Parsing-Probleme):
+
+- **Tabelle `pw_ereignis`** (Migration `Version000046…`): `zeitpunkt` (Unix),
+  `art` (`sync|budget_import|budget_reimport|novemberbrief|sitzungsantraege|fehler`),
+  `bereich`, `erfolg` (0/1), `titel`, `meldung`, `ausgeloest_von` (Nutzer-ID oder
+  `auto`). Die String-Spalten sind **nullable** (eine NOT-NULL-String-Spalte mit
+  leerem Default bricht das occ-Upgrade ab — siehe `MigrationSchemaTest`).
+- **`EreignisService::protokolliere(art, bereich, erfolg, titel, meldung, ausgeloestVon)`**
+  schreibt einen Eintrag (Zeitpunkt aus `ITimeFactory`, Auslöser leer → aktuelle
+  Nutzer-ID bzw. `auto`) und räumt beim Schreiben Ereignisse älter als 180 Tage weg;
+  `liste($limit)` liefert die neuesten zuerst.
+- **Protokolliert wird** in `BudgetController` (import/reimport/novemberbrief/
+  sitzungsantraege — Erfolg wie Fehler, der Fehlerfall mit der Meldung des Imports,
+  z.B. «Teil B … lieferte keine Produktegruppen»), in `SyncJob` (automatischer Sync und
+  automatischer Budget-Import, Auslöser `auto`) und in `SettingsController::run` (manueller
+  Sync, Zusammenfassung «X neu, Y geändert» aus der Sync-Statistik).
+- **Frontend:** Navigationsbereich «Protokoll» (`Protokoll.vue`), Endpunkt
+  `GET /apps/parlwin/protokoll`; Fehler-Ereignisse sind hervorgehoben
+  (`pw-protokoll-fehler`). Es ist der dokumentierte Ort für Parsing-Probleme.
+
 ### Budget: Datenmodell, Import und Engines
 
 Fachlicher Hintergrund: [doc/budget-prozess-und-parlwin.md](doc/budget-prozess-und-parlwin.md).
@@ -641,6 +678,22 @@ eingebetteten Text (keine Scans) — die Extraktion erfolgt server-seitig in PHP
 
 - **Text-Extraktion:** PHP-Bibliothek `smalot/pdfparser` (rein PHP, läuft im
   shell-losen Runtime-Image). Kein `pdftotext`-Shell-Aufruf im Auslieferungs-Image.
+  - **musl-iconv-Fix (Pflicht im Image):** Das Auslieferungs-Image ist Alpine/musl,
+    dessen `iconv` viele PDF-Font-Kodierungen NICHT kennt (u.a. `macintosh`/MacRoman).
+    smalot dekodiert MacRoman-Fonts über `iconv('macintosh', 'UTF-8//TRANSLIT//IGNORE', …)`
+    (`Font.php`); unter musl liefert das leeren Text, und der Import parst 0 Produktegruppen.
+    Darum lädt `Dockerfile.php-fpm` **GNU libiconv per `LD_PRELOAD`**: eine `very-base`-Stage
+    baut einen winzigen C-Shim, der die unpräfixierten `iconv_*`-Symbole an GNU libiconv
+    (`libiconv_*`) weiterreicht (Alpine `gnu-libiconv` liefert die frühere
+    `preloadable_libiconv.so` nicht mehr). `tests/image-contract.sh` prüft mit
+    `iconv('macintosh','UTF-8','A')`, dass der Fix im gebauten Image greift — dieser Test
+    läuft NUR im echten Alpine-Image, ein lokaler phpunit-Lauf (glibc) sieht das Problem nie.
+  - **Leer-Guard vor dem Löschen (Reimport-Sicherung):** `ladeStruktur` scheitert laut, wenn
+    der Parse keine Produktegruppen liefert — BEVOR `schreibeStruktur` die bestehenden
+    Produktegruppen löscht. So vernichtet ein fehlgeschlagener Parse (falscher Link,
+    Fehlerseite, Kodierungsproblem) nicht den bestehenden Stand. `ladeDokument` prüft zudem
+    den `%PDF-`-Kopf; die künstliche Position entsteht nur bei vorhandenen operativen
+    Produktegruppen.
 - **Teil-B-Parser** (Anker, positionsunabhängig — F89-Toleranz):
   - **Inhaltsverzeichnis:** `Departement <Name>` als Gruppenkopf, darunter Zeilen
     `<Produktegruppenname> (<Code>) …… <Seite>` → Departement→Produktegruppe(Code)-Baum
@@ -678,9 +731,38 @@ eingebetteten Text (keine Scans) — die Extraktion erfolgt server-seitig in PHP
   `bereits_getaetigt`/`planungskosten` stehen in dieser Tabelle nicht und bleiben 0
   (die Tabelle führt Budget-/Planwerte je Jahr, keine kumulierten Projektkosten). Der
   Parser ist projektweise gegen das Buch validiert (`BudgetBuchParserTest`).
-- **Novemberbrief-Parser (F90):** kleineres PDF mit Anpassungen je Produktegruppe →
-  Deltas auf die bestehenden `pw_budget_produktegruppe`-Zahlen; setzt
-  `novemberbrief_importiert = true`.
+- **Drehbuch-Parser (`BudgetDrehbuchParser`, F90):** das «Drehbuch zur Budgetbehandlung»
+  (Beilage der Budgetsitzung) ist die Quelle für die **Sitzungsanträge** und den
+  **Novemberbrief**. Das Drehbuch ist ein ungetaggtes PDF, dessen Tabellen im reinen
+  Textstrom von `getText()` verkleben (NB- und Antragsspalten laufen ineinander). Der
+  Parser arbeitet deshalb **koordinatenbasiert** über `Smalot\PdfParser\Page::getDataTm()`:
+  er gruppiert die Textfragmente je Seite zeilenweise (nach y, Toleranz ¼ Zeile) und
+  ordnet sie innerhalb der Zeile nach x. Damit bleiben die Spalten getrennt.
+  - **Produktegruppe:** Kopfzeile mit sechsstelliger Nummer (`121000` → PG-Code `121`) am
+    linken Rand UND einem Kommissionshinweis in Klammern (`(AK, …)`) — daran unterscheidet
+    sie sich von einer gleich aussehenden Konto-Nummer der Verpflichtungskredite.
+  - **Sitzungsanträge:** Zeilen `Antrag <Quelle>: <Erhöhung|Reduktion> [des] Globalkredit[s]
+    um CHF <Betrag>` → Quelle (Kommission `AK/SBK/BSKK/SSK/UBK` oder `Fraktion <X>`),
+    Richtung (Erhöhung = +, Reduktion = −) und Betrag; das direkt folgende
+    `<n>:<m> angenommen|abgelehnt` wird dem Antrag als Kommissionsergebnis zugeordnet, die
+    dazwischenstehende `Begründung:` gesammelt. Ein in der Kommission nicht abgestimmter
+    Fraktionsantrag bleibt ohne Ergebnis.
+  - **Novemberbrief:** der Zahlenwert im x-Band der Spalte «NB» der Nettokosten-Datenzeile
+    je Produktegruppe. Führt das Drehbuch dort keine Werte (Budget 2026: NB-Spalte leer),
+    ist die Liste leer und es gibt keinen Novemberbrief.
+- **Drehbuch-Live-Abruf (`BudgetImportService::drehbuchUrl`):** Weg zum Drehbuch —
+  `findeBudgetWeisung($jahr)` (Budget-Geschäft) → `TraktandumMapper::findByGeschaeft`
+  (dessen Traktandum, `sitzung_id`) → `SitzungMapper::find` (die Budgetsitzung, `url`) →
+  deren Seite scrapen und die Beilage nehmen, deren Beschriftung «Drehbuch» enthält. Das
+  PDF wird zur Laufzeit heruntergeladen, in eine temporäre Datei geschrieben, geparst und
+  wieder gelöscht; das Ergebnis wird je Request zwischengespeichert.
+- **Sitzungsanträge einlesen:** `BudgetImportService::sitzungsantraege($jahr)` liefert die
+  geparsten Anträge, `BudgetService::sitzungsantraegeEinlesen($jahr, $geparst)` legt sie als
+  Anträge an (`quelle='sitzung'`, `phase='sitzung'`, `herkunft='fremde'`, Standard-Haltung
+  «offen»; das Kommissionsergebnis in der Begründung vermerkt) und **dedupliziert** über
+  (PG-Code, Antragsteller, Betrag) — erneutes Einlesen ergänzt nur Neues. Route
+  `POST /budget/{jahr}/sitzungsantraege`; im Frontend der Knopf «Sitzungsanträge einlesen»
+  im Sitzungsmodus mit Fortschrittsbalken und Abschluss-Toast.
 - **Auslöser:** automatisch über `SyncJob` (`BudgetImportService::automatischerImport`):
   im geplanten Hintergrundlauf wird das neueste verfügbare Budgetjahr eingelesen, sobald
   dessen Weisung vorliegt und es noch nicht importiert ist; ein vorhandener, noch nicht
@@ -827,6 +909,40 @@ Erweiterungen an `pw_budget_antrag` (Migration Version000040) und `pw_budget_ver
   Seiten genau ein freier Kandidat mit gleichem `bereich/zielRef/betragDelta` besteht, und
   überträgt die Haltung in die Sitzung; Mehrdeutiges bleibt frei. `verknuepfungSetzen`
   (Endpunkt `budget#verknuepfen`) setzt/löst von Hand.
+
+#### WoV: Zielvorgaben, Kostenzeilen und Antrags-Aufteilung (F109/F110)
+
+- **Parsen (`BudgetBuchParser::parseTeilB`):** zwei Sammel-Modi im Body-Loop, je über
+  mehrere Seiten, die Feinauswertung folgt nach dem Loop.
+  - **Zielvorgaben** (`_zvZeilen` → `parseZielvorgabenBlock`): Start bei
+    «Parlamentarische Zielvorgaben», Ende bei «Globalkredit»/«Informationsteil».
+    Nummerierte Ziele (`^\d{1,2}\s+\p{L}`), Titel-Fortsetzung über eine Wortzeile, je
+    Messgrösse eine Wertzeile aus sechs Tokens; `soll` = Index 2 (Soll aktuell). Rein
+    qualitative Ziele («erfüllt / zu erfüllen …») tragen keine Zahl und werden nicht erfasst.
+  - **Kostenzeilen** (`_kostenZeilen` → `parseKostenzeilen`): Start bei der
+    Informationsteil-Kopfzeile mit «in%»-Spalten, Ende bei «Stellenplan»/«Kostendeckungsgrad».
+    Label + `soll` (Zahlenindex 4 wegen der in%-Spalten); Summen-/Verrechnungszeilen sind
+    keine Positionen; umgebrochene Labels werden zusammengeführt. **Wichtig:** der
+    Kosten-Modus sammelt, aber **fällt zu `fuelleZeile` durch** (kein `continue`), sonst
+    fehlen Aufwand/Ertrag (Total effektive Kosten/Erlöse).
+  - **Erläuterungen** behalten die Struktur: `erlaeuterungAnfuegen` beginnt bei
+    Aufzählungspunkten und Jahres-Zwischentiteln eine neue Zeile, sonst Fortsetzung.
+- **Speicherung:** `pw_budget_produktegruppe.zielvorgaben` (V38) und `.kostenzeilen`
+  (V48) als JSON; `pw_budget_antrag.ziel_aenderungen` und `.aufteilung` (V47) als JSON.
+  Die Entities dekodieren in `jsonSerialize`, der Import kodiert.
+- **Antragsmodell:** `zielAenderungen` = `[{zielNummer, messgroesse, neuerWert}]` (keine
+  Budgetwirkung); `aufteilung` = `[{ebene, ref, produkt?, betrag?, prozent?}]`, Ebenen
+  `pg-kosten|produkt|produkt-kosten`. `BudgetService::aufteilungSummeAnwenden`: ist der
+  PG-Betrag 0, wird die Summe der Aufteilungs-Beträge eingesetzt; ist er gesetzt, bleibt
+  die Aufteilung nur Begründung. Ein Zielvorgaben- oder reiner Aufteilungs-Antrag ist ohne
+  oberen Betrag zulässig (Client-Guard in `antragGlobalbudget`). Das Antrags-PDF rendert
+  beide in der Begründung (`budget_antraege_pdf.php`).
+- **Frontend:** die Produktegruppen-Karte trägt einen «Details»-Knopf; er öffnet
+  `BudgetPgDetail.vue` als Vollbild-Popup (`.pw-modal-vollbild`, Teleport, wie
+  GeschäftDetail) — Zielvorgaben-Tabelle (Soll-Spalte hervorgehoben, eigener
+  `overflow-x`-Scrollcontainer), Produkte als Karten, Erläuterungen. Das Antragsformular
+  (`BudgetAntragForm.vue`) bekommt Props `zielvorgaben`/`kostenzeilen`/`produkte` und
+  schreibt `form.zielAenderungen`/`form.aufteilung`.
 
 ## Weitere Regeln
 

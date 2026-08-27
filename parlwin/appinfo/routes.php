@@ -151,12 +151,18 @@ return [
         ['name' => 'settings#run', 'url' => '/sync', 'verb' => 'POST'],
 
         // Budget (vor der {jahr}-Route stehen die spezifischen Pfade)
+        // Ereignis-Protokoll (F105)
+        ['name' => 'ereignis#index', 'url' => '/protokoll', 'verb' => 'GET'],
+
         ['name' => 'budget#jahre', 'url' => '/budget/jahre', 'verb' => 'GET'],
         ['name' => 'budget#verfuegbar', 'url' => '/budget/verfuegbar', 'verb' => 'GET'],
         ['name' => 'budget#antragErstellen', 'url' => '/budget/{jahr}/antraege', 'verb' => 'POST', 'requirements' => ['jahr' => '\d+']],
         ['name' => 'budget#verteilung', 'url' => '/budget/{jahr}/verteilung', 'verb' => 'PUT', 'requirements' => ['jahr' => '\d+']],
+        ['name' => 'budget#steuerfussAutomatik', 'url' => '/budget/{jahr}/steuerfuss-automatik', 'verb' => 'PUT', 'requirements' => ['jahr' => '\d+']],
         ['name' => 'budget#importieren', 'url' => '/budget/{jahr}/import', 'verb' => 'POST', 'requirements' => ['jahr' => '\d+']],
         ['name' => 'budget#novemberbrief', 'url' => '/budget/{jahr}/novemberbrief', 'verb' => 'POST', 'requirements' => ['jahr' => '\d+']],
+        ['name' => 'budget#sitzungsantraege', 'url' => '/budget/{jahr}/sitzungsantraege', 'verb' => 'POST', 'requirements' => ['jahr' => '\d+']],
+        ['name' => 'budget#reimport', 'url' => '/budget/{jahr}/reimport', 'verb' => 'POST', 'requirements' => ['jahr' => '\d+']],
         ['name' => 'budget#antraegePdf', 'url' => '/budget/{jahr}/antraege-pdf', 'verb' => 'GET', 'requirements' => ['jahr' => '\d+']],
         ['name' => 'budget#ansicht', 'url' => '/budget/{jahr}', 'verb' => 'GET', 'requirements' => ['jahr' => '\d+']],
         ['name' => 'budget#antragAendern', 'url' => '/budget/antraege/{id}', 'verb' => 'PUT', 'requirements' => ['id' => '\d+']],

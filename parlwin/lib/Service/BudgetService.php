@@ -25,6 +25,8 @@ use OCP\IUserSession;
 class BudgetService {
     private const CONFIG_BETRAG_PRO_STELLE = 'budget_betrag_pro_stelle';
     private const DEFAULT_BETRAG_PRO_STELLE = 200000;
+    /** Pro Jahr gespeichert: ist die automatische Steuerfuss-Senkung an (F88)? Default: ja. */
+    private const CONFIG_STEUERFUSS_AUTOMATIK = 'budget_steuerfuss_automatik';
     /** Objekttyp für die geteilten Notizen (F103), wie 'vorstoss' beim Vorstoss. */
     private const NOTIZ_OBJEKT_TYP = 'budget-antrag';
 
@@ -149,10 +151,21 @@ class BudgetService {
             }
         }
 
-        $summen = BudgetRechnung::summen($this->gruppenFuerRechnung($gefiltert), $summenAntraege);
+        // Die Summe kommt aus allen gezeigten Produktegruppen inklusive der
+        // künstlichen (F89); ungefiltert ergibt das exakt das deklarierte Total.
+        $gruppenRechnung = $this->gruppenFuerRechnung($gefiltert);
+        $summen = BudgetRechnung::summen($gruppenRechnung, $summenAntraege);
+        // Stadtratsbudget (F102): die Zahlen, wie der Stadtrat sie vorgelegt hat —
+        // ohne unsere Anträge —, für den Vergleich mit dem Fraktionsbudget (mit Anträgen).
+        $summenStadtrat = BudgetRechnung::summen($gruppenRechnung, []);
 
         return [
-            'jahr' => $jahrRow->jsonSerialize(),
+            // Der beantragte Steuerfuss ist der geparste Wert; das Vorjahr (falls
+            // importiert) erlaubt die Differenz-Anzeige im Steuerfuss-Tab (F88).
+            'jahr' => array_merge($jahrRow->jsonSerialize(), [
+                'steuerfussVorjahr' => $this->steuerfussVorjahr($jahr),
+                'steuerfussAutomatik' => $this->steuerfussAutomatikAn($jahr),
+            ]),
             'departemente' => $this->departementListe($alleGruppen),
             'produktegruppen' => array_map(static fn ($g) => $g->jsonSerialize(), $gefiltert),
             'investitionen' => array_map(
@@ -168,14 +181,19 @@ class BudgetService {
                 $d['aktionen'] = $notizen[(int) $a->getId()] ?? [];
                 return $d;
             }, $alleAntraege),
-            'verteilung' => $this->verteilungen->findeOderStandard($jahr)->jsonSerialize(),
+            // Alle Pauschalanträge (F100) — die Liste startet leer, es gibt keinen
+            // automatisch angelegten Standard mehr. Jeder trägt seinen Ziel-Typ.
             'pauschalantraege' => array_map(
                 static fn ($v) => $v->jsonSerialize(),
-                array_values(array_filter($this->verteilungen->alleFuerJahr($jahr), static fn ($v) => $v->modusOderStandard() === 'fest'))
+                $this->verteilungen->alleFuerJahr($jahr)
             ),
             'summen' => $summen,
+            'summenStadtrat' => $summenStadtrat,
             'standardBetragProStelle' => $this->standardBetragProStelle(),
             'kommissionZuordnung' => $zuordnung,
+            // Die eigene Fraktion aus der Konfiguration (dieselbe Quelle wie das PDF,
+            // F94): Antragsteller-Felder werden damit vorbelegt.
+            'eigeneFraktion' => $this->eigeneFraktion(),
         ];
     }
 
@@ -213,6 +231,7 @@ class BudgetService {
     private function gruppenFuerRechnung(array $gruppen): array {
         return array_map(static fn ($g) => [
             'code' => (string) $g->getCode(),
+            'kuenstlich' => (int) $g->getKuenstlich(),
             'aufwandSoll' => (int) $g->getAufwandSoll(),
             'aufwandVorjahr' => (int) $g->getAufwandSollVorjahr(),
             'ertragSoll' => (int) $g->getErtragSoll(),
@@ -220,6 +239,28 @@ class BudgetService {
             'stellenSoll' => (float) $g->getStellenSoll(),
             'stellenVorjahr' => (float) $g->getStellenSollVorjahr(),
         ], $gruppen);
+    }
+
+    /** Steuerfuss des Vorjahres, falls importiert — sonst 0 (F88 Differenz-Anzeige). */
+    private function steuerfussVorjahr(int $jahr): int {
+        try {
+            return (int) $this->jahre->findByJahr($jahr - 1)->getSteuerfuss();
+        } catch (\OCP\AppFramework\Db\DoesNotExistException) {
+            return 0;
+        }
+    }
+
+    /** Ob die Produktegruppe mit diesem Code für das Jahr künstlich ist (F89). */
+    private function istKuenstlicheGruppe(int $jahr, string $code): bool {
+        if ($code === '') {
+            return false;
+        }
+        foreach ($this->gruppen->findByJahr($jahr) as $g) {
+            if ((string) $g->getCode() === $code) {
+                return (int) $g->getKuenstlich() === 1;
+            }
+        }
+        return false;
     }
 
     /** @return array<string, float|int|string> */
@@ -236,14 +277,20 @@ class BudgetService {
         if ($erlaubteDepts !== null && !in_array((string) $g->getDepartement(), $erlaubteDepts, true)) {
             return false;
         }
-        $vorjahr = (int) $g->getAufwandSollVorjahr();
-        $soll = (int) $g->getAufwandSoll();
+        // «Anstieg» meint den Anstieg des Globalkredits (Nettokosten) — genau den
+        // Wert, den die Karte neben dem Betrag zeigt (soll − sollVorjahr). Nicht den
+        // Aufwand: der kann steigen, während der Globalkredit fällt (mehr Ertrag).
+        $vorjahr = (int) $g->getGlobalkreditSollVorjahr();
+        $soll = (int) $g->getGlobalkreditSoll();
         $absolut = $soll - $vorjahr;
         if ($minAbsolut !== null && $absolut < $minAbsolut) {
             return false;
         }
         if ($minProzent !== null) {
-            $prozent = $vorjahr > 0 ? ($absolut / $vorjahr) * 100 : 0.0;
+            // Prozentualer Anstieg relativ zum Betrag des Vorjahres (auch ein
+            // negativer Globalkredit — Nettoertrag — hat einen sinnvollen Betrag).
+            $basis = abs($vorjahr);
+            $prozent = $basis > 0 ? ($absolut / $basis) * 100 : 0.0;
             if ($prozent < $minProzent) {
                 return false;
             }
@@ -267,6 +314,12 @@ class BudgetService {
 
     /** @param array<string, mixed> $daten */
     public function antragErstellen(int $jahr, array $daten): BudgetAntrag {
+        // Künstliche Produktegruppen (F89) sind nicht antragbar — server-seitig gesperrt.
+        $zielBereich = (string) ($daten['bereich'] ?? 'globalbudget');
+        if (in_array($zielBereich, ['globalbudget', 'personal'], true)
+            && $this->istKuenstlicheGruppe($jahr, (string) ($daten['zielRef'] ?? ''))) {
+            throw new \RuntimeException('Auf eine künstliche Produktegruppe sind keine Anträge möglich');
+        }
         $a = new BudgetAntrag();
         $a->setJahr($jahr);
         $a->setBereich((string) ($daten['bereich'] ?? 'globalbudget'));
@@ -285,6 +338,14 @@ class BudgetService {
         // Betrag: CHF und Prozent (F95), Steuerfuss in Prozentpunkten (F96).
         $this->betragSetzen($a, $daten, $jahr, $proStelle);
         $this->felderSetzen($a, $daten);
+        // F109: fehlt oben ein Betrag, wird die Summe der Aufteilung eingesetzt.
+        $this->aufteilungSummeAnwenden($a);
+        // Ein Steuerfussantrag ist ein Antrag der eigenen Fraktion (F88/F96): fehlt
+        // der Antragsteller, tragen wir den eigenen Fraktionsnamen ein, damit er im
+        // Antrags-PDF nicht leer bleibt.
+        if ($a->getBereich() === 'steuerfuss' && trim((string) $a->getAntragsteller()) === '') {
+            $a->setAntragsteller($this->eigeneFraktion());
+        }
         // Phase (F93): «fraktion» (Vorbereitung) oder «sitzung» (offizielle Sitzungsanträge).
         $phase = (string) ($daten['phase'] ?? 'fraktion');
         $a->setPhase($phase === 'sitzung' ? 'sitzung' : 'fraktion');
@@ -294,6 +355,66 @@ class BudgetService {
         $gespeichert = $this->antraege->insert($a);
         $this->nachAenderung($jahr);
         return $gespeichert;
+    }
+
+    /**
+     * Übernimmt die aus dem Drehbuch der Budgetsitzung gelesenen Sitzungsanträge
+     * (F90) in die Datenbank — als offizielle Sitzungsanträge (Phase «sitzung»,
+     * Herkunft «fremde», Quelle «sitzung»). Bereits vorhandene, gleich lautende
+     * Sitzungsanträge (gleiche Produktegruppe, Antragsteller und Betrag) werden
+     * NICHT dupliziert; ein erneutes Einlesen ergänzt nur Neues und lässt von Hand
+     * gesetzte Haltungen und Entscheide unberührt. Liefert die Zahl der neu
+     * angelegten Anträge.
+     *
+     * @param list<array<string, mixed>> $geparst
+     */
+    public function sitzungsantraegeEinlesen(int $jahr, array $geparst): int {
+        $vorhanden = [];
+        foreach ($this->antraege->findByJahr($jahr) as $a) {
+            if ((string) $a->getQuelle() === 'sitzung') {
+                $vorhanden[$this->sitzungsantragSchluessel(
+                    (string) $a->getZielRef(),
+                    (string) $a->getAntragsteller(),
+                    (int) $a->getBetragDelta()
+                )] = true;
+            }
+        }
+        $neu = 0;
+        foreach ($geparst as $antrag) {
+            $code = (string) ($antrag['code'] ?? '');
+            $steller = (string) ($antrag['antragsteller'] ?? '');
+            $betrag = (int) ($antrag['betragDelta'] ?? 0);
+            if ($code === '' || $betrag === 0) {
+                continue;
+            }
+            $schluessel = $this->sitzungsantragSchluessel($code, $steller, $betrag);
+            if (isset($vorhanden[$schluessel])) {
+                continue;
+            }
+            $vorhanden[$schluessel] = true;
+            $ergebnis = trim((string) ($antrag['ergebnis'] ?? ''));
+            $begruendung = trim((string) ($antrag['begruendung'] ?? ''));
+            if ($ergebnis !== '') {
+                $begruendung = trim($begruendung . ' (Kommission: ' . $ergebnis . ')');
+            }
+            $this->antragErstellen($jahr, [
+                'bereich' => (string) ($antrag['bereich'] ?? 'globalbudget'),
+                'zielTyp' => 'produktegruppe',
+                'zielRef' => $code,
+                'betragDelta' => $betrag,
+                'quelle' => 'sitzung',
+                'herkunft' => 'fremde',
+                'phase' => 'sitzung',
+                'antragsteller' => $steller,
+                'begruendung' => $begruendung,
+            ]);
+            $neu++;
+        }
+        return $neu;
+    }
+
+    private function sitzungsantragSchluessel(string $code, string $antragsteller, int $betrag): string {
+        return $code . '|' . mb_strtolower(trim($antragsteller)) . '|' . $betrag;
     }
 
     /**
@@ -383,6 +504,101 @@ class BudgetService {
         if (array_key_exists('pauschalAusnahme', $daten)) {
             $a->setPauschalAusnahme($daten['pauschalAusnahme'] ? 1 : 0);
         }
+        if (array_key_exists('zielAenderungen', $daten)) {
+            $a->setZielAenderungen((string) json_encode($this->zielAenderungenBereinigt($daten['zielAenderungen'])));
+        }
+        if (array_key_exists('aufteilung', $daten)) {
+            $a->setAufteilung((string) json_encode($this->aufteilungBereinigt($daten['aufteilung'])));
+        }
+    }
+
+    /**
+     * Normalisiert die Einsparungsverteilung eines Antrags (F109) zu
+     * [{ebene, ref, produkt?, betrag?, prozent?}]. Erlaubte Ebenen: «pg-kosten»
+     * (Kostenzeile im Informationsteil), «produkt», «produkt-kosten» (Kostenzeile
+     * innerhalb eines Produkts). Betrag und Prozent sind je optional.
+     *
+     * @param mixed $roh
+     * @return list<array<string, mixed>>
+     */
+    private function aufteilungBereinigt($roh): array {
+        if (!is_array($roh)) {
+            return [];
+        }
+        $erlaubt = ['pg-kosten', 'produkt', 'produkt-kosten'];
+        $out = [];
+        foreach ($roh as $e) {
+            if (!is_array($e)) {
+                continue;
+            }
+            $ebene = (string) ($e['ebene'] ?? '');
+            $ref = trim((string) ($e['ref'] ?? ''));
+            if (!in_array($ebene, $erlaubt, true) || $ref === '') {
+                continue;
+            }
+            $eintrag = ['ebene' => $ebene, 'ref' => $ref];
+            if ($ebene === 'produkt-kosten') {
+                $eintrag['produkt'] = trim((string) ($e['produkt'] ?? ''));
+            }
+            if (isset($e['betrag']) && is_numeric($e['betrag'])) {
+                $eintrag['betrag'] = (int) $e['betrag'];
+            }
+            if (isset($e['prozent']) && is_numeric($e['prozent'])) {
+                $eintrag['prozent'] = (float) $e['prozent'];
+            }
+            $out[] = $eintrag;
+        }
+        return $out;
+    }
+
+    /**
+     * F109: Ist auf Ebene Produktegruppe kein Betrag/Prozent gesetzt, weiter unten
+     * aber schon, wird oben die Summe der unteren Beträge eingesetzt. Ist oben ein
+     * Wert gesetzt, wird nichts gerechnet — die Aufteilung dient dann nur der
+     * Begründung.
+     */
+    private function aufteilungSummeAnwenden(BudgetAntrag $a): void {
+        if ((int) $a->getBetragDelta() !== 0 || (float) $a->getProzentDelta() !== 0.0) {
+            return;
+        }
+        $summe = 0;
+        $hat = false;
+        foreach ($a->getAufteilungArray() as $e) {
+            if (isset($e['betrag'])) {
+                $summe += (int) $e['betrag'];
+                $hat = true;
+            }
+        }
+        if ($hat) {
+            $a->setBetragDelta($summe);
+        }
+    }
+
+    /**
+     * Normalisiert die Zielvorgaben-Änderungen eines Antrags (F109) zu
+     * [{zielNummer, messgroesse, neuerWert}]. Verworfen wird alles ohne Ziel-Nummer,
+     * Messgrösse oder Wert.
+     *
+     * @param mixed $roh
+     * @return list<array{zielNummer:int,messgroesse:string,neuerWert:string}>
+     */
+    private function zielAenderungenBereinigt($roh): array {
+        if (!is_array($roh)) {
+            return [];
+        }
+        $out = [];
+        foreach ($roh as $e) {
+            if (!is_array($e)) {
+                continue;
+            }
+            $nr = (int) ($e['zielNummer'] ?? 0);
+            $mg = trim((string) ($e['messgroesse'] ?? ''));
+            $wert = trim((string) ($e['neuerWert'] ?? ''));
+            if ($nr > 0 && $mg !== '' && $wert !== '') {
+                $out[] = ['zielNummer' => $nr, 'messgroesse' => $mg, 'neuerWert' => $wert];
+            }
+        }
+        return $out;
     }
 
     /** Erlaubte Haltung je nach Herkunft (F97); sonst der Herkunfts-Standard. */
@@ -439,6 +655,8 @@ class BudgetService {
             $this->betragSetzen($a, $daten, $jahr, (int) $a->getBetragProStelle());
         }
         $this->felderSetzen($a, $daten);
+        // F109: fehlt oben ein Betrag, wird die Summe der Aufteilung eingesetzt.
+        $this->aufteilungSummeAnwenden($a);
         $gespeichert = $this->antraege->update($a);
         $this->nachAenderung($jahr);
         return $gespeichert;
@@ -449,6 +667,20 @@ class BudgetService {
         $jahr = (int) $a->getJahr();
         $this->antraege->delete($a);
         $this->nachAenderung($jahr);
+    }
+
+    /**
+     * Löscht ALLE Fraktionsdaten zu einem Budgetjahr unwiederbringlich: Anträge
+     * samt Notizen und Entscheiden sowie die Pauschalanträge. Dient dem Re-Import
+     * über das Frontend, der ausdrücklich alles Bestehende zu diesem Budget
+     * verwirft (nur nach doppelter Bestätigung im UI ausgelöst).
+     */
+    public function budgetFraktionsdatenLeeren(int $jahr): void {
+        $antragIds = array_map(static fn ($a) => (int) $a->getId(), $this->antraege->findByJahr($jahr));
+        $this->notizService->alleLoeschen(self::NOTIZ_OBJEKT_TYP, $antragIds);
+        $this->entscheide->deleteByAntraege($antragIds);
+        $this->antraege->deleteByJahr($jahr);
+        $this->verteilungen->deleteByJahr($jahr);
     }
 
     // ── Verteilung / Steuerfuss ──────────────────────────────────────────────
@@ -468,13 +700,135 @@ class BudgetService {
     }
 
     /**
+     * Rechnet die automatischen Verteilungen und die Steuerfuss-Senkung neu —
+     * öffentlich für den Aufruf nach einem Import (Weisung oder Novemberbrief),
+     * damit die Automatik schon beim ersten Laden greift, nicht erst nach der
+     * ersten Bearbeitung.
+     */
+    public function automatikNeuBerechnen(int $jahr): void {
+        $this->nachAenderung($jahr);
+    }
+
+    /**
+     * Ist die automatische Steuerfuss-Senkung für dieses Jahr eingeschaltet (F88)?
+     * Default: ja. Der Schalter wird pro Budgetjahr gespeichert, damit der Zustand
+     * einen Reload überlebt (früher nur clientseitig, darum kam der Auto-Antrag
+     * nach dem Neuladen zurück).
+     */
+    public function steuerfussAutomatikAn(int $jahr): bool {
+        return $this->config->getAppValue(
+            Application::APP_ID,
+            self::CONFIG_STEUERFUSS_AUTOMATIK . '_' . $jahr,
+            '1'
+        ) === '1';
+    }
+
+    /**
+     * Schaltet die automatische Steuerfuss-Senkung für ein Jahr ein oder aus (F88)
+     * und rechnet neu. Beim Einschalten wird ein etwaiger manueller Steuerfussantrag
+     * entfernt, damit die Automatik greift; beim Ausschalten fällt der Steuerfuss
+     * auf den Stadtratsantrag zurück (der automatische Antrag wird nicht mehr erzeugt).
+     */
+    public function steuerfussAutomatikSetzen(int $jahr, bool $an): void {
+        if ($an) {
+            foreach ($this->antraege->findByJahr($jahr) as $a) {
+                if ((string) $a->getBereich() === 'steuerfuss' && (string) $a->getQuelle() !== 'pauschal') {
+                    $this->antraege->delete($a);
+                }
+            }
+        }
+        $this->config->setAppValue(
+            Application::APP_ID,
+            self::CONFIG_STEUERFUSS_AUTOMATIK . '_' . $jahr,
+            $an ? '1' : '0'
+        );
+        $this->nachAenderung($jahr);
+    }
+
+    /** Name der eigenen Fraktion (Config «fraktion») — Antragsteller unserer eigenen Anträge. */
+    public function eigeneFraktion(): string {
+        return trim((string) $this->config->getAppValue(Application::APP_ID, 'fraktion', ''));
+    }
+
+    /**
      * Rechnet nach jeder Änderung die automatische Pauschalverteilung und die
      * Steuerfuss-Senkung neu (idempotent), publiziert ein Realtime-Event.
      */
     private function nachAenderung(int $jahr): void {
         $this->pauschalNeu($jahr);
+        $this->steuerfussAutomatikNeu($jahr);
         $this->verknuepfungenAktualisieren($jahr);
         $this->realtime->publish('budget.updated', ['jahr' => $jahr]);
+    }
+
+    /**
+     * Automatische Steuerfuss-Senkung (F88): Steht am Ende (auf dem bereits
+     * pauschal gekürzten Stand) ein Überschuss, wird der Steuerfuss in ganzen
+     * Prozent-Schritten gesenkt, bis der Überschuss aufgebraucht ist — der
+     * Gesamtertrag geht damit auf (nahe) null. Die Senkung ist ein echter Antrag
+     * (quelle «pauschal», damit sie wie die Pauschalkürzungen jeden Zyklus neu
+     * gerechnet und in deletePauschalByJahr mitgelöscht wird): sie erscheint in
+     * der Antragsliste und im Antrags-PDF und reduziert die Einnahmen.
+     *
+     * Verhältnis zur Ziel-Pauschalverteilung (Lösung B): Beide Automatiken dürfen
+     * gleichzeitig aktiv sein. Die Ziel-Verteilung verteilt ausschliesslich
+     * Defizite als Kürzungen (F84); einen Überschuss rührt sie nicht an. Ein
+     * Überschuss — auch ein als Zielbetrag gewünschter Ertrag — wird stattdessen
+     * hier über die Steuerfuss-Senkung ausgeglichen, sodass der Gesamtertrag
+     * wieder null ist. So gibt es keinen Widerspruch zwischen «gewünschter Ertrag»
+     * und «Überschuss senkt den Steuerfuss».
+     *
+     * Ein manuell gestellter Steuerfuss-Antrag (quelle ≠ «pauschal») schaltet die
+     * Automatik aus — dann bestimmt der manuelle Antrag den Steuerfuss.
+     */
+    private function steuerfussAutomatikNeu(int $jahr): void {
+        // Vom Nutzer für dieses Jahr ausgeschaltet (F88): keine automatische Senkung,
+        // der Steuerfuss bleibt beim Stadtratsantrag.
+        if (!$this->steuerfussAutomatikAn($jahr)) {
+            return;
+        }
+        $alle = $this->antraege->findByJahr($jahr);
+        foreach ($alle as $a) {
+            if ((string) $a->getBereich() === 'steuerfuss' && (string) $a->getQuelle() !== 'pauschal') {
+                return; // manuelle Kontrolle → keine Automatik
+            }
+        }
+        $jahrRow = $this->jahre->findByJahr($jahr);
+        $steuerfuss = (int) $jahrRow->getSteuerfuss();
+        $steuerertrag = (int) $jahrRow->getSteuerertrag();
+        // Überschuss auf dem laufenden (bereits pauschal gekürzten) Stand, ohne
+        // einen etwaigen früheren Steuerfuss-Antrag.
+        $laufend = array_map(fn ($a) => $this->antragFuerRechnung($a), array_values(array_filter(
+            $alle,
+            static fn ($a) => ((string) ($a->getPhase() ?? 'fraktion')) === 'fraktion'
+                && $a->wirdUnterstuetzt()
+                && (string) $a->getBereich() !== 'steuerfuss'
+        )));
+        $summen = BudgetRechnung::summen($this->gruppenFuerRechnung($this->gruppen->findByJahr($jahr)), $laufend);
+        $senkung = BudgetRechnung::steuerfussSenkung((int) $summen['ergebnis'], $steuerertrag, $steuerfuss);
+        if ($senkung['gesenkteProzent'] <= 0) {
+            return;
+        }
+        $a = new BudgetAntrag();
+        $a->setJahr($jahr);
+        $a->setBereich('steuerfuss');
+        $a->setZielTyp('steuerfuss');
+        $a->setZielRef('');
+        $a->setProzentDelta(-1.0 * $senkung['gesenkteProzent']);
+        $a->setBetragDelta(-1 * $senkung['reduktion']);
+        $a->setStellenDelta(0.0);
+        $a->setBetragProStelle(0);
+        $a->setQuelle('pauschal');
+        $a->setHerkunft('eigene');
+        $a->setHaltung('einreichen');
+        // Die automatische Senkung ist ein Antrag der eigenen Fraktion (F88) — ihr
+        // Name (Config) ist der Antragsteller, sonst bliebe er im Antrags-PDF leer.
+        $a->setAntragsteller($this->eigeneFraktion());
+        $a->setBegruendung('Automatische Steuerfusssenkung um ' . $senkung['gesenkteProzent'] . ' Prozentpunkte (Überschuss ausgeglichen)');
+        $a->setReihenfolge(9500); // ganz am Ende der Antragsliste (F88)
+        $a->setErstelltVon($this->aktuellerNutzer());
+        $a->setErstelltAm($this->time->getTime());
+        $this->antraege->insert($a);
     }
 
     /**
@@ -582,9 +936,10 @@ class BudgetService {
                 $this->erzeugePauschalKinder($jahr, $v, $betrag, $alleFuerRechnung, $laufend);
             }
         }
-        // Ziel-Verteilungen (Ausgleich) danach — auf dem bereits gekürzten Stand.
+        // Das absolute Ziel (Ausgleich) danach — auf dem bereits durch die
+        // Einsparungen gekürzten Stand (F100). Es gibt höchstens eines (F84/F85).
         foreach ($verteilungen as $v) {
-            if ($v->modusOderStandard() !== 'ziel' || (int) $v->getAutomatikEin() !== 1) {
+            if ($v->modusOderStandard() !== 'ziel') {
                 continue;
             }
             $summen = BudgetRechnung::summen($alleFuerRechnung, $laufend);
@@ -624,9 +979,11 @@ class BudgetService {
      */
     private function erzeugePauschalKinder(int $jahr, BudgetVerteilung $v, int $betrag, array $alleFuerRechnung, array &$laufend): void {
         $ausnahmen = $v->getAusnahmenArray();
+        // Pauschalkürzungen verteilen nur auf die echten, operativen Produktegruppen
+        // — nie auf die künstliche (F89) und nicht auf ausgenommene Positionen (F101).
         $verteilbar = array_values(array_filter(
             $alleFuerRechnung,
-            static fn ($g) => !in_array((string) $g['code'], $ausnahmen, true)
+            static fn ($g) => empty($g['kuenstlich']) && !in_array((string) $g['code'], $ausnahmen, true)
         ));
         $haltung = $v->haltungOderStandard();
         $herkunft = ((string) ($v->getHerkunft() ?? 'eigene')) === 'fremde' ? 'fremde' : 'eigene';
@@ -669,8 +1026,9 @@ class BudgetService {
     public function pauschalErstellen(int $jahr, array $daten): BudgetVerteilung {
         $v = new BudgetVerteilung();
         $v->setJahr($jahr);
-        $v->setModus('fest');
-        $v->setAutomatikEin(1);
+        // Vorbelegung: eine Einsparung (relativ). Ein absolutes Ziel wählt der
+        // Nutzer danach; die Ein-absolutes-Ziel-Regel greift dabei (F84/F85).
+        $daten['zielModus'] = $daten['zielModus'] ?? 'einsparungen';
         $this->pauschalFelderSetzen($v, $daten);
         $v->setReihenfolge((int) ($daten['reihenfolge'] ?? $this->naechstePauschalReihenfolge($jahr)));
         $gespeichert = $this->verteilungen->insert($v);
@@ -695,8 +1053,37 @@ class BudgetService {
         $this->nachAenderung($jahr);
     }
 
+    /**
+     * Absolute Ziel-Typen: sie legen ein Gesamtergebnis fest (schwarze Null,
+     * fester Ertrag, festes Defizit). Davon darf immer nur EINER aktiv sein
+     * (F84/F85); «Einsparungen» (relativ) sind beliebig oft möglich.
+     *
+     * @var list<string>
+     */
+    private const ABSOLUTE_ZIELE = ['schwarze_null', 'fester_ertrag', 'festes_defizit'];
+
     /** @param array<string, mixed> $daten */
     private function pauschalFelderSetzen(BudgetVerteilung $v, array $daten): void {
+        // Ziel-Typ (F84/F85/F100): «einsparungen» (relativ, beliebig oft) oder ein
+        // absolutes Ziel (schwarze Null / fester Ertrag / festes Defizit, nur eines).
+        // Der Diskriminator «modus» folgt daraus: fest = Einsparungen, ziel = absolut.
+        if (array_key_exists('zielModus', $daten)) {
+            $ziel = (string) $daten['zielModus'];
+            if (!in_array($ziel, self::ABSOLUTE_ZIELE, true) && $ziel !== 'einsparungen') {
+                $ziel = 'einsparungen';
+            }
+            $v->setZielModus($ziel === 'einsparungen' ? 'schwarze_null' : $ziel);
+            $v->setModus($ziel === 'einsparungen' ? 'fest' : 'ziel');
+            $v->setAutomatikEin(1);
+            // Nur ein absolutes Ziel je Jahr: ein bestehendes anderes wird zur
+            // Einsparung 0 herabgestuft (der ältere weicht, F84/F85).
+            if (in_array($ziel, self::ABSOLUTE_ZIELE, true)) {
+                $this->absolutesZielFreiraeumen((int) $v->getJahr(), (int) $v->getId());
+            }
+        }
+        if (array_key_exists('zielBetrag', $daten)) {
+            $v->setZielBetrag((int) $daten['zielBetrag']);
+        }
         if (array_key_exists('betrag', $daten)) {
             $v->setBetrag((int) $daten['betrag']);
         }
@@ -717,6 +1104,23 @@ class BudgetService {
         }
         if (array_key_exists('ausnahmen', $daten) && is_array($daten['ausnahmen'])) {
             $v->setAusnahmen((string) json_encode(array_values(array_map(static fn ($x) => (string) $x, $daten['ausnahmen']))));
+        }
+    }
+
+    /**
+     * Stuft ein bereits bestehendes absolutes Ziel (ausser $ausser) auf eine
+     * Einsparung 0 herab, damit je Jahr nur ein absolutes Ziel aktiv ist (F84/F85).
+     */
+    private function absolutesZielFreiraeumen(int $jahr, int $ausser): void {
+        foreach ($this->verteilungen->alleFuerJahr($jahr) as $andere) {
+            if ((int) $andere->getId() === $ausser || $andere->modusOderStandard() !== 'ziel') {
+                continue;
+            }
+            $andere->setModus('fest');
+            $andere->setZielModus('schwarze_null');
+            $andere->setBetrag(0);
+            $andere->setProzent(0.0);
+            $this->verteilungen->update($andere);
         }
     }
 

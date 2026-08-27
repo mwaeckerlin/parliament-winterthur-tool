@@ -62,7 +62,7 @@ class BudgetPauschalTest extends TestCase {
      *
      * @param array<int, BudgetVerteilung>|null $verteilungen
      */
-    private function serviceMitCapture(?array $verteilungen = null): BudgetService {
+    private function serviceMitCapture(?array $verteilungen = null, ?BudgetVerteilungMapper $mapperOverride = null): BudgetService {
         $this->inserted = [];
         $jahre = $this->createStub(BudgetJahrMapper::class);
         $jahrRow = new BudgetJahr();
@@ -89,9 +89,13 @@ class BudgetPauschalTest extends TestCase {
 
         $zielVerteilung = new BudgetVerteilung();
         $zielVerteilung->setModus('ziel');
-        $verteilungenMapper = $this->createStub(BudgetVerteilungMapper::class);
-        $verteilungenMapper->method('findeOderStandard')->willReturn($zielVerteilung);
-        $verteilungenMapper->method('alleFuerJahr')->willReturn($verteilungen ?? [$zielVerteilung]);
+        if ($mapperOverride !== null) {
+            $verteilungenMapper = $mapperOverride;
+        } else {
+            $verteilungenMapper = $this->createStub(BudgetVerteilungMapper::class);
+            $verteilungenMapper->method('findeOderStandard')->willReturn($zielVerteilung);
+            $verteilungenMapper->method('alleFuerJahr')->willReturn($verteilungen ?? [$zielVerteilung]);
+        }
 
         $config = $this->createStub(IConfig::class);
         $config->method('getAppValue')->willReturnCallback(
@@ -156,5 +160,34 @@ class BudgetPauschalTest extends TestCase {
         $service->verteilungSetzen(2026, false, 'schwarze_null', 0);
         $summe = array_sum(array_map(static fn ($a) => (int) $a->getBetragDelta(), $this->inserted));
         self::assertSame(-7000000, $summe, 'beliebig viele Pauschalverteilungen kumulieren (F100)');
+    }
+
+    public function testNurEinAbsolutesZiel(): void {
+        // F84/F85: Es darf nur EIN absolutes Ziel geben. Wird ein zweites gewählt,
+        // wird das ältere zur Einsparung 0 herabgestuft (der ältere weicht).
+        $alt = new BudgetVerteilung();
+        $alt->setId(1);
+        $alt->setJahr(2026);
+        $alt->setModus('ziel');
+        $alt->setZielModus('festes_defizit');
+        $alt->setZielBetrag(-500000);
+        $neu = new BudgetVerteilung();
+        $neu->setId(2);
+        $neu->setJahr(2026);
+        $neu->setModus('fest');
+
+        $mapper = $this->createStub(BudgetVerteilungMapper::class);
+        $mapper->method('alleFuerJahr')->willReturn([$alt, $neu]);
+        $mapper->method('findeVerteilung')->willReturnCallback(static fn (int $id) => $id === 1 ? $alt : $neu);
+        $mapper->method('update')->willReturnArgument(0);
+
+        $service = $this->serviceMitCapture(null, $mapper);
+        // Der zweite Pauschalantrag wird zum absoluten Ziel «schwarze Null».
+        $service->pauschalAendern(2, ['zielModus' => 'schwarze_null']);
+
+        self::assertSame('fest', $alt->modusOderStandard(), 'älteres absolutes Ziel wurde zur Einsparung herabgestuft');
+        self::assertSame('schwarze_null', $alt->getZielModus());
+        self::assertSame(0, (int) $alt->getBetrag(), 'herabgestuftes Ziel spart nichts mehr');
+        self::assertSame('ziel', $neu->modusOderStandard(), 'das neue absolute Ziel ist aktiv');
     }
 }

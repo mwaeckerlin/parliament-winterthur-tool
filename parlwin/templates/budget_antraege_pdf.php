@@ -15,6 +15,7 @@ declare(strict_types=1);
 
 $jahr = (int) ($_['jahr'] ?? 0);
 $kommission = (string) ($_['kommission'] ?? '');
+$fraktion = trim((string) ($_['fraktion'] ?? ''));
 $eintraege = is_array($_['eintraege'] ?? null) ? $_['eintraege'] : [];
 
 // Gruppierung nach Departement, Buchreihenfolge bleibt erhalten.
@@ -35,6 +36,18 @@ $bereichLabel = [
     'investition' => 'Investition',
     'steuerfuss' => 'Steuerfuss',
 ];
+// Einsparungsverteilung eines Antrags (F109) als lesbare Zeile für die Begründung.
+$aufteilungLabel = static function (array $t) use ($fr): string {
+    $ebene = (string) ($t['ebene'] ?? '');
+    $ref = (string) ($t['ref'] ?? '');
+    $ort = $ebene === 'produkt'
+        ? ('Produkt ' . $ref)
+        : ($ebene === 'produkt-kosten'
+            ? ('Produkt ' . (string) ($t['produkt'] ?? '') . ', ' . $ref)
+            : $ref);
+    $wert = isset($t['betrag']) ? $fr($t['betrag']) : (isset($t['prozent']) ? ($t['prozent'] . '%') : '');
+    return $ort . ($wert !== '' ? ' (' . $wert . ')' : '');
+};
 ?><!DOCTYPE html>
 <html lang="de">
 <head>
@@ -129,7 +142,7 @@ $bereichLabel = [
     <button type="button" class="druck-knopf" id="druck-knopf">Als PDF speichern / drucken</button>
 
     <header class="kopf">
-        <h1>Budgetanträge der Fraktion</h1>
+        <h1>Budgetanträge der <?php p($fraktion !== '' ? $fraktion : 'Fraktion'); ?></h1>
         <p class="unter">Budget <?php p((string) $jahr); ?><?php if ($kommission !== ''): ?> · <?php p($kommission); ?><?php endif; ?></p>
     </header>
 
@@ -160,7 +173,10 @@ $bereichLabel = [
                         <td class="betrag"><?php p($fr($a['betragDelta'] ?? 0)); ?></td>
                         <td class="betrag"><?php p((string) ((float) ($a['stellenDelta'] ?? 0) !== 0.0 ? ($a['stellenDelta'] ?? '') : '')); ?></td>
                         <td><?php p((string) ($a['antragsteller'] ?? '')); ?><?php if ($auto): ?> <span class="auto">(automatisch)</span><?php endif; ?></td>
-                        <td><?php p((string) ($a['begruendung'] ?? '')); ?></td>
+                        <td><?php p((string) ($a['begruendung'] ?? '')); ?><?php
+                            $zae = is_array($a['zielAenderungen'] ?? null) ? $a['zielAenderungen'] : [];
+                            $auf = is_array($a['aufteilung'] ?? null) ? $a['aufteilung'] : [];
+                        ?><?php if ($zae): ?><br><em>Zielvorgaben:</em><?php foreach ($zae as $z): ?> Ziel <?php p((string) ($z['zielNummer'] ?? '')); ?> «<?php p((string) ($z['messgroesse'] ?? '')); ?>» → Soll <?php p((string) ($z['neuerWert'] ?? '')); ?>;<?php endforeach; ?><?php endif; ?><?php if ($auf): ?><br><em>Einsparung verteilt:</em><?php foreach ($auf as $t): ?> <?php p($aufteilungLabel($t)); ?>;<?php endforeach; ?><?php endif; ?></td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>

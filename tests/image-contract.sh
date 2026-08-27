@@ -43,6 +43,24 @@ _no_interpreter() {
     fi
 }
 
+# PHP-Images müssen eine vollständige iconv-Abdeckung haben. Die musl-iconv der
+# Alpine-Basis kennt «macintosh»/MacRoman NICHT und gibt false zurück — dann
+# extrahiert smalot aus MacRoman-kodierten Budgetbüchern leeren Text und der
+# Import parst 0 Produktegruppen (der Budget-Wipe). GNU libiconv (per LD_PRELOAD)
+# behebt das. Geprüft wird nur, wo ein PHP-Interpreter vorhanden ist.
+_php_iconv() {
+    local image="$1"
+    if ! docker run --rm --pull=never --entrypoint /usr/bin/php "${image}" -v > /dev/null 2>&1; then
+        return 0  # kein PHP im Image — nicht zutreffend
+    fi
+    if docker run --rm --pull=never --entrypoint /usr/bin/php "${image}" \
+        -r 'exit(@iconv("macintosh","UTF-8","A")==="A" ? 0 : 1);' > /dev/null 2>&1; then
+        _pass "${image}_iconv_macroman"
+    else
+        _fail "${image}_iconv_macroman" "iconv('macintosh') liefert kein Ergebnis — GNU libiconv (LD_PRELOAD) fehlt; smalot dekodiert MacRoman-PDF nicht"
+    fi
+}
+
 echo "==> Image contract: headless images"
 
 for image in "$@"; do
@@ -51,6 +69,7 @@ for image in "$@"; do
     _no_interpreter "${image}" /bin/bash    bash    -c :
     _no_interpreter "${image}" /bin/busybox busybox ls /
     _no_interpreter "${image}" /usr/bin/perl perl   -e 1
+    _php_iconv "${image}"
 done
 
 echo ""

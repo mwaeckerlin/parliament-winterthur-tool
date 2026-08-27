@@ -60,6 +60,10 @@ use JsonSerializable;
  * @method void   setErstelltAm(?int $v)
  * @method string getPhase()
  * @method void   setPhase(?string $v)
+ * @method string getZielAenderungen()
+ * @method void   setZielAenderungen(?string $v)
+ * @method string getAufteilung()
+ * @method void   setAufteilung(?string $v)
  */
 class BudgetAntrag extends Entity implements JsonSerializable {
     protected int $jahr = 0;
@@ -89,6 +93,19 @@ class BudgetAntrag extends Entity implements JsonSerializable {
     protected ?int $erstelltAm = null;
     /** Phase: «fraktion» (interne Vorbereitung) oder «sitzung» (offizielle Sitzungsanträge). */
     protected ?string $phase = 'fraktion';
+    /**
+     * Zielvorgaben-Änderungen (F109, WoV) als JSON-Liste
+     * [{zielNummer, messgroesse, neuerWert}] — die Produktegruppe ist zielRef.
+     * Ein Antrag kann Budget UND/ODER Zielvorgaben ändern; eine Zielvorgabe hat
+     * keine automatische Budgetwirkung.
+     */
+    protected ?string $zielAenderungen = null;
+    /**
+     * Hierarchische Einsparungsverteilung (F109) als JSON-Liste
+     * [{ebene, ref, produkt?, betrag?, prozent?}] — wo innerhalb der Produktegruppe
+     * der beantragte Betrag einzusparen ist. Dient vor allem der Begründung.
+     */
+    protected ?string $aufteilung = null;
 
     public function __construct() {
         foreach (['jahr', 'betragDelta', 'betragProStelle', 'verteilungId', 'reihenfolge', 'erstelltAm', 'pauschalAusnahme', 'verknuepftMitId'] as $f) {
@@ -122,6 +139,34 @@ class BudgetAntrag extends Entity implements JsonSerializable {
     /** @return list<array{key:string,name:string}> */
     public function getUnterstuetzerArray(): array {
         return self::alsListe($this->unterstuetzer);
+    }
+
+    /**
+     * Zielvorgaben-Änderungen als Liste [{zielNummer, messgroesse, neuerWert}] (F109).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function getZielAenderungenArray(): array {
+        $roh = trim($this->zielAenderungen ?? '');
+        if ($roh === '') {
+            return [];
+        }
+        $dekodiert = json_decode($roh, true);
+        return is_array($dekodiert) ? array_values($dekodiert) : [];
+    }
+
+    /**
+     * Einsparungsverteilung als Liste [{ebene, ref, produkt?, betrag?, prozent?}] (F109).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function getAufteilungArray(): array {
+        $roh = trim($this->aufteilung ?? '');
+        if ($roh === '') {
+            return [];
+        }
+        $dekodiert = json_decode($roh, true);
+        return is_array($dekodiert) ? array_values($dekodiert) : [];
     }
 
     /**
@@ -167,6 +212,8 @@ class BudgetAntrag extends Entity implements JsonSerializable {
             'reihenfolge' => $this->reihenfolge,
             'erstelltVon' => $this->erstelltVon,
             'phase' => $this->phase ?? 'fraktion',
+            'zielAenderungen' => $this->getZielAenderungenArray(),
+            'aufteilung' => $this->getAufteilungArray(),
         ];
     }
 }

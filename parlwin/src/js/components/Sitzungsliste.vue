@@ -10,11 +10,11 @@
     />
   </Teleport>
   <Teleport v-if="filterReady" to="#pw-filter-slot">
-    <div class="pw-filter-body">
+    <FilterPanel @reset="filterZuruecksetzen">
       <NcCheckboxRadioSwitch v-model="nurKuenftige" type="switch">
         Nur zukünftige Sitzungen
       </NcCheckboxRadioSwitch>
-    </div>
+    </FilterPanel>
   </Teleport>
 
   <section class="pw-view-content pw-sitzungen">
@@ -671,6 +671,7 @@ import NcActionButton from '@nextcloud/vue/components/NcActionButton'
 import NcButton from '@nextcloud/vue/components/NcButton'
 import NcCheckboxRadioSwitch from '@nextcloud/vue/components/NcCheckboxRadioSwitch'
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
+import FilterPanel from './FilterPanel.vue'
 import NcSelect from '@nextcloud/vue/components/NcSelect'
 import NcTextField from '@nextcloud/vue/components/NcTextField'
 import PwMultiSelect from './PwMultiSelect.vue'
@@ -679,7 +680,7 @@ import PwDatumInput from './PwDatumInput.vue'
 
 export default {
   name: 'Sitzungsliste',
-  components: { GeschaeftDetail, BudgetSitzungsantraege, NotizenListe, Aktionszeitleiste, GeschaeftDokumente, NcActions, NcActionButton, NcButton, NcCheckboxRadioSwitch, NcLoadingIcon, NcSelect, NcTextField, PwMultiSelect, PwField, PwDatumInput },
+  components: { GeschaeftDetail, BudgetSitzungsantraege, NotizenListe, Aktionszeitleiste, GeschaeftDokumente, NcActions, NcActionButton, NcButton, NcCheckboxRadioSwitch, NcLoadingIcon, NcSelect, NcTextField, PwMultiSelect, PwField, PwDatumInput, FilterPanel },
   props: {
     mitglieder:   { type: Array, default: () => [] },
     fraktionen:   { type: Array, default: () => [] },
@@ -867,6 +868,10 @@ export default {
   },
   methods: {
     kuerze,
+    filterZuruecksetzen() {
+      this.suche = ''
+      this.nurKuenftige = true
+    },
     async ladeSitzungstypen() {
       try {
         const { data } = await axios.get(generateUrl('/apps/parlwin/sitzungstypen'))

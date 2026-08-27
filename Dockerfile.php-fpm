@@ -18,15 +18,42 @@ RUN ${PKG_INSTALL} composer
 COPY parlwin/composer.json ./composer.json
 RUN composer update --no-dev --no-interaction --no-progress --prefer-dist --ignore-platform-reqs
 
+# GNU libiconv als LD_PRELOAD-fähige Bibliothek: die musl-iconv der Alpine-Basis
+# kennt viele PDF-Font-Kodierungen NICHT (z.B. «macintosh»/MacRoman) und gibt für
+# `iconv('macintosh', …)` schlicht `false` zurück. smalot/pdfparser dekodiert
+# MacRoman-Fonts genau darüber (Font.php: `iconv($enc, 'UTF-8//TRANSLIT//IGNORE', …)`);
+# unter musl liefert das leeren Text, und der Budget-Import parst 0 Produktegruppen.
+# GNU libiconv (per LD_PRELOAD vorgeladen) bringt die vollständige iconv-Abdeckung.
+FROM mwaeckerlin/very-base AS iconv
+# GNU libiconv führt seine Funktionen intern als libiconv_* (um nicht mit der libc
+# zu kollidieren). Damit LD_PRELOAD musls iconv im PHP-Prozess ersetzt, braucht es
+# die unpräfixierten Symbole iconv_open/iconv/iconv_close — ein winziger Shim, der
+# an GNU libiconv weiterreicht, liefert genau die.
+RUN ${PKG_INSTALL} gnu-libiconv gnu-libiconv-dev build-base
+RUN printf '%s\n' \
+    '#include <stddef.h>' \
+    'typedef void* iconv_t;' \
+    'extern iconv_t libiconv_open(const char*, const char*);' \
+    'extern size_t libiconv(iconv_t, char**, size_t*, char**, size_t*);' \
+    'extern int libiconv_close(iconv_t);' \
+    'iconv_t iconv_open(const char* t, const char* f){ return libiconv_open(t, f); }' \
+    'size_t iconv(iconv_t c, char** i, size_t* il, char** o, size_t* ol){ return libiconv(c, i, il, o, ol); }' \
+    'int iconv_close(iconv_t c){ return libiconv_close(c); }' \
+    > /shim.c \
+    && gcc -shared -fPIC -O2 -o /preloadable_libiconv.so /shim.c -liconv
+
 FROM mwaeckerlin/nodejs-build AS app-build
 WORKDIR /build
 COPY --chown=${BUILD_USER} package*.json ./
 RUN npm install --no-audit --no-fund
 
 COPY --chown=${BUILD_USER} parlwin/ ./parlwin/
-# CHANGELOG.md wird zur Build-Zeit in die «Änderungsverlauf»-Ansicht eingebunden
-# (Webpack-Alias @changelog → ../CHANGELOG.md relativ zu parlwin/).
+# CHANGELOG.md und README.md werden zur Build-Zeit eingebunden: der «Änderungs-
+# verlauf» aus @changelog → ../CHANGELOG.md, die «Bedienungsanleitung» aus
+# @readme → ../README.md (relativ zu parlwin/). Fehlt eine der Dateien, scheitert
+# der Webpack-Build im Image.
 COPY --chown=${BUILD_USER} CHANGELOG.md ./CHANGELOG.md
+COPY --chown=${BUILD_USER} README.md ./README.md
 RUN npm run build:app \
     && rm -rf node_modules \
     parlwin/src \
@@ -35,6 +62,13 @@ RUN npm run build:app \
     parlwin/.phpunit.result.cache
 
 FROM mwaeckerlin/nextcloud:php-fpm
+# GNU libiconv vorladen, damit PHPs iconv() alle PDF-Font-Kodierungen abdeckt
+# (MacRoman u.a.) — sonst extrahiert smalot aus manchen Budgetbüchern leeren Text
+# (siehe iconv-Stage oben). Die Bibliothek ist eigenständig LD_PRELOAD-tauglich.
+COPY --from=iconv /preloadable_libiconv.so /usr/lib/preloadable_libiconv.so
+COPY --from=iconv /usr/lib/libiconv.so.2 /usr/lib/libiconv.so.2
+COPY --from=iconv /usr/lib/libcharset.so.1 /usr/lib/libcharset.so.1
+ENV LD_PRELOAD=/usr/lib/preloadable_libiconv.so
 COPY --from=app-build /build/parlwin /usr/local/share/nextcloud/seed/custom_apps/parlwin
 # Composer-vendor (smalot/pdfparser) — von Application.php via vendor/autoload.php geladen.
 COPY --from=php-deps /deps/vendor /usr/local/share/nextcloud/seed/custom_apps/parlwin/vendor

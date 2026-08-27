@@ -2,7 +2,7 @@
   <!-- Filter im Navigations-Slot — wie alle anderen Ansichten (kein eigenes
        Filterband auf der Seite). -->
   <Teleport v-if="filterReady" to="#pw-filter-slot">
-    <div class="pw-filter-body">
+    <FilterPanel @reset="filterZuruecksetzen">
       <NcSelect v-if="jahrOptionen.length" v-model="jahrOption" :options="jahrOptionen" :clearable="false" input-label="Budgetjahr" @update:model-value="jahrGewechselt" />
       <NcSelect v-if="kommissionOptionen.length" v-model="kommissionOption" :options="kommissionOptionen" input-label="Zuständige Kommission" placeholder="Alle" @update:model-value="kommissionGewechselt" />
       <NcSelect v-model="departementOption" :options="departementOptionen" input-label="Departement" placeholder="Alle" @update:model-value="ladeAnsicht(false)" />
@@ -10,50 +10,90 @@
       <NcTextField v-model="minAbsolut" type="number" label="Anstieg ab CHF" />
       <NcSelect v-model="antragsartOption" :options="antragsartOptionen" :clearable="false" input-label="Anträge" />
       <NcCheckboxRadioSwitch :model-value="sitzungsmodus" type="switch" @update:model-value="sitzungsmodusUmschalten">
-        Sitzungsmodus (offizielle Sitzungsanträge)
+        Sitzungsmodus
       </NcCheckboxRadioSwitch>
-    </div>
+    </FilterPanel>
   </Teleport>
 
   <section class="pw-view-content pw-budget">
     <header class="pw-view-header">
       <h2 class="pw-view-title">Budget</h2>
       <span class="pw-view-count">{{ produktegruppenCount }}</span>
-      <NcButton type="secondary" @click="pdfOeffnen">Anträge als PDF</NcButton>
       <NcButton v-if="novemberbriefMoeglich" type="secondary" @click="novemberbriefEinlesen">Novemberbrief einlesen</NcButton>
+      <NcButton v-if="sitzungsmodus && ansicht" type="secondary" :disabled="sitzungsantraegeLaeuft" @click="sitzungsantraegeEinlesen">Sitzungsanträge einlesen</NcButton>
+      <NcButton v-if="ansicht" type="tertiary" @click="reimportOeffnen">Budget neu einlesen</NcButton>
       <NcButton type="primary" @click="neuOeffnen">+ Neu</NcButton>
+      <!-- Link zur Weisung ganz rechts, nach den Buttons. -->
+      <a v-if="weisungQuelle" class="pw-weisung-link pw-weisung-rechts" :href="weisungQuelle" target="_blank" rel="noopener noreferrer">Weisung {{ weisungNummer }}</a>
     </header>
+
+    <!-- Fortschritt beim Einlesen der Sitzungsanträge (F90): das Drehbuch wird live
+         geladen und geparst, das dauert einige Sekunden. -->
+    <div v-if="sitzungsantraegeLaeuft" class="pw-reimport-fortschritt">
+      <span class="pw-reimport-label">Sitzungsanträge werden aus dem Drehbuch eingelesen…</span>
+      <div class="pw-reimport-bar" role="progressbar" aria-label="Sitzungsanträge werden eingelesen">
+        <div class="pw-reimport-bar-inner"></div>
+      </div>
+    </div>
+
+    <!-- Fortschritt beim Neu-Einlesen (F91): das Budgetbuch wird geparst, das dauert. -->
+    <div v-if="reimportLaeuft" class="pw-reimport-fortschritt">
+      <span class="pw-reimport-label">Budget wird neu eingelesen…</span>
+      <div class="pw-reimport-bar" role="progressbar" aria-label="Budget wird neu eingelesen">
+        <div class="pw-reimport-bar-inner"></div>
+      </div>
+    </div>
 
     <div v-if="laden" class="pw-laden"><NcLoadingIcon :size="32" /></div>
     <NcEmptyContent v-else-if="!ansicht" name="Kein Budgetjahr vorhanden" description="Über «+ Neu» ein vergangenes Budgetjahr importieren." />
 
     <template v-else>
-      <!-- Summenzeile (budget-eigen, richtet sich nach den Filtern) -->
+      <!-- Übersicht (F102): Vergleich Stadtratsbudget (wie vorgelegt) mit dem
+           Fraktionsbudget (mit unseren Anträgen); die Differenz zeigt, was unsere
+           Anträge bewirken. Richtet sich nach den Filtern. -->
+      <!-- Übersicht und Tabs kleben zusammen als EIN Sticky-Block am oberen Rand:
+           so überlagern sich die beiden nicht, und die Tabs hängen unten an den
+           Übersichtszahlen (statt zwei konkurrierende Stickies auf top: 0). -->
+      <div class="pw-budget-sticky">
       <div class="pw-budget-summen">
-        <div class="pw-summe">
-          <span class="pw-summe-label">Stellen</span>
-          <span class="pw-summe-wert">{{ zahl(summen.stellen) }}</span>
-          <span class="pw-summe-diff" :class="diffKlasse(summen.stellenDiff)">{{ diff(summen.stellenDiff, true) }}</span>
-        </div>
-        <div class="pw-summe">
-          <span class="pw-summe-label">Ausgaben</span>
-          <span class="pw-summe-wert">{{ fr(summen.ausgaben) }}</span>
-          <span class="pw-summe-diff" :class="diffKlasse(summen.ausgabenDiff)">{{ diff(summen.ausgabenDiff) }}</span>
-        </div>
-        <div class="pw-summe">
-          <span class="pw-summe-label">Einnahmen</span>
-          <span class="pw-summe-wert">{{ fr(summen.einnahmen) }}</span>
-          <span class="pw-summe-diff" :class="diffKlasse(summen.einnahmenDiff)">{{ diff(summen.einnahmenDiff) }}</span>
-        </div>
-        <div class="pw-summe">
-          <span class="pw-summe-label">{{ summen.ergebnis < 0 ? 'Defizit' : 'Ertrag' }}</span>
-          <span class="pw-summe-wert" :class="summen.ergebnis < 0 ? 'pw-negativ' : 'pw-positiv'">{{ fr(summen.ergebnis) }}</span>
-          <span class="pw-summe-diff" :class="diffKlasse(summen.ergebnisDiff)">{{ diff(summen.ergebnisDiff) }}</span>
-        </div>
-        <div class="pw-summe">
-          <span class="pw-summe-label">Steuerfuss</span>
-          <span class="pw-summe-wert">{{ steuerfussEffektiv }}%</span>
-        </div>
+        <table class="pw-budget-vergleich">
+          <thead>
+            <tr>
+              <th class="pw-vergleich-zeile"></th>
+              <th>Ausgaben</th>
+              <th>Einnahmen</th>
+              <th>{{ ergebnisLabelFraktion }}</th>
+              <th>Steuerfuss</th>
+              <th>Stellen</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th class="pw-vergleich-zeile">Stadtratsbudget</th>
+              <td data-label="Ausgaben">{{ fr(summenStadtrat.ausgaben) }}</td>
+              <td data-label="Einnahmen">{{ fr(summenStadtrat.einnahmen) }}</td>
+              <td :data-label="ergebnisLabelFraktion" :class="summenStadtrat.ergebnis < 0 ? 'pw-negativ' : 'pw-positiv'">{{ fr(summenStadtrat.ergebnis) }}</td>
+              <td data-label="Steuerfuss">{{ ansicht.jahr.steuerfuss }}%</td>
+              <td data-label="Stellen">{{ zahl(summenStadtrat.stellen) }}</td>
+            </tr>
+            <tr>
+              <th class="pw-vergleich-zeile">Fraktionsbudget</th>
+              <td data-label="Ausgaben">{{ fr(summen.ausgaben) }}</td>
+              <td data-label="Einnahmen">{{ fr(summen.einnahmen) }}</td>
+              <td :data-label="ergebnisLabelFraktion" :class="summen.ergebnis < 0 ? 'pw-negativ' : 'pw-positiv'">{{ fr(summen.ergebnis) }}</td>
+              <td data-label="Steuerfuss">{{ steuerfussEffektiv }}%</td>
+              <td data-label="Stellen">{{ zahl(summen.stellen) }}</td>
+            </tr>
+            <tr class="pw-vergleich-differenz">
+              <th class="pw-vergleich-zeile">Differenz</th>
+              <td data-label="Ausgaben" :class="diffKlasse(summen.ausgaben - summenStadtrat.ausgaben)">{{ diff(summen.ausgaben - summenStadtrat.ausgaben) }}</td>
+              <td data-label="Einnahmen" :class="diffKlasse(summen.einnahmen - summenStadtrat.einnahmen)">{{ diff(summen.einnahmen - summenStadtrat.einnahmen) }}</td>
+              <td :data-label="ergebnisLabelFraktion" :class="diffKlasse(summen.ergebnis - summenStadtrat.ergebnis)">{{ diff(summen.ergebnis - summenStadtrat.ergebnis) }}</td>
+              <td data-label="Steuerfuss">{{ steuerfussEffektiv - ansicht.jahr.steuerfuss === 0 ? '±0%' : (steuerfussEffektiv - ansicht.jahr.steuerfuss) + '%' }}</td>
+              <td data-label="Stellen" :class="diffKlasse(summen.stellen - summenStadtrat.stellen)">{{ diff(summen.stellen - summenStadtrat.stellen, true) }}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
       <div class="pw-budget-tabs" role="tablist">
@@ -65,34 +105,25 @@
           class="pw-budget-tab"
           :class="{ 'pw-budget-tab-aktiv': aktiverTab === t.key }"
           :aria-selected="aktiverTab === t.key"
-          @click="aktiverTab = t.key"
+          @click="tabWechseln(t.key)"
         >{{ t.label }}</button>
+      </div>
       </div>
 
       <!-- Tab: Globalbudgets -->
       <div v-show="aktiverTab === 'globalbudget'" class="pw-budget-tabpanel">
-        <div v-if="!sitzungsmodus" class="pw-data-card pw-verteilung">
-          <NcCheckboxRadioSwitch :model-value="verteilung.automatikEin" type="switch" @update:model-value="verteilungAendern('automatikEin', $event)">
-            Defizit automatisch als Pauschalkürzung verteilen
-          </NcCheckboxRadioSwitch>
-          <NcCheckboxRadioSwitch v-if="verteilung.automatikEin" :model-value="pauschalEinreichen" type="switch" @update:model-value="pauschalEinreichenUmschalten">
-            Pauschalantrag einreichen
-          </NcCheckboxRadioSwitch>
-          <div class="pw-verteilung-ziel">
-            <NcSelect :model-value="zielModusOption" :options="zielModusOptionen" :clearable="false" input-label="Ziel" @update:model-value="verteilungAendern('zielModus', $event ? $event.value : 'schwarze_null')" />
-            <NcTextField v-if="verteilung.zielModus !== 'schwarze_null'" v-model="zielBetrag" type="number" label="Zielbetrag CHF" />
-            <NcButton v-if="!verteilung.automatikEin" type="secondary" @click="pauschalVerteilen">Defizit verteilen</NcButton>
-          </div>
-        </div>
-
-        <!-- Weitere, voneinander unabhängige Pauschalanträge (F100) -->
+        <!-- Pauschalanträge (F100): alle gleich behandelt, jeder mit eigenem Ziel-Typ
+             (Einsparungen, schwarze Null, fester Ertrag, festes Defizit). Die Liste
+             startet leer; «+ Pauschalantrag» legt einen neuen an. -->
         <div v-if="!sitzungsmodus" class="pw-data-card pw-pauschalantraege">
-          <h3 class="pw-pauschal-titel">Weitere Pauschalanträge</h3>
+          <h3 class="pw-pauschal-titel">Pauschalanträge</h3>
           <BudgetPauschalForm
             v-for="p in pauschalantraege"
             :key="p.id"
             :pauschal="p"
             :produktegruppen="ansicht.produktegruppen"
+            :fraktion-optionen="fraktionOptionen"
+            :eigene-fraktion="eigeneFraktionName"
             @save="felder => pauschalAendern(p.id, felder)"
             @delete="pauschalLoeschen(p.id)"
           />
@@ -102,10 +133,10 @@
         <div v-for="dep in gruppenNachDepartement" :key="dep.name" class="pw-budget-departement">
           <h3 class="pw-budget-dep-titel">{{ dep.name }}</h3>
           <div class="pw-card-grid">
-            <article v-for="g in dep.gruppen" :key="g.id" class="pw-data-card">
+            <article v-for="g in dep.gruppen" :key="g.id" class="pw-data-card" :class="{ 'pw-budget-kuenstlich': g.kuenstlich }">
               <div class="pw-data-card-header">
                 <div>
-                  <p class="pw-data-card-kicker">Produktegruppe {{ g.code }}</p>
+                  <p class="pw-data-card-kicker">{{ g.kuenstlich ? 'Rechnerische Position' : 'Produktegruppe ' + g.code }}</p>
                   <h3>{{ g.name }}</h3>
                 </div>
                 <span class="pw-budget-betrag">
@@ -118,13 +149,16 @@
                   <span class="pw-antrag-betrag" :class="diffKlasse(a.betragDelta)">{{ fr(a.betragDelta) }}</span>
                   <span class="pw-antrag-steller">{{ a.antragsteller || (a.automatisch ? 'automatisch' : '') }}</span>
                   <span class="pw-antrag-begruendung">{{ a.begruendung }}</span>
-                  <NcSelect v-if="!a.automatisch" :model-value="haltungOptFor(a)" :options="haltungOptionen(a.herkunft)" :clearable="false" aria-label="Unsere Haltung" class="pw-antrag-haltung" @update:model-value="antragHaltung(a.id, $event ? $event.value : a.haltung)" />
-                  <span class="pw-antrag-entscheid" :class="'pw-entscheid-' + a.entscheid">{{ entscheidLabel(a.entscheid) }}</span>
-                  <span class="pw-entscheid-knoepfe">
-                    <NcButton type="tertiary" :aria-label="'Antrag angenommen'" @click="entscheidSetzen(a.id, a.entscheid === 'angenommen' ? 'offen' : 'angenommen')">✓</NcButton>
-                    <NcButton type="tertiary" :aria-label="'Antrag abgelehnt'" @click="entscheidSetzen(a.id, a.entscheid === 'abgelehnt' ? 'offen' : 'abgelehnt')">✕</NcButton>
-                  </span>
-                  <NcButton v-if="!a.automatisch" type="tertiary" aria-label="Antrag löschen" @click="antragLoeschen(a.id)">🗑</NcButton>
+                  <NcCheckboxRadioSwitch v-if="!a.automatisch" :model-value="haltungAn(a)" type="switch" class="pw-antrag-toggle" @update:model-value="haltungUmschalten(a, $event)">{{ haltungLabel(a) }}</NcCheckboxRadioSwitch>
+                  <!-- Entscheid (Parlamentsbeschluss) nur in der Sitzung. -->
+                  <template v-if="sitzungsmodus">
+                    <span class="pw-antrag-entscheid" :class="'pw-entscheid-' + a.entscheid">{{ entscheidLabel(a.entscheid) }}</span>
+                    <span class="pw-entscheid-knoepfe">
+                      <NcButton type="tertiary" :aria-label="'Antrag angenommen'" @click="entscheidSetzen(a.id, a.entscheid === 'angenommen' ? 'offen' : 'angenommen')">✓</NcButton>
+                      <NcButton type="tertiary" :aria-label="'Antrag abgelehnt'" @click="entscheidSetzen(a.id, a.entscheid === 'abgelehnt' ? 'offen' : 'abgelehnt')">✕</NcButton>
+                    </span>
+                  </template>
+                  <PwLoeschen v-if="!a.automatisch" class="pw-antrag-loeschen" label="Antrag löschen" @click="antragLoeschen(a.id)" />
                   <NcSelect v-if="sitzungsmodus" :model-value="verknuepfungOpt(a)" :options="verknuepfungsKandidaten(a)" input-label="Verknüpft mit" placeholder="nicht verknüpft" class="pw-antrag-verknuepfen" @update:model-value="verknuepfungWaehlen(a.id, $event ? $event.value : 0)" />
                   <details class="pw-antrag-notizen" @toggle="notizenToggle(a.id, $event)">
                     <summary>Notizen</summary>
@@ -132,55 +166,39 @@
                   </details>
                 </li>
               </ul>
-              <NcCheckboxRadioSwitch
-                v-if="!sitzungsmodus && verteilung.automatikEin"
-                :model-value="pauschalAusnahmen.includes(g.code)"
-                type="checkbox"
-                @update:model-value="ausnahmeUmschalten(g.code, $event)"
-              >Ausnahme vom Pauschalantrag</NcCheckboxRadioSwitch>
+              <!-- F101: pro Pauschalantrag ein Ausnahme-Toggle direkt an der Produkte-
+                   gruppe (zusätzlich zur Mehrfachauswahl im Pauschalantrag selbst).
+                   Toggle aus = diese Position ist vom Pauschalantrag ausgenommen. -->
+              <ul v-if="!g.kuenstlich && !sitzungsmodus && pauschalantraege.length" class="pw-pg-pauschale">
+                <li v-for="p in pauschalantraege" :key="'ps' + p.id">
+                  <NcCheckboxRadioSwitch
+                    :model-value="!pgAusgenommen(p, g.code)"
+                    type="switch"
+                    @update:model-value="v => pgPauschalToggle(p, g.code, v)"
+                  >{{ pauschalKurz(p) }}<template v-if="pgAusgenommen(p, g.code)"> — ausgenommen</template></NcCheckboxRadioSwitch>
+                </li>
+              </ul>
               <BudgetAntragForm
-                v-if="formOffen['g' + g.code]"
+                v-if="!g.kuenstlich && formOffen['g' + g.code]"
                 :form="neu[g.code]"
                 :antragsteller-optionen="antragstellerOptionen(neu[g.code].herkunft)"
-                :haltung-optionen="haltungOptionen(neu[g.code].herkunft)"
                 :fraktion-optionen="fraktionOptionen"
                 :basis="g.globalkredit.soll"
+                :zielvorgaben="g.zielvorgaben || []"
+                :kostenzeilen="g.kostenzeilen || []"
+                :produkte="g.produkte || []"
                 @herkunft="herkunftGewechselt(neu[g.code], $event)"
                 @save="antragGlobalbudget(g.code)"
+                @abbrechen="formSchliessen('g' + g.code)"
               />
-              <NcButton v-else type="tertiary" @click="formOeffnen('g' + g.code)">+ Antrag</NcButton>
-              <details v-if="g.auftrag" class="pw-budget-info">
-                <summary>Auftrag</summary>
-                <p>{{ g.auftrag }}</p>
-              </details>
-              <details v-if="g.produkte && g.produkte.length" class="pw-budget-info">
-                <summary>Produkte (Information)</summary>
-                <ul>
-                  <li v-for="(p, i) in g.produkte" :key="i">
-                    {{ p.nummer }} {{ p.name }}
-                    <span v-if="p.nettokosten && p.nettokosten.soll" class="pw-produkt-kosten">{{ fr(p.nettokosten.soll) }}</span>
-                  </li>
-                </ul>
-              </details>
-              <details v-if="g.begruendungAbweichung || g.erlaeuterungStellen || g.begruendungFap || g.massnahmen" class="pw-budget-info">
-                <summary>Erläuterungen</summary>
-                <template v-if="g.begruendungAbweichung">
-                  <h4>Begründung Abweichung</h4>
-                  <p>{{ g.begruendungAbweichung }}</p>
-                </template>
-                <template v-if="g.erlaeuterungStellen">
-                  <h4>Erläuterungen zum Stellenplan</h4>
-                  <p>{{ g.erlaeuterungStellen }}</p>
-                </template>
-                <template v-if="g.begruendungFap">
-                  <h4>Begründung FAP</h4>
-                  <p>{{ g.begruendungFap }}</p>
-                </template>
-                <template v-if="g.massnahmen">
-                  <h4>Wesentliche Massnahmen und Projekte</h4>
-                  <p>{{ g.massnahmen }}</p>
-                </template>
-              </details>
+              <!-- Aktionszeile am Kartenfuss: «Antrag» als Hauptaktion, «Details» öffnet
+                   das Vollbild-Popup (F110) mit Zielvorgaben, Produkten und Erläuterungen. -->
+              <div v-if="!g.kuenstlich" class="pw-budget-card-aktionen">
+                <NcButton v-if="!formOffen['g' + g.code]" type="secondary" @click="formOeffnen('g' + g.code)">+ Antrag</NcButton>
+                <NcButton type="tertiary" class="pw-pg-detail-knopf" @click="pgDetailOeffnen(g.code)">
+                  Details<span v-if="g.zielvorgaben && g.zielvorgaben.length"> · {{ g.zielvorgaben.length }} Zielvorgaben</span>
+                </NcButton>
+              </div>
             </article>
           </div>
         </div>
@@ -191,7 +209,7 @@
         <div v-for="dep in gruppenNachDepartement" :key="dep.name" class="pw-budget-departement">
           <h3 class="pw-budget-dep-titel">{{ dep.name }}</h3>
           <div class="pw-card-grid">
-            <article v-for="g in dep.gruppen" :key="g.id" class="pw-data-card">
+            <article v-for="g in dep.gruppen" v-show="!g.kuenstlich" :key="g.id" class="pw-data-card">
               <div class="pw-data-card-header">
                 <div>
                   <p class="pw-data-card-kicker">Produktegruppe {{ g.code }}</p>
@@ -208,13 +226,15 @@
                   <span class="pw-antrag-betrag" :class="diffKlasse(a.betragDelta)">{{ fr(a.betragDelta) }}</span>
                   <span class="pw-antrag-steller">{{ a.antragsteller }}</span>
                   <span class="pw-antrag-begruendung">{{ a.begruendung }}</span>
-                  <NcSelect v-if="!a.automatisch" :model-value="haltungOptFor(a)" :options="haltungOptionen(a.herkunft)" :clearable="false" aria-label="Unsere Haltung" class="pw-antrag-haltung" @update:model-value="antragHaltung(a.id, $event ? $event.value : a.haltung)" />
-                  <span class="pw-antrag-entscheid" :class="'pw-entscheid-' + a.entscheid">{{ entscheidLabel(a.entscheid) }}</span>
-                  <span class="pw-entscheid-knoepfe">
-                    <NcButton type="tertiary" aria-label="Antrag angenommen" @click="entscheidSetzen(a.id, a.entscheid === 'angenommen' ? 'offen' : 'angenommen')">✓</NcButton>
-                    <NcButton type="tertiary" aria-label="Antrag abgelehnt" @click="entscheidSetzen(a.id, a.entscheid === 'abgelehnt' ? 'offen' : 'abgelehnt')">✕</NcButton>
-                  </span>
-                  <NcButton type="tertiary" aria-label="Antrag löschen" @click="antragLoeschen(a.id)">🗑</NcButton>
+                  <NcCheckboxRadioSwitch v-if="!a.automatisch" :model-value="haltungAn(a)" type="switch" class="pw-antrag-toggle" @update:model-value="haltungUmschalten(a, $event)">{{ haltungLabel(a) }}</NcCheckboxRadioSwitch>
+                  <template v-if="sitzungsmodus">
+                    <span class="pw-antrag-entscheid" :class="'pw-entscheid-' + a.entscheid">{{ entscheidLabel(a.entscheid) }}</span>
+                    <span class="pw-entscheid-knoepfe">
+                      <NcButton type="tertiary" aria-label="Antrag angenommen" @click="entscheidSetzen(a.id, a.entscheid === 'angenommen' ? 'offen' : 'angenommen')">✓</NcButton>
+                      <NcButton type="tertiary" aria-label="Antrag abgelehnt" @click="entscheidSetzen(a.id, a.entscheid === 'abgelehnt' ? 'offen' : 'abgelehnt')">✕</NcButton>
+                    </span>
+                  </template>
+                  <PwLoeschen v-if="!a.automatisch" class="pw-antrag-loeschen" label="Antrag löschen" @click="antragLoeschen(a.id)" />
                   <NcSelect v-if="sitzungsmodus" :model-value="verknuepfungOpt(a)" :options="verknuepfungsKandidaten(a)" input-label="Verknüpft mit" placeholder="nicht verknüpft" class="pw-antrag-verknuepfen" @update:model-value="verknuepfungWaehlen(a.id, $event ? $event.value : 0)" />
                   <details class="pw-antrag-notizen" @toggle="notizenToggle(a.id, $event)">
                     <summary>Notizen</summary>
@@ -226,13 +246,13 @@
                 v-if="formOffen['p' + g.code]"
                 :form="neuPersonal[g.code]"
                 :antragsteller-optionen="antragstellerOptionen(neuPersonal[g.code].herkunft)"
-                :haltung-optionen="haltungOptionen(neuPersonal[g.code].herkunft)"
                 :fraktion-optionen="fraktionOptionen"
                 mit-stellen
                 @herkunft="herkunftGewechselt(neuPersonal[g.code], $event)"
                 @save="antragPersonal(g.code)"
+                @abbrechen="formSchliessen('p' + g.code)"
               />
-              <NcButton v-else type="tertiary" @click="formOeffnen('p' + g.code)">+ Antrag</NcButton>
+              <NcButton v-else type="secondary" @click="formOeffnen('p' + g.code)">+ Antrag</NcButton>
             </article>
           </div>
         </div>
@@ -262,13 +282,15 @@
                   <span class="pw-antrag-betrag" :class="diffKlasse(a.betragDelta)">{{ fr(a.betragDelta) }}</span>
                   <span class="pw-antrag-steller">{{ a.antragsteller }}</span>
                   <span class="pw-antrag-begruendung">{{ a.begruendung }}</span>
-                  <NcSelect v-if="!a.automatisch" :model-value="haltungOptFor(a)" :options="haltungOptionen(a.herkunft)" :clearable="false" aria-label="Unsere Haltung" class="pw-antrag-haltung" @update:model-value="antragHaltung(a.id, $event ? $event.value : a.haltung)" />
-                  <span class="pw-antrag-entscheid" :class="'pw-entscheid-' + a.entscheid">{{ entscheidLabel(a.entscheid) }}</span>
-                  <span class="pw-entscheid-knoepfe">
-                    <NcButton type="tertiary" aria-label="Antrag angenommen" @click="entscheidSetzen(a.id, a.entscheid === 'angenommen' ? 'offen' : 'angenommen')">✓</NcButton>
-                    <NcButton type="tertiary" aria-label="Antrag abgelehnt" @click="entscheidSetzen(a.id, a.entscheid === 'abgelehnt' ? 'offen' : 'abgelehnt')">✕</NcButton>
-                  </span>
-                  <NcButton type="tertiary" aria-label="Antrag löschen" @click="antragLoeschen(a.id)">🗑</NcButton>
+                  <NcCheckboxRadioSwitch v-if="!a.automatisch" :model-value="haltungAn(a)" type="switch" class="pw-antrag-toggle" @update:model-value="haltungUmschalten(a, $event)">{{ haltungLabel(a) }}</NcCheckboxRadioSwitch>
+                  <template v-if="sitzungsmodus">
+                    <span class="pw-antrag-entscheid" :class="'pw-entscheid-' + a.entscheid">{{ entscheidLabel(a.entscheid) }}</span>
+                    <span class="pw-entscheid-knoepfe">
+                      <NcButton type="tertiary" aria-label="Antrag angenommen" @click="entscheidSetzen(a.id, a.entscheid === 'angenommen' ? 'offen' : 'angenommen')">✓</NcButton>
+                      <NcButton type="tertiary" aria-label="Antrag abgelehnt" @click="entscheidSetzen(a.id, a.entscheid === 'abgelehnt' ? 'offen' : 'abgelehnt')">✕</NcButton>
+                    </span>
+                  </template>
+                  <PwLoeschen v-if="!a.automatisch" class="pw-antrag-loeschen" label="Antrag löschen" @click="antragLoeschen(a.id)" />
                   <NcSelect v-if="sitzungsmodus" :model-value="verknuepfungOpt(a)" :options="verknuepfungsKandidaten(a)" input-label="Verknüpft mit" placeholder="nicht verknüpft" class="pw-antrag-verknuepfen" @update:model-value="verknuepfungWaehlen(a.id, $event ? $event.value : 0)" />
                   <details class="pw-antrag-notizen" @toggle="notizenToggle(a.id, $event)">
                     <summary>Notizen</summary>
@@ -280,13 +302,13 @@
                 v-if="formOffen['i' + i.id]"
                 :form="neuInv[i.id]"
                 :antragsteller-optionen="antragstellerOptionen(neuInv[i.id].herkunft)"
-                :haltung-optionen="haltungOptionen(neuInv[i.id].herkunft)"
                 :fraktion-optionen="fraktionOptionen"
                 :basis="i.bu"
                 @herkunft="herkunftGewechselt(neuInv[i.id], $event)"
                 @save="antragInvestition(i)"
+                @abbrechen="formSchliessen('i' + i.id)"
               />
-              <NcButton v-else type="tertiary" @click="formOeffnen('i' + i.id)">+ Antrag</NcButton>
+              <NcButton v-else type="secondary" @click="formOeffnen('i' + i.id)">+ Antrag</NcButton>
             </article>
           </div>
         </div>
@@ -295,16 +317,58 @@
       <!-- Tab: Steuerfuss -->
       <div v-show="aktiverTab === 'steuerfuss'" class="pw-budget-tabpanel">
         <div class="pw-data-card pw-steuerfuss">
-          <p>Geltender Steuerfuss: <strong>{{ ansicht.jahr.steuerfuss }}%</strong></p>
+          <p>Stadtratsantrag Steuerfuss: <strong>{{ ansicht.jahr.steuerfuss }}%</strong></p>
+          <p v-if="steuerfussVorjahr">Geltender Steuerfuss (Vorjahr): {{ steuerfussVorjahr }}% · Differenz zum Vorjahr: <strong>{{ steuerfussDiffVorjahr }}</strong></p>
+          <p v-else>Differenz zum Vorjahr: <strong>±0%</strong></p>
           <p>1 Steuerprozent ≈ {{ fr(wertProProzent) }}</p>
-          <NcCheckboxRadioSwitch :model-value="steuerfussAutomatik" type="switch" @update:model-value="steuerfussAutomatikUmschalten">
+          <NcCheckboxRadioSwitch :model-value="steuerfussAutomatik" :disabled="steuerfussLaeuft" type="switch" @update:model-value="steuerfussAutomatikUmschalten">
             Steuerfuss bei Überschuss automatisch senken
           </NcCheckboxRadioSwitch>
-          <div v-if="!steuerfussAutomatik" class="pw-verteilung-ziel">
-            <NcTextField v-model="steuerfussManuell" type="number" label="Steuerfuss %" />
-            <NcButton type="secondary" @click="steuerfussAntragStellen">Steuerfuss-Antrag stellen</NcButton>
-          </div>
-          <p v-else>Automatisch gesenkt auf <strong>{{ steuerfussEffektiv }}%</strong> ({{ ansicht.jahr.steuerfuss - steuerfussEffektiv }} Prozentpunkte).</p>
+          <!-- Automatik ein: die Senkung ist ein impliziter Antrag der eigenen
+               Fraktion, das manuelle Feld und der Toggle bleiben ausgeblendet (F88). -->
+          <p v-if="steuerfussAutomatik" class="pw-steuerfuss-auto">
+            <template v-if="steuerfussAntragAuto">Automatisch gesenkt auf <strong>{{ steuerfussEffektiv }}%</strong> ({{ ansicht.jahr.steuerfuss - steuerfussEffektiv }} Prozentpunkte). Antrag der eigenen Fraktion: {{ steuerfussAntragAuto.antragsteller || 'eigene Fraktion' }}.</template>
+            <template v-else>Kein Überschuss — keine automatische Senkung, es gilt der Stadtratsantrag.</template>
+          </p>
+          <!-- Automatik aus: Steuerfuss von Hand setzen (Default Stadtratsantrag).
+               «Antrag stellen» ist ein Toggle, kein Knopf — der Antrag entsteht und
+               verschwindet mit ihm, Mehrfachklicks erzeugen keine Duplikate. -->
+          <template v-else>
+            <div class="pw-verteilung-ziel">
+              <NcTextField :model-value="steuerfussManuell" :disabled="steuerfussLaeuft" type="number" label="Steuerfuss %" @update:model-value="steuerfussManuellSetzen" />
+            </div>
+            <NcCheckboxRadioSwitch :model-value="steuerfussAntragStellenAn" :disabled="steuerfussLaeuft" type="switch" @update:model-value="steuerfussAntragStellenUmschalten">
+              Antrag stellen
+            </NcCheckboxRadioSwitch>
+          </template>
+        </div>
+      </div>
+
+      <!-- Tab: Anträge — alle Anträge der aktiven Phase zusammengefasst (nach
+           Departement wie im PDF), plus der PDF-Export. So sieht man alle Anträge
+           auf einen Blick, ohne das PDF zu erzeugen. -->
+      <div v-show="aktiverTab === 'antraege'" class="pw-budget-tabpanel">
+        <div class="pw-antraege-kopf">
+          <NcCheckboxRadioSwitch :model-value="pdfMitFremden" type="switch" @update:model-value="pdfMitFremden = $event">Mit unterstützten fremden Anträgen</NcCheckboxRadioSwitch>
+          <NcButton type="secondary" @click="pdfOeffnen">Anträge als PDF</NcButton>
+        </div>
+        <div v-if="!alleAntraege.length" class="pw-budget-info">Keine Anträge.</div>
+        <!-- Ein Grid über ALLE Departemente (Subgrid je Zeile), damit die Spalten
+             gruppenübergreifend fluchten: Position links, Betrag/Zusatz-Zahl rechts,
+             Einheit auf gemeinsamer linker Kante, Begründung flexibel, Beschluss rechts. -->
+        <div v-else class="pw-antraege-tabelle">
+          <template v-for="grp in antraegeNachDepartement" :key="grp.name">
+            <h3 class="pw-antraege-dep">{{ grp.name }}</h3>
+            <div v-for="a in grp.antraege" :key="a.id" class="pw-antrag-zeile" :class="{ 'pw-antrag-auto': a.automatisch }">
+              <span class="pw-antrag-pos">{{ a.posName }}</span>
+              <span class="pw-antrag-betrag pw-num" :class="diffKlasse(a.betragDelta)">{{ a.betragDelta ? fr(a.betragDelta) : '' }}</span>
+              <span class="pw-antrag-znum pw-num" :class="diffKlasse(antragZusatzWert(a))">{{ antragZusatzNum(a) }}</span>
+              <span class="pw-antrag-zeinheit">{{ antragZusatzEinheit(a) }}</span>
+              <span class="pw-antrag-steller">{{ a.antragsteller || (a.automatisch ? 'automatisch' : '') }}</span>
+              <span class="pw-antrag-begruendung">{{ a.begruendung }}</span>
+              <span class="pw-antrag-entscheid" :class="'pw-entscheid-' + a.entscheid">{{ entscheidLabel(a.entscheid) }}</span>
+            </div>
+          </template>
         </div>
       </div>
     </template>
@@ -335,12 +399,49 @@
         </div>
       </div>
     </Teleport>
+
+    <!-- Budget neu einlesen — destruktiv, darum doppelte Absicherung: Dialog plus
+         Verstanden-Checkbox; «Neu einlesen» ist gesperrt, bis die Checkbox gesetzt ist. -->
+    <Teleport to="body">
+      <div v-if="reimportOffen" class="pw-modal-overlay" @click.self="reimportAbbrechen">
+        <div class="pw-modal">
+          <div class="pw-modal-kopf">
+            <h3>Budget {{ jahrOption ? jahrOption.value : '' }} neu einlesen — bist du ganz sicher?</h3>
+            <button type="button" class="button pw-btn-schliessen" aria-label="Dialog schliessen" @click="reimportAbbrechen">✕</button>
+          </div>
+          <div class="pw-modal-body">
+            <p>Das Budget wird vollständig neu aus dem Budgetbuch eingelesen. Dabei werden <strong>alle bestehenden Anträge, Notizen, Pauschalanträge und Entscheide zu diesem Budget unwiederbringlich gelöscht.</strong></p>
+            <NcCheckboxRadioSwitch :model-value="reimportVerstanden" type="checkbox" @update:model-value="v => reimportVerstanden = v">
+              Ich verstehe, dass alle bestehenden Anträge, Notizen, usw. zu diesem Budget dabei unwiederbringlich gelöscht werden
+            </NcCheckboxRadioSwitch>
+          </div>
+          <div class="pw-modal-aktionen">
+            <NcButton type="error" :disabled="!reimportVerstanden || reimportLaeuft" @click="reimportAusfuehren">Neu einlesen</NcButton>
+            <NcButton type="tertiary" @click="reimportAbbrechen">Abbrechen</NcButton>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Vollbild-Detail einer Produktegruppe (F110): wie bei den Geschäften ein
+         Popup, das den ganzen Bildschirm für eine Produktegruppe nutzt. -->
+    <Teleport to="body">
+      <div v-if="pgDetail" class="pw-modal-overlay" @click.self="pgDetailSchliessen">
+        <div class="pw-modal pw-modal-vollbild">
+          <div class="pw-modal-kopf pw-modal-kopf-leer">
+            <button type="button" class="button pw-btn-schliessen" aria-label="Dialog schliessen" @click="pgDetailSchliessen">✕</button>
+          </div>
+          <BudgetPgDetail :gruppe="pgDetail" :jahr="ansicht && ansicht.jahr ? ansicht.jahr.jahr : 0" />
+        </div>
+      </div>
+    </Teleport>
   </section>
 </template>
 
 <script>
 import { generateUrl } from '@nextcloud/router'
 import { getCurrentUser } from '@nextcloud/auth'
+import { showSuccess, showError } from '@nextcloud/dialogs'
 import axios from '@nextcloud/axios'
 import NcButton from '@nextcloud/vue/components/NcButton'
 import NcSelect from '@nextcloud/vue/components/NcSelect'
@@ -351,29 +452,15 @@ import NcEmptyContent from '@nextcloud/vue/components/NcEmptyContent'
 import PwMultiSelect from './PwMultiSelect.vue'
 import BudgetAntragForm from './BudgetAntragForm.vue'
 import BudgetPauschalForm from './BudgetPauschalForm.vue'
+import BudgetPgDetail from './BudgetPgDetail.vue'
+import FilterPanel from './FilterPanel.vue'
 import NotizenListe from './NotizenListe.vue'
+import PwLoeschen from './PwLoeschen.vue'
 import { subscribeRealtime } from '../realtime'
-
-const ZIEL_MODI = [
-  { value: 'schwarze_null', label: 'Schwarze Null' },
-  { value: 'defizit', label: 'Akzeptiertes Defizit' },
-  { value: 'ertrag', label: 'Gewünschter Ertrag' },
-]
-
-// Haltung je Herkunft (F97): eigene Anträge reichen wir ein, fremde unterstützen wir.
-const HALTUNG_EIGEN = [
-  { value: 'einreichen', label: 'Reichen wir ein' },
-  { value: 'nicht_einreichen', label: 'Reichen wir nicht ein' },
-]
-const HALTUNG_FREMD = [
-  { value: 'unterstuetzen', label: 'Unterstützen wir' },
-  { value: 'nicht_unterstuetzen', label: 'Unterstützen wir nicht' },
-  { value: 'offen', label: 'Offen' },
-]
 
 export default {
   name: 'Budgetliste',
-  components: { NcButton, NcSelect, NcTextField, NcCheckboxRadioSwitch, NcLoadingIcon, NcEmptyContent, PwMultiSelect, BudgetAntragForm, BudgetPauschalForm, NotizenListe },
+  components: { NcButton, NcSelect, NcTextField, NcCheckboxRadioSwitch, NcLoadingIcon, NcEmptyContent, PwMultiSelect, BudgetAntragForm, BudgetPauschalForm, BudgetPgDetail, FilterPanel, NotizenListe, PwLoeschen },
   props: {
     kommissionen: { type: Array, default: () => [] },
     mitglieder: { type: Array, default: () => [] },
@@ -403,26 +490,38 @@ export default {
       ansicht: null,
       laden: false,
       aktiverTab: 'globalbudget',
-      tabs: [
+      // Anträge-PDF: unterstützte fremde Anträge mit aufnehmen? (Option, F92).
+      pdfMitFremden: false,
+      basisTabs: [
         { key: 'globalbudget', label: 'Globalbudgets' },
         { key: 'personal', label: 'Personalbestand' },
         { key: 'investition', label: 'Investitionsrechnung' },
         { key: 'steuerfuss', label: 'Steuerfuss' },
       ],
-      zielModusOptionen: ZIEL_MODI,
-      zielBetrag: '0',
       neu: {},
       neuPersonal: {},
       neuInv: {},
       steuerfussManuell: '',
-      steuerfussManuellModus: false,
+      // Läuft gerade eine Steuerfuss-Operation? Sperrt Schalter, Feld und Toggle,
+      // damit Mehrfachklicks während des (langsamen) Neurechnens keine doppelten
+      // Anträge erzeugen. steuerfussTimer entprellt das Feld-Eintippen.
+      steuerfussLaeuft: false,
+      steuerfussTimer: null,
+      // Scrollposition je Tab — nur im RAM (kein Cookie/Storage): beim Tabwechsel
+      // gemerkt, bei Rückkehr wiederhergestellt, damit man nicht neu suchen muss.
+      scrollProTab: {},
+      // Code der Produktegruppe, deren Vollbild-Detail (F110) offen ist; null = zu.
+      pgDetailCode: null,
       neuOffen: false,
       neuJahrOption: null,
       importierbareJahre: [],
       neuMitNovemberbrief: false,
+      reimportOffen: false,
+      reimportVerstanden: false,
+      reimportLaeuft: false,
+      sitzungsantraegeLaeuft: false,
       unsubRealtime: null,
       ladeTimer: null,
-      zielTimer: null,
     }
   },
   computed: {
@@ -444,11 +543,20 @@ export default {
     },
     // Fraktionen für die Mehrfachauswahl «unterstützende Fraktionen» (F98).
     fraktionOptionen() {
-      return (this.fraktionen || [])
+      const opt = (this.fraktionen || [])
         .filter(f => f && f.aktiv !== false && f.name)
         .map(f => ({ value: f.name, label: f.name }))
+      // Die eigene Fraktion (Config, für die Antragsteller-Vorbelegung) muss wählbar
+      // sein, auch wenn sie nicht in der Mitglieder-Fraktionsliste vorkommt.
+      const eigen = this.eigeneFraktionName
+      if (eigen && !opt.some(o => o.value === eigen)) { opt.unshift({ value: eigen, label: eigen }) }
+      return opt
     },
     eigeneFraktionName() {
+      // Autoritativ ist die Konfiguration (dieselbe Quelle wie das PDF); Rückfall auf
+      // die als «eigene» markierte Fraktion in der Mitgliederliste.
+      const konf = this.ansicht && this.ansicht.eigeneFraktion ? String(this.ansicht.eigeneFraktion).trim() : ''
+      if (konf) { return konf }
       const f = (this.fraktionen || []).find(x => x && x.eigene)
       return f ? f.name : ''
     },
@@ -480,23 +588,13 @@ export default {
       return this.importierbareJahre.map(j => ({ value: j, label: String(j) }))
     },
     summen() { return this.ansicht ? this.ansicht.summen : {} },
-    verteilung() {
-      return this.ansicht ? this.ansicht.verteilung : { automatikEin: true, zielModus: 'schwarze_null', zielBetrag: 0, haltung: 'einreichen', ausnahmen: [] }
-    },
-    // F100: wird der Pauschalantrag eingereicht?
-    pauschalEinreichen() {
-      return (this.verteilung.haltung || 'einreichen') !== 'nicht_einreichen'
-    },
-    // F101: Positionen, die vom Pauschalantrag ausgenommen sind.
-    pauschalAusnahmen() {
-      return Array.isArray(this.verteilung.ausnahmen) ? this.verteilung.ausnahmen : []
-    },
-    // F100: weitere (feste) Pauschalanträge neben dem automatischen Ausgleich.
+    // Stadtratsbudget (F102): die Summen ohne unsere Anträge, für den Vergleich.
+    summenStadtrat() { return this.ansicht && this.ansicht.summenStadtrat ? this.ansicht.summenStadtrat : this.summen },
+    ergebnisLabelFraktion() { return (this.summen.ergebnis || 0) < 0 ? 'Defizit' : 'Ertrag' },
+    // F100: alle Pauschalanträge (einheitlich, je mit eigenem Ziel-Typ). Die Liste
+    // startet leer.
     pauschalantraege() {
       return this.ansicht && Array.isArray(this.ansicht.pauschalantraege) ? this.ansicht.pauschalantraege : []
-    },
-    zielModusOption() {
-      return ZIEL_MODI.find(m => m.value === this.verteilung.zielModus) || ZIEL_MODI[0]
     },
     standardBetragProStelle() {
       return this.ansicht ? this.ansicht.standardBetragProStelle : 200000
@@ -507,39 +605,101 @@ export default {
     investitionenNachDepartement() {
       return this.gruppieren(this.ansicht ? this.ansicht.investitionen : [], i => i.departement, 'projekte')
     },
+    // Alle Anträge der aktiven Phase (für das Anträge-Tab und dessen Zähler).
+    alleAntraege() {
+      return (this.ansicht ? this.ansicht.antraege : []).filter(a => (a.phase || 'fraktion') === this.aktivePhase)
+    },
+    // Tabs inkl. dynamischem «X Anträge»-Tab (X = Anzahl der Anträge).
+    tabs() {
+      return [...this.basisTabs, { key: 'antraege', label: this.alleAntraege.length + ' Anträge' }]
+    },
+    // Alle Anträge nach Departement gruppiert, mit lesbarer Positionsbezeichnung —
+    // die Zusammenfassung im Anträge-Tab (dieselbe Gliederung wie das Anträge-PDF).
+    antraegeNachDepartement() {
+      const pgNach = {}
+      for (const g of (this.ansicht ? this.ansicht.produktegruppen : [])) { pgNach[g.code] = g }
+      const invNach = {}
+      for (const i of (this.ansicht ? this.ansicht.investitionen : [])) { invNach[String(i.id)] = i }
+      const gruppen = new Map()
+      for (const a of this.alleAntraege) {
+        let dept = 'Weiteres'
+        let pos = a.zielRef
+        if (a.bereich === 'steuerfuss') {
+          dept = 'Steuerfuss'; pos = 'Steuerfuss'
+        } else if (a.bereich === 'investition') {
+          const i = invNach[String(a.zielRef)]; dept = i ? i.departement : 'Investitionen'; pos = i ? i.projekt : a.zielRef
+        } else {
+          const g = pgNach[a.zielRef]; dept = g ? g.departement : 'Weiteres'; pos = g ? (g.name + ' (' + g.code + ')') : a.zielRef
+        }
+        if (!gruppen.has(dept)) { gruppen.set(dept, []) }
+        gruppen.get(dept).push({ ...a, posName: pos })
+      }
+      return [...gruppen.entries()].map(([name, antraege]) => ({ name, antraege }))
+    },
+    // Die Produktegruppe des offenen Vollbild-Details (F110), oder null.
+    pgDetail() {
+      if (!this.pgDetailCode || !this.ansicht) { return null }
+      return (this.ansicht.produktegruppen || []).find(g => g.code === this.pgDetailCode) || null
+    },
     wertProProzent() {
       const j = this.ansicht ? this.ansicht.jahr : null
       return j && j.steuerfuss > 0 ? Math.floor(j.steuerertrag / j.steuerfuss) : 0
     },
-    steuerfussAntrag() {
-      return (this.ansicht ? this.ansicht.antraege : []).find(a => a.bereich === 'steuerfuss') || null
+    // Steuerfuss des Vorjahres (falls importiert) und die Differenz zum beantragten
+    // Steuerfuss (F88).
+    steuerfussVorjahr() {
+      return this.ansicht && this.ansicht.jahr ? (this.ansicht.jahr.steuerfussVorjahr || 0) : 0
     },
-    steuerfussAutomatik() { return !this.steuerfussManuellModus && this.steuerfussAntrag === null },
+    steuerfussDiffVorjahr() {
+      const d = (this.ansicht && this.ansicht.jahr ? this.ansicht.jahr.steuerfuss : 0) - this.steuerfussVorjahr
+      return (d > 0 ? '+' : (d < 0 ? '−' : '±')) + Math.abs(d) + '%'
+    },
+    // Ein von Hand gestellter Steuerfuss-Antrag (quelle ≠ «pauschal»); existiert nur,
+    // wenn die Automatik aus und «Antrag stellen» ein ist.
+    steuerfussAntrag() {
+      return (this.ansicht ? this.ansicht.antraege : []).find(a => a.bereich === 'steuerfuss' && a.quelle !== 'pauschal') || null
+    },
+    // Der automatisch erzeugte Steuerfuss-Antrag (F88), der den Überschuss senkt.
+    steuerfussAntragAuto() {
+      return (this.ansicht ? this.ansicht.antraege : []).find(a => a.bereich === 'steuerfuss' && a.quelle === 'pauschal') || null
+    },
+    // F88: der Automatik-Schalter kommt vom Server (pro Jahr gespeichert), nicht mehr
+    // aus einem flüchtigen Client-Flag — so überlebt der Zustand einen Reload.
+    steuerfussAutomatik() { return !!(this.ansicht && this.ansicht.jahr && this.ansicht.jahr.steuerfussAutomatik) },
+    // «Antrag stellen»-Toggle: an, sobald ein manueller Steuerfussantrag existiert.
+    steuerfussAntragStellenAn() { return this.steuerfussAntrag !== null },
     steuerfussEffektiv() {
       const j = this.ansicht ? this.ansicht.jahr : null
       if (!j) { return 0 }
+      // Massgeblich ist der gespeicherte Antrag (das gerenderte Ergebnis ist die
+      // Wahrheit), nicht der noch nicht übernommene Feldwert.
       if (this.steuerfussAntrag) {
-        // F96: die Prozentpunkte des Antrags ergeben den effektiven Steuerfuss.
-        return this.steuerfussManuell !== '' ? Number(this.steuerfussManuell) : j.steuerfuss + (this.steuerfussAntrag.prozentDelta || 0)
+        return j.steuerfuss + Math.round(this.steuerfussAntrag.prozentDelta || 0)
       }
-      const ueberschuss = this.summen.ergebnis || 0
-      if (ueberschuss > 0 && this.wertProProzent > 0) {
-        return j.steuerfuss - Math.floor(ueberschuss / this.wertProProzent)
+      // F88: die automatische Senkung ist ein echter Antrag; sein Prozentpunkt-Delta
+      // ist massgeblich (der Überschuss in den Summen ist dadurch bereits reduziert).
+      if (this.steuerfussAntragAuto) {
+        return j.steuerfuss + Math.round(this.steuerfussAntragAuto.prozentDelta || 0)
       }
       return j.steuerfuss
     },
     novemberbriefMoeglich() {
-      return !!(this.ansicht && this.ansicht.jahr && !this.ansicht.jahr.novemberbriefImportiert)
+      // F91: der Knopf erscheint nur, wenn tatsächlich ein noch nicht eingelesener,
+      // mindestens zwei Tage alter Novemberbrief vorliegt (vom Server bestimmt) —
+      // im August ist er typischerweise noch gar nicht da.
+      return !!(this.ansicht && this.ansicht.jahr && this.ansicht.jahr.novemberbriefVerfuegbar)
+    },
+    // F89: Link zum Budget-Geschäft (Weisung) auf der Parlamentswebseite.
+    weisungQuelle() {
+      return this.ansicht && this.ansicht.jahr ? (this.ansicht.jahr.weisungQuelle || '') : ''
+    },
+    weisungNummer() {
+      return this.ansicht && this.ansicht.jahr ? (this.ansicht.jahr.weisungNummer || '') : ''
     },
   },
   watch: {
     minProzent() { this.ladeVerzoegert() },
     minAbsolut() { this.ladeVerzoegert() },
-    zielBetrag(neu) {
-      if (!this.ansicht || Number(neu) === Number(this.verteilung.zielBetrag)) { return }
-      if (this.zielTimer) { clearTimeout(this.zielTimer) }
-      this.zielTimer = setTimeout(() => this.verteilungZielBetrag(), 400)
-    },
   },
   mounted() {
     this.ladeJahre()
@@ -548,6 +708,7 @@ export default {
   },
   beforeUnmount() {
     if (this.unsubRealtime) { this.unsubRealtime() }
+    if (this.steuerfussTimer) { clearTimeout(this.steuerfussTimer) }
   },
   methods: {
     fr(n) {
@@ -570,6 +731,24 @@ export default {
     },
     entscheidLabel(e) {
       return { angenommen: 'angenommen', abgelehnt: 'abgelehnt' }[e] || 'offen'
+    },
+    // Zusatzgrösse eines Antrags fürs Anträge-Tab (neben dem CHF-Betrag): Stellen
+    // oder Steuerprozentpunkte. Zahl und Einheit getrennt, damit sie im Grid je auf
+    // ihrer eigenen Kante fluchten (Zahl rechts, Einheit links). Wert für die Farbe.
+    antragZusatzWert(a) {
+      if (a.stellenDelta) { return a.stellenDelta }
+      if (a.prozentDelta && a.bereich === 'steuerfuss') { return a.prozentDelta }
+      return 0
+    },
+    antragZusatzNum(a) {
+      if (a.stellenDelta) { return this.zahl(a.stellenDelta) }
+      if (a.prozentDelta && a.bereich === 'steuerfuss') { return (a.prozentDelta > 0 ? '+' : '−') + Math.abs(a.prozentDelta) }
+      return ''
+    },
+    antragZusatzEinheit(a) {
+      if (a.stellenDelta) { return 'Stellen' }
+      if (a.prozentDelta && a.bereich === 'steuerfuss') { return '%' }
+      return ''
     },
     gruppieren(liste, keyFn, feld) {
       const map = new Map()
@@ -617,7 +796,6 @@ export default {
         if (this.minAbsolut !== '') { params.minAbsolut = this.minAbsolut }
         const { data } = await axios.get(generateUrl('/apps/parlwin/budget/' + this.jahrOption.value), { params })
         this.ansicht = data
-        this.zielBetrag = String(data.verteilung.zielBetrag || 0)
         this.initEingaben()
       } catch (f) {
         console.error('Budgetansicht laden fehlgeschlagen', f)
@@ -631,8 +809,11 @@ export default {
     leererAntrag(zusatz = {}) {
       return {
         betrag: '', prozent: '', mehrausgabe: false,
-        herkunft: 'eigene', antragsteller: this.eigenerName,
+        // Antragsteller per Default die eigene Fraktion (im Rat stellt die Fraktion
+        // den Antrag); die Person lässt sich weiterhin auswählen.
+        herkunft: 'eigene', antragsteller: this.eigeneFraktionName || this.eigenerName,
         haltung: 'einreichen', unterstuetzer: [], begruendung: '',
+        zielAenderungen: [], aufteilung: [],
         ...zusatz,
       }
     },
@@ -648,9 +829,10 @@ export default {
       this.neu = neu
       this.neuPersonal = neuPersonal
       this.neuInv = neuInv
+      this.steuerfussManuellSync()
     },
-    // Antragsteller-Auswahl (F94): bei eigenen Anträgen die aktiven Mitglieder,
-    // bei fremden die aktiven Fraktionen zuoberst, dann Mitglieder.
+    // Antragsteller-Auswahl (F94): bei fremden die aktiven Fraktionen zuoberst, dann
+    // Mitglieder; bei eigenen die eigene Fraktion zuoberst (Default), dann die Mitglieder.
     antragstellerOptionen(herkunft) {
       const personen = (this.mitglieder || [])
         .filter(m => m && m.aktiv !== false && m.name)
@@ -658,10 +840,10 @@ export default {
       const fraktionen = (this.fraktionen || [])
         .filter(f => f && f.aktiv !== false && f.name)
         .map(f => ({ value: f.name, label: f.name }))
-      return herkunft === 'fremde' ? [...fraktionen, ...personen] : personen
-    },
-    haltungOptionen(herkunft) {
-      return herkunft === 'fremde' ? HALTUNG_FREMD : HALTUNG_EIGEN
+      if (herkunft === 'fremde') { return [...fraktionen, ...personen] }
+      const eigen = this.eigeneFraktionName
+      const eigenOpt = eigen ? [{ value: eigen, label: eigen }] : []
+      return [...eigenOpt, ...personen.filter(p => p.value !== eigen)]
     },
     // Wechsel der Herkunft setzt die Haltung auf den passenden Standard zurück.
     herkunftGewechselt(form, wert) {
@@ -699,6 +881,16 @@ export default {
       this.sitzungsmodus = wert
       this.ladeAnsicht(false)
     },
+    // Setzt die Filter zurück (Budgetjahr und Sitzungsmodus bleiben — das sind
+    // Auswahl/Modus, keine Filter).
+    filterZuruecksetzen() {
+      this.departementOption = null
+      this.kommissionOption = null
+      this.minProzent = ''
+      this.minAbsolut = ''
+      this.antragsartOption = { value: 'alle', label: 'Alle Anträge' }
+      this.ladeAnsicht(false)
+    },
     handleRealtime(event) {
       if ((event?.type || '') === 'budget.updated') { this.ladeAnsicht(false) }
     },
@@ -710,6 +902,8 @@ export default {
         antragsteller: form.antragsteller,
         begruendung: form.begruendung,
         unterstuetzer: this.unterstuetzerMit(form),
+        zielAenderungen: form.zielAenderungen || [],
+        aufteilung: form.aufteilung || [],
       }
     },
     // F98: unterstützen wir den Antrag (eigen «einreichen» / fremd «unterstuetzen»),
@@ -734,7 +928,11 @@ export default {
     async antragGlobalbudget(code) {
       const e = this.neu[code]
       const betrag = this.signierterBetrag(e)
-      if (betrag.betragDelta === undefined && betrag.prozentDelta === undefined) { return }
+      // F109: ein reiner Zielvorgaben-Antrag oder eine reine Aufteilung (Summe wird
+      // serverseitig zum PG-Betrag) ist ohne oberen Budgetwert zulässig.
+      const hatZiel = (e.zielAenderungen || []).length > 0
+      const hatAufteilung = (e.aufteilung || []).length > 0
+      if (betrag.betragDelta === undefined && betrag.prozentDelta === undefined && !hatZiel && !hatAufteilung) { return }
       await this.antragSenden({ bereich: 'globalbudget', zielTyp: 'produktegruppe', zielRef: code, ...betrag, ...this.gemeinsameFelder(e) })
     },
     async antragPersonal(code) {
@@ -770,41 +968,8 @@ export default {
         console.error('Antrag löschen fehlgeschlagen', f)
       }
     },
-    async verteilungAendern(feld, wert) {
-      const v = { ...this.verteilung }
-      v[feld] = wert
-      await this.verteilungSenden(v.automatikEin, v.zielModus, Number(this.zielBetrag) || 0)
-    },
-    verteilungZielBetrag() {
-      this.verteilungSenden(this.verteilung.automatikEin, this.verteilung.zielModus, Number(this.zielBetrag) || 0)
-    },
-    async pauschalVerteilen() {
-      await this.verteilungSenden(true, this.verteilung.zielModus, Number(this.zielBetrag) || 0)
-    },
-    async verteilungSenden(automatikEin, zielModus, zielBetrag, extra = {}) {
-      const haltung = extra.haltung !== undefined ? extra.haltung : (this.verteilung.haltung || 'einreichen')
-      const ausnahmen = extra.ausnahmen !== undefined ? extra.ausnahmen : this.pauschalAusnahmen
-      try {
-        const { data } = await axios.put(generateUrl('/apps/parlwin/budget/' + this.jahrOption.value + '/verteilung'), { automatikEin, zielModus, zielBetrag, haltung, ausnahmen })
-        this.ansicht = data
-        this.initEingaben()
-      } catch (f) {
-        console.error('Verteilung setzen fehlgeschlagen', f)
-      }
-    },
-    // F100: den Einreichen-Entscheid des Pauschalantrags umschalten.
-    async pauschalEinreichenUmschalten(einreichen) {
-      await this.verteilungSenden(this.verteilung.automatikEin, this.verteilung.zielModus, Number(this.zielBetrag) || 0, { haltung: einreichen ? 'einreichen' : 'nicht_einreichen' })
-    },
-    // F101: eine Position vom Pauschalantrag ausnehmen oder wieder aufnehmen.
-    async ausnahmeUmschalten(code, aus) {
-      const ausnahmen = [...this.pauschalAusnahmen]
-      const i = ausnahmen.indexOf(code)
-      if (aus && i < 0) { ausnahmen.push(code) }
-      if (!aus && i >= 0) { ausnahmen.splice(i, 1) }
-      await this.verteilungSenden(this.verteilung.automatikEin, this.verteilung.zielModus, Number(this.zielBetrag) || 0, { ausnahmen })
-    },
-    // F100: einen weiteren (festen) Pauschalantrag anlegen, ändern, löschen.
+    // F100: einen Pauschalantrag anlegen, ändern, löschen. Jeder trägt seinen
+    // Ziel-Typ (Einsparungen / schwarze Null / fester Ertrag / festes Defizit).
     async pauschalErstellen() {
       try {
         await axios.post(generateUrl('/apps/parlwin/budget/' + this.jahrOption.value + '/pauschal'), {})
@@ -829,6 +994,25 @@ export default {
         console.error('Pauschalantrag löschen fehlgeschlagen', f)
       }
     },
+    // F101: kurze Beschriftung eines Pauschalantrags für den Ausnahme-Toggle an der PG.
+    pauschalKurz(p) {
+      if ((p.zielTyp || p.zielModus) === 'einsparungen') {
+        return p.prozent ? 'Pauschalkürzung ' + Math.abs(p.prozent) + '%' : 'Pauschalkürzung ' + this.fr(p.betrag || 0)
+      }
+      return { schwarze_null: 'Schwarze Null', fester_ertrag: 'Fester Ertrag', festes_defizit: 'Festes Defizit' }[p.zielTyp || p.zielModus] || 'Pauschalantrag'
+    },
+    // Ist diese Produktegruppe (code) von diesem Pauschalantrag ausgenommen?
+    pgAusgenommen(p, code) {
+      return Array.isArray(p.ausnahmen) && p.ausnahmen.includes(String(code))
+    },
+    // F101: die Produktegruppe im Pauschalantrag aufnehmen (teilnehmen=true) oder
+    // ausnehmen — trägt den Code in die Ausnahmenliste des Pauschalantrags ein/aus.
+    pgPauschalToggle(p, code, teilnehmen) {
+      const c = String(code)
+      const alt = Array.isArray(p.ausnahmen) ? p.ausnahmen.map(String).filter(x => x !== c) : []
+      const neu = teilnehmen ? alt : [...alt, c]
+      this.pauschalAendern(p.id, { ausnahmen: neu })
+    },
     async entscheidSetzen(id, status) {
       try {
         await axios.put(generateUrl('/apps/parlwin/budget/antraege/' + id + '/entscheid'), { status })
@@ -837,8 +1021,20 @@ export default {
         console.error('Entscheid setzen fehlgeschlagen', f)
       }
     },
-    haltungOptFor(a) {
-      return this.haltungOptionen(a.herkunft).find(o => o.value === a.haltung) || this.haltungOptionen(a.herkunft)[0]
+    // Haltung als einfacher Toggle (statt Dropdown): eigene «Antrag stellen»
+    // (einreichen), fremde «Unterstützen». An = fliesst ins Fraktionsbudget und
+    // erscheint in der Übersicht; aus = wird ignoriert.
+    haltungAn(a) {
+      return a.haltung === 'einreichen' || a.haltung === 'unterstuetzen'
+    },
+    haltungLabel(a) {
+      return a.herkunft === 'fremde' ? 'Unterstützen' : 'Antrag stellen'
+    },
+    haltungUmschalten(a, wert) {
+      const neu = a.herkunft === 'fremde'
+        ? (wert ? 'unterstuetzen' : 'nicht_unterstuetzen')
+        : (wert ? 'einreichen' : 'nicht_einreichen')
+      this.antragHaltung(a.id, neu)
     },
     // Unsere Haltung an einem bestehenden Antrag ändern (F97), getrennt vom
     // Sitzungs-Beschluss.
@@ -871,38 +1067,113 @@ export default {
         console.error('Verknüpfung setzen fehlgeschlagen', f)
       }
     },
-    steuerfussAutomatikUmschalten(ein) {
-      if (ein) {
-        // Automatik wieder ein: manuellen Modus verlassen, ein Steuerfuss-Antrag entfällt.
-        this.steuerfussManuellModus = false
-        if (this.steuerfussAntrag) { this.antragLoeschen(this.steuerfussAntrag.id) }
-      } else {
-        // Automatik aus: manueller Modus, damit das Eingabefeld erscheint (F88).
-        this.steuerfussManuellModus = true
-        this.steuerfussManuell = String(this.steuerfussEffektiv)
+    // F88: die Automatik pro Jahr am Server umschalten (überlebt einen Reload). Ein
+    // ist implizit «Antrag stellen» der eigenen Fraktion; Aus fällt auf den
+    // Stadtratsantrag zurück und gibt das manuelle Feld frei. Die Laufsperre
+    // verhindert doppelte Auslösung während des (langsamen) Neurechnens.
+    async steuerfussAutomatikUmschalten(ein) {
+      if (this.steuerfussLaeuft) { return }
+      this.steuerfussLaeuft = true
+      try {
+        await axios.put(generateUrl('/apps/parlwin/budget/' + this.jahrOption.value + '/steuerfuss-automatik'), { an: !!ein })
+        await this.ladeAnsicht(false)
+      } catch (f) {
+        console.error('Steuerfuss-Automatik umschalten fehlgeschlagen', f)
+      } finally {
+        this.steuerfussLaeuft = false
       }
     },
-    async steuerfussAntragStellen() {
-      const neuerFuss = Number(this.steuerfussManuell)
+    // Feld-Eingabe (Automatik aus): Wert lokal übernehmen und — wenn «Antrag stellen»
+    // ein ist — entprellt in den Antrag schreiben, damit nicht jeder Tastendruck speichert.
+    steuerfussManuellSetzen(wert) {
+      this.steuerfussManuell = wert
+      if (!this.steuerfussAntragStellenAn) { return }
+      if (this.steuerfussTimer) { clearTimeout(this.steuerfussTimer) }
+      this.steuerfussTimer = setTimeout(() => this.steuerfussAntragSpeichern(), 500)
+    },
+    // «Antrag stellen»-Toggle (Automatik aus): ein legt den Antrag an bzw. aktualisiert
+    // ihn auf den Feldwert, aus löscht ihn (zurück zum Stadtratsantrag).
+    async steuerfussAntragStellenUmschalten(ein) {
+      if (this.steuerfussLaeuft) { return }
+      if (ein) {
+        await this.steuerfussAntragSpeichern()
+        return
+      }
+      if (!this.steuerfussAntrag) { return }
+      this.steuerfussLaeuft = true
+      try {
+        await axios.delete(generateUrl('/apps/parlwin/budget/antraege/' + this.steuerfussAntrag.id))
+        await this.ladeAnsicht(false)
+      } catch (f) {
+        console.error('Steuerfuss-Antrag löschen fehlgeschlagen', f)
+      } finally {
+        this.steuerfussLaeuft = false
+      }
+    },
+    // Legt den manuellen Steuerfussantrag an oder aktualisiert ihn (F96, Prozentpunkte).
+    // Die Laufsperre verhindert doppelte Anträge bei Mehrfachauslösung.
+    async steuerfussAntragSpeichern() {
+      if (this.steuerfussLaeuft || !this.ansicht || !this.ansicht.jahr) { return }
       const j = this.ansicht.jahr
-      if (!neuerFuss || !j.steuerfuss) { return }
+      const wert = Number(this.steuerfussManuell)
+      if (this.steuerfussManuell === '' || !Number.isFinite(wert) || !j.steuerfuss) { return }
       // F96: der Steuerfuss-Antrag wird in Prozentpunkten gestellt; den CHF-Effekt
       // auf den Ertrag rechnet der Server (Ertrag × Prozentpunkte / Steuerfuss).
-      const prozentDelta = neuerFuss - j.steuerfuss
+      const prozentDelta = wert - j.steuerfuss
+      this.steuerfussLaeuft = true
       try {
         if (this.steuerfussAntrag) {
           await axios.put(generateUrl('/apps/parlwin/budget/antraege/' + this.steuerfussAntrag.id), { prozentDelta })
         } else {
-          await axios.post(generateUrl('/apps/parlwin/budget/' + this.jahrOption.value + '/antraege'), { bereich: 'steuerfuss', zielTyp: 'steuerfuss', prozentDelta, begruendung: 'Steuerfuss auf ' + neuerFuss + '%' })
+          await axios.post(generateUrl('/apps/parlwin/budget/' + this.jahrOption.value + '/antraege'), { bereich: 'steuerfuss', zielTyp: 'steuerfuss', prozentDelta, begruendung: 'Steuerfuss auf ' + wert + '%' })
         }
         await this.ladeAnsicht(false)
       } catch (f) {
         console.error('Steuerfuss-Antrag fehlgeschlagen', f)
+      } finally {
+        this.steuerfussLaeuft = false
       }
     },
+    // Setzt das manuelle Feld auf den Stand des Servers: den Antragswert, sonst den
+    // Stadtratsantrag (Default). Läuft nach jedem Ansicht-Laden (initEingaben).
+    steuerfussManuellSync() {
+      if (!this.ansicht || !this.ansicht.jahr) { return }
+      const j = this.ansicht.jahr
+      this.steuerfussManuell = String(this.steuerfussAntrag ? (j.steuerfuss + (this.steuerfussAntrag.prozentDelta || 0)) : j.steuerfuss)
+    },
+    // Der scrollende Vorfahr (Nextcloud-App-Inhalt) — die Tabs kleben an dessen
+    // oberer Kante, und je Tab wird dessen scrollTop gemerkt/wiederhergestellt.
+    scrollContainer() {
+      let el = this.$el ? this.$el.parentElement : null
+      while (el && el !== document.body) {
+        const stil = window.getComputedStyle(el)
+        if (/(auto|scroll)/.test(stil.overflowY) && el.scrollHeight > el.clientHeight) { return el }
+        el = el.parentElement
+      }
+      return document.scrollingElement || document.documentElement
+    },
+    // Tabwechsel mit Scroll-Gedächtnis (nur RAM): Position des alten Tabs merken,
+    // Tab umschalten, Position des neuen Tabs wiederherstellen (Default oben).
+    tabWechseln(key) {
+      if (key === this.aktiverTab) { return }
+      const container = this.scrollContainer()
+      if (container) { this.scrollProTab[this.aktiverTab] = container.scrollTop }
+      this.aktiverTab = key
+      this.$nextTick(() => {
+        const c = this.scrollContainer()
+        if (c) { c.scrollTop = this.scrollProTab[key] || 0 }
+      })
+    },
+    // Vollbild-Detail einer Produktegruppe öffnen/schliessen (F110).
+    pgDetailOeffnen(code) { this.pgDetailCode = code },
+    pgDetailSchliessen() { this.pgDetailCode = null },
     pdfOeffnen() {
-      const params = this.departementOption ? '?kommission=' + encodeURIComponent(this.departementOption.value) : ''
-      window.open(generateUrl('/apps/parlwin/budget/' + this.jahrOption.value + '/antraege-pdf') + params, '_blank')
+      const params = new URLSearchParams()
+      if (this.departementOption) { params.set('kommission', this.departementOption.value) }
+      // Option (F92): die von uns unterstützten fremden Anträge mit ins PDF nehmen.
+      if (this.pdfMitFremden) { params.set('mitFremden', '1') }
+      const q = params.toString()
+      window.open(generateUrl('/apps/parlwin/budget/' + this.jahrOption.value + '/antraege-pdf') + (q ? '?' + q : ''), '_blank')
     },
     async neuOeffnen() {
       this.neuJahrOption = null
@@ -941,6 +1212,62 @@ export default {
         console.error('Novemberbrief einlesen fehlgeschlagen', f)
       }
     },
+    // Sitzungsanträge (F90) live aus dem Drehbuch der Budgetsitzung einlesen: das
+    // Drehbuch wird von der Parlamentswebseite geladen und geparst; die gefundenen
+    // Kommissions- und Fraktionsanträge kommen als offizielle Sitzungsanträge dazu.
+    async sitzungsantraegeEinlesen() {
+      if (!this.jahrOption || this.sitzungsantraegeLaeuft) { return }
+      const jahr = this.jahrOption.value
+      this.sitzungsantraegeLaeuft = true
+      try {
+        const { data } = await axios.post(generateUrl('/apps/parlwin/budget/' + jahr + '/sitzungsantraege'), {}, { timeout: 120000 })
+        await this.ladeAnsicht(false)
+        const neu = (data && data.sitzungsantraegeNeu) || 0
+        const gefunden = (data && data.sitzungsantraegeGefunden) || 0
+        if (gefunden === 0) {
+          showError('Kein Drehbuch zur Budgetsitzung gefunden')
+        } else if (neu === 0) {
+          showSuccess('Sitzungsanträge sind aktuell — keine neuen Anträge')
+        } else {
+          showSuccess(neu + ' neue Sitzungsanträge eingelesen')
+        }
+      } catch (f) {
+        console.error('Sitzungsanträge einlesen fehlgeschlagen', f)
+        const grund = (f && f.response && f.response.data && f.response.data.fehler) || (f && f.message) || ''
+        showError('Sitzungsanträge einlesen fehlgeschlagen' + (grund ? ': ' + grund : ''))
+      } finally {
+        this.sitzungsantraegeLaeuft = false
+      }
+    },
+    // Budget neu einlesen — destruktiv, darum doppelt abgesichert (Dialog + Checkbox).
+    reimportOeffnen() {
+      this.reimportVerstanden = false
+      this.reimportOffen = true
+    },
+    reimportAbbrechen() {
+      this.reimportOffen = false
+      this.reimportVerstanden = false
+    },
+    async reimportAusfuehren() {
+      if (!this.reimportVerstanden || !this.jahrOption || this.reimportLaeuft) { return }
+      const jahr = this.jahrOption.value
+      // Dialog sofort schliessen, dann läuft der Fortschrittsbalken; am Ende ein Toast.
+      this.reimportOffen = false
+      this.reimportVerstanden = false
+      this.reimportLaeuft = true
+      try {
+        // Das Neu-Einlesen parst die Budgetbücher (dauert), darum grosszügiges Timeout.
+        await axios.post(generateUrl('/apps/parlwin/budget/' + jahr + '/reimport'), {}, { timeout: 300000 })
+        await this.ladeAnsicht(false)
+        showSuccess('Budget ' + jahr + ' neu eingelesen')
+      } catch (f) {
+        console.error('Budget neu einlesen fehlgeschlagen', f)
+        const grund = (f && f.response && f.response.data && f.response.data.fehler) || (f && f.message) || ''
+        showError('Budget neu einlesen fehlgeschlagen' + (grund ? ': ' + grund : ''))
+      } finally {
+        this.reimportLaeuft = false
+      }
+    },
   },
 }
 </script>
@@ -948,26 +1275,69 @@ export default {
 <style scoped lang="scss">
 /* Nur budget-eigene Elemente (Summenzeile, Tabs, Antragszeilen). View-Rahmen,
    Header, Filter, Karten und Modal stammen aus dem gemeinsamen Stylesheet. */
-.pw-budget-summen {
+/* Übersicht und Tabs bilden EINEN Sticky-Block am oberen Rand des scrollenden
+   App-Inhalts. Ein einziger Sticky-Container (statt zwei konkurrierende Stickies
+   auf top: 0, die sich überlagern) hält beide zusammen: die Übersicht oben, die
+   Tabs unten an ihr — ohne Magic-Number für die Höhe der Übersicht. */
+.pw-budget-sticky {
   position: sticky;
   top: 0;
   z-index: 5;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1.5rem;
+  background: var(--color-main-background);
+}
+.pw-budget-summen {
   padding: 0.6rem 0.9rem;
-  margin-block-end: 0.75rem;
   background: var(--color-main-background);
   border-block-end: 2px solid var(--color-border);
+  overflow-x: auto;
+}
+/* Fortschritt beim Neu-Einlesen (F91): indeterminierter Balken (der Server meldet
+   keinen Fortschritt), plus Beschriftung. */
+.pw-reimport-fortschritt { display: flex; flex-direction: column; gap: 0.35rem; margin-block-end: 0.75rem; }
+.pw-reimport-label { font-size: 0.85rem; color: var(--color-text-maxcontrast); }
+.pw-reimport-bar { position: relative; block-size: 0.25rem; border-radius: 0.25rem; background: var(--color-background-dark); overflow: hidden; }
+.pw-reimport-bar-inner { position: absolute; inset-block: 0; inline-size: 40%; border-radius: 0.25rem; background: var(--color-primary-element); animation: pw-reimport-slide 1.1s ease-in-out infinite; }
+@keyframes pw-reimport-slide { 0% { inset-inline-start: -40%; } 100% { inset-inline-start: 100%; } }
+.pw-budget-vergleich { inline-size: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.pw-budget-vergleich th, .pw-budget-vergleich td { padding: 0.25rem 0.75rem; text-align: right; white-space: nowrap; }
+.pw-budget-vergleich thead th { font-size: 0.8rem; color: var(--color-text-maxcontrast); text-transform: uppercase; letter-spacing: 0.03em; border-block-end: 1px solid var(--color-border); }
+.pw-budget-vergleich tbody td { font-size: 1rem; font-weight: 600; }
+.pw-budget-vergleich .pw-vergleich-zeile { text-align: left; font-weight: 600; color: var(--color-text-maxcontrast); }
+.pw-budget-vergleich .pw-vergleich-differenz td, .pw-budget-vergleich .pw-vergleich-differenz .pw-vergleich-zeile { font-size: 0.85rem; font-weight: 500; border-block-start: 1px solid var(--color-border); }
+/* Schmal (Handy): die Übersicht passt als 6-Spalten-Tabelle nicht mehr ins Bild —
+   sie bricht in je einen Block pro Budget um (Kennzahl links, Wert rechts), kein
+   H-Scroll. Bis ~46rem trägt die Tabelle noch (Tablet), darum erst darunter. */
+@media (max-width: 46rem) {
+  .pw-budget-summen { overflow-x: visible; }
+  .pw-budget-vergleich { display: block; }
+  .pw-budget-vergleich thead { display: none; }
+  .pw-budget-vergleich tbody, .pw-budget-vergleich tr, .pw-budget-vergleich th, .pw-budget-vergleich td { display: block; }
+  .pw-budget-vergleich tr { margin-block-end: 0.7rem; }
+  .pw-budget-vergleich .pw-vergleich-zeile { text-align: start; font-size: 0.95rem; padding-block-end: 0.2rem; border-block-end: 1px solid var(--color-border); }
+  .pw-budget-vergleich td { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; padding-block: 0.1rem; }
+  .pw-budget-vergleich td::before { content: attr(data-label); font-weight: 400; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.03em; color: var(--color-text-maxcontrast); }
 }
 .pw-summe { display: flex; flex-direction: column; min-inline-size: 8rem; }
 .pw-summe-label { font-size: 0.8rem; color: var(--color-text-maxcontrast); text-transform: uppercase; letter-spacing: 0.03em; }
 .pw-summe-wert { font-size: 1.1rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 .pw-summe-diff { font-size: 0.8rem; font-variant-numeric: tabular-nums; }
-.pw-positiv, .pw-diff-plus { color: var(--color-success, #2d7d46); }
-.pw-negativ, .pw-diff-minus { color: var(--color-error, #c0392b); }
+/* Bewusst dunkler als NCs helles --color-success/-error, damit die kleinen
+   Delta-Zahlen auf hellem Grund gut lesbar sind. */
+/* .pw-positiv/.pw-negativ (+ .pw-diff-plus/-minus) sind global in style.scss
+   definiert (einheitliche Farbe für die ganze App) — hier keine eigene Farbe. */
 
-.pw-budget-tabs { display: flex; gap: 0.25rem; border-block-end: 1px solid var(--color-border); margin-block-end: 0.75rem; }
+/* Tabs kleben am oberen Rand des scrollenden App-Inhalts, damit man zum Wechseln
+   nicht nach oben scrollen muss. Deckender Hintergrund, damit die darunter
+   durchlaufenden Karten nicht durchscheinen. */
+.pw-budget-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  border-block-end: 1px solid var(--color-border);
+  margin-block-end: 0.75rem;
+  background: var(--color-main-background);
+  padding-block-start: 0.25rem;
+}
 .pw-budget-tab {
   border: 0;
   background: transparent;
@@ -978,6 +1348,12 @@ export default {
   border-block-end: 2px solid transparent;
 }
 .pw-budget-tab-aktiv { color: var(--color-main-text); font-weight: 600; border-block-end-color: var(--color-primary-element); }
+/* Der aktive Tab sieht immer gleich aus — auch nachdem er mit der Maus geklickt
+   wurde: kein hängenbleibender Fokus-Hintergrund. Tastatur-Fokus bleibt als Ring
+   sichtbar (Barrierefreiheit). */
+.pw-budget-tab:focus { background: transparent; box-shadow: none; }
+.pw-budget-tab:hover { background: color-mix(in srgb, var(--color-background-hover) 70%, transparent); }
+.pw-budget-tab:focus-visible { outline: 2px solid var(--color-primary-element); outline-offset: -2px; border-radius: 0.25rem 0.25rem 0 0; }
 .pw-budget-tabpanel { display: flex; flex-direction: column; gap: 1rem; }
 .pw-budget-dep-titel { font-size: 1.05rem; margin: 0.5rem 0 0.4rem; color: var(--color-primary-element); }
 .pw-budget-betrag { font-variant-numeric: tabular-nums; white-space: nowrap; text-align: end; }
@@ -988,8 +1364,8 @@ export default {
 .pw-antrag-steller { font-weight: 600; }
 .pw-antrag-begruendung { color: var(--color-text-maxcontrast); flex: 1 1 12rem; }
 .pw-antrag-entscheid { font-size: 0.8rem; padding: 0.05rem 0.4rem; border-radius: 0.4rem; }
-.pw-entscheid-angenommen { background: var(--color-success, #2d7d46); color: #fff; }
-.pw-entscheid-abgelehnt { background: var(--color-error, #c0392b); color: #fff; }
+.pw-entscheid-angenommen { background: var(--color-success, #2d7d46); color: var(--color-primary-element-text, #fff); }
+.pw-entscheid-abgelehnt { background: var(--color-error, #c0392b); color: var(--color-primary-element-text, #fff); }
 .pw-entscheid-offen { background: var(--color-background-dark); }
 .pw-entscheid-knoepfe { display: flex; gap: 0.15rem; }
 .pw-antrag-haltung { min-inline-size: 10rem; max-inline-size: 14rem; }
@@ -997,10 +1373,61 @@ export default {
 .pw-antrag-notizen { flex-basis: 100%; font-size: 0.85rem; margin-block-start: 0.2rem; }
 .pw-antrag-notizen > summary { cursor: pointer; color: var(--color-text-maxcontrast); }
 .pw-verteilung-ziel { display: flex; gap: 0.5rem; align-items: flex-end; flex-wrap: wrap; margin-block-start: 0.4rem; }
-.pw-verteilung { display: flex; flex-direction: column; gap: 0.5rem; }
+/* Künstliche Produktegruppe (F89): abgesetzter Grund, nicht antragbar. */
+.pw-budget-kuenstlich { background: var(--pw-surface-kuenstlich); }
+.pw-weisung-link { color: var(--color-primary-element); text-decoration: none; font-size: 0.9rem; white-space: nowrap; }
+.pw-weisung-link:hover { text-decoration: underline; }
 .pw-steuerfuss { display: flex; flex-direction: column; gap: 0.6rem; max-inline-size: 32rem; }
 .pw-budget-info { font-size: 0.9rem; color: var(--color-text-maxcontrast); }
 .pw-budget-info li { display: flex; justify-content: space-between; gap: 0.5rem; }
+
+/* Weisungs-Link ganz nach rechts im Header (nach den Buttons). */
+.pw-weisung-rechts { margin-inline-start: auto; }
+
+/* Anträge-Tab: PDF-Knopf oben rechts, Anträge nach Departement gruppiert. Die
+   Titelregel — viel Abstand über der Departement-Überschrift, wenig darunter. */
+.pw-antraege-kopf { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: var(--pw-gap-1); margin-block-end: 0.75rem; }
+
+/* EIN Grid über alle Departemente: jede Antragszeile ist ein Subgrid, das die
+   Spalten des Container-Grids übernimmt — so fluchten Position, Betrag, Zusatz-
+   Zahl, Einheit, Antragsteller, Begründung und Beschluss zeilen- UND gruppen-
+   übergreifend. Zahlen rechts, Einheit links auf gemeinsamer Kante (Tabellenregel). */
+.pw-antraege-tabelle {
+  display: grid;
+  grid-template-columns:
+    [pos] minmax(8rem, max-content)
+    [betrag] max-content
+    [znum] max-content
+    [zeinheit] max-content
+    [steller] max-content
+    [grund] minmax(6rem, 1fr)
+    [beschluss] max-content;
+  column-gap: 0.75rem;
+  row-gap: 0.35rem;
+  align-items: baseline;
+  font-size: 0.9rem;
+}
+/* Departement-Überschrift über die ganze Breite; Titelregel: viel drüber, wenig drunter. */
+.pw-antraege-dep { grid-column: 1 / -1; margin-block: 1.25rem 0.1rem; font-size: 1rem; font-weight: 700; }
+.pw-antrag-zeile { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: baseline; }
+.pw-num { text-align: end; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pw-antrag-znum { min-inline-size: 0; }
+.pw-antrag-zeinheit { text-align: start; color: var(--color-text-maxcontrast); }
+.pw-antrag-entscheid { justify-self: end; }
+/* Schmal: kein horizontales Scrollen — das Grid bricht in gestapelte Antragsblöcke um. */
+@media (max-width: 56rem) {
+  .pw-antraege-tabelle { display: block; }
+  .pw-antrag-zeile { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.1rem 0.5rem; padding-block: 0.35rem; border-block-end: 1px solid var(--color-border); }
+  .pw-antrag-pos { flex-basis: 100%; }
+  .pw-antrag-begruendung { flex-basis: 100%; }
+  .pw-num { text-align: start; }
+  /* Im Stapel keine Grid-Mindestbreite und keine leeren Zahl/Einheit-Zellen, sonst
+     klafft eine Lücke zwischen Betrag und Antragsteller (z.B. «−3'850   automatisch»). */
+  .pw-antrag-betrag { min-inline-size: 0; }
+  .pw-antrag-znum:empty, .pw-antrag-zeinheit:empty { display: none; }
+}
 .pw-produkt-kosten { color: var(--color-text-maxcontrast); white-space: nowrap; }
+/* F101: kompakte Liste der Pauschalantrag-Ausnahme-Schalter an der Produktegruppe. */
+.pw-pg-pauschale { list-style: none; margin: 0.3rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.85rem; }
 .pw-modal-aktionen { display: flex; gap: 0.5rem; justify-content: flex-end; padding: 0.75rem 1rem; }
 </style>

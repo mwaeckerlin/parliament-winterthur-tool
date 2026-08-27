@@ -212,7 +212,7 @@ test.describe('Budget: Globalbudgets — Anträge und Live-Entscheid (F80, F81, 
     await sorgeFuerBudgetjahr(page, JAHR)
     await gotoBudget(page)
 
-    const verteilung = page.locator('.pw-verteilung')
+    const verteilung = page.locator('.pw-pauschal-automatik')
     await verteilung.waitFor({ state: 'visible', timeout: 30_000 })
     await expect(verteilung.getByText('Defizit automatisch als Pauschalkürzung verteilen')).toBeVisible()
     // Automatik aus → der explizite Verteil-Knopf erscheint. Das Umschalten löst
@@ -333,7 +333,7 @@ test.describe('Budget: Steuerfuss, Import und PDF (F88, F89, F91, F92)', () => {
     // verschwindet, die Automatik-Karte auch.
     await page.locator('#pw-filter-slot .checkbox-radio-switch__content').first().click()
     await page.waitForLoadState('networkidle')
-    await expect(page.locator('.pw-verteilung'), 'Automatik-Karte im Sitzungsmodus weiterhin sichtbar').toHaveCount(0)
+    await expect(page.locator('.pw-pauschalantraege'), 'Pauschalanträge-Kasten im Sitzungsmodus weiterhin sichtbar').toHaveCount(0)
     await expect(
       page.locator('.pw-budget-tabpanel .pw-budget-antraege li', { hasText: fraktionText }),
       'Fraktionsantrag im Sitzungsmodus weiterhin sichtbar',
@@ -400,7 +400,7 @@ test.describe('Budget: Antragsmodell — Herkunft, Betrag, Haltung, Pauschal, No
     // F100: der Einreichen-Entscheid des Pauschalantrags ist bedienbar. Die
     // Automatik kann durch einen früheren Test aus sein → nötigenfalls einschalten
     // (der Schalter erscheint nur bei eingeschalteter Automatik).
-    const verteilung = page.locator('.pw-verteilung')
+    const verteilung = page.locator('.pw-pauschal-automatik')
     if (await verteilung.getByText('Pauschalantrag einreichen').count() === 0) {
       await verteilung.locator('.checkbox-radio-switch__content').first().click()
       await page.waitForLoadState('networkidle')

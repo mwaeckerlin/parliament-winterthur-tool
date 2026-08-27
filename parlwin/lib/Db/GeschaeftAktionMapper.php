@@ -128,6 +128,36 @@ class GeschaeftAktionMapper extends QBMapper
         return $this->findEntities($qb);
     }
 
+    /**
+     * Löscht ALLE Aktionen (Notizen usw.) der angegebenen Objekte hart und gibt
+     * deren IDs zurück, damit der Aufrufer die zugehörigen Revisionen mitlöschen
+     * kann. Für den vollständigen Purge eines Budgets (Frontend-Re-Import).
+     *
+     * @param int[] $objektIds
+     * @return int[] die gelöschten Aktions-IDs
+     */
+    public function deleteFuerObjekte(string $objektTyp, array $objektIds): array
+    {
+        if ($objektIds === []) {
+            return [];
+        }
+        $qb = $this->db->getQueryBuilder();
+        $qb->select('id')
+            ->from($this->getTableName())
+            ->where($qb->expr()->eq('objekt_typ', $qb->createNamedParameter($objektTyp)))
+            ->andWhere($qb->expr()->in('geschaeft_id', $qb->createNamedParameter($objektIds, IQueryBuilder::PARAM_INT_ARRAY)));
+        $ergebnis = $qb->executeQuery();
+        $ids = array_map(static fn ($r): int => (int) $r['id'], $ergebnis->fetchAll());
+        $ergebnis->closeCursor();
+
+        $del = $this->db->getQueryBuilder();
+        $del->delete($this->getTableName())
+            ->where($del->expr()->eq('objekt_typ', $del->createNamedParameter($objektTyp)))
+            ->andWhere($del->expr()->in('geschaeft_id', $del->createNamedParameter($objektIds, IQueryBuilder::PARAM_INT_ARRAY)));
+        $del->executeStatement();
+        return $ids;
+    }
+
     public function findLetzterGueltigerBeschluss(int $geschaeftId): ?GeschaeftAktion
     {
         return $this->findAktuelleAktionVom($geschaeftId, 'beschluss');

@@ -23,6 +23,8 @@ use JsonSerializable;
  * @method void   setDepartement(?string $v)
  * @method int    getReihenfolge()
  * @method void   setReihenfolge(int $v)
+ * @method int    getKuenstlich()
+ * @method void   setKuenstlich(int $v)
  */
 class BudgetProduktegruppe extends Entity implements JsonSerializable {
     protected int $jahr = 0;
@@ -30,6 +32,11 @@ class BudgetProduktegruppe extends Entity implements JsonSerializable {
     protected ?string $name = null;
     protected ?string $departement = null;
     protected int $reihenfolge = 0;
+    // Künstliche Produktegruppe (F89): trägt die aus Teil A geparsten Posten, die
+    // nicht in einer echten Produktegruppe stehen (interne Verrechnung, Abgrenzung),
+    // damit Σ aller Produktegruppen dem deklarierten Gesamtergebnis entspricht. Nicht
+    // antragbar; keine Pauschalkürzung greift auf sie.
+    protected int $kuenstlich = 0;
     protected int $globalkreditIst = 0;
     protected int $globalkreditSollVorjahr = 0;
     protected int $globalkreditSoll = 0;
@@ -48,6 +55,7 @@ class BudgetProduktegruppe extends Entity implements JsonSerializable {
     protected float $auszubildendeSoll = 0.0;
     protected ?string $auftrag = null;
     protected ?string $zielvorgaben = null;
+    protected ?string $kostenzeilen = null;
     protected ?string $erlaeuterungStellen = null;
     protected ?string $begruendungAbweichung = null;
     protected ?string $begruendungFap = null;
@@ -60,7 +68,7 @@ class BudgetProduktegruppe extends Entity implements JsonSerializable {
             'globalkreditIst', 'globalkreditSollVorjahr', 'globalkreditSoll',
             'globalkreditPlan1', 'globalkreditPlan2', 'globalkreditPlan3',
             'aufwandIst', 'aufwandSollVorjahr', 'aufwandSoll',
-            'ertragIst', 'ertragSollVorjahr', 'ertragSoll',
+            'ertragIst', 'ertragSollVorjahr', 'ertragSoll', 'kuenstlich',
         ] as $f) {
             $this->addType($f, 'integer');
         }
@@ -78,6 +86,8 @@ class BudgetProduktegruppe extends Entity implements JsonSerializable {
             'name' => $this->name,
             'departement' => $this->departement,
             'reihenfolge' => $this->reihenfolge,
+            'kuenstlich' => (bool) $this->kuenstlich,
+            'antragbar' => !$this->kuenstlich,
             'globalkredit' => [
                 'ist' => $this->globalkreditIst,
                 'sollVorjahr' => $this->globalkreditSollVorjahr,
@@ -91,7 +101,8 @@ class BudgetProduktegruppe extends Entity implements JsonSerializable {
             'stellen' => ['ist' => $this->stellenIst, 'sollVorjahr' => $this->stellenSollVorjahr, 'soll' => $this->stellenSoll],
             'auszubildendeSoll' => $this->auszubildendeSoll,
             'auftrag' => $this->auftrag,
-            'zielvorgaben' => $this->zielvorgaben,
+            'zielvorgaben' => $this->zielvorgaben ? (json_decode($this->zielvorgaben, true) ?: []) : [],
+            'kostenzeilen' => $this->kostenzeilen ? (json_decode($this->kostenzeilen, true) ?: []) : [],
             'erlaeuterungStellen' => $this->erlaeuterungStellen,
             'begruendungAbweichung' => $this->begruendungAbweichung,
             'begruendungFap' => $this->begruendungFap,

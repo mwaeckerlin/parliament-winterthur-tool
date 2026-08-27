@@ -11,13 +11,12 @@
       <div class="pw-notiz-kopf">
         <span class="pw-notiz-autor">{{ n.autorName || n.autorUid }}</span>
         <span class="pw-notiz-datum">{{ formatieredatum(n.erstelltAm) }} {{ formatiereUhrzeit(n.erstelltAm) }}</span>
-        <button
+        <PwLoeschen
           v-if="!readonly && istEigeneAktion(n) && aktiveNotizId !== n.id"
-          type="button"
-          class="button pw-btn-mini pw-btn-loeschen"
-          title="Notiz löschen"
+          class="pw-notiz-loeschen"
+          label="Notiz löschen"
           @click="notizLoeschen(n)"
-        ><svg class="pw-btn-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path :d="mdiDelete" fill="currentColor" /></svg></button>
+        />
       </div>
       <div v-if="editorOffen && editorModus === 'edit' && aktiveNotizId === n.id" class="pw-notiz-bearbeiten-zeile">
         <PwWysiwyg
@@ -74,8 +73,8 @@ import { generateUrl } from '@nextcloud/router'
 import { showSuccess, showError } from '@nextcloud/dialogs'
 import { markdownZuHtml } from '../utils'
 import axios from '@nextcloud/axios'
-import { mdiDelete } from '@mdi/js'
 import PwWysiwyg from './PwWysiwyg.vue'
+import PwLoeschen from './PwLoeschen.vue'
 
 /**
  * Geteilte Notizen-Liste für Geschäfte UND Vorstösse — 100 % derselbe Code und
@@ -97,7 +96,7 @@ import PwWysiwyg from './PwWysiwyg.vue'
  */
 export default {
   name: 'NotizenListe',
-  components: { PwWysiwyg },
+  components: { PwWysiwyg, PwLoeschen },
   props: {
     /** API-Basis OHNE führenden Slash, z.B. `geschaefte/123` oder `vorstoesse/45`. */
     basisUrl: { type: String, required: true },
@@ -120,7 +119,6 @@ export default {
   emits: ['geaendert'],
   data() {
     return {
-      mdiDelete,
       // Lokale Arbeitskopie der Notizen (aus der prop synchronisiert via watch).
       arbeitsNotizen: [],
       // Ein einziger Notiz-Editor-Zustand — neue Notiz und Bearbeiten teilen ihn:

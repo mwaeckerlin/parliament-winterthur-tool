@@ -2,7 +2,6 @@
 .agents
 .codex
 tests
-README.md
 LICENSE
 .env
 .env.*

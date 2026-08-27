@@ -19,6 +19,16 @@ use JsonSerializable;
  * @method void   setSteuerertrag(int $v)
  * @method int    getPersonalsteuer()
  * @method void   setPersonalsteuer(int $v)
+ * @method int    getTotalAufwand()
+ * @method void   setTotalAufwand(int $v)
+ * @method int    getTotalErtrag()
+ * @method void   setTotalErtrag(int $v)
+ * @method int    getTotalAufwandVorjahr()
+ * @method void   setTotalAufwandVorjahr(int $v)
+ * @method int    getTotalErtragVorjahr()
+ * @method void   setTotalErtragVorjahr(int $v)
+ * @method int    getGesamtergebnis()
+ * @method void   setGesamtergebnis(int $v)
  * @method string getWeisungQuelle()
  * @method void   setWeisungQuelle(?string $v)
  * @method string getNovemberbriefQuelle()
@@ -33,6 +43,11 @@ class BudgetJahr extends Entity implements JsonSerializable {
     protected int $steuerfuss = 0;
     protected int $steuerertrag = 0;
     protected int $personalsteuer = 0;
+    protected int $totalAufwand = 0;
+    protected int $totalErtrag = 0;
+    protected int $totalAufwandVorjahr = 0;
+    protected int $totalErtragVorjahr = 0;
+    protected int $gesamtergebnis = 0;
     protected ?string $weisungQuelle = null;
     protected ?string $novemberbriefQuelle = null;
     protected int $novemberbriefImportiert = 0;
@@ -43,6 +58,11 @@ class BudgetJahr extends Entity implements JsonSerializable {
         $this->addType('steuerfuss', 'integer');
         $this->addType('steuerertrag', 'integer');
         $this->addType('personalsteuer', 'integer');
+        $this->addType('totalAufwand', 'integer');
+        $this->addType('totalErtrag', 'integer');
+        $this->addType('totalAufwandVorjahr', 'integer');
+        $this->addType('totalErtragVorjahr', 'integer');
+        $this->addType('gesamtergebnis', 'integer');
         $this->addType('novemberbriefImportiert', 'integer');
         $this->addType('erstelltAm', 'integer');
     }
@@ -55,6 +75,11 @@ class BudgetJahr extends Entity implements JsonSerializable {
             'steuerfuss' => $this->getSteuerfuss(),
             'steuerertrag' => $this->getSteuerertrag(),
             'personalsteuer' => $this->getPersonalsteuer(),
+            'totalAufwand' => $this->getTotalAufwand(),
+            'totalErtrag' => $this->getTotalErtrag(),
+            'totalAufwandVorjahr' => $this->getTotalAufwandVorjahr(),
+            'totalErtragVorjahr' => $this->getTotalErtragVorjahr(),
+            'gesamtergebnis' => $this->getGesamtergebnis(),
             'novemberbriefImportiert' => (bool) $this->getNovemberbriefImportiert(),
         ];
     }

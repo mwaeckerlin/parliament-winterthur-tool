@@ -117,6 +117,47 @@ class GeschaeftMapper extends QBMapper
     }
 
     /**
+     * Das Budget-Geschäft (die Weisung) eines Jahres — «Budget <Jahr> … Festsetzung
+     * des Steuerfusses» bzw. «Genehmigung des Budgets <Jahr> …». Erkannt am Titel
+     * (enthält «Budget», die Jahreszahl und «Steuerfuss»), damit Budget-Postulate/
+     * -Motionen («Budget <Jahr> - …» ohne Steuerfuss) nicht mitzählen. Liefert null,
+     * wenn keine Weisung vorliegt.
+     */
+    public function findeBudgetWeisung(int $jahr): ?Geschaeft
+    {
+        $qb = $this->db->getQueryBuilder();
+        $qb->select('*')
+            ->from($this->getTableName())
+            ->where($qb->expr()->eq('geloescht', $qb->createNamedParameter(false, IQueryBuilder::PARAM_BOOL)))
+            ->andWhere($qb->expr()->iLike('titel', $qb->createNamedParameter('%' . $this->db->escapeLikeParameter('Budget') . '%')))
+            ->andWhere($qb->expr()->iLike('titel', $qb->createNamedParameter('%' . $this->db->escapeLikeParameter((string) $jahr) . '%')))
+            ->andWhere($qb->expr()->iLike('titel', $qb->createNamedParameter('%' . $this->db->escapeLikeParameter('Steuerfuss') . '%')))
+            ->orderBy('id', 'DESC')
+            ->setMaxResults(1);
+        $treffer = $this->findEntities($qb);
+        return $treffer[0] ?? null;
+    }
+
+    /**
+     * Alle Budget-Weisungen (Budget-Geschäfte «Budget <Jahr> … Steuerfuss»),
+     * neueste zuerst — Grundlage für die live verfügbaren Budgetjahre (das
+     * Budgetjahr wird aus dem Titel «Budget <Jahr>» gelesen).
+     *
+     * @return Geschaeft[]
+     */
+    public function alleBudgetWeisungen(): array
+    {
+        $qb = $this->db->getQueryBuilder();
+        $qb->select('*')
+            ->from($this->getTableName())
+            ->where($qb->expr()->eq('geloescht', $qb->createNamedParameter(false, IQueryBuilder::PARAM_BOOL)))
+            ->andWhere($qb->expr()->iLike('titel', $qb->createNamedParameter('%' . $this->db->escapeLikeParameter('Budget') . '%')))
+            ->andWhere($qb->expr()->iLike('titel', $qb->createNamedParameter('%' . $this->db->escapeLikeParameter('Steuerfuss') . '%')))
+            ->orderBy('id', 'DESC');
+        return $this->findEntities($qb);
+    }
+
+    /**
      * Gibt ein Geschäft anhand seiner ID zurück.
      *
      * @throws DoesNotExistException wenn nicht gefunden

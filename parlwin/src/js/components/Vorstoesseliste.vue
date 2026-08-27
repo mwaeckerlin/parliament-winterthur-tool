@@ -10,10 +10,10 @@
     />
   </Teleport>
   <Teleport v-if="filterReady" to="#pw-filter-slot">
-    <div class="pw-filter-body">
+    <FilterPanel @reset="filterZuruecksetzen">
       <NcSelect v-model="herkunftOption" :options="herkunftOptionen" :clearable="false" input-label="Herkunft" />
       <NcSelect v-model="statusOption" :options="statusOptionen" :clearable="false" input-label="Status" />
-    </div>
+    </FilterPanel>
   </Teleport>
 
   <section class="pw-view-content pw-vorstoesse">
@@ -62,7 +62,7 @@
             </div>
           </div>
           <div class="pw-data-card-aktionen">
-            <NcButton type="error" @click.stop="loeschen(vorstoss)">Löschen</NcButton>
+            <PwLoeschen label="Vorstoss löschen" @click="loeschen(vorstoss)" />
           </div>
         </article>
       </div>
@@ -224,6 +224,7 @@ import NcButton from '@nextcloud/vue/components/NcButton'
 import NcSelect from '@nextcloud/vue/components/NcSelect'
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 import NcEmptyContent from '@nextcloud/vue/components/NcEmptyContent'
+import FilterPanel from './FilterPanel.vue'
 import PwField from './PwField.vue'
 import BeschlussWidget from './BeschlussWidget.vue'
 import PwMultiSelect from './PwMultiSelect.vue'
@@ -233,6 +234,7 @@ import GeschaeftDokumente from './GeschaeftDokumente.vue'
 import NotizenListe from './NotizenListe.vue'
 import Aktionszeitleiste from './Aktionszeitleiste.vue'
 import GeschaeftVerknuepfenDialog from './GeschaeftVerknuepfenDialog.vue'
+import PwLoeschen from './PwLoeschen.vue'
 
 const HERKUENFTE = [
   { code: 'eigene', label: 'Eigene' },
@@ -260,7 +262,7 @@ const FREMD_BESCHLUESSE = [
 
 export default {
   name: 'Vorstoesseliste',
-  components: { NcTextField, NcButton, NcSelect, NcLoadingIcon, NcEmptyContent, PwField, BeschlussWidget, PwMultiSelect, PwPrioritaetSelect, PwWysiwyg, GeschaeftDokumente, NotizenListe, Aktionszeitleiste, GeschaeftVerknuepfenDialog },
+  components: { NcTextField, NcButton, NcSelect, NcLoadingIcon, NcEmptyContent, FilterPanel, PwField, BeschlussWidget, PwMultiSelect, PwPrioritaetSelect, PwWysiwyg, GeschaeftDokumente, NotizenListe, Aktionszeitleiste, GeschaeftVerknuepfenDialog, PwLoeschen },
   props: {
     mitglieder: { type: Array, default: () => [] },
     fraktionen: { type: Array, default: () => [] },
@@ -401,6 +403,11 @@ export default {
     this.lade()
   },
   methods: {
+    filterZuruecksetzen() {
+      this.suche = ''
+      this.herkunftOption = { label: 'Alle', value: '' }
+      this.statusOption = { label: 'Alle', value: '' }
+    },
     vollerName,
     personKey,
     kuerze,

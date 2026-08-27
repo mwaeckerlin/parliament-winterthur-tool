@@ -142,6 +142,22 @@ class NotizService
     }
 
     /**
+     * Löscht ALLE Notizen (samt Revisionen) der angegebenen Objekte HART und
+     * unwiederbringlich — für den vollständigen Purge eines Budgets beim
+     * Frontend-Re-Import. Kein Soft-Delete, keine Undo-History.
+     *
+     * @param int[] $objektIds
+     */
+    public function alleLoeschen(string $objektTyp, array $objektIds): void
+    {
+        if ($objektIds === []) {
+            return;
+        }
+        $aktionIds = $this->aktionMapper->deleteFuerObjekte($objektTyp, $objektIds);
+        $this->revisionMapper->deleteByAktionen($aktionIds);
+    }
+
+    /**
      * Macht das Löschen rückgängig — die Notiz erscheint samt History wieder.
      *
      * @return array<string, mixed>

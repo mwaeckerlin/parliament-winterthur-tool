@@ -162,4 +162,51 @@ class BudgetAntragErstellenTest extends TestCase {
         $namen = array_map(static fn ($f) => $f['name'], $a->getUnterstuetzerArray());
         self::assertSame(['Grüne', 'SP'], $namen, 'unterstützende Fraktionen gespeichert (F98)');
     }
+
+    public function testZielAenderungenGespeichert(): void {
+        // F109: ein Antrag kann Zielvorgaben ändern; die Änderungen liegen als Liste
+        // [{zielNummer, messgroesse, neuerWert}] am Antrag. Reiner Zielvorgaben-Antrag
+        // ohne Budget: der Betrag bleibt null.
+        $a = $this->service()->antragErstellen(2026, [
+            'bereich' => 'globalbudget', 'zielRef' => '121',
+            'zielAenderungen' => [
+                ['zielNummer' => 2, 'messgroesse' => 'Prozentsatz der zufrieden Antwortenden', 'neuerWert' => '100'],
+                ['zielNummer' => 3, 'messgroesse' => 'Anzahl Kurstage', 'neuerWert' => '1200'],
+                ['zielNummer' => 0, 'messgroesse' => '', 'neuerWert' => ''], // verworfen
+            ],
+        ]);
+        $zv = $a->getZielAenderungenArray();
+        self::assertCount(2, $zv, 'leere Änderung verworfen');
+        self::assertSame(2, $zv[0]['zielNummer']);
+        self::assertSame('100', $zv[0]['neuerWert']);
+        self::assertSame(0, $a->getBetragDelta(), 'reiner Zielvorgaben-Antrag hat keine Budgetwirkung');
+    }
+
+    public function testAufteilungOhneObenBetragErgibtSumme(): void {
+        // F109: ist auf PG-Ebene kein Betrag gesetzt, unten aber schon, wird oben die
+        // Summe der unteren Beträge eingesetzt (npnp: ohne aufteilungSummeAnwenden 0).
+        $a = $this->service()->antragErstellen(2026, [
+            'bereich' => 'globalbudget', 'zielRef' => '121',
+            'aufteilung' => [
+                ['ebene' => 'produkt', 'ref' => '1', 'betrag' => -20000],
+                ['ebene' => 'produkt-kosten', 'produkt' => '2', 'ref' => 'Sachkosten', 'betrag' => -30000],
+                ['ebene' => 'pg-kosten', 'ref' => 'Personalkosten'], // ohne Betrag → zählt nicht zur Summe
+            ],
+        ]);
+        self::assertSame(-50000, $a->getBetragDelta(), 'PG-Betrag = Summe der unteren Beträge');
+        self::assertCount(3, $a->getAufteilungArray(), 'die Aufteilung selbst bleibt vollständig erhalten');
+    }
+
+    public function testAufteilungNurBegruendungWennObenBetrag(): void {
+        // F109: ist oben UND unten ein Betrag gesetzt, wird nichts gerechnet — die
+        // Aufteilung dient nur der Begründung; der obere Betrag bleibt unverändert.
+        $a = $this->service()->antragErstellen(2026, [
+            'bereich' => 'globalbudget', 'zielRef' => '121', 'betragDelta' => -100000,
+            'aufteilung' => [
+                ['ebene' => 'produkt', 'ref' => '1', 'betrag' => -20000],
+            ],
+        ]);
+        self::assertSame(-100000, $a->getBetragDelta(), 'oben gesetzter Betrag bleibt unverändert');
+        self::assertCount(1, $a->getAufteilungArray());
+    }
 }

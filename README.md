@@ -355,6 +355,54 @@ zuerst persönlich, später in den geteilten Ordner verschieben.
    gleichzeitig tippen – wie in Google Docs).
 6. **Talk statt WhatsApp** für fraktionsinterne Themen – bleibt unter euch.
 
+### Budget: Fassungen (Begriffe)
+
+Im Budgetprozess entstehen mehrere Fassungen desselben Budgets. Diese Begriffe
+werden durchgehend so verwendet:
+
+- **Stadtratsbudget** – das Budget **1:1 aus der Weisung des Stadtrats**, inklusive
+  Novemberbrief, sofern ein solcher vorliegt. Es ist der unveränderte Ausgangsstand.
+- **Fraktionsbudget** – das Budget **mit allen erfassten Anträgen, welche die Fraktion
+  einreicht oder unterstützt**. Es zeigt, wie das Budget nach dem Willen der eigenen
+  Fraktion aussähe.
+- **Kommissionsbudget** – das Budget **mit allen Mehrheitsbeschlüssen aus den
+  Kommissionen**. (In diesem Tool bisher nicht eigens dargestellt — hier nur zur
+  Einordnung genannt.)
+- **Parlamentsbudget** – das vom **Parlament beschlossene, finale und gültige** Budget.
+
+### Budget: Pauschalanträge und Steuerfuss
+
+Im Budget-Bereich fasst der Kasten **«Pauschalanträge»** (Tab Globalbudgets) den
+automatischen Ausgleich und die frei angelegten Pauschalanträge zusammen:
+
+- **Defizit automatisch verteilen:** Ist der Schalter «Defizit automatisch als
+  Pauschalkürzung verteilen» eingeschaltet, wird ein Defizit anteilig zum Aufwand auf
+  die Produktegruppen verteilt, bis das gewählte **Ziel** erreicht ist (Standard:
+  schwarze Null; wahlweise ein Zielbetrag). Mit «Pauschalantrag einreichen» entscheidet
+  man, ob die so erzeugten Einzelanträge tatsächlich eingereicht werden — nur dann
+  stehen sie im Antrags-PDF.
+- **Weitere Pauschalanträge:** Über «+ Pauschalantrag» lassen sich beliebig viele,
+  voneinander unabhängige Pauschalanträge anlegen (Einsparung in Franken oder Prozent,
+  Antragsteller-Fraktion, Ausnahmen, Begründung). Ihre Kürzungen summieren sich; der
+  automatische Ausgleich rechnet zuletzt, auf dem bereits gekürzten Stand.
+
+**Steuerfuss bei Überschuss (Tab Steuerfuss).** Bleibt am Ende ein **Überschuss**, senkt
+die App den Steuerfuss automatisch in ganzen Prozent-Schritten, bis der Überschuss
+aufgebraucht ist — der Ertrag geht damit auf (nahe) null. Ein Steuerprozent ist so viel
+wert wie «Steuerertrag geteilt durch Steuerfuss». Die Senkung ist ein **echter Antrag**:
+Sie reduziert die Einnahmen in der Summenzeile und steht am Ende der Antragsliste und des
+Antrags-PDF. Wer den Steuerfuss selbst festlegen will, schaltet die Automatik auf dem
+Steuerfuss-Tab ab und stellt einen manuellen Steuerfuss-Antrag; dieser verdrängt die
+Automatik.
+
+**Wenn beides zusammenkommt (gewünschter Ertrag und Steuerfuss-Senkung).** Beide
+Automatiken dürfen gleichzeitig laufen. Der automatische Defizit-Ausgleich verteilt nur
+**Defizite** als Kürzungen und rührt einen Überschuss nie an. Ein Überschuss — auch ein
+als Zielbetrag gewünschter Ertrag — wird stattdessen über die **Steuerfuss-Senkung**
+ausgeglichen: Man gibt den Zielbetrag ein und verteilt den Überschuss, dieser Betrag
+fliesst in die Steuerfuss-Senkung, und der Gesamtertrag ist wieder null. So ist eindeutig,
+was mit einem Überschuss geschieht, wenn beide Schalter aktiv sind.
+
 
 ## Administration
 
@@ -658,6 +706,21 @@ Laufenden Sync abbrechen:
 
 ```bash
 php /path/to/nextcloud/occ parlwin:sync:cancel
+```
+
+Ein Budgetjahr sauber neu aus dem Budgetbuch einlesen (etwa nach einer
+fehlerhaften früheren Fassung in der Datenbank) — ersetzt Produktegruppen,
+Investitionen und Kennzahlen, die eigenen Anträge bleiben erhalten:
+
+```bash
+php /path/to/nextcloud/occ parlwin:budget-reimport 2026
+```
+
+Mit `--purge` werden zusätzlich alle Anträge und Pauschalanträge des Jahres
+gelöscht (voller Clean-Slate):
+
+```bash
+php /path/to/nextcloud/occ parlwin:budget-reimport 2026 --purge
 ```
 
 Im Admin-UI startet `Jetzt synchronisieren` denselben Sync-Flow und stellt live

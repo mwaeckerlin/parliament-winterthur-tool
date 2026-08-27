@@ -7,6 +7,8 @@ namespace OCA\ParliamentWinterthur\BackgroundJob;
 use OCA\ParliamentWinterthur\AppInfo\Application;
 use OCA\ParliamentWinterthur\Command\SyncCommand;
 use OCA\ParliamentWinterthur\Service\BudgetImportService;
+use OCA\ParliamentWinterthur\Service\BudgetService;
+use OCA\ParliamentWinterthur\Service\EreignisService;
 use OCA\ParliamentWinterthur\Service\FraktionsraumService;
 use OCA\ParliamentWinterthur\Service\SyncZeitplan;
 use OCA\ParliamentWinterthur\Service\VorstossImportService;
@@ -33,6 +35,8 @@ class SyncJob extends TimedJob {
         private readonly IConfig $config,
         private readonly VorstossImportService $vorstossImport,
         private readonly BudgetImportService $budgetImport,
+        private readonly BudgetService $budgetService,
+        private readonly EreignisService $ereignisse,
     ) {
         parent::__construct($time);
         // Kurzes Intervall: die Fälligkeit entscheidet der Zeitplan, nicht das
@@ -85,16 +89,26 @@ class SyncJob extends TimedJob {
         try {
             $budget = $this->budgetImport->automatischerImport();
             if ($budget !== null && ($budget['importiert'] || $budget['novemberbrief'])) {
+                // Automatik (Pauschalverteilung, Steuerfuss-Senkung) auf dem frisch
+                // eingelesenen Stand rechnen, damit die Ansicht sofort stimmt.
+                $this->budgetService->automatikNeuBerechnen((int) $budget['jahr']);
                 $this->logger->info(
                     'Parlament Winterthur: Budgetjahr ' . $budget['jahr'] . ' automatisch eingelesen'
                     . ($budget['novemberbrief'] ? ' (inkl. Novemberbrief)' : '')
                 );
+                $this->ereignisse->protokolliere('budget_import', 'budget', true,
+                    'Budget ' . $budget['jahr'] . ' automatisch eingelesen'
+                    . ($budget['novemberbrief'] ? ' (inkl. Novemberbrief)' : ''), '', 'auto');
             }
         } catch (\Throwable $e) {
             $this->logger->error(
                 'Parlament Winterthur: Fehler beim automatischen Budget-Import: ' . $e->getMessage(),
                 ['exception' => $e]
             );
+            // Der Ort, an dem Parsing-Probleme des automatischen Budget-Imports sichtbar
+            // werden (F105) — z.B. ein Budgetbuch ohne erkannte Produktegruppen.
+            $this->ereignisse->protokolliere('fehler', 'budget', false,
+                'Automatischer Budget-Import fehlgeschlagen', $e->getMessage(), 'auto');
         }
 
         $this->logger->info('Parlament Winterthur: Starte Datensynchronisation (BackgroundJob)');
@@ -111,11 +125,15 @@ class SyncJob extends TimedJob {
             }
 
             $this->logger->info('Parlament Winterthur: Datensynchronisation (BackgroundJob) erfolgreich abgeschlossen');
+            $this->ereignisse->protokolliere('sync', '', true,
+                'Automatische Synchronisation abgeschlossen', '', 'auto');
         } catch (\Throwable $e) {
             $this->logger->error(
                 'Parlament Winterthur: Fehler bei der Datensynchronisation (BackgroundJob): ' . $e->getMessage(),
                 ['exception' => $e]
             );
+            $this->ereignisse->protokolliere('fehler', '', false,
+                'Automatische Synchronisation fehlgeschlagen', $e->getMessage(), 'auto');
         }
     }
 }

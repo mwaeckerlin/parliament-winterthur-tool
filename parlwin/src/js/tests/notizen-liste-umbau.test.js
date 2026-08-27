@@ -3,6 +3,7 @@ import { shallowMount } from '@vue/test-utils'
 import GeschaeftDetail from '../components/GeschaeftDetail.vue'
 import NotizenListe from '../components/NotizenListe.vue'
 import Aktionszeitleiste from '../components/Aktionszeitleiste.vue'
+import PwLoeschen from '../components/PwLoeschen.vue'
 
 vi.mock('../realtime', () => ({ subscribeRealtime: () => vi.fn() }))
 vi.mock('@nextcloud/axios', () => ({
@@ -136,12 +137,14 @@ describe('NotizenListe — nur aktive Notizen', () => {
     expect(wrapper.find('button[title="Löschen rückgängig machen"]').exists()).toBe(false)
   })
 
-  it('unterscheidet Löschen (Mülleimer-Icon) optisch vom Schliessen (✕)', () => {
+  it('nutzt für Löschen den einheitlichen ✕-Knopf (PwLoeschen), kein Mülleimer-Icon', () => {
     const wrapper = mountListe([NOTIZ])
-    const loeschen = wrapper.find('button[title="Notiz löschen"]')
+    // Überall derselbe Löschen-Knopf: die geteilte PwLoeschen-Komponente mit «✕».
+    const loeschen = wrapper.findComponent(PwLoeschen)
     expect(loeschen.exists()).toBe(true)
-    expect(loeschen.text()).not.toContain('✕')
-    expect(loeschen.element.children.length).toBeGreaterThan(0)
+    expect(loeschen.props('label')).toBe('Notiz löschen')
+    // Kein eigenes Papierkorb-SVG mehr in der Notiz-Kopfzeile.
+    expect(wrapper.find('.pw-notiz-kopf svg').exists()).toBe(false)
   })
 })
 

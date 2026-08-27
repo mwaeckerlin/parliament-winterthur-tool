@@ -27,6 +27,13 @@ class BudgetVerteilungMapper extends QBMapper {
         return $this->findEntities($qb);
     }
 
+    public function deleteByJahr(int $jahr): void {
+        $qb = $this->db->getQueryBuilder();
+        $qb->delete($this->getTableName())
+            ->where($qb->expr()->eq('jahr', $qb->createNamedParameter($jahr, IQueryBuilder::PARAM_INT)));
+        $qb->executeStatement();
+    }
+
     public function findeVerteilung(int $id): BudgetVerteilung {
         $qb = $this->db->getQueryBuilder();
         $qb->select('*')

@@ -30,4 +30,19 @@ class NotizRevisionMapper extends QBMapper {
 
         return $this->findEntities($qb);
     }
+
+    /**
+     * Löscht die Revisionen der angegebenen Aktionen hart (Purge eines Budgets).
+     *
+     * @param int[] $aktionIds
+     */
+    public function deleteByAktionen(array $aktionIds): void {
+        if ($aktionIds === []) {
+            return;
+        }
+        $qb = $this->db->getQueryBuilder();
+        $qb->delete($this->getTableName())
+            ->where($qb->expr()->in('aktion_id', $qb->createNamedParameter($aktionIds, IQueryBuilder::PARAM_INT_ARRAY)));
+        $qb->executeStatement();
+    }
 }

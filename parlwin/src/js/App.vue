@@ -10,7 +10,7 @@
           :key="ansicht.key"
           :name="ansicht.bezeichnung"
           :active="aktiveAnsicht === ansicht.key"
-          @click="aktiveAnsicht = ansicht.key"
+          @click="ansichtWechseln(ansicht.key)"
         >
           <template #icon>
             <NcIconSvgWrapper :path="ansicht.icon" :size="20" />
@@ -68,7 +68,9 @@
         :fraktionen="fraktionen"
         :kommissionen="kommissionen"
       />
+      <Bedienungsanleitung v-else-if="aktiveAnsicht === 'anleitung'" />
       <Changelog v-else-if="aktiveAnsicht === 'changelog'" />
+      <Protokoll v-else-if="aktiveAnsicht === 'protokoll'" />
     </NcAppContent>
   </NcContent>
 </template>
@@ -89,7 +91,9 @@ import {
   mdiBullhornOutline,
   mdiFileDocumentEditOutline,
   mdiCashMultiple,
+  mdiBookOpenOutline,
   mdiHistory,
+  mdiClipboardListOutline,
 } from '@mdi/js'
 import { subscribeRealtime } from './realtime'
 import Geschaeftsliste from './components/Geschaeftsliste.vue'
@@ -99,7 +103,9 @@ import Kommissionsliste from './components/Kommissionsliste.vue'
 import Vorstoesseliste from './components/Vorstoesseliste.vue'
 import Sitzungstypenliste from './components/Sitzungstypenliste.vue'
 import Budgetliste from './components/Budgetliste.vue'
+import Bedienungsanleitung from './components/Bedienungsanleitung.vue'
 import Changelog from './components/Changelog.vue'
+import Protokoll from './components/Protokoll.vue'
 
 export default {
   name: 'ParliamentWinterthurApp',
@@ -116,7 +122,9 @@ export default {
     Vorstoesseliste,
     Sitzungstypenliste,
     Budgetliste,
+    Bedienungsanleitung,
     Changelog,
+    Protokoll,
   },
   data() {
     return {
@@ -135,24 +143,46 @@ export default {
         { key: 'budget', bezeichnung: 'Budget', icon: mdiCashMultiple },
         { key: 'mitglieder', bezeichnung: 'Mitglieder', icon: mdiAccountGroupOutline },
         { key: 'sitzungstypen', bezeichnung: 'Sitzungstypen', icon: mdiFileDocumentEditOutline },
+        { key: 'protokoll', bezeichnung: 'Protokoll', icon: mdiClipboardListOutline },
+        { key: 'anleitung', bezeichnung: 'Bedienungsanleitung', icon: mdiBookOpenOutline },
         { key: 'changelog', bezeichnung: 'Änderungsverlauf', icon: mdiHistory },
       ],
       unsubRealtime: null,
     }
   },
   mounted() {
+    // Deep-Link: eine im URL-Hash genannte Ansicht direkt öffnen (z.B. …/#budget),
+    // und auf Vor-/Zurück-Navigation reagieren.
+    this.ansichtAusHashAnwenden()
+    window.addEventListener('hashchange', this.ansichtAusHashAnwenden)
     this.ladeMitglieder()
     this.ladeFraktionen()
     this.ladeKommissionen()
     this.unsubRealtime = subscribeRealtime(this.handleRealtimeEvent)
   },
   beforeUnmount() {
+    window.removeEventListener('hashchange', this.ansichtAusHashAnwenden)
     if (this.unsubRealtime) {
       this.unsubRealtime()
       this.unsubRealtime = null
     }
   },
   methods: {
+    // Ansicht wechseln und als Deep-Link in den URL-Hash schreiben (direkt
+    // aufrufbar und teilbar, z.B. für Design-Scans einzelner Seiten).
+    ansichtWechseln(key) {
+      this.aktiveAnsicht = key
+      if (window.location.hash.replace(/^#/, '') !== key) {
+        window.location.hash = key
+      }
+    },
+    // Ansicht aus dem URL-Hash übernehmen, wenn er einen gültigen Bereich nennt.
+    ansichtAusHashAnwenden() {
+      const key = window.location.hash.replace(/^#/, '')
+      if (key && this.ansichten.some(a => a.key === key) && this.aktiveAnsicht !== key) {
+        this.aktiveAnsicht = key
+      }
+    },
     async ladeMitglieder() {
       try {
         const { data } = await axios.get(generateUrl('/apps/parlwin/mitglieder'))

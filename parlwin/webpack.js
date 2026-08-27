@@ -22,6 +22,7 @@ module.exports = {
     alias: {
       ...((webpackConfig.resolve && webpackConfig.resolve.alias) || {}),
       '@changelog': path.join(__dirname, '..', 'CHANGELOG.md'),
+      '@readme': path.join(__dirname, '..', 'README.md'),
     },
   },
   output: {
@@ -50,7 +51,7 @@ module.exports = {
   // Entfernen bzw. senken, sobald die Abhaengigkeiten kleiner werden.
   performance: {
     hints: 'warning',
-    maxAssetSize: 2_300_000,
-    maxEntrypointSize: 2_300_000,
+    maxAssetSize: 2_400_000,
+    maxEntrypointSize: 2_400_000,
   },
 }

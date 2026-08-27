@@ -3,7 +3,7 @@
     <NcTextField v-model="suche" label="Suche" placeholder="Name, Partei oder E-Mail" trailing-button-icon="close" :show-trailing-button="!!suche" @trailing-button-click="suche = ''" />
   </Teleport>
   <Teleport v-if="filterReady" to="#pw-filter-slot">
-    <div class="pw-filter-body">
+    <FilterPanel @reset="filterZuruecksetzen">
       <section class="pw-filter-panel pw-filter-gruppe">
         <div class="pw-filter-header"><h3>Sortieren</h3></div>
         <NcSelect v-model="sortierModusOption" :options="sortierOptions" :clearable="false" input-label="Sortieren nach" />
@@ -18,7 +18,7 @@
           Nur aktive Mitglieder
         </NcCheckboxRadioSwitch>
       </section>
-    </div>
+    </FilterPanel>
   </Teleport>
 
   <section class="pw-view-content pw-mitglieder">
@@ -73,11 +73,12 @@ import NcTextField from '@nextcloud/vue/components/NcTextField'
 import NcSelect from '@nextcloud/vue/components/NcSelect'
 import NcCheckboxRadioSwitch from '@nextcloud/vue/components/NcCheckboxRadioSwitch'
 import NcEmptyContent from '@nextcloud/vue/components/NcEmptyContent'
+import FilterPanel from './FilterPanel.vue'
 import { kuerze } from '../utils'
 
 export default {
   name: 'Mitgliederliste',
-  components: { NcTextField, NcSelect, NcCheckboxRadioSwitch, NcEmptyContent },
+  components: { NcTextField, NcSelect, NcCheckboxRadioSwitch, NcEmptyContent, FilterPanel },
   props: {
     mitglieder: { type: Array, default: () => [] },
     fraktionen: { type: Array, default: () => [] },
@@ -253,6 +254,14 @@ export default {
   },
   methods: {
     kuerze,
+    filterZuruecksetzen() {
+      this.suche = ''
+      this.filterFraktion = ''
+      this.filterPartei = ''
+      this.filterKommission = ''
+      this.filterFunktion = ''
+      this.nurAktive = true
+    },
     parseBehoerdenMitglieder(raw) {
       if (!raw) return []
       let arr

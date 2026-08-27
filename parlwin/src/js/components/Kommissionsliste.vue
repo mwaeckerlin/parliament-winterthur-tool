@@ -3,14 +3,14 @@
     <NcTextField v-model="suche" label="Suche" placeholder="Name oder Beschreibung" trailing-button-icon="close" :show-trailing-button="!!suche" @trailing-button-click="suche = ''" />
   </Teleport>
   <Teleport v-if="filterReady" to="#pw-filter-slot">
-    <div class="pw-filter-body">
+    <FilterPanel @reset="filterZuruecksetzen">
       <NcCheckboxRadioSwitch v-model="nurAktive" type="switch">
         Nur aktive Kommissionen
       </NcCheckboxRadioSwitch>
       <NcCheckboxRadioSwitch v-model="nurAktiveMitglieder" type="switch">
         Nur aktive Mitglieder
       </NcCheckboxRadioSwitch>
-    </div>
+    </FilterPanel>
   </Teleport>
 
   <section class="pw-view-content pw-kommissionen">
@@ -114,10 +114,11 @@ import NcTextField from '@nextcloud/vue/components/NcTextField'
 import NcCheckboxRadioSwitch from '@nextcloud/vue/components/NcCheckboxRadioSwitch'
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 import NcEmptyContent from '@nextcloud/vue/components/NcEmptyContent'
+import FilterPanel from './FilterPanel.vue'
 
 export default {
   name: 'Kommissionsliste',
-  components: { GeschaeftDetail, NcTextField, NcCheckboxRadioSwitch, NcLoadingIcon, NcEmptyContent },
+  components: { GeschaeftDetail, NcTextField, NcCheckboxRadioSwitch, NcLoadingIcon, NcEmptyContent, FilterPanel },
   props: {
     mitglieder: { type: Array, default: () => [] },
   },
@@ -213,6 +214,11 @@ export default {
   },
   methods: {
     kuerze,
+    filterZuruecksetzen() {
+      this.suche = ''
+      this.nurAktive = true
+      this.nurAktiveMitglieder = true
+    },
     async ladeKommissionen() {
       this.laden = true
       try {

@@ -108,15 +108,30 @@
   --pw-surface: var(--color-main-background);
   --pw-surface-strong: color-mix(in srgb, var(--color-main-background) 92%, var(--color-background-hover));
   --pw-surface-soft: color-mix(in srgb, var(--color-main-background) 82%, var(--color-background-hover));
+  /* Künstliche Produktegruppe (F89): leicht abgesetzter Grund, damit sie sich
+     sichtbar von den echten, antragbaren Produktegruppen unterscheidet. */
+  --pw-surface-kuenstlich: color-mix(in srgb, var(--color-primary-element) 7%, var(--pw-surface));
   --pw-border: color-mix(in srgb, var(--color-border) 88%, var(--color-main-text) 12%);
   --pw-muted: var(--color-text-maxcontrast);
   --pw-shadow: 0 var(--pw-space-md-plus) 2.25rem color-mix(in srgb, var(--color-box-shadow, #000) 10%, transparent);
   --pw-focus-ring: 0 0 0 var(--pw-space-2xs) color-mix(in srgb, var(--color-primary-element) 24%, transparent);
 
+  /* Positive/negative Kennzahlen (Differenzen, Beträge): der NC-Standard-Grün/Rot,
+     zur besseren Lesbarkeit zum Text hin abgedunkelt — theme-fähig, EIN Wert für die
+     ganze App (Utility-Klassen .pw-positiv/.pw-negativ unten). */
+  --pw-positiv: color-mix(in srgb, var(--color-success) 68%, var(--color-main-text));
+  --pw-negativ: color-mix(in srgb, var(--color-error) 74%, var(--color-main-text));
+
   /* Priorität: «hoch» dezent hervorheben, «tief» abschwächen (sichtbar bleiben) */
   --pw-prio-hoch-bg: color-mix(in srgb, var(--color-warning, var(--color-primary-element)) 12%, var(--pw-surface));
   --pw-prio-tief-opacity: 0.62;
 }
+
+/* Einheitliche Grün/Rot-Auszeichnung für positive/negative Werte (Differenzen,
+   Beträge) — EINE globale Definition für die ganze App (Budget-Summen, Antrags-
+   beträge, Sitzungsanträge …), damit die Farbe überall identisch ist. */
+.pw-positiv, .pw-diff-plus { color: var(--pw-positiv); }
+.pw-negativ, .pw-diff-minus { color: var(--pw-negativ); }
 
 /* ---- App-Shell wie Files/Photos/Activity (via @nextcloud/vue) ---- */
 
@@ -233,6 +248,14 @@
   gap: var(--pw-gap-1);
 }
 
+/* Fester Teil des Filter-Widgets: der «Filter zurücksetzen»-Knopf sitzt immer
+   unten und wird durch eine Linie vom flexiblen Filterteil abgesetzt. */
+.pw-filter-fix {
+  margin-block-start: auto;
+  padding-block-start: var(--pw-gap-1);
+  border-block-start: var(--pw-border-thin) solid var(--pw-border);
+}
+
 .pw-filter-body .pw-filter-stack {
   display: flex;
   flex-direction: column;
@@ -271,6 +294,7 @@
 .pw-modal-kicker,
 .pw-detail-kicker,
 .pw-data-card-kicker,
+.pw-protokoll-meta,
 .pw-app-kicker,
 .pw-app-main-kicker {
   color: var(--pw-muted);
@@ -618,6 +642,54 @@
 .pw-data-card-header,
 .pw-mitglied-kopf {
   margin-block-end: var(--pw-gap-1);
+}
+
+// ---- Protokoll (F105): chronologische Historie ----
+// Ein Protokoll liest sich als EINE Spalte oben nach unten (neueste zuerst),
+// nie als Kachelwand — darum kein pw-card-grid, sondern eine einspaltige Liste
+// mit begrenzter Lesebreite. Der Abstand zwischen den Einträgen kommt allein
+// aus dem gap der Liste (eine Quelle), der Innenabstand aus dem pw-data-card-
+// Padding. Der Status hängt am linken Akzent-Strich (grün/rot) UND am Zeichen
+// (✓/✕) — nie an der Farbe allein.
+.pw-protokoll-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--pw-gap-2);
+  max-inline-size: var(--pw-bp-card-rem);
+}
+
+.pw-protokoll-eintrag {
+  border-inline-start: var(--pw-border-accent) solid var(--pw-positiv);
+}
+
+.pw-protokoll-eintrag.pw-protokoll-fehler {
+  border-inline-start-color: var(--pw-negativ);
+}
+
+.pw-protokoll-kopf {
+  display: flex;
+  align-items: baseline;
+  gap: var(--pw-space-sm);
+  margin-block: 0 var(--pw-space-xs);
+}
+
+.pw-protokoll-status {
+  font-weight: bold;
+  font-size: var(--pw-font-lg);
+  line-height: 1;
+}
+
+.pw-protokoll-meldung {
+  margin-block-start: var(--pw-space-sm);
+  white-space: pre-wrap;
+}
+
+.pw-protokoll-leer {
+  margin-block: var(--pw-gap-2);
+  color: var(--pw-muted);
 }
 
 .pw-data-pair {
@@ -1021,6 +1093,173 @@
   padding-block: var(--pw-gap-1);
   border-block-end: none;
   background: transparent;
+}
+
+/* Vollbild-Popup einer Produktegruppe (F110): nutzt fast den ganzen Bildschirm. */
+.pw-modal-vollbild {
+  inline-size: min(96rem, 100%);
+  block-size: calc(100dvb - var(--pw-space-xl));
+}
+
+.pw-pg-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pw-gap-3);
+  padding: 0 var(--pw-gap-3) var(--pw-gap-4);
+}
+
+.pw-pg-detail-kopf {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pw-space-2xs);
+}
+
+.pw-pg-detail-titel { margin: 0; }
+.pw-pg-detail-kredit { color: var(--pw-muted); }
+/* Abstand zwischen Globalkredit-Wert und Differenz, sonst kleben sie aneinander. */
+.pw-pg-detail-kredit .pw-summe-diff { margin-inline-start: var(--pw-space-xs); }
+
+.pw-pg-abschnitt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pw-gap-1);
+}
+
+.pw-pg-abschnitt > h3 { margin: 0; }
+.pw-pg-abschnitt p { margin: 0; }
+
+.pw-zielvorgabe {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pw-space-xs);
+  margin-block-start: var(--pw-gap-1);
+}
+
+.pw-zielvorgabe > h4 { margin: 0; }
+
+/* Eigener Scrollcontainer für die breite Zielvorgaben-Tabelle (Design-Regel:
+   breite Inhalte scrollen in sich, nie die Seite). */
+.pw-zv-scroll { overflow-x: auto; }
+
+.pw-zielvorgabe-tabelle {
+  inline-size: 100%;
+  /* Auf schmalen Screens nicht quetschen, sondern im Container scrollen. */
+  min-inline-size: 34rem;
+  border-collapse: collapse;
+  font-size: var(--pw-font-sm);
+  /* Feste Breiten, damit eine lange Messgrösse die Wertspalten nicht aus dem Bild
+     drückt — die Messgrösse umbricht stattdessen. */
+  table-layout: fixed;
+}
+
+.pw-zielvorgabe-tabelle th,
+.pw-zielvorgabe-tabelle td {
+  padding: var(--pw-space-xs) var(--pw-space-sm);
+  text-align: end;
+  border-block-end: var(--pw-border-thin) solid var(--pw-border);
+}
+
+.pw-zielvorgabe-tabelle th.pw-zv-mg,
+.pw-zielvorgabe-tabelle td.pw-zv-mg {
+  text-align: start;
+  inline-size: 40%;
+  /* Der lange Messgrössen-Text bricht um (überschreibt ein vom Framework geerbtes
+     nowrap), damit er nicht über die Wertspalten läuft. */
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.pw-zielvorgabe-tabelle th {
+  color: var(--pw-muted);
+  font-weight: normal;
+}
+
+/* «Soll aktuell» ist die vom Parlament entscheidbare Spalte — hervorgehoben. */
+.pw-zv-soll { background: var(--pw-surface-strong); font-weight: 600; }
+
+.pw-erlaeuterung-liste,
+.pw-produkt-leistungen {
+  margin: 0;
+  padding-inline-start: 1.2em;
+  list-style: disc;
+}
+
+.pw-erlaeuterung-liste li { margin-block: 0.15em; }
+
+.pw-produkt-leistungen {
+  margin-block-start: var(--pw-gap-1);
+  font-size: var(--pw-font-sm);
+  color: var(--pw-muted);
+}
+
+.pw-produkt-leistungen li { margin-block: 0.1em; }
+
+/* Kostentabelle je Produkt (Budgetzahlen): Kosten, Erlös, Nettokosten,
+   Kostendeckungsgrad über Ist / Soll Vorjahr / Soll aktuell. Scrollt bei Bedarf im
+   eigenen Container (.pw-zv-scroll), «Soll aktuell» hervorgehoben. */
+.pw-produkt-kosten {
+  inline-size: 100%;
+  min-inline-size: 18rem;
+  border-collapse: collapse;
+  font-size: var(--pw-font-sm);
+  margin-block-start: var(--pw-gap-1);
+  /* Feste Spalten: die Zahlenspalten quetschen die Label-Spalte nicht, der lange
+     Label «Kostendeckungsgrad in %» bricht am Leerzeichen statt mitten im Wort. */
+  table-layout: fixed;
+}
+
+.pw-produkt-kosten th,
+.pw-produkt-kosten td {
+  padding: var(--pw-space-xs);
+  text-align: end;
+  white-space: nowrap;
+  border-block-end: var(--pw-border-thin) solid var(--pw-border);
+}
+
+.pw-produkt-kosten th:first-child,
+.pw-produkt-kosten td:first-child {
+  text-align: start;
+  white-space: normal;
+  overflow-wrap: break-word;
+  inline-size: 40%;
+}
+
+.pw-produkt-kosten th { color: var(--pw-muted); font-weight: normal; }
+
+.pw-produkt-kosten .pw-kosten-soll { background: var(--pw-surface-strong); font-weight: 600; }
+
+/* Zielvorgaben ändern im Antragsformular (F109): je Messgrösse eine Zeile mit
+   Bezeichnung, aktuellem Soll und dem Feld für den neuen Soll — sauber getrennt,
+   damit der Messgrössen-Text nicht mit «Soll …» zusammenläuft. */
+.pw-antrag-ziel-zeile {
+  display: grid;
+  gap: var(--pw-space-xs);
+  padding-block: var(--pw-space-sm);
+  border-block-start: var(--pw-border-thin) solid var(--pw-border);
+}
+
+.pw-antrag-ziel-label { font-size: var(--pw-font-sm); }
+
+.pw-antrag-ziel-eingabe {
+  display: flex;
+  align-items: center;
+  gap: var(--pw-space-sm);
+  flex-wrap: wrap;
+}
+
+.pw-antrag-ziel-soll {
+  font-size: var(--pw-font-sm);
+  color: var(--pw-muted);
+  white-space: nowrap;
+}
+
+/* Aktionszeile am Fuss einer Budget-Karte: die Buttons nebeneinander statt
+   gestapelt, linksbündig, mit gleichmässigem Abstand. */
+.pw-budget-card-aktionen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--pw-space-sm);
+  margin-block-start: var(--pw-gap-1);
 }
 
 /* ----------------------------------------------------------------------

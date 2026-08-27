@@ -3,7 +3,7 @@
     <NcTextField v-model="suche" label="Suche" placeholder="Nr. oder Titel" trailing-button-icon="close" :show-trailing-button="!!suche" @trailing-button-click="suche = ''" />
   </Teleport>
   <Teleport v-if="filterReady" to="#pw-filter-slot">
-    <div class="pw-filter-body">
+    <FilterPanel @reset="resetFilter">
       <NcSelect v-model="entscheidungsbedarfOption" :options="entscheidungsbedarfOptions" :clearable="false" input-label="Entscheidungsbedarf" />
       <PwMultiSelect :model-value="filterStatus" :options="alleStatus" input-label="Status" placeholder="Alle" @update:model-value="filterStatus = $event || []" />
       <PwMultiSelect :model-value="filterTyp" :options="alleTypen" input-label="Typ" placeholder="Alle" @update:model-value="filterTyp = $event || []" />
@@ -18,8 +18,7 @@
       <NcCheckboxRadioSwitch v-model="zeigeErledigte" type="switch">
         Erledigte anzeigen
       </NcCheckboxRadioSwitch>
-      <NcButton type="tertiary" wide @click="resetFilter">Filter zurücksetzen</NcButton>
-    </div>
+    </FilterPanel>
   </Teleport>
 
   <section class="pw-view-content pw-geschaefte">
@@ -201,10 +200,11 @@ import NcCheckboxRadioSwitch from '@nextcloud/vue/components/NcCheckboxRadioSwit
 import NcButton from '@nextcloud/vue/components/NcButton'
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 import NcEmptyContent from '@nextcloud/vue/components/NcEmptyContent'
+import FilterPanel from './FilterPanel.vue'
 
 export default {
   name: 'Geschaeftsliste',
-  components: { GeschaeftDetail, NcTextField, NcSelect, PwMultiSelect, PwPrioritaetSelect, NcCheckboxRadioSwitch, NcButton, NcLoadingIcon, NcEmptyContent, BeschlussWidget },
+  components: { GeschaeftDetail, NcTextField, NcSelect, PwMultiSelect, PwPrioritaetSelect, NcCheckboxRadioSwitch, NcButton, NcLoadingIcon, NcEmptyContent, BeschlussWidget, FilterPanel },
   props: {
     mitglieder: { type: Array, default: () => [] },
   },

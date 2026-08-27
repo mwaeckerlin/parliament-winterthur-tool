@@ -40,7 +40,7 @@
             <p v-if="typ.zweck" class="pw-sitzungstyp-zweck">{{ typ.zweck }}</p>
           </div>
           <div class="pw-sitzungstyp-aktionen">
-            <NcButton type="error" @click.stop="loeschen(typ)">Löschen</NcButton>
+            <PwLoeschen label="Sitzungstyp löschen" @click="loeschen(typ)" />
           </div>
         </div>
         <div class="pw-sitzungstyp-meta">
@@ -163,10 +163,11 @@ import NcCheckboxRadioSwitch from '@nextcloud/vue/components/NcCheckboxRadioSwit
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 import PwMultiSelect from './PwMultiSelect.vue'
 import PwField from './PwField.vue'
+import PwLoeschen from './PwLoeschen.vue'
 
 export default {
   name: 'Sitzungstypenliste',
-  components: { NcTextField, NcButton, NcCheckboxRadioSwitch, NcLoadingIcon, PwMultiSelect, PwField },
+  components: { NcTextField, NcButton, NcCheckboxRadioSwitch, NcLoadingIcon, PwMultiSelect, PwField, PwLoeschen },
   props: {
     mitglieder: { type: Array, default: () => [] },
     fraktionen: { type: Array, default: () => [] },
@@ -512,7 +513,7 @@ export default {
 .pw-zeile .pw-input { flex: 1; }
 .pw-btn-klein {
   padding: 4px 8px; cursor: pointer;
-  background: var(--color-error, #c00); color: #fff;
+  background: var(--color-error, #c00); color: var(--color-primary-element-text, #fff);
   border: none; border-radius: 4px;
 }
 .pw-hinweis { color: var(--color-text-maxcontrast, #888); padding: 12px 0; }

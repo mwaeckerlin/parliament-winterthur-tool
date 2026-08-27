@@ -494,6 +494,26 @@ Nummern werden einmal vergeben und nie wiederverwendet; jeder Test in
 
 - **F64** Ein eigener Bereich zeigt, was in welcher Version dazugekommen ist — als
   aufklappbare Liste, die Neuerungen der aktuellen Version bereits geöffnet.
+- **F106** Ein eigener Bereich **«Bedienungsanleitung»** (in der Navigation direkt vor
+  «Änderungsverlauf») zeigt das README des Projekts als **formatiertes Markdown** — damit
+  die Anleitung direkt im Tool auffindbar ist, ohne ins Repository zu wechseln.
+- **F107** **Deep-Linking:** Jeder Bereich ist über den **URL-Hash** direkt aufrufbar und
+  teilbar (z.B. `…/apps/parlwin/#budget`, `…/#anleitung`). Der Hash folgt der Navigation,
+  ein direkt aufgerufener Hash öffnet den passenden Bereich, ein unbekannter Hash bleibt beim
+  Standardbereich, und Vor/Zurück im Browser wechselt den Bereich. (Grundlage u.a. für den
+  gezielten Design-Scan einzelner Seiten.)
+- **F108** Ein eigener Bereich **«Protokoll»** (in der Navigation vor «Bedienungsanleitung»)
+  zeigt die **Historie der Synchronisationen und Budget-Importe** — neueste zuerst. Jeder
+  Eintrag trägt **Zeitpunkt**, **Art** (Synchronisation, Budget-Import, Budget neu eingelesen,
+  Novemberbrief, Sitzungsanträge, Fehler), eine **Erfolg/Fehler-Markierung**, einen **Titel**
+  und eine **Meldung** (bei Synchronisationen «X neu, Y geändert»; bei Budget-Importen die
+  Zahl der Produktegruppen und Investitionen; bei Sitzungsanträgen «N neu von M gefundenen»),
+  sowie den **Auslöser** (die Nutzer-ID beim manuellen Auslösen bzw. «auto» im automatischen
+  Hintergrundlauf). Protokolliert werden sowohl die automatischen (Hintergrundjob) als auch
+  die manuell ausgelösten Läufe. **Fehler-Ereignisse sind hervorgehoben** und sind der Ort,
+  an dem **Parsing-Probleme dokumentiert** werden — z.B. ein Budgetbuch, aus dem keine
+  Produktegruppen gelesen werden konnten, samt der geladenen Adresse. Das Protokoll behält die
+  Ereignisse der letzten 180 Tage.
 
 ## Budget
 
@@ -515,6 +535,11 @@ Gesamt-Erfolgsrechnung.
   Budget-Seite. Sie besteht aus vier Untertabs (Globalbudgets, Personalbestand,
   Investitionsrechnung, Steuerfuss); die Filter und die Summenzeile gelten für alle
   Tabs gemeinsam.
+    - Die **Tab-Leiste bleibt beim Scrollen oben stehen** (sticky), sodass man zum
+      Wechseln nicht nach oben scrollen muss.
+    - Die **Scrollposition wird je Tab gemerkt** und beim Zurückwechseln
+      wiederhergestellt; ein noch nicht besuchter Tab startet oben. Das Merken ist
+      flüchtig (nur solange die Seite offen ist, kein Cookie/Speicher).
 - **F75** Ein Filter wählt das **Budgetjahr** aus einem Auswahlmenü der tatsächlich
   vorhandenen Jahre (nur Jahre, für die Daten in der Datenbank liegen); vorbelegt ist
   das neueste Jahr. Für vergangene Jahre (aktuell alle vor 2027) wird nichts mehr neu
@@ -528,7 +553,14 @@ Gesamt-Erfolgsrechnung.
   Summenzeile auf das gewählte Departement bzw. die gewählte Kommission ein.
 - **F77** Filter nach **Kostensteigerung** gegenüber dem Vorjahr, in Prozent und in
   absoluten Franken, kombinierbar (z.B. «alles über 5% gestiegen» und/oder «alles
-  über 1 Mio gestiegen»).
+  über 1 Mio gestiegen»). Verglichen wird der **beschlussfähige Globalkredit**
+  (Nettokosten) der Produktegruppe — Soll des Budgetjahres gegen Soll des Vorjahres —,
+  nicht der Bruttoaufwand. Der Filter zeigt **nur echte Anstiege**: eine Produktegruppe,
+  deren Globalkredit gleich bleibt oder **sinkt** (negative Differenz), erscheint bei
+  einer «Anstieg ab …»-Schwelle nie, ebenso wenig ein Anstieg **unter** der Schwelle.
+  Der Prozentwert misst am **Betrag** des Vorjahreswertes (`abs`), damit ein negativer
+  Vorjahreswert das Vorzeichen nicht verdreht; ist der Vorjahreswert 0, gilt der
+  Prozentanstieg als 0.
 - **F78** Sortiert wird überall in der Reihenfolge des Buches: **Departement →
   Produktegruppe → Produkt** (im Investitions-Tab: Departement → Projekt).
 - **F79** Auf **allen** Tabs steht zuoberst eine Summenzeile, die bei jeder Anpassung
@@ -559,20 +591,24 @@ Gesamt-Erfolgsrechnung.
   auf alle verfügbaren (nach aktuellem Filter beschlussfähigen) Produktegruppen —
   **anteilig zum Aufwand** (grössere Budgets tragen absolut mehr). Die dafür nötigen
   Einzelanträge werden dabei automatisch erzeugt.
-- **F84** Eine **automatische Verteilung** ist standardmässig eingeschaltet: Auch ohne
-  ausdrücklichen Knopfdruck (der Knopf ist dann gar nicht sichtbar) wird bei jeder
-  Budgetanpassung ein Überschuss 1:1 beibehalten — es werden also nur Einsparungen
-  automatisch verteilt, keine Mehrausgaben —, während ein Defizit automatisch als
-  Pauschalkürzung auf die Produktegruppen verteilt wird. Ist die automatische
-  Verteilung ausgeschaltet, erscheint stattdessen ein Knopf, um ein Defizit auf
-  Knopfdruck als Pauschalkürzung zu verteilen.
-- **F85** **Pauschalkürzungen** addieren sich zu den manuellen Kürzungen und werden
-  separat verfolgt. Das Verteilziel lässt sich in der Diskussion jederzeit manuell
-  festlegen: neben dem Standard «schwarze Null» auch auf ein gewünschtes akzeptiertes
-  Defizit oder einen gewünschten Ertrag. Danach wird automatisch neu gerechnet und
-  alle dafür nötigen Einzelanträge werden auf den Produktegruppen erstellt, angepasst
-  oder — wenn nicht mehr nötig — wieder gelöscht. Automatisch aus der Verteilfunktion
-  erzeugte Anträge sind als solche erkennbar und im Frontend eigens filterbar.
+- **F84** Alle Pauschalanträge werden **gleich behandelt** und stehen im gemeinsamen
+  Kasten «Pauschalanträge» (F100). Die Liste **startet leer**; «+ Pauschalantrag» legt
+  einen neuen an. Jeder Pauschalantrag trägt einen **Ziel-Typ**:
+    - **Einsparungen** (relativ): ein fester Betrag (CHF) oder Prozentsatz des
+      ursprünglichen Aufwands wird anteilig gekürzt. Beliebig viele möglich, ihre
+      Kürzungen kumulieren.
+    - **Schwarze Null**, **fester Ertrag** oder **festes Defizit** (absolut): das
+      Gesamtergebnis wird auf diesen Wert ausgeglichen. Von diesen **absoluten Zielen
+      darf nur EINES aktiv sein**; wählt man ein zweites, wird das ältere automatisch
+      zur **Einsparung 0** herabgestuft (der ältere weicht).
+  Es gibt **keinen Automatik-Schalter** und **keinen separaten «Defizit verteilen»-Knopf**
+  mehr: ein absolutes Ziel gleicht selbsttätig aus. Zuerst werden alle Einsparungen
+  gerechnet, das absolute Ziel **zuletzt** auf dem bereits gekürzten Stand (F100).
+- **F85** Die zur Erfüllung eines Pauschalantrags nötigen **Einzelanträge** werden
+  automatisch auf den Produktegruppen erstellt, angepasst oder — wenn nicht mehr nötig —
+  wieder gelöscht; sie verteilen **anteilig zum Aufwand** und greifen nur auf die echten,
+  operativen Produktegruppen (nie auf die künstliche, F89). Automatisch erzeugte Anträge
+  sind als solche erkennbar und im Frontend eigens filterbar.
 
 ### Tab «Personalbestand»
 
@@ -598,13 +634,89 @@ Gesamt-Erfolgsrechnung.
 
 ### Tab «Steuerfuss»
 
-- **F88** Der vierte Tab zeigt den **Steuerfuss**. Standardmässig wird bei einem
-  Überschuss der Steuerfuss in abgerundeten Prozent-Schritten automatisch entsprechend
-  gesenkt und der Überschuss dadurch reduziert. Dieses Verhalten muss auf dem
-  Steuerfuss-Tab ausdrücklich abgeschaltet werden; erst dann lässt sich der Steuerfuss
-  von Hand bearbeiten. Der Wert eines Steuerprozents wird aus dem Budgetbuch
-  abgeleitet (Steuerertrag geteilt durch den geltenden Steuerfuss). Eine Anpassung des
-  Steuerfusses erzeugt ebenfalls einen Antrag — ganz am Ende der Antragsliste.
+- **F88** Der vierte Tab zeigt den **Steuerfuss**. Der Tab zeigt den **geltenden**
+  Steuerfuss, den **beantragten** Steuerfuss (aus dem Stadtratsantrag) und die Differenz
+  zum Vorjahr (z.B. ±0%). Standardmässig wird bei einem **Ertragsüberschuss** der
+  Steuerfuss in abgerundeten Prozent-Schritten automatisch gesenkt und der Überschuss
+  dadurch abgebaut (1 Steuerprozent = Steuerertrag geteilt durch den geltenden
+  Steuerfuss). Der Schalter «Steuerfuss bei Überschuss automatisch senken» wird **pro
+  Budgetjahr gespeichert** und überlebt das Neuladen. Bei aktiver Automatik ist «Antrag
+  stellen» implizit ein; das manuelle Feld und der «Antrag stellen»-Schalter sind
+  ausgeblendet. **Schaltet man die Automatik aus, fällt der Steuerfuss auf den
+  Stadtratsantrag zurück** (der automatische Antrag verschwindet), und es erscheint ein
+  Eingabefeld (vorbelegt mit dem Stadtratsantrag) samt dem **Schalter** «Antrag stellen».
+  «Antrag stellen» ist ein **Schalter, kein Knopf**: einschalten stellt den
+  Steuerfuss-Antrag auf den Feldwert (ändert man das Feld, wird der Antrag entprellt
+  nachgeführt), ausschalten löscht ihn wieder (zurück zum Stadtratsantrag). Mehrfaches
+  Auslösen während des Neurechnens erzeugt **keine doppelten Anträge** (Laufsperre). Eine
+  **beliebige manuelle Steuerfuss-Festlegung ist nie ein Konflikt** — sie steht für sich.
+  Jede Steuerfuss-Anpassung (automatisch wie manuell) erzeugt einen **echten Antrag** und
+  erzeugt/anpasst/löscht dazu automatisch einen **Antrag auf die Steuererträge**
+  (Einnahmen) in der entsprechenden Höhe; beide werden per Default von der **eigenen
+  Fraktion** beantragt und stehen am Ende der Antragsliste und des Antrags-PDF (F92).
+    - **Steuerfuss-Senkung und fixer Ertrag zusammen:** Ist die automatische Senkung aktiv
+      und es gibt **keinen** fixen Pauschalantrag, wird der natürliche Ertragsüberschuss über
+      die Senkung abgebaut → Gesamtertrag null. Gibt es zusätzlich einen **fix definierten
+      Ertrag** (fixer Pauschalantrag, F100), wird **exakt dieser fixe Ertragsbetrag zur
+      Steuerfuss-Senkung verwendet**, und der tatsächliche Fraktions-Ertrag ist dann **nicht**
+      mehr der fixe Betrag, sondern **null**. Ohne aktive Senkung bleibt der fixe Ertrag auf
+      seinem festgelegten Wert (F100).
+
+### Parlamentarische Zielvorgaben und Antrags-Aufteilung (WoV)
+
+WoV (Wirkungsorientierte Verwaltung): das Parlament steuert die Verwaltung über
+Wirkungs- und Leistungsziele, nicht über Ausgabenposten. Entschieden wird **nur auf
+Ebene Produktegruppe** — über das Globalbudget (Geld) und die Zielvorgaben. Alles
+andere (Produkte, Kostentabellen, Erläuterungen) ist Information.
+
+- **F109** Jede Produktegruppe trägt ihre **Parlamentarischen Zielvorgaben**: nummerierte
+  Ziele (z.B. «2 Kundenorientierung zentrales Personalmanagement») mit je einer oder
+  mehreren **Messgrössen**, jede mit sechs Jahresspalten (Ist Vorjahr, Soll Vorjahr,
+  **Soll aktuell**, drei Planjahre). Das Parlament entscheidet über «Soll aktuell».
+    - **Antrag auf eine Zielvorgabe:** Zu jeder Zahl kann ein Antrag gestellt werden, der
+      den Soll-Wert ändert (z.B. 100 statt 90). Ein Zielvorgaben-Antrag hat **keine
+      automatische Budgetwirkung**. Ein Antrag kann **eine oder mehrere Zielvorgaben**
+      ändern.
+    - **Zielvorgabe und Budget getrennt oder zusammen:** In EINEM Antrag lassen sich
+      Zielvorgaben-Änderungen **und** eine Budgetanpassung kombinieren. Nur Zielvorgabe
+      ohne Budget: der Budgetwert bleibt leer. Nur Budget ohne Zielvorgabe: keine
+      Zielvorgabe wählen. Beispiel: «nur noch 80% zufrieden, dafür 20% billiger» sind
+      zwei Wirkungen in einem oder zwei Anträgen — Zielvorgabe 80 statt 90 und ein
+      Budgetantrag «20% einsparen».
+    - **Hierarchische Aufteilung (Einsparungsverteilung):** Weil das Parlament nur über
+      die Produktegruppe bestimmt, dient die Aufteilung vor allem der **Begründung** —
+      sie sagt, **wo** innerhalb der Produktegruppe der beantragte Betrag einzusparen ist.
+      Beim Antrag lassen sich mit je optionalem Betrag **oder** Prozentanteil auswählen:
+      (a) eine oder mehrere **Zeilen der Kostentabelle** im Informationsteil der
+      Produktegruppe (Personalkosten, Sachkosten, Informatikkosten …), (b) ein oder
+      mehrere **Produkte**, (c) eine oder mehrere **Kostenzeilen innerhalb eines
+      Produkts**.
+        - Ist auf Ebene Produktegruppe **kein** Betrag gesetzt, weiter unten aber schon,
+          wird oben die **Summe** der unteren Beträge eingesetzt.
+        - Ist oben **und** unten ein Betrag gesetzt, wird nichts gerechnet — die
+          Aufteilung geht dann **nur in die Begründung**.
+        - Ein unten gesetzter Betrag oder Prozentwert bedeutet: vom ganzen beantragten
+          Betrag ist der angegebene Anteil an dieser Stelle einzusparen.
+        - Die vollständige Aufteilung erscheint **im Antrags-PDF in der Begründung**,
+          zusätzlich zur manuell erfassten Begründung.
+    - **Produktegruppen-Budget = Summe der Produkt-Budgets.** Produkte sind Information;
+      manche sind in ihren Kosten weiter aufgeschlüsselt.
+
+- **F110** **Grafischer Aufbau der Budgetansicht (Baumstruktur** Globalbudget →
+  Departement → Produktegruppe → Produkt**):**
+    - **Departement:** dient nur als Gruppierungstitel, unter dem direkt die Karten der
+      Produktegruppen stehen — kein Informationstext darüber. Das Budgetbuch führt
+      allgemeine Informationen nur auf Ebene Produktegruppe, nicht je Departement.
+    - **Produktegruppe:** bleibt als Karte; ein Klick öffnet ein **Vollbild-Popup** (wie
+      bei den Geschäften), das den ganzen Bildschirm für eine Produktegruppe nutzt. Im
+      Kopf der Globalkredit, oben die Zielvorgaben, darunter die Produkte als Karten. Jede
+      Produkt-Karte zeigt oben die prominente Nettokosten-Soll-Zahl, darunter die
+      **Kostentabelle** (Kosten, Erlös, Nettokosten, Kostendeckungsgrad über Ist,
+      Soll Vorjahr und Soll aktuell — «Soll aktuell» hervorgehoben), und die **Leistungen**
+      des Produkts als Aufzählung.
+    - **Erläuterungen** (Auftrag, Begründungen, Massnahmen, Erläuterungen zum Stellenplan)
+      gehören zur Produktegruppe und behalten ihre **Formatierung** (Absätze,
+      Aufzählungen); dazu die Leistungen je Produkt — alles wird im Popup angezeigt.
 
 ### Import der Budgetbücher
 
@@ -615,24 +727,124 @@ Gesamt-Erfolgsrechnung.
   automatisch angelegt, sobald eine neue Budgetweisung veröffentlicht und gescannt
   wurde. Der Import ist gegenüber Formatanpassungen der Bücher so tolerant wie
   möglich.
-- **F90** Erscheint der **Novemberbrief** (nachträgliche Anpassungen des Stadtrats zum
-  Budgetentwurf), werden dessen Anpassungen automatisch gescannt und an den richtigen
-  Stellen übernommen.
+    - **Departementszuordnung robust gegen umgebrochene Inhaltsverzeichnis-Zeilen:**
+      Ein Departementsname enthält immer Buchstaben. Eine im Buch umgebrochene Zeile
+      aus nur Füllpunkten und einer Seitenzahl («……… 175») wird nicht als
+      Departementskopf gelesen und landet nicht als Departement der folgenden
+      Produktegruppe (die dann unter ihrem richtigen Departement erscheint).
+    - **Das Budgetbuch wird LIVE von der Parlamentswebseite geladen, nie aus einer
+      gebündelten Datei.** Beim Scrapen wird das **Budget-Geschäft** erkannt (die Weisung
+      «Budget&nbsp;<Jahr> … Festsetzung des Steuerfusses»); auf dessen Seite hängen die
+      Bücher als Beilagen «… Teil A …» (Budget/Finanzplan/Investitionen/Steuerfuss) und
+      «… Teil B …» (Produktegruppen-Globalbudgets). Beim Import werden genau diese beiden
+      PDF **zur Laufzeit heruntergeladen und geparst**; das Ergebnis geht direkt als SQL in
+      die Datenbank. **Im Image liegt kein Budgetbuch und kein JSON** — neue Bücher kommen in
+      die Datenbank, ohne dass ein neues Image gebaut wird. Ein geparstes JSON existiert im
+      Prod-System **zu keinem Zeitpunkt**. Die Herkunft (URL des Budget-Geschäfts) wird als
+      **Weisungsquelle** gespeichert und als Link im Kopf der Budgetseite gezeigt. Wo ein
+      Budget existiert, existiert damit immer auch der Link.
+    - **Wording aus dem Dokument übernehmen:** Bezeichnungen folgen dem Budgetbuch
+      (z.B. «Ertragsüberschuss» / «Aufwandüberschuss» / «Gesamtergebnis»), nicht generischen
+      Eigenbegriffen.
+    - **Getestet wird das Parsen selbst** — mit **echten Budgetbüchern (PDF) aus mindestens
+      vier vergangenen Jahrgängen**. Diese PDF sind **reine Testfixtures** (unter
+      `parlwin/tests/Fixtures/`, via `.dockerignore` **nie im Image**) und dienen im Test
+      **ausschliesslich als Eingabe des PDF-Parsers und als Vergleich seines Resultats** —
+      sie werden **immer neu geparst**, nie als vorgeparstes Ergebnis verwendet. Der Import-
+      Test spielt sogar den Live-Abruf nach (Geschäft-Seite → Teil-A/B-Links → PDF-Bytes),
+      damit derselbe Pfad wie produktiv geprüft wird. Zusätzlich werden die im Dokument
+      ausgewiesenen **Gesamtsummen** (Gesamtergebnis, Total Aufwand/Ertrag) geparst und mit
+      den aus den Produktegruppen **errechneten** Werten verglichen — weicht die App-Summe
+      vom Buch ab, ist der Import oder das Ergebnis-Modell falsch (Schlechtfall-Guard).
+    - **Import-Filter tolerant gegenüber Formatanpassungen** der Bücher (F89), projektweise
+      gegen das Buch validiert (auch die Investitionsprojekte, Anhang Investitionsplan).
+    - **Gesamtergebnis über eine künstliche Produktegruppe.** Das offizielle Gesamtergebnis der
+      Stadt (Erfolgsrechnung, Teil A) ist **nicht** Σ der operativen Produktegruppen: die Teil-B-
+      Produktegruppen führen ihre effektiven Kosten/Erlöse **brutto** (inklusive der internen
+      Verrechnung, die zwischen den Produktegruppen fliesst), während die Erfolgsrechnung
+      **netto** abschliesst. **Steuererträge und Finanzausgleich stehen bereits in einer echten
+      Produktegruppe** («Steuern und Finanzausgleich», Departement Finanzen) — sie werden nicht
+      doppelt erfasst. Was ausserhalb der operativen Produktegruppen bleibt, ist die **interne
+      Verrechnung samt Abgrenzung**; sie wird als **eine künstliche Produktegruppe «Interne
+      Verrechnung / Abgrenzung»** im Departement Finanzen abgebildet, sodass **Σ(alle
+      Produktegruppen inkl. der künstlichen) exakt das deklarierte Gesamtergebnis** ergibt. Das
+      **Ergebnis** der künstlichen Produktegruppe wird an die **Schlagzeile der Erfolgsrechnung**
+      gebunden (das vom Stadtrat deklarierte Gesamtergebnis, «Ertragsüberschuss» /
+      «Aufwandüberschuss»); die Aufwand-Seite folgt dem geparsten Total. Sie wird einmalig beim
+      Import gebildet und ist danach fix; Anträge und Novemberbrief verschieben die Summe wie bei
+      jeder echten Produktegruppe. Die künstliche Produktegruppe ist **nicht antragbar**: kein
+      «+ Antrag», keine Pauschalkürzung greift auf sie (Pauschalkürzungen verteilen nur auf die
+      echten, operativen Produktegruppen). Der **Summen-Guard** prüft an den echten Büchern, dass
+      Σ(alle Produktegruppen) exakt dem deklarierten Gesamtergebnis entspricht.
+    - **Anzeige der künstlichen Produktegruppe:** im **Globalbudget-Tab** beim Departement
+      Finanzen, **nach** den echten Produktegruppen, optisch durch eine **leicht andere
+      Hintergrundfarbe** abgesetzt (aus einem CSS-Token, nie ein harter Farbcode) und **ohne**
+      Antrags-Bedienelemente; im Personalbestand-Tab erscheint sie nicht (sie trägt keine Stellen).
+- **F90** Das **Drehbuch zur Budgetbehandlung** (die Beilage der Budgetsitzung, die den
+  Ablauf und alle Anträge der Sitzung führt) ist die Quelle für zwei Dinge — die
+  Sitzungsanträge und den Novemberbrief. Es wird **live von der Parlamentswebseite geladen**,
+  nie gebündelt: vom Budget-Geschäft über dessen Traktandum zur Budgetsitzung und von deren
+  Seite die Beilage, deren Bezeichnung «Drehbuch» enthält.
+    - **Sitzungsanträge einlesen (Sitzungsmodus):** Im Sitzungsmodus erscheint oben rechts
+      «Sitzungsanträge einlesen». Der Knopf lädt das Drehbuch und übernimmt die dort je
+      Produktegruppe behandelten **Kommissions- und Fraktionsanträge** als offizielle
+      Sitzungsanträge. Zu jedem Antrag werden **Quelle** (z.B. «AK», «Fraktion SP»),
+      **Richtung und Betrag** (Erhöhung/Reduktion des Globalkredits in CHF) und die
+      **Begründung** übernommen; das **Abstimmungsergebnis der Kommission** (z.B. «11:0
+      angenommen», oder keines bei einem in der Kommission nicht abgestimmten Fraktionsantrag)
+      wird in der Begründung vermerkt. Die eingelesenen Anträge sind **fremde** Anträge und
+      stehen zunächst **offen** (unsere Haltung setzen wir selbst). Das Einlesen ist
+      **wiederholbar, ohne zu duplizieren**: bereits vorhandene, gleich lautende
+      Sitzungsanträge (gleiche Produktegruppe, Antragsteller und Betrag) werden nicht erneut
+      angelegt, und von Hand gesetzte Haltungen und Entscheide bleiben unberührt. Während des
+      Ladens läuft ein Fortschrittsbalken; am Ende meldet ein Toast, wie viele neue Anträge
+      dazugekommen sind (oder dass keine neuen vorlagen bzw. kein Drehbuch gefunden wurde).
+    - **Novemberbrief:** Die nachträglichen Korrekturen des Stadtrats zum Budgetentwurf stehen
+      im Drehbuch in der Spalte «NB» der Nettokosten-Tabelle je Produktegruppe. Führt das
+      Drehbuch dort Korrekturen, lassen sie sich über «Novemberbrief einlesen» übernehmen;
+      führt es keine (wie im Budget 2026, dessen NB-Spalte leer ist), gibt es für das Jahr
+      keinen Novemberbrief und der Knopf erscheint nicht.
 - **F91** Für die manuelle Nutzung und für Tests: Über «+ Neu» lässt sich ein
-  vergangenes Budgetjahr **importieren** — die Auswahl bietet die Jahre an, für die
+  vergangenes Budgetjahr **importieren**. **«Vergangen» heisst:** das zugehörige
+  **Budget-Geschäft ist «Erledigt»** — das Parlament hat das Budget beschlossen bzw.
+  genehmigt. Das **aktuelle** (nicht vergangene) Budget ist das **noch nicht erledigte**
+  Budget-Geschäft, das gerade in Beratung ist; **nur dieses** wird automatisch eingelesen
+  (F89). Jedes erledigte Budget ist vergangen und wird **ausschliesslich manuell** über
+  «+ Neu» importiert (nie automatisch) — auch das Budget des laufenden Kalenderjahres,
+  sobald es beschlossen ist. Zeitlogik dazu: das aktuelle Budget ist immer das des
+  **nächsten** Jahres, das gegen Ende des laufenden Jahres erstellt wird (Ende 2026 →
+  Budget 2027); **nach dem 1. Dezember des Vorjahres** werden nicht generierte Budgetjahre
+  ignoriert — es werden keine Daten mehr gescannt, die nicht schon in der Datenbank sind.
+  Die Auswahl bietet die Jahre an, für die
   Budgetunterlagen vorliegen und die noch nicht importiert sind (kein Freitext),
-  wahlweise nur das Budget oder zusammen mit dem Novemberbrief. Ist für ein Jahr nur das Budget in der Datenbank, existiert aber ein
-  Novemberbrief, der noch nicht eingelesen wurde, lässt er sich von Hand einlesen. Der
-  dafür nötige Knopf erscheint nur dann — oben rechts neben «+ Neu» — wenn für das
-  betreffende Jahr ein Budget in der Datenbank liegt und zusätzlich ein mindestens
-  zwei Tage alter Novemberbrief vorliegt, der noch nicht in der Datenbank ist.
-  Andernfalls ist der Knopf nicht vorhanden.
+  wahlweise nur das Budget oder zusammen mit dem Novemberbrief. Ist für ein Jahr nur das Budget in der Datenbank, führt aber das
+  Drehbuch der Budgetsitzung Novemberbrief-Korrekturen (Spalte «NB»), die noch nicht eingelesen wurden, lässt er sich von Hand einlesen. Der
+  dafür nötige Knopf «Novemberbrief einlesen» erscheint nur dann — oben rechts neben «+ Neu» — wenn für das
+  betreffende Jahr ein Budget in der Datenbank liegt, es noch nicht als Novemberbrief-eingelesen markiert ist und das
+  Drehbuch tatsächlich NB-Korrekturen führt. Andernfalls ist der Knopf nicht vorhanden.
+    - **Budget neu einlesen (destruktiv, doppelt abgesichert):** Ein bereits importiertes
+      Budgetjahr lässt sich über «Budget neu einlesen» (im Kopf der Budgetseite) vollständig
+      neu aus dem Budgetbuch einlesen. Dabei werden **alle bestehenden Anträge, Notizen,
+      Pauschalanträge und Entscheide zu diesem Budget unwiederbringlich gelöscht**. Wegen
+      dieser Gefahr geschieht das **nur nach doppelter Bestätigung**: ein Dialog «Bist du ganz
+      sicher?» mit einer Checkbox «Ich verstehe, dass alle bestehenden Anträge, Notizen, usw.
+      zu diesem Budget dabei unwiederbringlich gelöscht werden»; der Knopf «Neu einlesen»
+      bleibt gesperrt, bis die Checkbox gesetzt ist. Für die Administration gibt es denselben
+      Vorgang als occ-Befehl `parlwin:budget-reimport <Jahr>` (mit `--purge` für den vollen
+      Clean-Slate).
 
 ### Anträge einreichen und Live-Verfolgung
 
-- **F92** Ein **PDF mit allen Anträgen der Fraktion** lässt sich erzeugen — insgesamt
+- **F92** Ein **PDF mit den Anträgen der Fraktion** lässt sich erzeugen — insgesamt
   oder getrennt nach Kommission —, damit die Fraktion in der Kommission ein fertiges
-  Antrags-PDF einreichen kann.
+  Antrags-PDF einreichen kann. Das PDF enthält die **eigenen einzureichenden Anträge**
+  (Toggle «Antrag stellen» ein, F97); eine **Option (Schalter)** nimmt zusätzlich die
+  **von uns unterstützten fremden Anträge** auf (Toggle «Unterstützen» ein). Ein Antrag,
+  den wir nicht einreichen, und ein Pauschalantrag mit abgeschaltetem Einreichen-Toggle
+  (F100) erscheinen nicht. Als **Antragsteller steht im PDF immer die Fraktion** (im Rat
+  stellt die Fraktion die Anträge) — die eingetragene Person erscheint nur in der
+  Bildschirm-Übersicht, nicht im PDF. Die automatische Steuerfuss-Senkung (F88) steht als
+  eigener Antrag am Ende der Liste. Der PDF-Knopf steht im Anträge-Tab (F102).
 - **F93** In den Sitzungen, in denen das Budget traktandiert ist, ist eine
   **Live-Verfolgung** der Beschlüsse möglich: Jeder gestellte Antrag (eigene wie
   fremde) wird aus der Einladung bzw. den Dokumenten übernommen und angezeigt. Zu
@@ -649,11 +861,13 @@ Gesamt-Erfolgsrechnung.
 
 - **F94** Jeder Antrag hat eine **Herkunft**: «eigen» (Standard) oder «fremd» — mit
   demselben Bedienmuster wie beim Vorstoss (F19/F20). Der **Antragsteller** wird immer
-  aus einer Liste gewählt, nie als Freitext: bei eigenen Anträgen eine **Person aus der
-  eigenen Fraktion**, vorbelegt mit der eintragenden Person; bei fremden Anträgen eine
-  **Fraktion** (zuoberst in der Liste) oder eine Person. Die Liste der Personen und
-  Fraktionen stammt aus denselben Quellen wie beim Vorstoss (aktive Mitglieder der
-  eigenen Fraktion, aktive Fraktionen).
+  aus einer Liste gewählt, nie als Freitext, und ist **per Default die eigene Fraktion**
+  (im Rat stellt die Fraktion die Anträge): bei eigenen Anträgen steht die **eigene
+  Fraktion zuoberst** und ist vorbelegt, darunter die Personen der eigenen Fraktion (eine
+  Person lässt sich statt der Fraktion wählen); bei fremden Anträgen eine **Fraktion**
+  (zuoberst) oder eine Person. Die eigene Fraktion stammt aus der Konfiguration (dieselbe
+  Quelle wie das PDF), die übrigen Personen und Fraktionen aus denselben Quellen wie beim
+  Vorstoss (aktive Mitglieder, aktive Fraktionen).
 - **F95** Ein Antrag trägt seinen Betrag **in CHF und in Prozent**, mit einem
   **Umschalter Reduktion/Mehrausgabe**: Standard ist eine Reduktion (Kürzung),
   umgeschaltet eine Mehrausgabe. Die Richtung ist allein das **Vorzeichen** (kein
@@ -668,10 +882,16 @@ Gesamt-Erfolgsrechnung.
   Änderung von X auf Y Prozentpunkte gilt «neuer Ertrag = bisheriger Ertrag × Y/X».
   −2 Prozentpunkte bei einem Steuerfuss von 125% bedeuten also 123% und einen Ertrag von
   bisher × 123/125. In CHF ist das nur eine Schätzung; massgeblich ist der Prozentpunkt-Wert.
-- **F97** Jeder Antrag trägt **unsere Haltung**, getrennt vom Sitzungs-Beschluss
-  (F93): Bei eigenen Anträgen «reichen wir ein» (Standard) oder «reichen wir nicht ein» —
-  nur die einzureichenden erscheinen im Antrags-PDF (F92). Bei fremden Anträgen
-  «unterstützen wir», «unterstützen wir nicht» oder offen (Standard: offen).
+- **F97** Jeder Antrag trägt **unsere Haltung** als einfacher **Schalter** an der
+  Antragszeile, getrennt vom Sitzungs-Beschluss (F93): bei eigenen Anträgen **«Antrag
+  stellen»** (ein = wir reichen ihn ein, Standard bei einem neu angelegten eigenen
+  Antrag), bei fremden Anträgen **«Unterstützen»** (ein = wir unterstützen ihn; ein neu
+  erfasster fremder Antrag startet ausgeschaltet). Nur eingeschaltete Anträge fliessen
+  ins Fraktionsbudget, erscheinen in der Übersicht-Antragsliste und — beim eigenen
+  Toggle — im Antrags-PDF (fremde nur mit der PDF-Option, F92); ein ausgeschalteter
+  fremder Antrag wird ignoriert. Gelöscht wird ein Antrag mit **«✕»** (kein
+  Papierkorb-Symbol). Der Beschluss (angenommen/abgelehnt, ✓/✕) erscheint nur im
+  **Sitzungsmodus**, nicht in der Vorbereitung.
 - **F98** Zu jeder Antragsposition lässt sich mit einer **Mehrfachauswahl** festhalten,
   **welche Fraktionen den Antrag unterstützen**. Haben wir für den Antrag Zustimmung
   beschlossen (F97), ist die eigene Fraktion automatisch ausgewählt.
@@ -683,25 +903,47 @@ Gesamt-Erfolgsrechnung.
 
 ### Pauschalanträge, Übersicht und Sitzungsverknüpfung
 
-- **F100** Ein **Pauschalantrag** verteilt einen Betrag anteilig zum Aufwand auf die
-  Positionen und erzeugt je Position einen Einzelantrag. Der Betrag lässt sich in **CHF**
-  oder in **Prozent** angeben; ein Prozentsatz («10% einsparen») bezieht sich immer auf
-  den **ursprünglichen** Aufwand, nie auf einen bereits gekürzten. Auch der Pauschalantrag
+- **F100** Ein **Pauschalantrag** verteilt anteilig zum Aufwand auf die Positionen und
+  erzeugt je Position einen Einzelantrag. Sein **Ziel-Typ** (F84) bestimmt, was verteilt
+  wird: eine **Einsparung** in **CHF** oder in **Prozent** des **ursprünglichen** Aufwands
+  (nie eines bereits gekürzten), oder ein **absolutes Ziel** (schwarze Null / fester Ertrag /
+  festes Defizit), das das Gesamtergebnis auf diesen Wert ausgleicht. Jeder Pauschalantrag
   hat einen **Einreichen-Entscheid** (F97): wird er eingereicht, erscheint je nicht
   ausgenommene Position ein Einzelantrag im Antrags-PDF; wird er nicht eingereicht, keiner.
-  **Beliebig viele, voneinander unabhängige** Pauschalanträge lassen sich anlegen; ihre
-  Kürzungen kumulieren. Neben diesen frei angelegten gibt es den automatischen Ausgleich
-  auf ein Ziel (schwarze Null usw., F84/F85), der zuletzt gerechnet wird — auf dem bereits
-  durch die übrigen Pauschalanträge gekürzten Stand.
-- **F101** Bei einer einzelnen Position lässt sich ein Pauschalantrag über eine Checkbox
-  **«Ausnahme vom Pauschalantrag»** lokal deaktivieren; dort wird er als nicht aktiv
-  angezeigt und es entsteht kein Einzelantrag ins PDF. Der einzusparende **Gesamtbetrag
-  bleibt gleich**: er verteilt sich neu auf die verbleibenden Positionen.
-- **F102** In der **Übersicht** (Einsparung/Mehrkosten und korrigierte Gesamtsumme)
-  zählt nur, **was die Fraktion unterstützt**; unentschiedene oder abgelehnte Anträge
-  zählen nicht. Im **Sitzungsmodus** zählen stattdessen die vom Parlament **angenommenen**
-  (beschlossenen) Anträge — so ist laufend sichtbar, wieviel das eigene korrigierte
-  Budget bringt bzw. was in der Sitzung tatsächlich beschlossen wurde.
+  Jeder trägt einen **Antragsteller** — eine **Fraktion** (F94), vorbelegt mit der
+  **eigenen Fraktion** —, der sich auf die erzeugten Einzelanträge überträgt. **Beliebig
+  viele** Pauschalanträge lassen sich anlegen; ihre Kürzungen kumulieren. Alle stehen im
+  gemeinsamen Kasten **«Pauschalanträge»** und werden gleich behandelt; das eine absolute
+  Ziel (F84) wird **zuletzt** gerechnet — auf dem bereits durch die Einsparungen gekürzten
+  Stand. Änderungen an einem Pauschalantrag werden **automatisch übernommen** (kein
+  «Übernehmen»-Knopf), kurz nach der letzten Eingabe.
+- **F101** Eine einzelne Produktegruppe lässt sich vom Pauschalantrag **ausnehmen** — auf
+  **zwei** Wegen, die sich entsprechen: über einen **Schalter direkt an der Produktegruppe**
+  (je Pauschalantrag einer; ausgeschaltet = ausgenommen, angezeigt als «— ausgenommen»)
+  **oder** über die **Mehrfachauswahl «Ausnahmen (Produktegruppen)»** im Pauschalantrag
+  selbst. Für eine ausgenommene Position entsteht kein Einzelantrag ins PDF. Der
+  einzusparende **Gesamtbetrag bleibt gleich**: er verteilt sich neu auf die verbleibenden
+  Positionen.
+- **F102** Zuoberst steht die **Übersicht** als **Vergleich** zwischen dem
+  **Stadtratsbudget** (die Zahlen, wie der Stadtrat sie vorgelegt hat — ohne unsere
+  Anträge) und dem **Fraktionsbudget** (mit unseren Anträgen); eine **Differenz**-Zeile
+  zeigt, was unsere Anträge bewirken. Verglichen werden Ausgaben, Einnahmen, Ergebnis
+  (Ertrag/Defizit), Steuerfuss und Stellen; die Übersicht richtet sich nach den aktiven
+  Filtern. In das Fraktionsbudget zählt nur, **was die Fraktion unterstützt**;
+  unentschiedene oder abgelehnte Anträge zählen nicht. Im **Sitzungsmodus** zählen
+  stattdessen die vom Parlament **angenommenen** (beschlossenen) Anträge — so ist laufend
+  sichtbar, wieviel das eigene korrigierte Budget bringt bzw. was in der Sitzung
+  tatsächlich beschlossen wurde.
+- **F102a** Unter der Übersicht stehen die Bereiche als **Tabs** (Globalbudgets,
+  Personalbestand, Investitionsrechnung, Steuerfuss) plus ein Tab **«N Anträge»**
+  (N = Anzahl der Anträge), das **alle Anträge nach Departement zusammengefasst** zeigt
+  (Position, Betrag/Stellen, Antragsteller, Begründung, Beschluss) — so sieht man alle
+  Anträge auf einen Blick, ohne das PDF zu erzeugen; dort steht auch der Knopf **«Anträge
+  als PDF»** samt der Option, die unterstützten fremden Anträge mitzunehmen (F92).
+  **Übersicht und Tabs bleiben beim Scrollen als ein Block am oberen Rand** (die Tabs
+  hängen unten an den Übersichtszahlen). Der Link zur **Weisung** steht im Kopf ganz
+  rechts. Der Filter aller Listen (auch Budget) trägt unten einen einheitlichen Knopf
+  **«Filter zurücksetzen»**.
 - **F104** Ein Vorbereitungs-Antrag wird mit dem tatsächlich eingereichten
   **Sitzungsantrag verknüpft**: **automatisch, wenn eindeutig** (gleiche Position und
   gleicher Betrag), sonst nicht — und immer **manuell korrigierbar**. Über die Verknüpfung
@@ -1159,7 +1401,7 @@ Aktionszeitleiste.
 2. **Je aktive Notiz** (von oben nach unten in der gespeicherten Reihenfolge):
     1. **Name der verfassenden Person** (ersatzweise deren Benutzername).
     2. **Datum und Uhrzeit** der Erfassung in Schweizer Schreibweise (Uhrzeit auf Stunden und Minuten).
-    3. **Löschknopf** (Papierkorb-Symbol, Hilfetext «Notiz löschen») — **bedingte Sichtbarkeit**: nur bei **eigenen** Notizen und nur, solange diese Notiz nicht gerade bearbeitet wird. Wirkung: die Notiz wird sofort ohne Rückfrage entfernt und erscheint fortan als Löschvermerk in der Aktionszeitleiste. Fehlermeldung: «Fehler beim Löschen der Notiz».
+    3. **Löschknopf «✕»** (Hilfetext «Notiz löschen», derselbe einheitliche Löschknopf wie überall — kein Papierkorb-Symbol) — **bedingte Sichtbarkeit**: nur bei **eigenen** Notizen und nur, solange diese Notiz nicht gerade bearbeitet wird. Wirkung: die Notiz wird sofort ohne Rückfrage entfernt und erscheint fortan als Löschvermerk in der Aktionszeitleiste. Fehlermeldung: «Fehler beim Löschen der Notiz».
     4. **Notiztext**, formatiert dargestellt. Bei **eigenen** Notizen ist er anklickbar (Hilfetext «Klicken zum Bearbeiten»); ein Klick oder die «Eingabe»-Taste öffnet an dieser Stelle das Bearbeitungsfeld. Fremde Notizen sind nicht anklickbar und nicht bearbeitbar.
 3. **Bearbeitungsfeld** (dasselbe Feld für neue und bestehende Notizen):
     - Formatierter Textbereich mit Werkzeugleiste; Platzhalter «Notiz bearbeiten…» beim Bearbeiten, «Kommentar, Beobachtung, Hinweis» bei einer neuen Notiz.
@@ -1648,7 +1890,7 @@ Unterschiede je Ort:
 - **Notiz zum Traktandum (ohne Geschäft)** — Hinweistext «Notiz zum Traktandum»; die Notiz haftet am Traktandum.
 - **Verknüpfte Sitzung — reine Ansicht** — die Notizenliste erscheint im Nur-Lese-Modus: kein «+ Neue Notiz», kein Bearbeiten, kein Löschen. Auch eigene Notizen sind hier nicht anklickbar.
 
-Wie überall gilt: Speichern ausschliesslich über «✓» (kein automatisches Zwischenspeichern, kein Speichern beim Verlassen des Feldes), Löschen über den Papierkorb (Soft-Delete mit Wiederherstellen über die Aktionszeitleiste), und der Versionsverlauf steht auch hier zur Verfügung.
+Wie überall gilt: Speichern ausschliesslich über «✓» (kein automatisches Zwischenspeichern, kein Speichern beim Verlassen des Feldes), Löschen über den einheitlichen «✕»-Knopf (Soft-Delete mit Wiederherstellen über die Aktionszeitleiste), und der Versionsverlauf steht auch hier zur Verfügung.
 
 ---
 
@@ -1661,7 +1903,7 @@ Diese Liste tritt in beiden Traktandendarstellungen an die Stelle der einfachen 
 3. **Je Notiz:**
     1. **Autor** — Anzeigename, ersatzweise Benutzerkennung.
     2. **Datum und Uhrzeit** — Erstellungszeitpunkt im Schweizer Format.
-    3. **Löschknopf mit Papierkorb-Symbol** — Hinweistext «Notiz löschen»; **nur bei eigenen Notizen** und nur, solange die Notiz nicht gerade bearbeitet wird. Die Notiz verschwindet aus dieser Liste und erscheint danach als Lösch-Vermerk in der Aktionszeitleiste der Traktandenzeile (siehe Punkt 5).
+    3. **Löschknopf «✕»** (einheitlicher Löschknopf, kein Papierkorb-Symbol) — Hinweistext «Notiz löschen»; **nur bei eigenen Notizen** und nur, solange die Notiz nicht gerade bearbeitet wird. Die Notiz verschwindet aus dieser Liste und erscheint danach als Lösch-Vermerk in der Aktionszeitleiste der Traktandenzeile (siehe Punkt 5).
     4. **Notiztext** — formatierter Text; eigene Notizen sind anklickbar bzw. per Eingabetaste auslösbar (Hinweistext «Klicken zum Bearbeiten») und öffnen den Editor an Ort und Stelle.
 4. **Bearbeitungszustand einer Notiz:**
     1. **Texteditor** — Platzhalter «Notiz bearbeiten…», vorbelegt mit dem bisherigen Text, mit vollständiger Formatierungsleiste **und zusätzlich den Knöpfen zum Blättern in früheren Fassungen**: «←» (Eine Version zurück), «→» (Eine Version vorwärts) und «»» (Zur neuesten Version). Sie erscheinen nur, wenn frühere Fassungen vorliegen; «→» und «»» nur, während eine ältere Fassung angezeigt wird. Dann steht rechts der Statustext «Ältere Fassung – nur Ansicht», und **der Editor ist gesperrt**.

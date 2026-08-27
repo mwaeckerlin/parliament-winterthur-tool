@@ -22,6 +22,12 @@ class BudgetRechnung {
      * @param array<int, array<string, float|int|string>> $antraege je Antrag:
      *        bereich (globalbudget|personal|pauschal|steuerfuss|investition),
      *        betragDelta (neg = Kürzung der Ausgaben bzw. Einnahmen), stellenDelta.
+     *
+     * Die künstliche Produktegruppe (F89) schliesst die Differenz zwischen den
+     * operativen Produktegruppen (brutto inkl. interner Verrechnung) und dem
+     * deklarierten Gesamtergebnis; sie ist eine reguläre Zeile in $gruppen, darum
+     * ergibt Σ aller Produktegruppen ohne Sonderbehandlung das deklarierte Total.
+     *
      * @return array<string, float|int>
      */
     public static function summen(array $gruppen, array $antraege): array {

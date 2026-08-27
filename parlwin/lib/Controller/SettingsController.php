@@ -8,6 +8,7 @@ use OCA\ParliamentWinterthur\AppInfo\Application;
 use OCA\ParliamentWinterthur\Command\SyncCommand;
 use OCA\ParliamentWinterthur\Db\FraktionMapper;
 use OCA\ParliamentWinterthur\Db\Mitglied;
+use OCA\ParliamentWinterthur\Service\EreignisService;
 use OCA\ParliamentWinterthur\Service\FraktionsarbeitService;
 use OCA\ParliamentWinterthur\Service\FraktionsraumService;
 use OCA\ParliamentWinterthur\Service\GeschaeftService;
@@ -78,6 +79,7 @@ class SettingsController extends Controller
         private readonly IGroupManager $groupManager,
         private readonly IUserManager $userManager,
         private readonly FraktionsraumService $fraktionsraumService,
+        private readonly EreignisService $ereignisse,
     ) {
         parent::__construct(Application::APP_ID, $request);
     }
@@ -1710,6 +1712,9 @@ class SettingsController extends Controller
                 'zeitpunkt' => $jetzt,
                 'statistik' => $statistik,
             ]);
+            // Ereignis-Protokoll (F105): wann gesynct und was neu/geändert kam.
+            $this->ereignisse->protokolliere('sync', '', true,
+                'Synchronisation abgeschlossen', $this->syncZusammenfassung($statistik));
 
             $status['running'] = false;
             $status['phase'] = 'abgeschlossen';
@@ -1824,6 +1829,36 @@ class SettingsController extends Controller
      * @param array<string, array<string, mixed>> $sections
      * @return array{0: int, 1: int}
      */
+    /**
+     * Kurze Zusammenfassung der Synchronisation für das Protokoll (F105): summiert
+     * rekursiv die «neu»- und «aktualisiert»-Zähler über alle Bereiche.
+     *
+     * @param array<string, mixed> $statistik
+     */
+    private function syncZusammenfassung(array $statistik): string
+    {
+        $neu = 0;
+        $geaendert = 0;
+        $sammle = function ($wert) use (&$sammle, &$neu, &$geaendert): void {
+            if (!is_array($wert)) {
+                return;
+            }
+            // Trägt diese Ebene selbst Zähler, gilt sie als Blatt (nicht weiter
+            // absteigen) — so wird ein Aggregat nicht zusätzlich zu seinen Details
+            // gezählt.
+            if (array_key_exists('neu', $wert) || array_key_exists('aktualisiert', $wert)) {
+                $neu += (int) ($wert['neu'] ?? 0);
+                $geaendert += (int) ($wert['aktualisiert'] ?? 0);
+                return;
+            }
+            foreach ($wert as $unter) {
+                $sammle($unter);
+            }
+        };
+        $sammle($statistik);
+        return $neu . ' neu, ' . $geaendert . ' geändert';
+    }
+
     private function berechneGlobalenFortschritt(array $sections): array
     {
         $processed = 0;
