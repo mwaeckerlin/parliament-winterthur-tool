@@ -34,6 +34,55 @@ function mountComponent(extraData = {}) {
   })
 }
 
+describe('geschaefteFuer', () => {
+  const ak = { id: 1, name: 'Aufsichtskommission', aktiv: true, mitglieder: '[]' }
+
+  it('zeigt ein eigenes Geschäft, das der Kommission zugewiesen wurde', () => {
+    // Der Weg aus der Fraktion: ein eigenes Geschäft anlegen und es im Feld
+    // «Kommission» der AK zuweisen. Sein Status ist «Pendent» und nennt keine
+    // Kommission — gesucht wurde bisher aber nur im Status, und deshalb erschien
+    // das Geschäft in der Lasche «Kommissionen» nie bei seiner Kommission.
+    const wrapper = mountComponent({
+      kommissionen: [ak],
+      geschaefte: [{ id: 7, titel: 'Antrag der Fraktion', status: 'Pendent', kommission: 'Aufsichtskommission' }],
+    })
+
+    expect(wrapper.vm.geschaefteFuer(ak).map(g => g.id)).toEqual([7])
+  })
+
+  it('zeigt weiterhin die Geschäfte, deren Status die Kommission nennt', () => {
+    const wrapper = mountComponent({
+      kommissionen: [ak],
+      geschaefte: [{ id: 8, titel: 'Weisung', status: 'Bei Aufsichtskommission pendent' }],
+    })
+
+    expect(wrapper.vm.geschaefteFuer(ak).map(g => g.id)).toEqual([8])
+  })
+
+  it('zeigt ein Geschäft, das beiden Regeln entspricht, genau einmal', () => {
+    const wrapper = mountComponent({
+      kommissionen: [ak],
+      geschaefte: [{
+        id: 9,
+        titel: 'Beides',
+        status: 'Bei Aufsichtskommission pendent',
+        kommission: 'Aufsichtskommission',
+      }],
+    })
+
+    expect(wrapper.vm.geschaefteFuer(ak).map(g => g.id)).toEqual([9])
+  })
+
+  it('zeigt kein Geschäft, das einer anderen Kommission zugewiesen ist', () => {
+    const wrapper = mountComponent({
+      kommissionen: [ak],
+      geschaefte: [{ id: 10, titel: 'Fremd', status: 'Pendent', kommission: 'Sachkommission Bau und Betriebe' }],
+    })
+
+    expect(wrapper.vm.geschaefteFuer(ak)).toEqual([])
+  })
+})
+
 describe('nachSpeichern', () => {
   it('schliesst das Popup NICHT nach dem Speichern', async () => {
     const wrapper = mountComponent()

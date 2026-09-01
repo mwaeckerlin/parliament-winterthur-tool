@@ -76,7 +76,8 @@
           </div>
           <p v-else class="pw-hinweis">Keine Mitglieder synchronisiert.</p>
           <p v-if="!geschaefteFuer(k).length" class="pw-hinweis">
-            Keine Geschäfte mit Status „Bei Kommission {{ kuerze(k.name) }} pendent“.
+            Keine Geschäfte mit Status „Bei Kommission {{ kuerze(k.name) }} pendent“
+            und keines, das dieser Kommission zugewiesen ist.
           </p>
           <div v-if="!istAktiv(k)" class="pw-inline-note">
             Diese Kommission erscheint nur, weil historische Daten vorhanden sind.
@@ -340,7 +341,12 @@ export default {
       return true
     },
     /**
-     * Liefert alle Geschäfte, deren Status auf diese Kommission verweist.
+     * Liefert alle Geschäfte dieser Kommission, aus zwei Quellen:
+     *
+     * 1. **Ausdrücklich zugewiesen:** Im Feld «Kommission» des Geschäfts steht
+     *    der Name dieser Kommission. So weist die Fraktion ein eigenes Geschäft
+     *    zu; dessen Status ist «Pendent» und nennt keine Kommission.
+     * 2. **Aus dem Status des Parlaments**, nach der folgenden Strategie.
      *
      * Beispiel-Status-Strings vom Parlament:
      *   - "Bei der Aufsichtskommission pendent"
@@ -379,6 +385,7 @@ export default {
       const knameRaw = (kommission.name || '').toLowerCase().trim()
       const knameTokens = tokenize(kommission.name)
       return this.geschaefte.filter(g => {
+        if ((g.kommission || '').toLowerCase().trim() === knameRaw) return true
         const s = (g.status || '').toLowerCase()
         if (!/\S*kommission\S*/.test(s)) return false
         if (knameTokens.length === 0) {

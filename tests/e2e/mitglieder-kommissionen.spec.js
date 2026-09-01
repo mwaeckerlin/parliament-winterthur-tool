@@ -145,6 +145,29 @@ async function ncWaehlenIndex(page, labelText, idx) {
   return txt
 }
 
+/**
+ * Öffnet eine vue-select-Auswahl AUSSERHALB der Seitenleiste (z.B. im Geschäft)
+ * und wählt die Option mit diesem Text. «vs--open» steht erst nach dem nächsten
+ * Durchlauf von Vue am Element: Wer sofort nachsieht, hält die geöffnete Liste
+ * für geschlossen und klappt sie mit dem Klick auf den Umschalter wieder zu.
+ */
+async function ncWaehleImFeld(page, feld, optionText) {
+  const suchfeld = feld.locator('.vs__search, .vs__dropdown-toggle').first()
+  await suchfeld.scrollIntoViewIfNeeded().catch(() => {})
+  await suchfeld.focus().catch(() => {})
+  await page.keyboard.press('ArrowDown')
+  try {
+    await expect(feld).toHaveClass(/vs--open/, { timeout: 4_000 })
+  } catch {
+    const box = await feld.locator('.vs__dropdown-toggle').first().boundingBox()
+    if (box) await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
+    await expect(feld).toHaveClass(/vs--open/, { timeout: 6_000 })
+  }
+  const menu = page.locator('.vs__dropdown-menu').first()
+  await menu.waitFor({ state: 'visible', timeout: 15_000 })
+  await menu.locator('li.vs__dropdown-option', { hasText: optionText }).first().click()
+}
+
 /** The NcCheckboxRadioSwitch renders a real checkbox; targets it via its label. */
 function switchCheckbox(page, name) {
   return page.locator('#pw-filter-slot').getByRole('checkbox', { name, exact: true })
@@ -737,5 +760,54 @@ test.describe('Kommissionen: Ansicht end-to-end', () => {
     }
     expect(ohneGeschaefte, 'Kein Geschäfte-Hinweis exerziert').toBeGreaterThan(0)
     expect(jsFehler, jsFehler.join(' | ')).toEqual([])
+  })
+
+  /**
+   * Der Weg aus der Fraktion, gemeldet aus der Produktion: ein eigenes Geschäft
+   * anlegen, es im Feld «Kommission» einer Kommission zuweisen — und es dann in
+   * der Lasche «Kommissionen» bei genau dieser Kommission wiederfinden.
+   *
+   * Ein eigenes Geschäft trägt den Status «Pendent» und nennt darin keine
+   * Kommission; gesucht wurde bisher nur im Status, und deshalb erschien das
+   * zugewiesene Geschäft dort nie.
+   */
+  test('Ein eigenes Geschäft, einer Kommission zugewiesen, erscheint bei ihr in der Lasche «Kommissionen»', async ({ page }) => {
+    const KOMMISSION = 'E2E Gemischte Kommission'
+    const titel = `E2E Zugewiesen ${Date.now()}`
+    await login(page, USERS.u1)
+
+    // 1. Anlegen und zuweisen — über die Maske, wie es die Fraktion tut.
+    await page.goto(`${BASE_URL}/index.php/apps/parlwin/`)
+    await page.waitForLoadState('networkidle')
+    await page.getByRole('link', { name: 'Geschäfte', exact: true }).click()
+    await page.getByRole('button', { name: /Eigenes Geschäft/ }).click()
+
+    const detail = page.locator('.pw-geschaeft-detail')
+    await detail.waitFor({ state: 'visible', timeout: 30_000 })
+    await detail.getByLabel('Titel').fill(titel)
+    await ncWaehleImFeld(page, detail.locator('tr', { hasText: 'Kommission' }).locator('.v-select'), KOMMISSION)
+    await expect(detail.locator('tr', { hasText: 'Kommission' }).locator('.vs__selected')).toContainText(KOMMISSION)
+
+    await page.locator('.pw-modal').first().locator('.pw-modal-footer')
+      .getByRole('button', { name: 'Speichern' }).click()
+    await expect(detail.locator('.pw-btn-neue-notiz').first()).toBeVisible({ timeout: 30_000 })
+    await page.locator('.pw-modal .pw-btn-schliessen').first().click()
+
+    // 2. Wiederfinden: in der Lasche «Kommissionen», in der Karte dieser Kommission.
+    await oeffneKommissionen(page)
+    const karte = page.locator('.pw-kommission-karte', { hasText: KOMMISSION }).first()
+    await expect(karte, `Die Kommission «${KOMMISSION}» fehlt in der Ansicht`).toBeVisible()
+    if (await karte.locator('.pw-kommission-details').count() === 0) {
+      await karte.locator('.pw-kommission-kopf').click()
+    }
+    await expect(
+      karte.locator('.pw-kommission-geschaeft-eintrag', { hasText: titel }),
+      'Das zugewiesene Geschäft erscheint nicht bei seiner Kommission',
+    ).toHaveCount(1, { timeout: 30_000 })
+
+    // Und es öffnet von dort aus seine Detailansicht.
+    await karte.locator('.pw-kommission-geschaeft-eintrag', { hasText: titel }).locator('.pw-titel').click()
+    await expect(page.locator('.pw-modal-overlay .pw-geschaeft-detail')).toBeVisible({ timeout: 30_000 })
+    await expect(page.locator('.pw-modal-overlay .pw-geschaeft-detail').getByLabel('Titel')).toHaveValue(titel)
   })
 })

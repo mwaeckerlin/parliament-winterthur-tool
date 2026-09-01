@@ -157,7 +157,10 @@ Nummern werden einmal vergeben und nie wiederverwendet; jeder Test in
       darunter. Wer in der zuständigen Kommission sitzt, wird nach der
       Synchronisation automatisch eingetragen (ohne bestehende Zuweisungen zu
       überschreiben); haben Fraktionsmitglieder das Geschäft selbst
-      eingereicht, werden sie in Einreicher-Reihenfolge zuständig.
+      eingereicht, werden sie in Einreicher-Reihenfolge zuständig. **Die
+      zuständige Kommission steht im Status des Parlaments oder im Feld
+      «Kommission»** — dieselbe Regel wie in der Lasche «Kommissionen» (F46),
+      damit hier und dort dasselbe Geschäft zur selben Kommission gehört.
     - **F22** **Fraktionsbeschluss:** Auswahl aus genau den zum Geschäftstyp passenden
       Beschlüssen. Die Auswahl je Typ:
         - **Motion:** Zustimmen, Ablehnen, Stimmfreigabe, Miteinreichen als
@@ -336,7 +339,11 @@ Nummern werden einmal vergeben und nie wiederverwendet; jeder Test in
 
 - **F46** Alle Kommissionen mit Status, Beschreibung, ihren pendenten Geschäften
   (Klick öffnet das Geschäft) und ihren Mitgliedern (Funktion, Partei,
-  Fraktion, E-Mail; die eigene Fraktion hervorgehoben).
+  Fraktion, E-Mail; die eigene Fraktion hervorgehoben). **Zu einer Kommission
+  gehört ein Geschäft aus zwei Gründen:** Sein Status nennt sie («Bei Kommission
+  … pendent», so schreibt es das Parlament), oder es ist ihr im Feld
+  «Kommission» zugewiesen — so ordnet die Fraktion ihre eigenen Geschäfte zu,
+  deren Status keine Kommission nennt.
 - **F47** Zwei Schalter, beide standardmässig aktiv: «Nur aktive Kommissionen» und
   «Nur aktive Mitglieder» (ist letzterer aus, zeigt der Mitglieder-Titel
   zusätzlich die Zahl der aktiven Mitglieder an); dazu eine Suche. Ohne

@@ -1,5 +1,9 @@
 # Changelog
 
+- 2026-09-01 **1.7.35**
+    - Kommissionen: **ein eigenes Geschäft, das einer Kommission zugewiesen ist, erscheint bei ihr** — die Lasche «Kommissionen» suchte die Geschäfte einer Kommission allein in deren Status («Bei Kommission … pendent»), wie ihn das Parlament schreibt. Ein selbst angelegtes Geschäft trägt den Status «Pendent» und nennt darin keine Kommission: Die Zuweisung im Feld «Kommission» blieb dort ohne Wirkung. Jetzt zählt beides, und der Hinweis auf der Karte sagt, dass weder ein Status noch eine Zuweisung auf sie zeigt
+    - Geschäfte: **die automatische Zuständigkeit folgt derselben Regel** — wer in der zugewiesenen Kommission sitzt, wird nach der Synchronisation zuständig, auch wenn die Kommission nur im Feld «Kommission» steht. Bestehende Zuweisungen bleiben unberührt, und wer das Geschäft eingereicht hat, geht weiterhin vor
+
 - 2026-08-10 **1.7.34**
     - Ein selbst angelegtes Geschäft lässt sich jetzt mit dem offiziellen Parlamentsgeschäft verknüpfen — genau wie ein Vorstoss mit einem Geschäft
         - In der Maske eines eigenen Geschäfts öffnet «Mit offiziellem Geschäft verknüpfen» einen Auswahldialog, der die ähnlichsten Geschäfte zuoberst vorschlägt (Suche nach Nummer oder Titel möglich); angeboten werden nur offizielle Geschäfte, erledigte eingeschlossen

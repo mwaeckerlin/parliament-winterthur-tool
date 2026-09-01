@@ -57,7 +57,8 @@ Eine vollständige, laufend nachgeführte Funktionsliste steht in
   Fraktion, Partei oder Name und filterbar nach Funktion (Fraktions- bzw.
   Kommissionspräsident) sowie nach einzelner Kommission.
 - **Kommissionsübersicht** – welche Kommission behandelt welches Geschäft, wer
-  sitzt drin.
+  sitzt drin. Ein Geschäft gehört zu ihr, wenn sein Status des Parlaments sie
+  nennt oder wenn es ihr im Feld «Kommission» zugewiesen wurde.
 - **Fraktionsarbeit**
   - Geschäften können **Zuständige** aus der eigenen Fraktion zugewiesen
     werden (Hauptzuständige + Mitarbeitende).
@@ -961,7 +962,9 @@ Wenn ein Geschäft aktuell in einer Kommission hängig ist (letztes
 Verfahrensereignis nennt das Kommissions-Organ) und niemand der eigenen
 Fraktion zugewiesen ist, weist der Sync nach erfolgreichem Mitglieder- und
 Geschäftsabgleich automatisch alle Mitglieder dieser Kommission zu, die zur
-eigenen Fraktion gehören. Die erste gefundene Person wird als Hauptzuständige
+eigenen Fraktion gehören. Die Kommission eines Geschäfts steht dabei im Status
+des Parlaments oder im Feld «Kommission», in das die Fraktion ihre eigenen
+Geschäfte einordnet; die Lasche «Kommissionen» liest beide Quellen gleich. Die erste gefundene Person wird als Hauptzuständige
 markiert; jede Zuweisung wird als reguläre Aktion (Typ `zuweisung`) in der
 Geschäftszeitleiste protokolliert. Bereits vorhandene Zuständigkeiten werden
 nie überschrieben.
