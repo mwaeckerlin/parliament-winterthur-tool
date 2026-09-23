@@ -1,5 +1,7 @@
 # Changelog
 
+- 2026-09-23 **1.8.19**
+
 - 2026-09-23 **1.8.18**
     - Betrieb: **der Server gibt jeder Anfrage 1024 MB Speicher** — bisher waren es 512 MB, und das reichte für ein Budgetbuch nicht mehr. Der Wert lässt sich im Betrieb setzen (`PARLWIN_PHP_MEMORY_LIMIT`) und gilt für die Oberfläche, die Kommandozeile und den Hintergrundauftrag gleichermassen
     - Budget: **ein Budgetbuch lässt sich auch dann lesen, wenn es gewachsen ist** — das Budget 2027 brach beim Einlesen mit «Allowed memory size exhausted» ab, weil das neue Buch mehr Speicher braucht, als eine Nextcloud-Installation einer Anfrage gibt. Für die Dauer des Lesens gilt jetzt eine höhere Grenze, danach wieder die der Installation; wer sie anders will, setzt sie im Betrieb (`PARLWIN_BUDGET_MEMORY_LIMIT`)
