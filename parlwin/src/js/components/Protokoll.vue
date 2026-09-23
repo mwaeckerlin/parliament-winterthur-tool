@@ -41,8 +41,8 @@ const ART_LABEL = {
   fehler: 'Fehler',
 }
 
-// Protokoll-Ansicht (F105): die Historie der Synchronisationen und Budget-Importe,
-// neueste zuerst — und der Ort, an dem Parsing-Probleme (Fehler-Ereignisse) sichtbar
+// Protokoll-Ansicht (F105): der Verlauf der Synchronisationen und der eingelesenen
+// Budgets, neueste zuerst — und der Ort, an dem Probleme beim Einlesen sichtbar
 // werden. Nutzt exakt dieselbe Seiten-/Card-Struktur wie alle anderen Ansichten.
 export default {
   name: 'Protokoll',

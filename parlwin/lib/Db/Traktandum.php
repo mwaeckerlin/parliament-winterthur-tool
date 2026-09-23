@@ -19,6 +19,7 @@ use OCP\AppFramework\Db\Entity;
  * @method string getTitel()
  * @method string getBeschreibung()
  * @method string|null getUrl()
+ * @method string      getDokumentTitel()
  * @method bool        getGeloescht()
  * @method string      getBemerkungen()
  * @method string      getNotizen()
@@ -45,6 +46,9 @@ class Traktandum extends Entity implements \JsonSerializable {
     /** @var string|null URL eines verknüpften Dokuments (Protokoll-PDF etc.) ohne eigenes Geschäft */
     protected ?string $url = null;
 
+    /** @var string Titel dieses Dokuments, wie ihn die Parlamentswebseite führt (nennt beim Protokoll die protokollierte Sitzung) */
+    protected string $dokumentTitel = '';
+
     /** @var bool Wurde das Traktandum entfernt? */
     protected bool $geloescht = false;
 
@@ -67,6 +71,12 @@ class Traktandum extends Entity implements \JsonSerializable {
         $this->addType('geloescht', 'boolean');
     }
 
+    /** Verträgt NULL aus der Datenbank (Zeilen aus der Zeit vor dieser Spalte). */
+    public function setDokumentTitel(?string $dokumentTitel): void {
+        $this->markFieldUpdated('dokumentTitel');
+        $this->dokumentTitel = (string) ($dokumentTitel ?? '');
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -79,6 +89,7 @@ class Traktandum extends Entity implements \JsonSerializable {
             'titel' => $this->getTitel(),
             'beschreibung' => $this->getBeschreibung(),
             'url' => $this->getUrl(),
+            'dokumentTitel' => $this->getDokumentTitel(),
             'geloescht' => $this->getGeloescht(),
             'bemerkungen' => $this->getBemerkungen(),
             'notizen' => $this->getNotizen(),

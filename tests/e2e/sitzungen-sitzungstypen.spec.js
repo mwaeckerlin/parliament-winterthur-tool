@@ -202,8 +202,16 @@ async function ncSelectWaehle(page, container, optionText = null) {
   await feld.scrollIntoViewIfNeeded().catch(() => {})
   await feld.focus().catch(() => {})
   await page.keyboard.press('ArrowDown')
-  const offen = await container.evaluate((el) => el.classList.contains('vs--open')).catch(() => false)
-  if (!offen) await container.locator('.vs__dropdown-toggle').click()
+  // «vs--open» steht erst nach dem nächsten Durchlauf von Vue am Element: Wer
+  // sofort nachsieht, hält die geöffnete Liste für geschlossen und schliesst sie
+  // mit dem Klick auf den Umschalter wieder.
+  const istOffen = () => container.evaluate((el) => el.classList.contains('vs--open')).catch(() => false)
+  let offen = false
+  for (let versuch = 0; versuch < 20 && !offen; versuch++) {
+    offen = await istOffen()
+    if (!offen) { await page.waitForTimeout(100) }
+  }
+  if (!offen) { await container.locator('.vs__dropdown-toggle').click() }
   const option = optionText
     ? page.locator('.vs__dropdown-option', { hasText: optionText })
     : page.locator('.vs__dropdown-option')
@@ -921,11 +929,86 @@ test.describe('Sitzungen: Öffnen und Traktanden', () => {
     await expect(tabelle).toBeVisible({ timeout: 30_000 })
 
     // Klick auf die Titel-Zelle der ersten Geschäfts-Zeile öffnet GeschaeftDetail.
+    // Gesucht wird die Notizzeile eines Traktandums MIT Geschäft: dieselbe Klasse
+    // trägt auch die Zeile «Notiz zum Traktandum» eines Traktandums ohne Geschäft
+    // — etwa der Protokoll-Abnahme, die zuoberst steht (F115) —, und deren
+    // Vorgängerzeile öffnet nichts.
     const geschaeftNotizZeile = tabelle.locator('tr.pw-traktandum-notizen-zeile')
-      .filter({ has: page.locator('.pw-sitzungsnotiz-hinweis') }).first()
+      .filter({ has: page.getByText('Sitzungsnotiz zum Geschäft', { exact: true }) }).first()
     const datenRow = geschaeftNotizZeile.locator('xpath=preceding-sibling::tr[1]')
     await datenRow.locator('.pw-col-titel').click()
     await expect(page.locator('.pw-modal .pw-sitzungsnotizen-details')).toBeVisible({ timeout: 30_000 })
+    await page.locator('.pw-modal .pw-btn-schliessen').first().click()
+
+    // F115: Der Protokoll-Link steht IN der klickbaren Titelzelle. Ein Klick auf
+    // ihn gehört ihm — er öffnet das Protokoll und nicht das Geschäft.
+    const protokollZeile = tabelle.locator('tr', { has: page.locator('.pw-traktandum-protokoll') }).first()
+    if (await protokollZeile.count() > 0) {
+      const link = protokollZeile.locator('.pw-traktandum-protokoll').first()
+      await expect(link).toHaveAttribute('target', '_blank')
+      const [neuerTab] = await Promise.all([
+        page.context().waitForEvent('page'),
+        link.click(),
+      ])
+      await neuerTab.close()
+      await expect(page.locator('.pw-modal .pw-sitzungsnotizen-details'),
+        'der Klick auf den Protokoll-Link öffnet das Geschäft (F115)').toHaveCount(0)
+    }
+
+    expect(jsFehler, `JS-Fehler: ${jsFehler.join(' | ')}`).toEqual([])
+  })
+
+  // F115: Das Protokoll einer Sitzung ist mit einem Klick erreichbar — oben auf
+  // ihrer Karte und noch einmal in der Folgesitzung beim Traktandum der Abnahme.
+  test('Das Protokoll ist oben bei der Sitzung und beim Traktandum der Abnahme verlinkt', async ({ page }) => {
+    await login(page, USER)
+    const sitzungen = await apiGet(page, '/sitzungen?limit=200')
+    expect(Array.isArray(sitzungen), 'Sitzungsliste ist keine Liste').toBeTruthy()
+
+    const mitProtokoll = sitzungen.filter((s) => (s.protokollUrl || '') !== '')
+    expect(mitProtokoll.length, 'Keine synchronisierte Sitzung mit veröffentlichtem Protokoll').toBeGreaterThan(0)
+
+    // Die Sitzung suchen, deren Traktandum ein Protokoll abnimmt.
+    let abnahme = null
+    for (const s of sitzungen) {
+      const traktanden = await apiGet(page, `/sitzungen/${s.id}/traktanden`)
+      const treffer = (traktanden || []).find((t) => t.protokoll && t.protokoll.url)
+      if (treffer) {
+        abnahme = { sitzung: s, traktandum: treffer }
+        break
+      }
+    }
+    expect(abnahme, 'Kein Traktandum mit Protokollabnahme in den Daten').not.toBeNull()
+
+    await gotoView(page, 'Sitzungen')
+    await zeigeAlleSitzungen(page)
+
+    // Oben auf der Karte der protokollierten Sitzung.
+    const sitzungMitProtokoll = mitProtokoll[0]
+    const karte = page.locator(`#pw-sitzung-${sitzungMitProtokoll.id}`)
+    await karte.scrollIntoViewIfNeeded()
+    const protokollLink = karte.locator('a.pw-protokoll-link')
+    await expect(protokollLink).toHaveAttribute('href', sitzungMitProtokoll.protokollUrl)
+    await expect(protokollLink).toHaveAttribute('target', '_blank')
+    await expect(protokollLink).toHaveText('Protokoll')
+
+    // Der Klick öffnet ein neues Fenster und klappt die Karte nicht auf.
+    await expect(karte.locator('.pw-sitzung-details')).toHaveCount(0)
+    // Das Protokoll ist ein PDF: Je nach Browser öffnet es ein Fenster oder lädt
+    // herunter. Beides ist recht; geprüft wird, dass die Karte zu bleibt.
+    const [neuesFenster] = await Promise.all([
+      page.waitForEvent('popup', { timeout: 5_000 }).catch(() => null),
+      protokollLink.click(),
+    ])
+    if (neuesFenster) await neuesFenster.close().catch(() => {})
+    await expect(karte.locator('.pw-sitzung-details')).toHaveCount(0)
+
+    // Und beim Traktandum der Folgesitzung, das es abnimmt.
+    const karteAbnahme = await oeffneSitzung(page, abnahme.sitzung.id)
+    const traktandumLink = karteAbnahme.locator('.pw-table-desktop a.pw-traktandum-protokoll').first()
+    await expect(traktandumLink).toHaveAttribute('href', abnahme.traktandum.protokoll.url)
+    await expect(traktandumLink).toHaveAttribute('target', '_blank')
+    await expect(traktandumLink).toHaveText(/^Protokoll \d{2}\.\d{2}\.\d{4}$/)
     expect(jsFehler, `JS-Fehler: ${jsFehler.join(' | ')}`).toEqual([])
   })
 })
@@ -1063,7 +1146,7 @@ test.describe('Sitzungen: Verknüpfungen und To-do', () => {
     // Fremde Notiz erscheint, aber nur lesend (kein «+ Neue Notiz», kein Löschen).
     await expect(block.getByText(notizA, { exact: false }).first()).toBeVisible({ timeout: 15_000 })
     await expect(block.locator('.pw-btn-neue-notiz')).toHaveCount(0)
-    await expect(block.locator('.pw-btn-loeschen')).toHaveCount(0)
+    await expect(block.locator('.pw-notiz-loeschen')).toHaveCount(0)
 
     // Entkoppeln entfernt den Block.
     await block.getByRole('button', { name: 'Entkoppeln' }).click()
@@ -1171,7 +1254,7 @@ test.describe('Sitzungsnotiz: haftet am Geschäft', () => {
     expect(jsFehler, `JS-Fehler: ${jsFehler.join(' | ')}`).toEqual([])
   })
 
-  test('Sitzungsnotiz löschen (Soft-Delete) und wiederherstellen', async ({ page }) => {
+  test('Sitzungsnotiz löschen (nur gekennzeichnet) und wiederherstellen', async ({ page }) => {
     const notiz = `E2E-Loesch-Sitzungsnotiz ${Date.now()}`
     await login(page, USER)
     const treffer = await findeParlamentsSitzungMitGeschaeft(page)
@@ -1180,8 +1263,10 @@ test.describe('Sitzungsnotiz: haftet am Geschäft', () => {
     await gotoView(page, 'Sitzungen')
     await zeigeAlleSitzungen(page)
     const karte = await oeffneSitzung(page, treffer.sitzungId)
+    // Die Notizzeile eines Traktandums MIT Geschäft: dieselbe Klasse trägt auch
+    // «Notiz zum Traktandum» eines Traktandums ohne Geschäft (F115).
     const zelle = karte.locator('.pw-table-desktop .pw-tabelle-traktanden tr.pw-traktandum-notizen-zeile')
-      .filter({ has: page.locator('.pw-sitzungsnotiz-hinweis') }).first()
+      .filter({ has: page.getByText('Sitzungsnotiz zum Geschäft', { exact: true }) }).first()
     const nl = zelle.locator('.pw-notizen-liste')
     await notizenListeSchreiben(page, nl, notiz)
     const eintrag = nl.locator('.pw-notiz-eintrag', { hasText: notiz }).first()
@@ -1191,7 +1276,7 @@ test.describe('Sitzungsnotiz: haftet am Geschäft', () => {
     // Traktandenzeile (dieselbe Komponente wie im Geschäft/Vorstoss), nicht mehr
     // in der Notizenliste.
     const zeitleiste = zelle.locator('.pw-detail-abschnitt', { hasText: 'Aktionszeitleiste' })
-    await eintrag.locator('.pw-btn-loeschen').click()
+    await eintrag.locator('.pw-notiz-loeschen').click()
     await expect(zeitleiste.getByText('hat seine Notiz gelöscht', { exact: false }).first(), 'Gelöschte Sitzungsnotiz fehlt in der Aktionszeitleiste').toBeVisible({ timeout: 15_000 })
     await expect(nl.locator('.pw-notiz-eintrag', { hasText: notiz }), 'Gelöschte Sitzungsnotiz steht noch in der Notizenliste').toHaveCount(0)
 

@@ -291,10 +291,19 @@ test.describe('«+ Neu» öffnet dieselbe vollständige Maske wie die Bearbeitun
     await modal.locator('.pw-btn-schliessen').click()
     await page.waitForLoadState('networkidle')
 
-    const karte = page.locator('.pw-data-card', { hasText: titel }).first()
+    // Seit F119 steht der Vorstoss auf breiten Fenstern in einer Tabellenzeile,
+    // auf schmalen in einer Karte — gesucht wird, was sichtbar ist.
+    const karte = page
+      .locator('.pw-vorstoesse .pw-tabelle-vorstoesse tbody tr, .pw-vorstoesse .pw-data-card')
+      .filter({ hasText: titel })
+      .locator('visible=true')
+      .first()
     await expect(karte).toBeVisible({ timeout: 30_000 })
     await expect(karte, 'Priorität «Hoch» wurde nicht gespeichert').toHaveClass(/pw-prio-hoch/)
-    await karte.click()
+    // In der Tabellenzeile steht mittig eine Auswahlliste; geklickt wird in den
+    // freien Bereich der Titelzelle (F119).
+    const zielzelle = karte.locator('.pw-col-titel')
+    await (await zielzelle.count() > 0 ? zielzelle.first() : karte).click()
 
     const wieder = page.locator('.pw-modal').first()
     await wieder.waitFor({ state: 'visible', timeout: 30_000 })
@@ -363,7 +372,13 @@ test.describe('«+ Neu» öffnet dieselbe vollständige Maske wie die Bearbeitun
     await modal.locator('.pw-btn-schliessen').click()
     await page.waitForLoadState('networkidle')
 
-    const karte = page.locator('.pw-data-card', { hasText: titel }).first()
+    // Seit F119 steht der Vorstoss breit in einer Tabellenzeile, schmal in
+    // einer Karte; beide tragen den Löschknopf.
+    const karte = page
+      .locator('.pw-vorstoesse .pw-tabelle-vorstoesse tbody tr, .pw-vorstoesse .pw-data-card')
+      .filter({ hasText: titel })
+      .locator('visible=true')
+      .first()
     await expect(karte).toBeVisible({ timeout: 30_000 })
 
     page.once('dialog', (d) => d.accept())

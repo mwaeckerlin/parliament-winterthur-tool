@@ -130,11 +130,20 @@ test.describe('Vorstösse: Datenfluss end-to-end (kein Datenverlust)', () => {
 
     // Schliessen über ✕ — der Vorstoss ist gespeichert und erscheint in der Übersicht.
     await page.locator('.pw-modal .pw-btn-schliessen').click()
-    const karte = page.locator('.pw-data-card', { hasText: TITEL })
+    // Seit F119 steht der Vorstoss breit in einer Tabellenzeile, schmal in
+    // einer Karte — gesucht wird, was sichtbar ist.
+    const karte = page
+      .locator('.pw-vorstoesse .pw-tabelle-vorstoesse tbody tr, .pw-vorstoesse .pw-data-card')
+      .filter({ hasText: TITEL })
+      .locator('visible=true')
+      .first()
     await expect(karte, 'Vorstoss erscheint nicht in der Übersicht').toBeVisible({ timeout: 30_000 })
 
     // Der eigentliche Datenverlust-Bug: erneut öffnen – der Titel darf NICHT leer sein.
-    await karte.click()
+    // In der Tabellenzeile steht mittig eine Auswahlliste; geklickt wird in den
+    // freien Bereich der Titelzelle (F119).
+    const zielzelle = karte.locator('.pw-col-titel')
+    await (await zielzelle.count() > 0 ? zielzelle.first() : karte).click()
     await expect(
       page.locator('.pw-modal input.pw-input').first(),
       'Beim Öffnen ist der Titel leer – Datenverlust',
@@ -184,7 +193,7 @@ test.describe('Vorstösse: Datenfluss end-to-end (kein Datenverlust)', () => {
     // Aktionszeitleiste, nicht mehr in der Notizenliste.
     const zeitleiste = page.locator('.pw-detail-abschnitt', { hasText: 'Aktionszeitleiste' })
     await liste.locator('.pw-notiz-eintrag', { hasText: bearbeitet }).first()
-      .locator('.pw-btn-loeschen').click()
+      .locator('.pw-notiz-loeschen').click()
     await expect(
       zeitleiste.getByText('hat seine Notiz gelöscht', { exact: false }).first(),
       'Gelöschte Notiz erscheint nicht als Vermerk in der Aktionszeitleiste',

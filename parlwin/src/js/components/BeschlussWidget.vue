@@ -27,7 +27,7 @@ export default {
     options: { type: Array, default: () => [] },
     disabled: { type: Boolean, default: false },
     placeholder: { type: String, default: 'Beschluss eingeben oder aus Liste wählen…' },
-    // Klasse des Eingabefeldes. Default ist der Beschluss; bei einem zweiten
+    // Klasse des Eingabefeldes. Standard ist der Beschluss; bei einem zweiten
     // Einsatz desselben Widgets (z.B. Status am eigenen Geschäft) eine andere
     // setzen, damit die beiden Felder unterscheidbar bleiben.
     inputClass: { type: String, default: 'pw-beschluss-input' },

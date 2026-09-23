@@ -47,8 +47,20 @@ export PARLWIN_REALTIME_PUBLISH_URL="${PARLWIN_REALTIME_PUBLISH_URL:-http://parl
 export PARLWIN_REALTIME_SECRET="${PARLWIN_REALTIME_SECRET:-parlwin_realtime_local_ChangeMe_2026}"
 export PARLWIN_REALTIME_AUTH_REQUIRED="${PARLWIN_REALTIME_AUTH_REQUIRED:-1}"
 export PARLWIN_NEXTCLOUD_BASE_URL="${PARLWIN_NEXTCLOUD_BASE_URL:-http://nextcloud-nginx:8080}"
-export PARLWIN_SYNC_LIMIT_GESCHAEFTE="${PARLWIN_SYNC_LIMIT_GESCHAEFTE:-30}"
-export PARLWIN_SYNC_LIMIT_SITZUNGEN="${PARLWIN_SYNC_LIMIT_SITZUNGEN:-60}"
+# Geschäfte OHNE Limit: die Quelle liefert ihre Liste unsortiert (gemessen am
+# 2026-08-28: 1236 Einträge, beginnend mit 2021.82, 2021.27, 2018.8 …), und das
+# Budget-Geschäft — die Weisung, aus der jeder Budget-Import sein Budgetbuch
+# holt — stand darin an Position 1137. Jedes Limit schneidet es damit weg, der
+# Import antwortet mit 500 und die ganze Budget-Familie (F74–F104) fällt aus.
+# Ein höherer Wert verschiebt das Problem nur; die Reihenfolge ist nicht stabil.
+export PARLWIN_SYNC_LIMIT_GESCHAEFTE="${PARLWIN_SYNC_LIMIT_GESCHAEFTE:-}"
+# Sitzungen OHNE Limit, aus demselben Grund: Die Liste der Quelle ist ebenfalls
+# unsortiert (gemessen am 2026-09-05: die ersten 60 von 255 Einträgen sind die
+# beiden angesetzten Sitzungen und Sitzungen aus 2018 bis 2022). Das Traktandum
+# «Abnahme Parlaments-Protokolle» trägt den Entwurf des Protokolls erst seit
+# Mitte 2023 als Dokument, also schneidet jedes Limit den Fall weg, den F115
+# prüft. Der volle Abgleich der Sitzungen dauert rund eine Minute.
+export PARLWIN_SYNC_LIMIT_SITZUNGEN="${PARLWIN_SYNC_LIMIT_SITZUNGEN:-}"
 export PARLWIN_SYNC_LIMIT_MITGLIEDER="${PARLWIN_SYNC_LIMIT_MITGLIEDER:-80}"
 export PARLWIN_SYNC_LIMIT_KOMMISSIONEN="${PARLWIN_SYNC_LIMIT_KOMMISSIONEN:-30}"
 export PARLWIN_SYNC_LIMIT_FRAKTIONEN="${PARLWIN_SYNC_LIMIT_FRAKTIONEN:-20}"
@@ -422,7 +434,7 @@ done
 STATUS_BODY="$(docker compose exec -T nextcloud-php-fpm php -r 'echo @file_get_contents("http://nextcloud-nginx:8080/status.php");')"
 jq -e '.installed == true' <<<"$STATUS_BODY" >/dev/null || fail "Nextcloud wurde nicht rechtzeitig initialisiert"
 
-echo "[E2E] Prüfe Realtime-Broker"
+echo "[E2E] Prüfe den Dienst parlwin-realtime"
 REALTIME_OK=0
 for _ in $(seq 1 60); do
   if realtime_health_ok_internal >/dev/null 2>&1; then
@@ -434,7 +446,16 @@ done
 [[ "$REALTIME_OK" -eq 1 ]] || fail "Realtime-Broker ist nicht erreichbar"
 realtime_runtime_expect_non_root_and_immutable || fail "parlwin-realtime läuft nicht mit sicherem Runtime-User oder Build-Artefakte sind schreibbar"
 
-echo "[E2E] Prüfe automatische App-Aktivierung und lege Testnutzer an"
+# Die Speichergrenze von PHP: Das Basis-Image liefert 512 MB, ein Budgetbuch
+# braucht beim Einlesen mehr (gemessen am Buch 2027: 574,7 MB), und in der
+# laufenden Instanz brach der automatische Import genau daran ab. Der Bootstrap
+# schreibt den Wert aus PARLWIN_PHP_MEMORY_LIMIT in ein eigenes ini-Verzeichnis;
+# gemessen wird im Container, weil nur er zeigt, was die Einstellung wirklich tut.
+echo "[E2E] Prüfe die Speichergrenze von PHP"
+PHP_MEM="$(docker compose exec -T nextcloud-php-fpm php -r 'echo ini_get("memory_limit");')"
+assert_eq "$PHP_MEM" "1024M" "Die Speichergrenze von PHP steht nicht auf dem konfigurierten Wert"
+
+echo "[E2E] Prüfe automatische App-Aktivierung und lege Testbenutzer an"
 APP_ENABLED=0
 for _ in $(seq 1 90); do
   if occ app:list --enabled | grep -q 'parlwin:'; then
@@ -508,7 +529,7 @@ api_expect_status POST "admin" "$ADMIN_TOKEN" "/geschaefte" "201" \
   --data-urlencode "titel=E2E Eigenes vor Sync $(date +%s)"
 EIGEN_VOR_SYNC_GID="$(jq -r '.id' <<<"$LAST_BODY")"
 
-echo "[E2E] Führe Sync über den gleichen Endpoint wie im Frontend aus"
+echo "[E2E] Führe die Synchronisation über dieselbe Schnittstelle aus wie die Oberfläche"
 api_expect_status POST "admin" "$ADMIN_TOKEN" "/sync" "202"
 assert_json '.erfolg == true' "Sync-Start meldet keinen Erfolg"
 assert_json '.asynchron == true' "Sync-Start läuft nicht asynchron"
@@ -544,9 +565,11 @@ assert_json '.statistik.mitglieder.mitglieder.neu >= 0' "Mitglieder-Statistik fe
 assert_json '.statistik.geschaefte.neu >= 0' "Geschäfte-Statistik fehlt im finalen Status"
 assert_json '.statistik.sitzungen.neu >= 0' "Sitzungs-Statistik fehlt im finalen Status"
 
-# Das vor dem Sync angelegte eigene Geschäft muss den Sync überlebt haben.
-api_expect_status GET "admin" "$ADMIN_TOKEN" "/geschaefte?show_erledigt=1&limit=1000" "200"
-assert_json "any(.[]; .id == ${EIGEN_VOR_SYNC_GID})" "Eigenes Geschäft wurde vom Sync gelöscht (Feature «eigene Geschäfte bleiben unberührt» verletzt)"
+# Das vor dem Sync angelegte eigene Geschäft muss den Sync überlebt haben. Gefragt
+# wird es einzeln: über die Liste hing die Prüfung an deren Länge und meldete das
+# Geschäft als gelöscht, sobald der Sync mehr Geschäfte holte als das Listenlimit.
+api_expect_status GET "admin" "$ADMIN_TOKEN" "/geschaefte/${EIGEN_VOR_SYNC_GID}" "200"
+assert_json '.geloescht == false' "Eigenes Geschäft wurde vom Sync gelöscht (Feature «eigene Geschäfte bleiben unberührt» verletzt)"
 
 TABLE_PREFIX="$(sql "SELECT configvalue FROM oc_appconfig WHERE appid='core' AND configkey='dbtableprefix' LIMIT 1;")"
 TABLE_PREFIX="${TABLE_PREFIX:-oc_}"
@@ -617,7 +640,7 @@ assert_json '.fehler | test("JJJJ-MM-TT")' "Ungültiges Datum wird nicht mit kla
 # werden. Die Liste MUSS erledigte Geschäfte einschliessen: der Standardfilter
 # blendet sie aus, und je nach Quelldaten sind alle synchronisierten Geschäfte
 # erledigt — sonst bliebe diese Schutzprüfung stillschweigend ungeprüft.
-api_expect_status GET "admin" "$ADMIN_TOKEN" "/geschaefte?show_erledigt=1&limit=1000" "200"
+api_expect_status GET "admin" "$ADMIN_TOKEN" "/geschaefte?show_erledigt=1&limit=5000" "200"
 FREMD_GID="$(jq -r '[.[] | select((.externId|tostring) | startswith("eigen:") | not)][0].id // empty' <<<"$LAST_BODY")"
 [ -n "$FREMD_GID" ] || fail "Kein Parlamentsgeschäft gefunden — der Schreib-/Löschschutz konnte nicht geprüft werden"
 api_expect_status PUT "admin" "$ADMIN_TOKEN" "/geschaefte/${FREMD_GID}/stammdaten" "403" \
@@ -632,8 +655,10 @@ api_expect_status DELETE "admin" "$ADMIN_TOKEN" "/geschaefte/99999999" "404"
 # Das F2-Test-Geschäft wird über den echten Lösch-Weg entfernt: damit ist der
 # Lösch-Endpunkt geprüft und die Aufräumarbeit zugleich erledigt.
 api_expect_status DELETE "admin" "$ADMIN_TOKEN" "/geschaefte/${EIGEN_VOR_SYNC_GID}" "200"
-api_expect_status GET "admin" "$ADMIN_TOKEN" "/geschaefte?show_erledigt=1&limit=1000" "200"
-assert_json "all(.[]; .id != ${EIGEN_VOR_SYNC_GID})" "Gelöschtes eigenes Geschäft erscheint weiterhin in der Liste"
+# Auch hier einzeln nachfragen: die Listenprüfung wäre bei genügend Geschäften
+# selbst dann grün, wenn das Geschäft noch existierte — es stünde nur hinter dem
+# Listenlimit. «Gelöscht» heisst: der Einzelabruf findet es nicht mehr.
+api_expect_status GET "admin" "$ADMIN_TOKEN" "/geschaefte/${EIGEN_VOR_SYNC_GID}" "404"
 
 echo "[E2E] Prüfe Anlegen ohne Titel"
 # «+ Neuer Vorstoss» legt NICHTS mehr sofort an: die Maske sammelt nur die
@@ -647,14 +672,14 @@ api_expect_status POST "admin" "$ADMIN_TOKEN" "/geschaefte" "400" \
   --data-urlencode "titel="
 assert_json '.fehler == "Titel erforderlich"' "Geschäft ohne Titel wird nicht mit klarer Meldung abgewiesen"
 
-echo "[E2E] Prüfe Frontend-Startseite"
+echo "[E2E] Prüfe die Startseite der Oberfläche"
 api_expect_status GET "admin" "$ADMIN_TOKEN" "/" "200"
 FRONTEND_HTML="$LAST_BODY"
 grep -q 'parlwin-root' <<<"$FRONTEND_HTML" || fail "Frontend-Root nicht gefunden"
 grep -q 'realtimeWsUrl' <<<"$FRONTEND_HTML" || fail "Frontend-Realtime-Konfiguration fehlt"
 grep -q 'parlwin-main.js' <<<"$FRONTEND_HTML" || fail "Frontend-Bundle wurde nicht eingebunden"
 
-echo "[E2E] Prüfe Responsive-CSS (Desktop + Mobile)"
+echo "[E2E] Prüfe das CSS für breite und schmale Fenster"
 FRONTEND_CSS="$(docker compose exec -T nextcloud-php-fpm php -r 'echo file_get_contents("/app/custom_apps/parlwin/css/parlwin-style.css");')"
 grep -Eq '@media[[:space:]]*\([[:space:]]*max-width:[[:space:]]*80rem[[:space:]]*\)' <<<"$FRONTEND_CSS" || fail "Responsive-Breakpoint 80rem (Desktop) fehlt"
 grep -Eq '@media[[:space:]]*\([[:space:]]*max-width:[[:space:]]*54rem[[:space:]]*\)' <<<"$FRONTEND_CSS" || fail "Responsive-Breakpoint 54rem (Mobile) fehlt"
@@ -736,7 +761,7 @@ grep -Eq 'richdocuments-document\.js|initial-state-richdocuments|collabora[^"]*:
 grep -Eq "fileId=${WOPI_FILE_ID}|initial-state-richdocuments" <<<"$EDITOR_HTML" \
   || fail "richdocuments-Editor-Seite referenziert FileID ${WOPI_FILE_ID} nicht"
 
-echo "[E2E] Plausibilitätschecks nach Sync"
+echo "[E2E] Plausibilitätsprüfungen nach der Synchronisation"
 api_expect_status GET "admin" "$ADMIN_TOKEN" "/geschaefte?limit=200" "200"
 GESCHAEFTE_COUNT_DEFAULT="$(jq 'length' <<<"$LAST_BODY")"
 
@@ -942,7 +967,7 @@ api_expect_status POST "parlwin_protokoll" "$PROTOKOLL_TOKEN" "/settings/fraktio
   --data-urlencode "name=Protokoll E2E"
 assert_json '.fehler | contains("Gruppen-Admin")' "Fehlende Gruppen-Admin-Berechtigung liefert nicht die erwartete 403-Meldung"
 
-echo "[E2E] Sitzung/Traktandum-Updates testen"
+echo "[E2E] Änderungen an Sitzung und Traktandum testen"
 api_expect_status PUT "admin" "$ADMIN_TOKEN" "/sitzungen/${FIRST_S_ID}" "200" \
   --data-urlencode "bemerkungen=E2E Sitzungskommentar $(date +%s)"
 assert_json '.bemerkungen | startswith("E2E Sitzungskommentar")' "Sitzungs-Bemerkung nicht gespeichert"
@@ -962,8 +987,8 @@ api_expect_status PUT "admin" "$ADMIN_TOKEN" "/sitzungen/${TRAKT_S_ID}/traktande
 assert_json '.bemerkungen | startswith("E2E Traktandumskommentar")' "Traktandums-Bemerkung nicht gespeichert"
 assert_json '.notizen | contains("E2E-Notiz")' "Traktandums-Notiz nicht gespeichert"
 
-echo "[E2E] API-Filter prüfen"
-api_expect_status GET "admin" "$ADMIN_TOKEN" "/geschaefte?letzter_beschluss=${ERSTER_BESCHLUSS_CODE}&show_erledigt=1&limit=1000" "200"
+echo "[E2E] Filter der Schnittstelle prüfen"
+api_expect_status GET "admin" "$ADMIN_TOKEN" "/geschaefte?letzter_beschluss=${ERSTER_BESCHLUSS_CODE}&show_erledigt=1&limit=5000" "200"
 jq -e 'map(.id) | index('"${FIRST_G_ID}"') != null' <<<"$LAST_BODY" >/dev/null \
   || fail "Filter nach letztem Beschluss liefert Testgeschäft nicht"
 
@@ -1004,20 +1029,20 @@ PENDENT_DB="$(sql "SELECT COUNT(*) FROM ${TABLE_PREFIX}pw_geschaefte WHERE geloe
 echo "[E2E] DB: gesamt=${ALLE_DB} pendent=${PENDENT_DB}"
 
 echo "[E2E] Prüfung 1/4: Geschäftsliste (inkl. erledigte) stimmt mit Datenbank überein"
-api_expect_status GET "admin" "$ADMIN_TOKEN" "/geschaefte?limit=1000&show_erledigt=1" "200"
+api_expect_status GET "admin" "$ADMIN_TOKEN" "/geschaefte?limit=5000&show_erledigt=1" "200"
 ALLE_API="$(jq 'length' <<<"$LAST_BODY")"
 assert_int_ge "$ALLE_API" 1 "API liefert keine Geschäfte trotz erfolgtem Sync"
 assert_eq "$ALLE_API" "$ALLE_DB" "API-Gesamtliste weicht von der DB ab"
 
 echo "[E2E] Prüfung 2/4: Standardfilter zeigt genau die pendenten Geschäfte"
-api_expect_status GET "admin" "$ADMIN_TOKEN" "/geschaefte?limit=1000" "200"
+api_expect_status GET "admin" "$ADMIN_TOKEN" "/geschaefte?limit=5000" "200"
 DEFAULT_API="$(jq 'length' <<<"$LAST_BODY")"
 assert_eq "$DEFAULT_API" "$PENDENT_DB" "Standardansicht zeigt nicht exakt die pendenten Geschäfte (API=$DEFAULT_API DB-pendent=$PENDENT_DB)"
 jq -e 'all(.[]; (.status==null) or ((.status|ascii_downcase|contains("erledigt")|not) and (.status|ascii_downcase|contains("abgeschlossen")|not) and (.status|ascii_downcase|contains("aufgehoben")|not)))' <<<"$LAST_BODY" >/dev/null \
   || fail "Standardansicht enthält erledigte/abgeschlossene/aufgehobene Geschäfte"
 
 echo "[E2E] Prüfung 3/4: Pflichtfelder vorhanden und Detailabruf möglich"
-api_expect_status GET "admin" "$ADMIN_TOKEN" "/geschaefte?limit=1000&show_erledigt=1" "200"
+api_expect_status GET "admin" "$ADMIN_TOKEN" "/geschaefte?limit=5000&show_erledigt=1" "200"
 jq -e 'all(.[]; .id and .titel and .status)' <<<"$LAST_BODY" >/dev/null || fail "Geschäfte fehlen erforderliche Felder"
 FIRST_ID="$(jq -r '.[0].id' <<<"$LAST_BODY")"
 api_expect_status GET "admin" "$ADMIN_TOKEN" "/geschaefte/${FIRST_ID}" "200"
@@ -1049,7 +1074,7 @@ DAV="/remote.php/dav/files"
 MIG_A="parlwin_praesidium"; MIG_B="parlwin_protokoll"; MIG_C="parlwin_mitglied"
 MIG_GESCH="20_Gesch%C3%A4fte" # 20_Geschäfte URL-kodiert
 
-echo "[E2E] Migrations-Setup: a legt eigenen Fraktion-Ordner an und teilt ihn mit der Gruppe"
+echo "[E2E] Vorbereitung der Migration: a legt einen eigenen Fraktion-Ordner an und teilt ihn mit der Gruppe"
 http_status_as MKCOL "$MIG_A" "$PRAESIDIUM_TOKEN" "$DAV/$MIG_A/Fraktion" >/dev/null
 http_status_as MKCOL "$MIG_A" "$PRAESIDIUM_TOKEN" "$DAV/$MIG_A/Fraktion/$MIG_GESCH" >/dev/null
 S=$(http_status_as PUT "$MIG_A" "$PRAESIDIUM_TOKEN" "$DAV/$MIG_A/Fraktion/$MIG_GESCH/a.txt" "Datei von a")
@@ -1058,14 +1083,14 @@ S=$(http_status_as POST "$MIG_A" "$PRAESIDIUM_TOKEN" "/ocs/v2.php/apps/files_sha
   "path=/Fraktion&shareType=1&shareWith=$FRAKTION_GRUPPE&permissions=31" "application/x-www-form-urlencoded")
 [[ "$S" == "200" ]] || fail "a konnte Fraktion nicht mit der Gruppe teilen (HTTP $S)"
 
-echo "[E2E] Migrations-Setup: b ergänzt eine zweite Datei und einen Nicht-Schema-Ordner Test"
+echo "[E2E] Vorbereitung der Migration: b ergänzt eine zweite Datei und einen Ordner Test ausserhalb der Struktur"
 S=$(http_status_as PUT "$MIG_B" "$PROTOKOLL_TOKEN" "$DAV/$MIG_B/Fraktion/$MIG_GESCH/b.txt" "Datei von b")
 [[ "$S" =~ ^2 ]] || fail "b konnte zweite Datei nicht anlegen (HTTP $S)"
 http_status_as MKCOL "$MIG_B" "$PROTOKOLL_TOKEN" "$DAV/$MIG_B/Fraktion/Test" >/dev/null
 S=$(http_status_as PUT "$MIG_B" "$PROTOKOLL_TOKEN" "$DAV/$MIG_B/Fraktion/Test/test.txt" "Testdatei von b")
 [[ "$S" =~ ^2 ]] || fail "b konnte Test-Datei nicht anlegen (HTTP $S)"
 
-echo "[E2E] Migrations-Setup: c liest die Datei in Fraktion/Test (geteilter Zugriff)"
+echo "[E2E] Vorbereitung der Migration: c liest die Datei in Fraktion/Test (geteilter Zugriff)"
 S=$(http_status_as GET "$MIG_C" "$MITGLIED_TOKEN" "$DAV/$MIG_C/Fraktion/Test/test.txt")
 [[ "$S" == "200" ]] || fail "c kann Datei in Fraktion/Test nicht lesen (HTTP $S)"
 
@@ -1141,7 +1166,7 @@ foreach($cands as $c){ if(is_file($c)){ echo "Log: $c\n"; foreach(array_slice(fi
 echo "[E2E] Diagnose: parlwin-Meldungen aus Container-Logs:"
 docker compose logs --tail=800 nextcloud-php-fpm 2>&1 | grep -iE 'parlwin|sharing fehlgeschlagen|not allowed to share|share' | tail -40 || true
 
-echo "[E2E] First-Run-Wizard deaktivieren (Modal würde Browser-Klicks blockieren)"
+echo "[E2E] Assistent beim ersten Start abschalten (sein Dialog würde die Klicks im Browser blockieren)"
 occ app:disable firstrunwizard >/dev/null 2>&1 || true
 
 echo "[E2E] Fraktionssitzungsmodus zurücksetzen (sonst Beschluss für Nicht-Protokollführer gesperrt)"
@@ -1161,7 +1186,7 @@ sql "UPDATE ${TABLE_PREFIX}pw_geschaefte SET status='Pendent', quelle_aktualisie
 # verknüpftes) Mitglied, ein aktives Mitglied ohne Fraktion/Partei, eine inaktive
 # Kommission, eine aktive Kommission mit gemischt aktiv/inaktiven Mitgliedern, und
 # ein bestehendes Geschäft zusätzlich als Traktandum einer zweiten Sitzung.
-echo "[E2E] Deterministische Testdaten für Browser-Randfälle seeden"
+echo "[E2E] Feste Testdaten für die Randfälle im Browser anlegen"
 sql "INSERT INTO ${TABLE_PREFIX}pw_mitglieder (extern_id,name,vorname,partei,fraktion,email,nextcloud_uid,aktiv,geloescht,erstellt_am,aktualisiert_am) VALUES ('e2e-ex-1','Ehemalig','Erika','E2E-Partei','E2E-Fraktion','erika.ehemalig@example.org','e2e-exuser',0,0,'2026-07-20 00:00:00','2026-07-20 00:00:00');"
 sql "INSERT INTO ${TABLE_PREFIX}pw_mitglieder (extern_id,name,vorname,partei,fraktion,email,aktiv,geloescht,erstellt_am,aktualisiert_am) VALUES ('e2e-nofrak','Ohnefraktion','Nora','','','nora.ohnefraktion@example.org',1,0,'2026-07-20 00:00:00','2026-07-20 00:00:00');"
 # Präsidium als synchronisiertes Mitglied → beim Anlegen eines Vorstosses ist der
@@ -1193,7 +1218,7 @@ fi
 # kann der Kommissionen-Browser-Test sie nie finden.
 api_expect_status GET "parlwin_praesidium" "$PRAESIDIUM_TOKEN" "/kommissionen" "200"
 assert_json 'any(.[]; .name == "E2E Gemischte Kommission")' "Seed-Kommission «E2E Gemischte Kommission» fehlt in /kommissionen (praesidium-Sicht)"
-api_expect_status GET "parlwin_praesidium" "$PRAESIDIUM_TOKEN" "/geschaefte?show_erledigt=1&limit=1000" "200"
+api_expect_status GET "parlwin_praesidium" "$PRAESIDIUM_TOKEN" "/geschaefte?show_erledigt=1&limit=5000" "200"
 assert_json 'any(.[]; (.status // "") | test("Gemischte"))' "Kein geladenes Geschäft mit Kommissions-Status «…Gemischte…» (praesidium-Sicht)"
 # Positiver Votum-Pfad (Backend-Feature ohne UI): eine Person wird für ein eigens
 # angelegtes Geschäft zuständig gemacht (Mitglied mit nextcloud_uid=parlwin_protokoll),
@@ -1235,7 +1260,7 @@ if [ -n "$E2E_FOLGE_GID" ]; then
   fi
 fi
 
-echo "[E2E] Multi-User-Browser-Test (Playwright, 3 gleichzeitige Nutzer)"
+echo "[E2E] Browser-Test mit drei gleichzeitigen Benutzern (Playwright)"
 export PW_U1="parlwin_praesidium" PW_P1="PwtP4ss!Praesidium"
 export PW_U2="parlwin_protokoll"  PW_P2="PwtP4ss!Protokoll"
 export PW_U3="parlwin_mitglied"   PW_P3="PwtP4ss!Mitglied"
@@ -1259,7 +1284,7 @@ export PW_ADMIN_PASS="${NEXTCLOUD_ADMIN_PASSWORD}"
 PW_REPORT="${TEMP_DIR}/e2e-junit/e2e.xml"
 PW_CONTAINER="parlwin-e2e-playwright"
 mkdir -p "$(dirname "$PW_REPORT")"
-# Reste eines abgebrochenen Vorlaufs entfernen, sonst kollidiert der feste Name.
+# Reste eines abgebrochenen Laufs entfernen, sonst kollidiert der feste Name.
 docker rm -f "$PW_CONTAINER" >/dev/null 2>&1 || true
 PW_EXIT=0
 # --build: Das Playwright-Image enthält die Testdateien per COPY — ohne Build
@@ -1354,7 +1379,7 @@ IMPORT_PUT_STATUS="$(dav_put "${IMPORT_DAV_URL}" "E2E Vorstoss-Dokument ${IMPORT
 api_expect_status GET "admin" "$ADMIN_TOKEN" "/vorstoesse" "200"
 assert_json "all(.[]; .titel != \"${IMPORT_NAME}\")" "F34: Testvorstoss existiert schon vor dem Import"
 
-echo "[E2E] Cron-Job-Test: automatischer Cron-Tick löst die Synchronisation aus"
+echo "[E2E] Hintergrundauftrag: der automatische Aufruf des Cron löst die Synchronisation aus"
 
 # 1. Sicherstellen, dass kein Sync läuft; Fortschritt über die DB prüfen (der Job
 #    läuft per CLI, daher nicht über den FPM-APCu-Cache der /sync/status-API).
@@ -1385,14 +1410,24 @@ sql "UPDATE ${TABLE_PREFIX}jobs SET last_run=0, last_checked=0, reserved_at=0 WH
 
 # 4. KEIN manueller Trigger: abwarten, bis der automatische Cron-Tick des Watchers
 #    einen Sync mit Quelle "background-job" startet (Tick alle PARLWIN_CRON_INTERVAL=5s).
+#    Das Fenster deckt ab, was der Auftrag VOR der Synchronisation erledigt: den
+#    Vorstoss-Import und das Einlesen des neuesten Budgetjahrs. Letzteres lädt
+#    beide Budgetbücher von der Parlamentswebseite und liest sie; gemessen am
+#    2026-09-22 am Buch 2027: 37,6 s Lesezeit auf dem Entwicklungsrechner, dazu
+#    das Herunterladen und das Schreiben der 49 Produktegruppen in die Datenbank.
+#    Ein Fenster von 40 s trug genau so lange, wie das Einlesen am Speicherlimit
+#    abbrach. Kommt der Tick früher, bricht die Schleife sofort ab.
 CRON_TRIGGERED=0
-for _ in $(seq 1 40); do
+for versuch in $(seq 1 300); do
   CRON_PROG="$(sql "SELECT configvalue FROM ${TABLE_PREFIX}appconfig WHERE appid='parlwin' AND configkey='sync_progress';")"
   if grep -q '"source":"background-job"' <<<"$CRON_PROG"; then CRON_TRIGGERED=1; break; fi
-  sleep 1
+  if (( versuch % 15 == 0 )); then
+    echo "[E2E] Warte auf den Cron-Tick (${versuch}/300 × 2s; der Auftrag liest zuerst Vorstösse und Budget ein)"
+  fi
+  sleep 2
 done
 [[ "$CRON_TRIGGERED" == "1" ]] || fail "Der automatische Cron-Tick hat keinen Sync ausgelöst (sync_progress ohne source=background-job): ${CRON_PROG}"
-echo "[E2E] Cron-Job-Test bestanden: Background-Job hat die Synchronisation ausgelöst"
+echo "[E2E] Bestanden: der Hintergrundauftrag hat die Synchronisation ausgelöst"
 
 # F34: Der Import läuft in SyncJob::run() VOR der Datensynchronisation. Sobald
 # oben source=background-job sichtbar wurde, ist er also bereits durch. Der
@@ -1423,11 +1458,11 @@ occ config:app:delete parlwin sync_zeitplan_letzter_check >/dev/null 2>&1 || tru
 # Standard-Zeitplan: ohne gespeicherten Zeitplan liefert die API die zwei
 # vorbelegten Standard-Einträge (alle Wochentage, 10:00 und 18:00). Die
 # Konfiguration ist nach dem Cron-Cleanup oben leer, der Default greift also.
-echo "[E2E] Standard-Sync-Zeitplan prüfen (leer → zwei Vorgaben 10:00/18:00, alle Wochentage)"
+echo "[E2E] Standard-Zeitplan der Synchronisation prüfen (leer → zwei Vorgaben 10:00/18:00, alle Wochentage)"
 api_expect_status GET "admin" "$ADMIN_TOKEN" "/settings/sync-zeitplan" "200"
 assert_json 'length == 2' "Standard-Zeitplan hat nicht genau zwei Einträge"
 assert_json 'any(.[]; .zeit == "10:00")' "Standard-Zeitplan enthält keinen 10:00-Eintrag"
 assert_json 'any(.[]; .zeit == "18:00")' "Standard-Zeitplan enthält keinen 18:00-Eintrag"
 assert_json 'all(.[]; (.tage | length) == 7)' "Standard-Zeitplan gilt nicht an allen sieben Wochentagen"
 
-echo "[E2E] Abgeschlossen: Integrationsprüfungen und Multi-User-Browser-Test bestanden."
+echo "[E2E] Abgeschlossen: die Prüfungen am ganzen System und der Browser-Test mit mehreren Benutzern sind bestanden."

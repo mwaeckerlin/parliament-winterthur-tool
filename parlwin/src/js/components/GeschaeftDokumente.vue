@@ -112,7 +112,7 @@ export default {
     // (vorstoss|geschaeft|sitzung) + Objekt-ID. Nur gesetzt → «Verknüpfen»-Knopf.
     objektTyp: { type: String, default: '' },
     objektId: { type: Number, default: 0 },
-    // Startordner des Filepickers (Default: aktuelles Jahr, aber frei navigierbar).
+    // Startordner der Dateiauswahl (Standard: aktuelles Jahr, aber frei navigierbar).
     startPfad: { type: String, default: '' },
   },
   data() {
@@ -195,7 +195,8 @@ export default {
       }
     },
     dateiUrl(d) {
-      // Öffnen via Files-App-Route (lädt Datei im Default-Viewer/Editor).
+      // Öffnen über die Route der App «Dateien» (lädt die Datei im
+      // Standard-Betrachter oder -Editor).
       return generateUrl(`/f/${d.fileId}`)
     },
     downloadUrl(d) {
@@ -248,8 +249,8 @@ export default {
         setTimeout(() => { this.meldung = '' }, 2500)
         await this.laden_()
       } catch (e) {
-        console.error('parlwin: Upload fehlgeschlagen', e)
-        this.meldung = 'Upload fehlgeschlagen: ' + (e?.response?.data?.fehler || e.message)
+        console.error('parlwin: Hochladen fehlgeschlagen', e)
+        this.meldung = 'Hochladen fehlgeschlagen: ' + (e?.response?.data?.fehler || e.message)
       } finally {
         this.uploadLaeuft = false
       }
@@ -274,7 +275,7 @@ export default {
         const fileId = data && data.fileId
         if (fileId && neuerTab) {
           // Direkt zur Files-Route mit fileid-Hash navigieren – öffnet den
-          // Default-Viewer (Collabora für Office-Dateien, Text-Editor sonst).
+          // Standard-Betrachter (Collabora für Office-Dateien, sonst der Text-Editor).
           neuerTab.location.href = generateUrl(`/f/${fileId}`)
         } else if (neuerTab) {
           neuerTab.close()

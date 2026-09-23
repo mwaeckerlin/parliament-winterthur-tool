@@ -132,6 +132,9 @@ class TraktandumController extends Controller
         $result = [];
         foreach ($traktanden as $t) {
             $eintrag = $t->jsonSerialize();
+            // Protokoll-Link (F115): das Traktandum der Protokollabnahme führt
+            // zum Protokoll der Sitzung, die es protokolliert.
+            $eintrag['protokoll'] = $this->service->protokollFuerTraktandum($t);
             $geschaeftId = (int) ($eintrag['geschaeftId'] ?? 0);
             $eintrag['geschaeft'] = null;
             if ($geschaeftId > 0) {

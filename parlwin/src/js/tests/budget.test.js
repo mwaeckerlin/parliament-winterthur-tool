@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { shallowMount, flushPromises } from '@vue/test-utils'
 import Budgetliste from '../components/Budgetliste.vue'
@@ -7,6 +8,14 @@ import axios from '@nextcloud/axios'
 
 vi.mock('@nextcloud/auth', () => ({ getCurrentUser: () => ({ uid: 'u', displayName: 'U' }) }))
 vi.mock('../realtime', () => ({ subscribeRealtime: () => () => {} }))
+
+const meldungen = { fehler: [], erfolg: [] }
+vi.mock('@nextcloud/dialogs', () => ({
+  showError: (t) => meldungen.fehler.push(String(t)),
+  showSuccess: (t) => meldungen.erfolg.push(String(t)),
+  showWarning: () => {},
+  showInfo: () => {},
+}))
 
 // Beispiel-Ansicht in der Struktur der Budget-API (BudgetService::ansicht).
 function ansichtFixture() {
@@ -40,7 +49,15 @@ function ansichtFixture() {
       },
     ],
     investitionen: [
-      { id: 5, departement: 'Bau und Mobilität', cluster: 'Strassen', projekt: 'Tösstalstrasse', bu: 2000000, fap1: 1000000, fap2: 0, fap3: 0, gesamtkosten: 5000000, bereitsGetaetigt: 500000, planungskosten: 200000 },
+      {
+        id: 5, departement: 'Bau und Mobilität', cluster: 'Strassen', projekt: '5001240 Tösstalstrasse',
+        bu: 2000000, fap1: 1000000, fap2: 0, fap3: 0,
+        gesamtkosten: 5000000, bereitsGetaetigt: 500000, planungskosten: 200000,
+        konten: [
+          { konto: '504051', name: 'Strassen, Projektierung', betrag: 200000, kredit: 400000, bewilligt: '18.08.2021' },
+          { konto: '504052', name: 'Strassen, Ausführung', betrag: 1800000, kredit: 4600000, bewilligt: '12.06.2024' },
+        ],
+      },
     ],
     antraege: [
       { id: 10, bereich: 'globalbudget', zielRef: '121', betragDelta: -100000, stellenDelta: 0, antragsteller: 'Fraktion X', begruendung: 'Sparen', automatisch: false, entscheid: 'offen', phase: 'fraktion' },
@@ -81,13 +98,17 @@ describe('Budgetliste', () => {
     axios.post.mockReset().mockResolvedValue({ data: {} })
     axios.put.mockReset().mockResolvedValue({ data: ansichtFixture() })
     axios.delete.mockReset().mockResolvedValue({ data: {} })
+    meldungen.fehler = []
+    meldungen.erfolg = []
   })
 
   // F74
-  it('Budget-Tab steht nach Vorstössen und vor Mitgliedern (vor Sitzungstypen) und lädt die Jahre beim Mount', () => {
+  it('Budget-Tab steht nach Vorstössen, davor die Fragestunde und die Mitglieder (vor Sitzungstypen), und lädt die Jahre beim Mount', () => {
     const keys = App.data().ansichten.map(a => a.key)
     expect(keys.indexOf('budget')).toBe(keys.indexOf('vorstoesse') + 1)
-    expect(keys.indexOf('mitglieder')).toBe(keys.indexOf('budget') + 1)
+    // Die Fragestunde steht direkt hinter dem Budget (F114).
+    expect(keys.indexOf('fragestunde')).toBe(keys.indexOf('budget') + 1)
+    expect(keys.indexOf('mitglieder')).toBe(keys.indexOf('fragestunde') + 1)
     expect(keys.indexOf('sitzungstypen')).toBe(keys.indexOf('mitglieder') + 1)
     shallowMount(Budgetliste)
     expect(axios.get.mock.calls.some(c => String(c[0]).includes('/budget/jahre'))).toBe(true)
@@ -236,13 +257,13 @@ describe('Budgetliste', () => {
     // Vorbereitung: nur Fraktionsanträge.
     expect(w.vm.aktivePhase).toBe('fraktion')
     expect(w.vm.antraegeFuer('121').map(a => a.id).sort()).toEqual([10, 11])
-    // Umschalten → nur der offizielle Sitzungsantrag, Reload mit phase=sitzung.
+    // Umschalten → nur der offizielle Sitzungsantrag, neu geladen mit phase=sitzung.
     w.vm.sitzungsmodusUmschalten(true)
     await flushPromises()
     expect(w.vm.aktivePhase).toBe('sitzung')
     expect(w.vm.antraegeFuer('121').map(a => a.id)).toEqual([12])
     const call = axios.get.mock.calls.reverse().find(c => /\/budget\/\d+(\?|$)/.test(String(c[0])) && c[1] && c[1].params && c[1].params.phase === 'sitzung')
-    expect(call, 'kein Reload mit phase=sitzung').toBeTruthy()
+    expect(call, 'kein Neuladen mitphase=sitzung').toBeTruthy()
   })
 
   // F93: ein im Sitzungsmodus gestellter Antrag ist ein Sitzungsantrag
@@ -253,6 +274,21 @@ describe('Budgetliste', () => {
     await w.vm.antragGlobalbudget('121')
     const call = axios.post.mock.calls.find(c => String(c[0]).includes('/budget/2026/antraege'))
     expect(call[1].phase).toBe('sitzung')
+  })
+
+  // F112: Ein Antrag, der über das Budget hinaus kürzt, wird vom Server abgelehnt.
+  // Bis zum Fix landete diese Ablehnung nur in der Browser-Konsole: das Formular
+  // blieb offen, nichts geschah, und niemand erfuhr warum.
+  it('meldet die abgelehnte Kürzung mit dem Grund des Servers (F112)', async () => {
+    const w = await mitAnsicht()
+    axios.post.mockRejectedValueOnce({
+      response: { status: 400, data: { fehler: 'Budget 4866124, bereits beantragt 150000, Rest 4716124' } },
+    })
+    w.vm.neu['121'].betrag = '-9000000'
+    await w.vm.antragGlobalbudget('121')
+    await flushPromises()
+    expect(meldungen.fehler.join(' | '), 'Die Ablehnung wird nicht gemeldet')
+      .toContain('Rest 4716124')
   })
 
   // F76: zwei verknüpfte Filter — Kommission (aus der Zuordnung) und Departement
@@ -268,9 +304,9 @@ describe('Budgetliste', () => {
     expect(w.vm.departementOption, 'Departement-Auswahl nach Kommissionswechsel nicht geleert').toBeNull()
     expect(w.vm.departementOptionen.map(o => o.value)).toEqual(['Präsidiales'])
     await flushPromises()
-    // Reload sendet den kommission-Parameter.
+    // Das Neuladen sendet den kommission-Parameter.
     const call = axios.get.mock.calls.reverse().find(c => /\/budget\/\d+(\?|$)/.test(String(c[0])) && c[1] && c[1].params && c[1].params.kommission)
-    expect(call, 'kein Reload mit kommission-Parameter').toBeTruthy()
+    expect(call, 'kein Neuladen mitkommission-Parameter').toBeTruthy()
     expect(call[1].params.kommission).toBe('SK Präsidiales')
   })
 
@@ -307,7 +343,7 @@ describe('Budgetliste', () => {
   })
 
   // F86
-  it('stellt Personalanträge mit Stellen und (Default-)Betrag', async () => {
+  it('stellt Personalanträge mit Stellen und dem vorgegebenen Betrag', async () => {
     const w = await mitAnsicht()
     w.vm.neuPersonal['121'].stellen = '-2'
     await w.vm.antragPersonal('121')
@@ -324,6 +360,53 @@ describe('Budgetliste', () => {
     const call = axios.post.mock.calls.find(c => c[1] && c[1].bereich === 'investition')
     expect(call[1].zielRef).toBe('5')
     expect(call[1].betragDelta).toBe(-1000000)
+  })
+
+  // F87: Die Gesamtkosten eines Projekts sind die Summe seiner Jahre — bereits
+  // getätigt, Budgetjahr und die drei Planjahre. Der bewilligte Kredit aus dem
+  // Anhang «Kontrolle der Investitionskredite» ist eine andere Aussage (was das
+  // Parlament freigegeben hat) und steht als eigener Wert daneben.
+  it('zeigt als Gesamtkosten die Summe aller Jahre und den bewilligten Kredit daneben', async () => {
+    const w = await mitAnsicht()
+    await w.vm.$nextTick()
+    const karte = w.findAll('.pw-data-card').find(c => c.text().includes('Tösstalstrasse'))
+    expect(karte, 'Investitionskarte fehlt').toBeTruthy()
+    const paare = {}
+    for (const p of karte.findAll('.pw-data-pair')) {
+      paare[p.find('span').text()] = p.find('strong').text()
+    }
+    // 500'000 + 2'000'000 + 1'000'000 = 3'500'000
+    expect(paare['Gesamtkosten']).toMatch(/3['’]500['’]000/)
+    expect(paare['bewilligter Kredit']).toMatch(/5['’]000['’]000/)
+  })
+
+  // F87: Über den Betrag des Budgetjahres wird entschieden — er ist der grösste
+  // und stärkste Wert der Karte.
+  it('hebt den Betrag des Budgetjahres auf jeder Karte hervor', async () => {
+    const w = await mitAnsicht()
+    const stil = readFileSync('parlwin/src/js/components/Budgetliste.vue', 'utf8')
+    const block = stil.split('.pw-budget-betrag')[1] || ''
+    const regel = block.slice(0, block.indexOf('}'))
+    expect(regel, 'der Budgetbetrag ist nicht hervorgehoben').toMatch(/font-weight:\s*(700|800|900|bold)/)
+    expect(regel, 'der Budgetbetrag ist nicht grösser gesetzt').toMatch(/font-size:\s*[\d.]+\s*(rem|em)/)
+    expect(w.findAll('.pw-budget-betrag').length).toBeGreaterThan(0)
+  })
+
+  // F87: Projekte, die im Budgetjahr nichts führen, lassen sich ausblenden.
+  it('blendet auf Wunsch die Projekte ohne Betrag im Budgetjahr aus', async () => {
+    const w = await mitAnsicht()
+    w.vm.ansicht.investitionen.push({
+      id: 6, departement: 'Bau und Mobilität', cluster: 'Strassen', projekt: '5009999 Erst später',
+      bu: 0, fap1: 300000, fap2: 0, fap3: 0, gesamtkosten: 0, bereitsGetaetigt: 0, planungskosten: 0, konten: [],
+    })
+    await w.vm.$nextTick()
+    const namen = () => w.vm.investitionenNachDepartement.flatMap(d => d.projekte.map(p => p.projekt))
+    expect(namen().some(n => n.includes('Erst später')), 'ohne Filter fehlt das Projekt').toBe(true)
+
+    w.vm.nurMitBetrag = true
+    await w.vm.$nextTick()
+    expect(namen().some(n => n.includes('Erst später')), 'der Filter blendet nicht aus').toBe(false)
+    expect(namen().some(n => n.includes('Tösstalstrasse')), 'der Filter blendet zu viel aus').toBe(true)
   })
 
   // F88 + F96: der Steuerfuss-Antrag wird in Prozentpunkten gestellt
@@ -406,7 +489,7 @@ describe('Budgetliste', () => {
     expect(call[1].ausnahmen).not.toContain('121')
   })
 
-  // F94: der Antragsteller eines neuen (eigenen) Antrags ist per Default die eigene
+  // F94: der Antragsteller eines neuen (eigenen) Antrags ist standardmässig die eigene
   // Fraktion (aus der Konfiguration, ansicht.eigeneFraktion), nicht die Person.
   it('belegt den Antragsteller neuer eigener Anträge mit der eigenen Fraktion vor', async () => {
     const w = await mitAnsicht()
@@ -416,6 +499,41 @@ describe('Budgetliste', () => {
     expect(w.vm.antragstellerOptionen('eigene')[0]).toMatchObject({ value: 'GLP' })
     // Und sie ist im Pauschalantrag-Fraktionsmenü enthalten.
     expect(w.vm.fraktionOptionen.some(o => o.value === 'GLP')).toBe(true)
+  })
+
+  // F94: ein eigener Antrag wird von der eigenen Fraktion oder von einem ihrer
+  // Mitglieder gestellt. Mitglieder anderer Fraktionen gehören nicht in die Auswahl —
+  // bei einem fremden Antrag dagegen stehen alle Fraktionen und alle Mitglieder da.
+  it('bietet als Antragsteller eines eigenen Antrags nur die eigene Fraktion und ihre Mitglieder an', async () => {
+    const w = shallowMount(Budgetliste, {
+      props: {
+        mitglieder: [
+          { name: 'Anna Muster', fraktion: 'GLP', aktiv: true },
+          { name: 'Beat Fremd', fraktion: 'SVP', aktiv: true },
+          { name: 'Cara Weg', fraktion: 'GLP', aktiv: false },
+        ],
+        fraktionen: [{ name: 'GLP', aktiv: true }, { name: 'SVP', aktiv: true }],
+      },
+    })
+    await flushPromises()
+    expect(w.vm.antragstellerOptionen('eigene').map(o => o.value)).toEqual(['GLP', 'Anna Muster'])
+    expect(w.vm.antragstellerOptionen('fremde').map(o => o.value)).toEqual(['GLP', 'SVP', 'Anna Muster', 'Beat Fremd'])
+  })
+
+  // F87: Ein Investitionsprojekt hat Details, die auf der Karte keinen Platz haben —
+  // die einzelnen Konten mit Teilbetrag, bewilligtem Kredit und Bewilligungsdatum.
+  // Ein Klick öffnet sie im selben Vollbild-Popup wie bei einer Produktegruppe.
+  it('öffnet zu einem Investitionsprojekt ein Detail mit seinen Konten', async () => {
+    const w = await mitAnsicht()
+    expect(w.vm.invDetail, 'ohne Klick ist kein Detail offen').toBeNull()
+
+    w.vm.invDetailOeffnen(5)
+    expect(w.vm.invDetail, 'Detail des Projekts 5 nicht geöffnet').not.toBeNull()
+    expect(w.vm.invDetail.projekt).toBe('5001240 Tösstalstrasse')
+    expect(w.vm.invDetail.konten.map(k => k.konto)).toEqual(['504051', '504052'])
+
+    w.vm.invDetailSchliessen()
+    expect(w.vm.invDetail).toBeNull()
   })
 
   // F97: die Haltung eines bestehenden Antrags ändern (getrennt vom Sitzungs-Beschluss)
@@ -496,7 +614,7 @@ describe('Budgetliste', () => {
     expect(w.vm.formOffen['g121']).toBeUndefined()
   })
 
-  // F88: der Automatik-Schalter wird am Server pro Jahr gespeichert (überlebt Reload);
+  // F88: der Automatik-Schalter wird am Server pro Jahr gespeichert (überlebt das Neuladen);
   // beim Abschalten fällt der Steuerfuss auf den Stadtratsantrag zurück.
   it('schaltet die Steuerfuss-Automatik am Server um und gibt bei Aus das manuelle Feld frei', async () => {
     let automatikAn = true
@@ -513,7 +631,7 @@ describe('Budgetliste', () => {
       return Promise.resolve({ data: {} })
     })
     const w = await mitAnsicht()
-    expect(w.vm.steuerfussAutomatik, 'Default: Automatik ein').toBe(true)
+    expect(w.vm.steuerfussAutomatik, 'Standard: Automatik ein').toBe(true)
     await w.vm.steuerfussAutomatikUmschalten(false)
     expect(
       axios.put.mock.calls.some(c => String(c[0]).includes('/steuerfuss-automatik') && c[1].an === false),
@@ -595,6 +713,20 @@ describe('Budgetliste', () => {
     expect(w.vm.pgDetail.zielvorgaben.length).toBe(1)
     w.vm.pgDetailSchliessen()
     expect(w.vm.pgDetail).toBe(null)
+  })
+
+  // F111: die grafische Übersicht ist der LETZTE Tab und bekommt die (gefilterten)
+  // Produktegruppen der Ansicht.
+  it('führt die Grafik als letzten Tab und übergibt ihr die Produktegruppen', async () => {
+    const w = await mitAnsicht()
+    const tabs = w.vm.tabs.map(t => t.key)
+    expect(tabs[tabs.length - 1]).toBe('grafik')
+    expect(w.vm.tabs.find(t => t.key === 'grafik').label).toBe('Grafik')
+    w.vm.tabWechseln('grafik')
+    await w.vm.$nextTick()
+    const grafik = w.findComponent({ name: 'BudgetGrafik' })
+    expect(grafik.exists(), 'Grafik-Tab rendert die Grafik nicht').toBe(true)
+    expect(grafik.props('produktegruppen')).toEqual(w.vm.ansicht.produktegruppen)
   })
 
   // Bedienung: der Tabwechsel merkt die Scrollposition je Tab (nur RAM) und stellt
@@ -679,7 +811,7 @@ describe('Budgetliste', () => {
   })
 
   // F93
-  it('trägt einen Entscheid für die Live-Verfolgung ein', async () => {
+  it('trägt einen Entscheid für die Verfolgung in der Sitzung ein', async () => {
     const w = await mitAnsicht()
     await w.vm.entscheidSetzen(10, 'angenommen')
     const call = axios.put.mock.calls.find(c => String(c[0]).includes('/budget/antraege/10/entscheid'))
@@ -688,7 +820,7 @@ describe('Budgetliste', () => {
 
   // F93: cross-session Live-Verfolgung — ein budget.updated-Ereignis aus einer
   // anderen Sitzung lädt die Ansicht neu (Beschlüsse erscheinen sofort überall).
-  it('lädt bei einem budget.updated-Realtime-Ereignis neu', async () => {
+  it('lädt bei einem Ereignis budget.updated neu', async () => {
     const w = await mitAnsicht()
     const ansichtRufe = () => axios.get.mock.calls.filter(c => /\/budget\/\d+(\?|$)/.test(String(c[0]))).length
     const vorher = ansichtRufe()
@@ -698,7 +830,7 @@ describe('Budgetliste', () => {
   })
 
   // F93: ein fremdes Realtime-Ereignis löst KEINE Neuladung aus.
-  it('ignoriert fremde Realtime-Ereignisse', async () => {
+  it('ignoriert Ereignisse, die es nichts angehen', async () => {
     const w = await mitAnsicht()
     const ansichtRufe = () => axios.get.mock.calls.filter(c => /\/budget\/\d+(\?|$)/.test(String(c[0]))).length
     const vorher = ansichtRufe()

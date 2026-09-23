@@ -42,7 +42,7 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
                 <section class="pw-admin-card">
                     <h3><?php p($l->t('Fraktionskonfiguration')); ?></h3>
                     <p class="settings-hint">
-                        <?php p($l->t('Wählen Sie Fraktion und Zielgruppe für die interne Fraktionsarbeit.')); ?>
+                        <?php p($l->t('Wähle Fraktion und Zielgruppe für die interne Fraktionsarbeit.')); ?>
                     </p>
 
                     <div class="pw-admin-grid">
@@ -90,9 +90,9 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
                 </section>
 
                 <section class="pw-admin-card">
-                    <h3><?php p($l->t('Fraktionsmitglieder ↔ Nextcloud-User')); ?></h3>
+                    <h3><?php p($l->t('Fraktionsmitglieder ↔ Nextcloud-Benutzer')); ?></h3>
                     <p class="settings-hint">
-                        <?php p($l->t('Nach Fraktionswahl können Mitglieder auf lokale User gemappt und ausgewählt angelegt werden.')); ?>
+                        <?php p($l->t('Nach der Wahl der Fraktion lassen sich die Mitglieder lokalen Benutzern zuordnen und die ausgewählten anlegen.')); ?>
                     </p>
 
                     <div class="pw-mitglied-toolbar">
@@ -118,7 +118,7 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
                                     </th>
                                     <th><?php p($l->t('Mitglied')); ?></th>
                                     <th><?php p($l->t('E-Mail')); ?></th>
-                                    <th><?php p($l->t('Username')); ?></th>
+                                    <th><?php p($l->t('Benutzername')); ?></th>
                                     <th><?php p($l->t('Gruppen')); ?></th>
                                 </tr>
                             </thead>
@@ -210,7 +210,7 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
 
 <?php if (!empty($_['build_time'])): ?>
 <p class="settings-hint" style="text-align:right;margin-top:4px;padding-right:1.5rem">
-    <?php p($l->t('Parlament Winterthur Tool — Build: %s', [$_['build_time']])); ?>
+    <?php p($l->t('Parlament Winterthur Tool — gebaut am: %s', [$_['build_time']])); ?>
 </p>
 <?php endif; ?>
 
@@ -489,7 +489,7 @@ $parlwinAdminNonce = \OCP\Server::get(\OC\Security\CSP\ContentSecurityPolicyNonc
                 tdLocal.textContent = vereinigeGruppen([aktuelleFraktionsGruppe()], groups).join(', ');
                 tdLocal.className = 'pw-member-groups pw-member-local-exists';
             } else if (username === '') {
-                tdLocal.textContent = t('parlwin', 'Bitte Username setzen');
+                tdLocal.textContent = t('parlwin', 'Bitte Benutzername setzen');
                 tdLocal.className = 'pw-member-groups pw-member-local-missing';
             } else {
                 tdLocal.textContent = aktuelleFraktionsGruppe();
@@ -561,7 +561,7 @@ $parlwinAdminNonce = \OCP\Server::get(\OC\Security\CSP\ContentSecurityPolicyNonc
                 tdEmail.textContent = String(mitglied.email || '').trim();
 
                 const tdUser = document.createElement('td');
-                tdUser.dataset.label = t('parlwin', 'Username');
+                tdUser.dataset.label = t('parlwin', 'Benutzername');
                 const input = document.createElement('input');
                 input.type = 'text';
                 input.className = 'pw-input pw-member-username';
@@ -570,7 +570,7 @@ $parlwinAdminNonce = \OCP\Server::get(\OC\Security\CSP\ContentSecurityPolicyNonc
                 input.dataset.memberId = String(mitglied.id);
                 if (mitglied.lokalerUserExistiert === true) {
                     input.disabled = true;
-                    input.title = t('parlwin', 'Lokaler User existiert bereits ({strategie})', {
+                    input.title = t('parlwin', 'Lokales Benutzerkonto existiert bereits ({strategie})', {
                         strategie: String(mitglied.lokaleMatchStrategie || ''),
                     });
                 }
@@ -628,7 +628,7 @@ $parlwinAdminNonce = \OCP\Server::get(\OC\Security\CSP\ContentSecurityPolicyNonc
                 tdEmail.appendChild(emailSpan);
 
                 const tdUser = document.createElement('td');
-                tdUser.dataset.label = t('parlwin', 'Username');
+                tdUser.dataset.label = t('parlwin', 'Benutzername');
                 const uidSpan = document.createElement('span');
                 uidSpan.className = 'pw-orphan-uid';
                 uidSpan.textContent = String(verwaist.uid || '');
@@ -834,7 +834,7 @@ $parlwinAdminNonce = \OCP\Server::get(\OC\Security\CSP\ContentSecurityPolicyNonc
                     setAutosaveStatus(t('parlwin', 'Alle Änderungen gespeichert'));
                 })
                 .catch((err) => {
-                    setAutosaveStatus(t('parlwin', 'Auto-Save fehlgeschlagen'));
+                    setAutosaveStatus(t('parlwin', 'Automatisches Speichern fehlgeschlagen'));
                     notifyTemporary(t('parlwin', 'Fehler beim Speichern: {msg}', { msg: err?.message || 'unbekannt' }));
                     console.error(err);
                 });
@@ -1017,7 +1017,7 @@ $parlwinAdminNonce = \OCP\Server::get(\OC\Security\CSP\ContentSecurityPolicyNonc
                 syncStatus.textContent = cancelRequested
                     ? t('parlwin', 'Abbruch angefragt...')
                     : t('parlwin', 'Synchronisiere...');
-                syncDetails.textContent = `${label} (${db}) - ${processed}/${total} | Gesamt ${global.processed}/${global.total} (${global.percent}%) | Quelle ${source} | ETA ${eta} | Laufzeit ${elapsed}`;
+                syncDetails.textContent = `${label} (${db}) - ${processed}/${total} | Gesamt ${global.processed}/${global.total} (${global.percent}%) | Quelle ${source} | Restzeit ${eta} | Laufzeit ${elapsed}`;
                 btnSync.disabled = true;
                 btnSyncCancel.disabled = cancelRequested;
                 return;

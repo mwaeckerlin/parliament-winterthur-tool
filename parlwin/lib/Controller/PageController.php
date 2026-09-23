@@ -75,9 +75,9 @@ class PageController extends Controller
             return $configured;
         }
 
-        // Default: same-origin reverse-proxy convention provided by
-        // mwaeckerlin/nextcloud:nginx. The /ws/<appid>/ location proxies
-        // to docker-compose service parlwin-realtime on internal port 3001.
+        // Standard: die Regel von mwaeckerlin/nextcloud:nginx, dass die Verbindung
+        // an dieselbe Herkunft geht. Der Pfad /ws/<appid>/ reicht sie an den Dienst
+        // parlwin-realtime aus dem Compose weiter, intern auf Port 3001.
         $host = trim((string) $this->request->getServerHost());
         if ($host === '') {
             $host = 'localhost';

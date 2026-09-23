@@ -11,9 +11,16 @@ import { defineConfig, devices } from '@playwright/test'
  */
 const BASE_URL = process.env.PARLWIN_BASE_URL || 'http://nextcloud-nginx:8080'
 
+// Für eine gezielte Messung an einem einzelnen Test: `PW_GREP="Synchronisation abbrechen"`.
+// Ohne die Variable läuft die ganze Suite — der volle Lauf braucht gut eine
+// Stunde, und eine Ursache an einem einzelnen Test zu suchen kostete jedes Mal
+// diese Stunde.
+const GREP = process.env.PW_GREP || ''
+
 export default defineConfig({
   testDir: '.',
   testMatch: '**/*.spec.js',
+  ...(GREP ? { grep: new RegExp(GREP) } : {}),
   // Echte Gleichzeitigkeit mehrerer Browser passiert innerhalb eines Tests
   // über mehrere Browser-Kontexte — die Tests selbst laufen seriell, damit
   // die geteilten Ressourcen deterministisch bleiben.

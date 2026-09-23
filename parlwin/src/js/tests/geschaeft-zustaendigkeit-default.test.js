@@ -19,9 +19,9 @@ import { personKey } from '../utils'
 // Der angemeldete Nutzer (uid «annab») als Fraktionsmitglied mit Nextcloud-Konto.
 const ICH = { id: 5, externId: 'p-annab', vorname: 'Anna', name: 'B', aktiv: true, nextcloudUid: 'annab' }
 
-// Feature: Beim Anlegen eines eigenen Geschäfts ist der Erzeuger per Default
+// Feature: Beim Anlegen eines eigenen Geschäfts ist der Erzeuger standardmässig
 // zuständig — als Vorauswahl sichtbar und beim Speichern übernommen.
-describe('Eigenes Geschäft: Erzeuger ist per Default zuständig', () => {
+describe('Eigenes Geschäft: der Erzeuger ist standardmässig zuständig', () => {
   beforeEach(() => { axios.post.mockClear(); axios.put.mockClear() })
 
   const neueMaske = (mitglieder) => shallowMount(GeschaeftDetail, {

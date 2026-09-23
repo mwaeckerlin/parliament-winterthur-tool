@@ -90,6 +90,8 @@
 </template>
 
 <script>
+import { frankenFormat } from '../utils'
+
 export default {
   name: 'BudgetPgDetail',
   props: {
@@ -128,11 +130,7 @@ export default {
     },
   },
   methods: {
-    fr(n) {
-      const v = Math.round(Number(n) || 0)
-      const ziffern = Math.abs(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '’')
-      return (v < 0 ? '−' : '') + ziffern
-    },
+    fr: frankenFormat,
     diff(n) {
       const v = Math.round(Number(n) || 0)
       return (v > 0 ? '+' : (v < 0 ? '−' : '±')) + this.fr(Math.abs(v))

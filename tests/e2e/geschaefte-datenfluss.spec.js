@@ -403,7 +403,7 @@ test.describe('Geschäfteliste: Tabelle, Spalten, Sortierung, externer Link', ()
 
 // ---------------------------------------------------------------------------
 test.describe('Geschäfteliste: Inline-Bearbeitung', () => {
-  test('Priorität inline: «—» ohne Wert, kein Detail-Öffnen, Highlight, bleibt nach Reload', async ({ page }) => {
+  test('Priorität in der Zeile: «—» ohne Wert, kein Detail-Öffnen, hervorgehoben, bleibt nach dem Neuladen', async ({ page }) => {
     const jsFehler = fehlerWaechter(page)
     await login(page, USERS.u1)
     await gotoGeschaefte(page)
@@ -416,7 +416,7 @@ test.describe('Geschäfteliste: Inline-Bearbeitung', () => {
     const zeile = page.locator('.pw-tabelle-geschaefte tbody tr', { hasText: titel }).first()
     await zeile.waitFor({ state: 'visible', timeout: 30_000 })
 
-    // Ohne Priorität: Platzhalter «—» (NICHT «Mittel»), keine Highlight-Klasse.
+    // Ohne Priorität: Platzhalter «—» (NICHT «Mittel»), keine Klasse für die Hervorhebung.
     const prioInput = zeile.locator('.pw-col-prio input.vs__search')
     await expect(prioInput).toHaveAttribute('placeholder', '—')
     await expect(zeile).not.toHaveClass(/pw-prio-hoch/)
@@ -430,11 +430,11 @@ test.describe('Geschäfteliste: Inline-Bearbeitung', () => {
     await page.fill('#pw-search-slot input', titel)
     await expect(page.locator('.pw-tabelle-geschaefte tbody tr', { hasText: titel }).first()).toHaveClass(/pw-prio-hoch/)
 
-    // Nach Reload weiterhin hoch.
+    // Nach dem Neuladen weiterhin hoch.
     await page.reload()
     await gotoGeschaefte(page)
     await page.fill('#pw-search-slot input', titel)
-    await expect(page.locator('.pw-tabelle-geschaefte tbody tr', { hasText: titel }).first(), 'Priorität nach Reload verloren').toHaveClass(/pw-prio-hoch/)
+    await expect(page.locator('.pw-tabelle-geschaefte tbody tr', { hasText: titel }).first(), 'Priorität nach dem Neuladen verloren').toHaveClass(/pw-prio-hoch/)
 
     // Auf «Tief» wechseln → pw-prio-tief.
     const zeile2 = page.locator('.pw-tabelle-geschaefte tbody tr', { hasText: titel }).first()
@@ -446,7 +446,7 @@ test.describe('Geschäfteliste: Inline-Bearbeitung', () => {
     expect(jsFehler, `JS-Fehler: ${jsFehler.join(' | ')}`).toEqual([])
   })
 
-  test('Beschluss inline als Freitext: kein Detail-Öffnen, bleibt nach Reload', async ({ page }) => {
+  test('Beschluss inline als Freitext: kein Detail-Öffnen, bleibt nach dem Neuladen', async ({ page }) => {
     await login(page, USERS.u1)
     await gotoGeschaefte(page)
     const titel = eindeutig('InlineBeschluss')
@@ -471,7 +471,7 @@ test.describe('Geschäfteliste: Inline-Bearbeitung', () => {
     await page.fill('#pw-search-slot input', titel)
     const zeile2 = page.locator('.pw-tabelle-geschaefte tbody tr', { hasText: titel }).first()
     await zeile2.waitFor({ state: 'visible', timeout: 30_000 })
-    await expect(zeile2.locator('.pw-col-beschluss input.pw-beschluss-input'), 'Inline-Beschluss nach Reload verloren').toHaveValue(beschlussText)
+    await expect(zeile2.locator('.pw-col-beschluss input.pw-beschluss-input'), 'Inline-Beschluss nach dem Neuladen verloren').toHaveValue(beschlussText)
   })
 })
 
@@ -822,7 +822,7 @@ test.describe('Notizen am Geschäft (über GeschaeftDetail)', () => {
     await expect(liste.getByText(`${notiz} bearbeitet`, { exact: false }).first(), 'Bearbeitete Notiz erscheint nicht').toBeVisible({ timeout: 15_000 })
 
     // Löschen (Soft-Delete) → Vermerk in der Aktionszeitleiste, nicht mehr in der Notizenliste.
-    await liste.locator('.pw-notiz-eintrag', { hasText: `${notiz} bearbeitet` }).first().locator('.pw-btn-loeschen').click()
+    await liste.locator('.pw-notiz-eintrag', { hasText: `${notiz} bearbeitet` }).first().locator('.pw-notiz-loeschen').click()
     await expect(zeitleiste.getByText('hat seine Notiz gelöscht', { exact: false }).first(), 'Gelöschte Notiz fehlt in der Aktionszeitleiste').toBeVisible({ timeout: 15_000 })
     await expect(liste.locator('.pw-notiz-eintrag', { hasText: `${notiz} bearbeitet` }), 'Gelöschte Notiz steht noch in der Notizenliste').toHaveCount(0)
 
@@ -856,7 +856,7 @@ test.describe('Notizen am Geschäft (über GeschaeftDetail)', () => {
       await expect(liste1.getByText(notiz).first()).toBeVisible({ timeout: 15_000 })
       // Autor: Löschen-Knopf und klickbarer Text vorhanden.
       const eintrag1 = liste1.locator('.pw-notiz-eintrag', { hasText: notiz }).first()
-      await expect(eintrag1.locator('.pw-btn-loeschen')).toHaveCount(1)
+      await expect(eintrag1.locator('.pw-notiz-loeschen')).toHaveCount(1)
       await expect(eintrag1.locator('.pw-notiz-inhalt.pw-notiz-text-klickbar')).toHaveCount(1)
 
       // Nicht-Autor öffnet dasselbe Geschäft.
@@ -865,7 +865,7 @@ test.describe('Notizen am Geschäft (über GeschaeftDetail)', () => {
       const liste2 = page2.locator('.pw-geschaeft-detail .pw-notizen-liste').first()
       await expect(liste2.getByText(notiz).first(), 'Nicht-Autor sieht die Notiz nicht').toBeVisible({ timeout: 15_000 })
       const eintrag2 = liste2.locator('.pw-notiz-eintrag', { hasText: notiz }).first()
-      await expect(eintrag2.locator('.pw-btn-loeschen'), 'Nicht-Autor sieht einen Löschen-Knopf').toHaveCount(0)
+      await expect(eintrag2.locator('.pw-notiz-loeschen'), 'Nicht-Autor sieht einen Löschen-Knopf').toHaveCount(0)
       await expect(eintrag2.locator('.pw-notiz-inhalt.pw-notiz-text-klickbar'), 'Nicht-Autor kann die Notiz bearbeiten').toHaveCount(0)
     } finally {
       await ctx1.close()

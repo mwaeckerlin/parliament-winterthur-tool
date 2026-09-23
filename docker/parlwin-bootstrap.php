@@ -7,6 +7,7 @@ declare(strict_types=1);
 // und php-fpm.  Deshalb ist dies ein PHP-Skript.
 //
 // Ablauf:
+//   0. Speichergrenze von PHP setzen (siehe pwbWritePhpIni).
 //   1. parlwin-Quelle aus /usr/local/share/nextcloud/seed/custom_apps/parlwin
 //      ueber /app/custom_apps/parlwin spiegeln.  Damit propagieren neue
 //      Image-Versionen ins persistente apps-Volume — die Basis-Funktion
@@ -20,6 +21,14 @@ declare(strict_types=1);
 const PARLWIN_SEED_SRC = '/usr/local/share/nextcloud/seed/custom_apps/parlwin';
 const PARLWIN_TARGET_DIR = '/app/custom_apps';
 const PARLWIN_LEGACY_NAME = 'parliamentwinterthur';
+// Das Verzeichnis, das `PHP_INI_SCAN_DIR` im Image zusaetzlich zum Standard
+// nennt (Dockerfile.php-fpm).  /etc/php* ist dem Laufzeit-Benutzer nicht
+// schreibbar, und die Basis hat keine Shell, um das zu aendern; /tmp traegt das
+// Sticky-Bit, und das hier angelegte Verzeichnis gehoert dem Laufzeit-Benutzer
+// mit 0755 — schreiben kann darin nur, wer ohnehin als dieser Benutzer laeuft
+// und damit auch den App-Code unter /app/custom_apps aendern koennte.
+const PARLWIN_PHP_INI_DIR = '/tmp/parlwin-php.d';
+const PARLWIN_MEMORY_LIMIT_DEFAULT = '1024M';
 
 function pwbLog(string $message): void
 {
@@ -73,6 +82,32 @@ function pwbCopyTree(string $src, string $dst): void
   }
 }
 
+// Speichergrenze von PHP: Das Basis-Image liefert 512 MB, ein Budgetbuch
+// braucht beim Einlesen mehr (gemessen am Buch 2027: 574,7 MB).  Der Wert steht
+// in `PARLWIN_PHP_MEMORY_LIMIT` und gilt fuer alles, was in diesem Container
+// laeuft: php-fpm, `occ` und der Hintergrundauftrag.  Geschrieben wird er,
+// bevor php-fpm und der Watcher starten — beide lesen das Verzeichnis beim
+// eigenen Start.
+function pwbWritePhpIni(): void
+{
+  $grenze = (string) (getenv('PARLWIN_PHP_MEMORY_LIMIT') ?: PARLWIN_MEMORY_LIMIT_DEFAULT);
+  if (!preg_match('/^-?\d+[KMG]?$/i', $grenze)) {
+    pwbLog("ignoring invalid PARLWIN_PHP_MEMORY_LIMIT «{$grenze}»");
+    $grenze = PARLWIN_MEMORY_LIMIT_DEFAULT;
+  }
+  if (!is_dir(PARLWIN_PHP_INI_DIR) && !@mkdir(PARLWIN_PHP_INI_DIR, 0755, true) && !is_dir(PARLWIN_PHP_INI_DIR)) {
+    pwbLog('failed to create ' . PARLWIN_PHP_INI_DIR . ' — memory limit stays at ' . ini_get('memory_limit'));
+    return;
+  }
+  $datei = PARLWIN_PHP_INI_DIR . '/99-parlwin.ini';
+  if (@file_put_contents($datei, "memory_limit = {$grenze}\n") === false) {
+    pwbLog('failed to write ' . $datei . ' — memory limit stays at ' . ini_get('memory_limit'));
+    return;
+  }
+  @chmod($datei, 0644);
+  pwbLog("memory_limit = {$grenze} ({$datei})");
+}
+
 function pwbSyncParlwin(): void
 {
   if (!is_dir(PARLWIN_SEED_SRC)) {
@@ -101,6 +136,7 @@ function pwbSyncParlwin(): void
   }
 }
 
+pwbWritePhpIni();
 pwbSyncParlwin();
 
 // Watcher als unabhaengigen Sub-Prozess starten.  Er aktiviert die App,

@@ -12,7 +12,7 @@ import { test, expect, request as pwRequest } from '@playwright/test'
  *  - Ein Dokument wird im geteilten Ordner per WebDAV angelegt, bearbeitet und von
  *    allen gelesen; im Browser ist der geteilte Ordner bei jedem Nutzer sichtbar.
  *  - Beschluss- und Notiz-Änderungen an einem Geschäft erscheinen bei den anderen
- *    Nutzern sofort ohne Reload (WebSocket-Echtzeit, parlwin-Detailansicht).
+ *    Nutzern sofort ohne Neuladen (WebSocket-Echtzeit, parlwin-Detailansicht).
  *
  * Voraussetzungen (von run-compose-e2e.sh hergestellt): drei Nutzer in der
  * Fraktionsgruppe, Fraktionsraum (Ordner + Kalender + Gruppen-Shares) eingerichtet,
@@ -309,7 +309,7 @@ test.describe('Fraktion: drei Nutzer arbeiten gleichzeitig zusammen', () => {
     }
   })
 
-  // 12 & 13: User1 setzt einen Beschluss → User2 und User3 sehen ihn sofort ohne Reload.
+  // 12 & 13: User1 setzt einen Beschluss → User2 und User3 sehen ihn sofort ohne Neuladen.
   test('12+13: Beschluss-Änderung erscheint bei allen sofort (Echtzeit)', async () => {
     // page1 öffnet die erste Zeile und liest die Geschäfts-ID aus dem eigenen
     // Detail-Request. So treffen «Beschluss setzen» und «betrachten» GARANTIERT
@@ -356,7 +356,7 @@ test.describe('Fraktion: drei Nutzer arbeiten gleichzeitig zusammen', () => {
     })
     expect(post.ok(), 'Beschluss konnte nicht gesetzt werden').toBeTruthy()
 
-    // Ohne Reload: WebSocket-Event aktualisiert die Detailansicht der Beobachter.
+    // Ohne Neuladen: das WebSocket-Ereignis aktualisiert die Detailansicht der Beobachter.
     for (const [page, user] of [[page2, USERS.u2], [page3, USERS.u3]]) {
       await expect(
         page.getByText(beschlussText, { exact: false }).first(),
@@ -365,7 +365,7 @@ test.describe('Fraktion: drei Nutzer arbeiten gleichzeitig zusammen', () => {
     }
   })
 
-  // 14: User1 schreibt eine Notiz → User2 und User3 sehen sie sofort ohne Reload.
+  // 14: User1 schreibt eine Notiz → User2 und User3 sehen sie sofort ohne Neuladen.
   test('14: Notiz erscheint bei allen sofort (Echtzeit)', async () => {
     // Notizen haben einen eigenen Bereich mit dem Knopf «+ Neue Notiz»; der
     // WYSIWYG-Editor (Tiptap/contenteditable) öffnet erst auf Klick. Eingabe

@@ -1,11 +1,11 @@
-# Vorstoss-Lifecycle: Modellierung
+# Der Weg eines Vorstosses: Modellierung
 
 Stand: 2026-05-12
 
-## Rechtsgrundlagen (Kurzbezug)
+## Rechtsgrundlagen (Überblick)
 
 - Kanton Zürich, Gemeindegesetz (GG):
-  - § 34: mögliche Vorstösse im Parlament (Motion, Postulat, PI, Interpellation, Anfrage).
+  - § 34: mögliche Vorstösse im Parlament (Motion, Postulat, Parlamentarische Initiative, Interpellation, Anfrage).
   - § 35: Wirkung überwiesener Motion/Postulat und unterstützter Interpellation.
 - Stadt Winterthur, Organisationsverordnung Stadtparlament (OV Parl):
   - Art. 77-79: Einreichung/Form/Verfahren inkl. Rückzug.
@@ -27,7 +27,7 @@ Die Detailseiten eines Geschäfts (`/politbusiness/{id}`) liefern als `<dt>/<dd>
 - `Geschäft in Vorberatung bei`
 - `Bemerkungen`
 
-Wichtig: gleiche Label können mehrfach vorkommen (z. B. mehrere Beschlussphasen).
+Wichtig: dieselbe Bezeichnung kann mehrfach vorkommen (z. B. mehrere Beschlussphasen).
 
 ## Datenmodell
 
@@ -42,8 +42,8 @@ Wichtig: gleiche Label können mehrfach vorkommen (z. B. mehrere Beschlussphasen
 - Tabelle: `pw_vorstoss_entwuerfe`
 - Zweck:
   - Vorstösse ohne Nummer separat führen
-  - später auf offizielles Geschäft matchen
-- Match-Reihenfolge:
+  - sie später dem offiziellen Geschäft zuordnen
+- Reihenfolge der Zuordnung:
   - `extern_id` (falls vorhanden)
   - sonst `titel_normalisiert` + `typ`
 
@@ -51,13 +51,13 @@ Wichtig: gleiche Label können mehrfach vorkommen (z. B. mehrere Beschlussphasen
 
 - Tabelle: `pw_geschaeft_ereignisse`
 - 1:n zu `pw_geschaefte`
-- speichert die zeitliche Reihenfolge (`reihenfolge`) jedes extrahierten Detailpunkts
-- Typisierung z. B.:
+- speichert die zeitliche Reihenfolge (`reihenfolge`) jeder ausgelesenen Angabe
+- Arten z. B.:
   - `beschlussdatum`, `beschlussart`, `beschluss`, `abstimmungsresultat`, `frist`, `antrag_bericht`, `beantwortung`, `vorberatung`, `bemerkung`, `status`
 
-## Warum so?
+## Begründung
 
 - Der Ablauf eines Vorstosses ist mehrstufig und im selben Geschäft sichtbar.
 - Einzelne Statusfelder genügen nicht, um den rechtlichen Ablauf sauber abzubilden.
-- Durch Ereignisse bleibt die Historie vollständig und auswertbar.
+- Durch Ereignisse bleibt der ganze Verlauf erhalten und auswertbar.
 - Entwürfe ohne Nummer bleiben sichtbar und können später automatisch zugeordnet werden.

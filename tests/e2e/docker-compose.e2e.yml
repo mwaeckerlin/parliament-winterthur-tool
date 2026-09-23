@@ -2,11 +2,27 @@ services:
   nextcloud-nginx:
     ports: !reset []
 
+  # Die Datenbank meldet selbst, wann sie Verbindungen annimmt. Ohne diese
+  # Meldung beginnt Nextcloud seine Installation, während MariaDB noch
+  # hochfährt, und probiert es blind wieder: Am 01.09.2026 lief der Testlauf
+  # deshalb in die Wartegrenze («Nextcloud wurde nicht rechtzeitig
+  # initialisiert»), während die Installation danach noch fertig wurde.
+  nextcloud-db:
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+      start_period: 10s
+
   nextcloud-php-fpm:
     environment:
       # Kurzer Cron-Tick für den E2E-Test (Produktion: 300s Default im Watcher),
       # damit der automatische Background-Job-Lauf im Test zügig greift.
       PARLWIN_CRON_INTERVAL: "5"
+    depends_on:
+      nextcloud-db:
+        condition: service_healthy
 
   parlwin-realtime:
     ports: !reset []
@@ -43,6 +59,8 @@ services:
       PW_U3: "${PW_U3:-parlwin_mitglied}"
       PW_P3: "${PW_P3:-}"
       PW_ADMIN_PASS: "${PW_ADMIN_PASS:-}"
+      # Filter für eine gezielte Messung an einem einzelnen Test; leer heisst alle.
+      PW_GREP: "${PW_GREP:-}"
       CI: "1"
     # Kein `npm ci` mehr: @playwright/test steckt im Image (NODE_PATH), die Tests
     # ebenso. Der Lauf ist damit unabhängig von der npm-Registry. Das Kommando

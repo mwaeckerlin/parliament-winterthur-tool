@@ -31,6 +31,13 @@ use OCP\Http\Client\IClientService;
 class BudgetImportService {
     private const BASE_URL = 'https://parlament.winterthur.ch';
 
+    /**
+     * Untergrenze für einen plausiblen Teil-B-Parse. Der schmalste Jahrgang (2017)
+     * führt 46 Produktegruppen; die Grenze liegt bewusst weit darunter, damit ein
+     * künftiges Buch mit weniger Gruppen nicht fälschlich abgewiesen wird.
+     */
+    private const MINDEST_PRODUKTEGRUPPEN = 20;
+
     public function __construct(
         private readonly BudgetJahrMapper $jahre,
         private readonly BudgetProduktegruppeMapper $gruppen,
@@ -43,6 +50,7 @@ class BudgetImportService {
         private readonly TraktandumMapper $traktanden,
         private readonly SitzungMapper $sitzungen,
         private readonly BudgetDrehbuchParser $drehbuchParser,
+        private readonly BudgetNovemberbriefParser $novemberbriefParser = new BudgetNovemberbriefParser(),
     ) {
     }
 
@@ -54,6 +62,15 @@ class BudgetImportService {
      * @var array<int, array{antraege: list<array<string, mixed>>, novemberbrief: array{produktegruppen: list<array<string, mixed>>}}|null>
      */
     private array $drehbuchCache = [];
+
+    /**
+     * Zwischenspeicher der je Jahr aus der Beilage «Novemberbrief» gelesenen
+     * Korrekturen, damit derselbe Abruf innerhalb eines Requests nicht mehrfach
+     * über das Netz geht.
+     *
+     * @var array<int, list<array<string, mixed>>>
+     */
+    private array $novemberbriefCache = [];
 
     /**
      * Herkunft eines Budgetjahres: das gescrapte Budget-Geschäft (die Weisung) mit
@@ -85,7 +102,10 @@ class BudgetImportService {
     public function verfuegbareJahre(): array {
         $jahre = [];
         foreach ($this->geschaefte->alleBudgetWeisungen() as $g) {
-            if (preg_match('/Budget\s+(\d{4})/u', (string) $g->getTitel(), $m)) {
+            // Beide Titelformen der Stadt: «Budget 2019 und Festsetzung des
+            // Steuerfusses» (bis Budget 2019) und «Genehmigung des BudgetS 2020
+            // und Festsetzung des Steuerfusses» (seit Budget 2020).
+            if (preg_match('/Budgets?\s+(\d{4})/u', (string) $g->getTitel(), $m)) {
                 $jahre[(int) $m[1]] = true;
             }
         }
@@ -129,8 +149,15 @@ class BudgetImportService {
         }
     }
 
-    /** Wendet die Novemberbrief-Anpassungen auf ein bereits importiertes Jahr an. */
+    /**
+     * Wendet die Novemberbrief-Anpassungen auf ein bereits importiertes Jahr an.
+     * Ein Jahr nimmt sie genau einmal an: Es sind Korrekturen am Entwurf, und ein
+     * zweiter Aufruf würde sie ein zweites Mal aufaddieren.
+     */
     public function importiereNovemberbrief(int $jahr): void {
+        if ($this->novemberbriefBereitsEingelesen($jahr)) {
+            return;
+        }
         $anpassungen = $this->novemberbriefAnpassungen($jahr);
         if (!is_array($anpassungen)) {
             throw new \RuntimeException('Kein Novemberbrief für Jahr ' . $jahr . ' verfügbar');
@@ -145,17 +172,19 @@ class BudgetImportService {
                 continue;
             }
             $g = $vorhandene[$code];
-            if (array_key_exists('globalkreditSoll', $a)) {
-                $g->setGlobalkreditSoll((int) $a['globalkreditSoll']);
+            // Der Novemberbrief nennt KORREKTUREN, keine neuen Beträge: Sie werden
+            // auf den Stand des Budgetentwurfs addiert. Bis zum 31.08.2026 suchte
+            // diese Schleife nach neuen Absolutwerten, die keine Quelle liefert —
+            // «Novemberbrief einlesen» markierte das Jahr als eingelesen und
+            // änderte keine einzige Zahl.
+            if (array_key_exists('nettokostenNb', $a)) {
+                $g->setGlobalkreditSoll((int) $g->getGlobalkreditSoll() + (int) $a['nettokostenNb']);
             }
-            if (array_key_exists('aufwandSoll', $a)) {
-                $g->setAufwandSoll((int) $a['aufwandSoll']);
+            if (array_key_exists('aufwandNb', $a)) {
+                $g->setAufwandSoll((int) $g->getAufwandSoll() + (int) $a['aufwandNb']);
             }
-            if (array_key_exists('ertragSoll', $a)) {
-                $g->setErtragSoll((int) $a['ertragSoll']);
-            }
-            if (array_key_exists('stellenSoll', $a)) {
-                $g->setStellenSoll((float) $a['stellenSoll']);
+            if (array_key_exists('ertragNb', $a)) {
+                $g->setErtragSoll((int) $g->getErtragSoll() + (int) $a['ertragNb']);
             }
             $this->gruppen->update($g);
         }
@@ -197,10 +226,23 @@ class BudgetImportService {
         // löscht sonst die bestehenden Produktegruppen, und die künstliche Position
         // schluckt das ganze Total (das Budget stünde ohne Produktegruppen da). Lieber
         // laut scheitern und den bestehenden Stand unangetastet lassen.
-        if (($struktur['produktegruppen'] ?? []) === []) {
+        $anzahl = \count($struktur['produktegruppen'] ?? []);
+        if ($anzahl === 0) {
             throw new \RuntimeException(
                 'Teil B (geladen von ' . $urls['teilB'] . ') lieferte keine Produktegruppen — '
                 . 'Budget ' . $jahr . ' bleibt unverändert'
+            );
+        }
+        // Dieselbe Bestandsgarantie für einen verstümmelten Parse: Jeder Jahrgang
+        // der Stadt führt über 40 Produktegruppen (der schmalste, 2017, hat 46).
+        // Kommt nur ein Bruchteil zurück, hat sich der Buchaufbau geändert oder es
+        // wurde das falsche Dokument geladen — der bestehende Stand ist dann mehr
+        // wert als der neue.
+        if ($anzahl < self::MINDEST_PRODUKTEGRUPPEN) {
+            throw new \RuntimeException(
+                'Teil B (geladen von ' . $urls['teilB'] . ') lieferte nur ' . $anzahl
+                . ' Produktegruppen (erwartet mindestens ' . self::MINDEST_PRODUKTEGRUPPEN
+                . ') — Budget ' . $jahr . ' bleibt unverändert'
             );
         }
         return $struktur;
@@ -220,17 +262,26 @@ class BudgetImportService {
         }
         $html = $this->ladeSeite((string) $g->getUrl());
         return [
-            'teilA' => $this->findeDokumentLink($html, 'Teil A'),
-            'teilB' => $this->findeDokumentLink($html, 'Teil B'),
+            'teilA' => $this->findeDokumentLink($html, 'Teil A', $jahr),
+            'teilB' => $this->findeDokumentLink($html, 'Teil B', $jahr),
         ];
     }
 
     /**
-     * Sucht in der Geschäft-Seite den ersten Dokument-Link (`/_doc/…`), dessen
-     * Beschriftung die Bezeichnung enthält (z.B. «Teil A»), und liefert die
+     * Sucht in der Geschäft-Seite den ersten passenden Dokument-Link (`/_doc/…`),
+     * dessen Beschriftung die Bezeichnung enthält (z.B. «Teil A»), und liefert die
      * absolute URL. Leerer String, wenn nicht gefunden.
+     *
+     * Nennt die Beschriftung ein ANDERES Budgetjahr, wird der Link übersprungen:
+     * An der Weisung zum Budget 2019 hängt eine Beilage «Budget 2018 — Teil A
+     * (Antrag)», und der erste Treffer wäre damit das falsche Buch.
+     *
+     * `$jahr = null` schaltet diese Prüfung ab. Das braucht das Drehbuch: Es hängt
+     * an der Sitzung, die das Budget berät, und trägt deren Datum im Titel
+     * («… Stadtparlament 8. Dezember 2025 inkl. Drehbuch zur Budgetbehandlung»)
+     * — also das Vorjahr des Budgets, das es behandelt.
      */
-    private function findeDokumentLink(string $html, string $bezeichnung): string {
+    private function findeDokumentLink(string $html, string $bezeichnung, ?int $jahr): string {
         $doc = new \DOMDocument();
         if (@$doc->loadHTML('<?xml encoding="utf-8"?>' . $html) !== true) {
             return '';
@@ -240,11 +291,29 @@ class BudgetImportService {
             if (!$a instanceof \DOMElement) {
                 continue;
             }
-            if (mb_stripos($a->textContent, $bezeichnung) !== false) {
-                return $this->absolutUrl((string) $a->getAttribute('href'));
+            if (mb_stripos($a->textContent, $bezeichnung) === false) {
+                continue;
             }
+            if ($jahr !== null && !$this->passtZumBudgetjahr($a->textContent, $jahr)) {
+                continue;
+            }
+            return $this->absolutUrl((string) $a->getAttribute('href'));
         }
         return '';
+    }
+
+    /**
+     * Ob die Beschriftung einer Beilage zum Budgetjahr passt: Sie darf das Jahr
+     * nennen oder gar keines — nur ein anderes Jahr schliesst sie aus. Die
+     * Geschäftsnummer («2024.81W — Beilage 2 — Teil A») zählt dabei nicht als
+     * Jahresangabe, sonst fiele jede korrekt benannte Beilage durch.
+     */
+    private function passtZumBudgetjahr(string $text, int $jahr): bool {
+        $ohneNummern = preg_replace('/\b\d{4}\.\d+\w*/u', ' ', $text) ?? $text;
+        if (preg_match_all('/\b(20\d{2})\b/u', $ohneNummern, $treffer) === 0) {
+            return true;
+        }
+        return in_array((string) $jahr, $treffer[1], true);
     }
 
     private function absolutUrl(string $url): string {
@@ -315,6 +384,10 @@ class BudgetImportService {
         $jahrRow->setTotalAufwandVorjahr((int) ($struktur['totalAufwandVorjahr'] ?? 0));
         $jahrRow->setTotalErtragVorjahr((int) ($struktur['totalErtragVorjahr'] ?? 0));
         $jahrRow->setGesamtergebnis((int) ($struktur['gesamtergebnis'] ?? 0));
+        // Die Zahlen kommen frisch aus dem Budgetentwurf: Die Korrekturen des
+        // Novemberbriefs stehen nicht mehr darin, also gilt er wieder als offen und
+        // die Oberfläche bietet ihn erneut zum Einlesen an.
+        $jahrRow->setNovemberbriefImportiert(0);
         $this->jahre->update($jahrRow);
 
         // Produktegruppen und Investitionen ersetzen (Anträge bleiben).
@@ -443,6 +516,8 @@ class BudgetImportService {
         $e->setGesamtkosten((int) ($i['gesamtkosten'] ?? 0));
         $e->setBereitsGetaetigt((int) ($i['bereitsGetaetigt'] ?? 0));
         $e->setPlanungskosten((int) ($i['planungskosten'] ?? 0));
+        $konten = \is_array($i['konten'] ?? null) ? $i['konten'] : [];
+        $e->setKonten((string) json_encode(array_values($konten)));
         $e->setReihenfolge((int) ($i['reihenfolge'] ?? $reihenfolge));
         return $e;
     }
@@ -537,17 +612,19 @@ class BudgetImportService {
      * — der Knopf «Novemberbrief einlesen» erscheint dann nicht.
      */
     public function novemberbriefVerfuegbar(int $jahr): bool {
-        if (!$this->jahre->existiert($jahr)) {
-            return false;
-        }
-        try {
-            if ((int) $this->jahre->findByJahr($jahr)->getNovemberbriefImportiert() === 1) {
-                return false;
-            }
-        } catch (DoesNotExistException) {
+        if (!$this->jahre->existiert($jahr) || $this->novemberbriefBereitsEingelesen($jahr)) {
             return false;
         }
         return $this->novemberbriefAnpassungen($jahr) !== null;
+    }
+
+    /** Ob die Korrekturen des Novemberbriefs schon in den Zahlen des Jahres stehen. */
+    private function novemberbriefBereitsEingelesen(int $jahr): bool {
+        try {
+            return (int) $this->jahre->findByJahr($jahr)->getNovemberbriefImportiert() === 1;
+        } catch (DoesNotExistException) {
+            return false;
+        }
     }
 
     /**
@@ -564,16 +641,88 @@ class BudgetImportService {
     }
 
     /**
-     * Die Novemberbrief-Anpassungen (je Produktegruppe) aus der «NB»-Spalte des
-     * Drehbuchs. Liefert null, wenn kein Drehbuch vorliegt oder die NB-Spalte leer
-     * ist (kein Novemberbrief in dem Jahr).
+     * Die Novemberbrief-Anpassungen je Produktegruppe.
+     *
+     * Zwei Quellen, in dieser Reihenfolge: die **Beilage «Novemberbrief»** am
+     * Budget-Geschäft — sie führt Aufwand, Ertrag und Nettokosten je
+     * Produktegruppe und ist die Quelle der Jahrgänge bis 2022 —, sonst die
+     * Spalte «NB» des Drehbuchs, die nur die Nettokosten nennt. Liefert null,
+     * wenn keine Quelle Korrekturen führt (kein Novemberbrief in dem Jahr).
      *
      * @return array<string, mixed>|null
      */
     private function novemberbriefAnpassungen(int $jahr): ?array {
+        $ausBeilage = $this->novemberbriefAusBeilage($jahr);
+        if ($ausBeilage !== []) {
+            return ['produktegruppen' => $ausBeilage];
+        }
         $struktur = $this->drehbuchStruktur($jahr);
         $nb = $struktur['novemberbrief']['produktegruppen'] ?? [];
         return $nb === [] ? null : ['produktegruppen' => $nb];
+    }
+
+    /**
+     * Die Korrekturen aus der Beilage «Novemberbrief» des Budget-Geschäfts, auf
+     * die Produktegruppen des Jahres abgebildet. Die Beilage nennt die
+     * Produktegruppe nur mit ihrem Namen; zugeordnet wird über den Namen der
+     * importierten Produktegruppe, verglichen ohne Satzzeichen und Leerraum
+     * («Städtische Allgemeinkosten / Erlöse» gegen «Städtische
+     * Allgemeinkosten/Erlöse»).
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function novemberbriefAusBeilage(int $jahr): array {
+        if (array_key_exists($jahr, $this->novemberbriefCache)) {
+            return $this->novemberbriefCache[$jahr];
+        }
+        $url = $this->novemberbriefUrl($jahr);
+        if ($url === null) {
+            return $this->novemberbriefCache[$jahr] = [];
+        }
+        $pfad = $this->tempPdf($this->ladeDokument($url));
+        try {
+            $gelesen = $this->novemberbriefParser->parse($pfad);
+        } finally {
+            @unlink($pfad);
+        }
+
+        $nachName = [];
+        foreach ($this->gruppen->findByJahr($jahr) as $g) {
+            $nachName[$this->namensschluessel((string) $g->getName())] = (string) $g->getCode();
+        }
+        $anpassungen = [];
+        foreach ($gelesen['produktegruppen'] as $eintrag) {
+            $code = $nachName[$this->namensschluessel((string) $eintrag['name'])] ?? null;
+            if ($code === null) {
+                continue;
+            }
+            $anpassungen[] = [
+                'code' => $code,
+                'aufwandNb' => (int) $eintrag['aufwandNb'],
+                'ertragNb' => (int) $eintrag['ertragNb'],
+                'nettokostenNb' => (int) $eintrag['nettokostenNb'],
+            ];
+        }
+        return $this->novemberbriefCache[$jahr] = $anpassungen;
+    }
+
+    /** Vergleichsform eines Produktegruppen-Namens: Kleinbuchstaben und Ziffern. */
+    private function namensschluessel(string $name): string {
+        return mb_strtolower((string) preg_replace('/[^\p{L}\p{N}]/u', '', $name));
+    }
+
+    /**
+     * Die Download-URL der Beilage «Novemberbrief» am Budget-Geschäft. Ihre
+     * Beschriftung trägt die Geschäftsnummer des VORJAHRES («2018.98-2
+     * «Novemberbrief»»), deshalb ohne Jahresprüfung.
+     */
+    private function novemberbriefUrl(int $jahr): ?string {
+        $g = $this->geschaefte->findeBudgetWeisung($jahr);
+        if ($g === null || (string) $g->getUrl() === '') {
+            return null;
+        }
+        $link = $this->findeDokumentLink($this->ladeSeite((string) $g->getUrl()), 'Novemberbrief', null);
+        return $link === '' ? null : $link;
     }
 
     /**
@@ -622,7 +771,9 @@ class BudgetImportService {
             if ($seite === '') {
                 continue;
             }
-            $link = $this->findeDokumentLink($this->ladeSeite($seite), 'Drehbuch');
+            // Ohne Jahresprüfung: Der Titel der Beilage nennt das Sitzungsdatum
+            // (Dezember des Vorjahres), nie das Budgetjahr.
+            $link = $this->findeDokumentLink($this->ladeSeite($seite), 'Drehbuch', null);
             if ($link !== '') {
                 return $link;
             }

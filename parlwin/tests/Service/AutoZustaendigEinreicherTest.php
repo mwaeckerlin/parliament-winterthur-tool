@@ -239,6 +239,40 @@ class AutoZustaendigEinreicherTest extends TestCase
         );
     }
 
+    /**
+     * Ein eigenes Geschäft trägt seine Kommission im Feld «Kommission»; sein
+     * Status («Pendent») nennt keine. Auch dann werden die Kommissionsmitglieder
+     * der eigenen Fraktion zuständig: Die Ansicht und diese Zuweisung bestimmen
+     * die Kommission eines Geschäfts nach derselben Regel.
+     */
+    public function testZugewieseneKommissionMachtIhreMitgliederZustaendig(): void
+    {
+        $geschaeft = $this->geschaeft(1, [], 'Pendent');
+        $geschaeft->setKommission('In Kommission');
+        $gesetzt = [];
+        $service = $this->makeService($geschaeft, $gesetzt);
+
+        $service->autoZuweisenKommissionsmitglieder();
+
+        self::assertSame(
+            ['Carla Kommission'],
+            array_column($gesetzt, 'personName'),
+            'Das der Kommission zugewiesene Geschäft macht ihre Fraktionsmitglieder nicht zuständig'
+        );
+    }
+
+    /** Ohne Zuweisung und ohne passenden Status bleibt das Geschäft unzugewiesen. */
+    public function testOhneKommissionUndOhneEinreicherBleibtEsUnzugewiesen(): void
+    {
+        $geschaeft = $this->geschaeft(1, [], 'Pendent');
+        $gesetzt = [];
+        $service = $this->makeService($geschaeft, $gesetzt);
+
+        $service->autoZuweisenKommissionsmitglieder();
+
+        self::assertSame([], $gesetzt, 'Ohne Kommission darf niemand zuständig werden');
+    }
+
     public function testEinreicherHabenVorrangVorDerKommission(): void
     {
         // Das Geschäft hat einen Einreicher aus der Fraktion UND passt zu einer

@@ -391,6 +391,10 @@ class BudgetController extends Controller {
             'bereich', 'zielTyp', 'zielRef', 'betragDelta', 'prozentDelta', 'stellenDelta',
             'betragProStelle', 'quelle', 'herkunft', 'haltung', 'unterstuetzer',
             'pauschalAusnahme', 'antragsteller', 'begruendung', 'phase',
+            // Zielvorgaben-Änderungen und Einsparungsverteilung (F109): Ohne sie
+            // kommt beim Dienst nichts an, was die Oberfläche unter «Zielvorgaben
+            // ändern» und «Einsparung verteilen» erfasst hat.
+            'zielAenderungen', 'aufteilung',
         ];
         $daten = [];
         foreach ($felder as $f) {

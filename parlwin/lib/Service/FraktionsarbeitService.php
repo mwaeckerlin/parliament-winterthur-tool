@@ -899,10 +899,7 @@ class FraktionsarbeitService
                 continue;
             }
 
-            $zugehoerigeKommission = self::findeKommissionFuerStatus(
-                (string) $geschaeft->getStatus(),
-                $kommissionsIndex
-            );
+            $zugehoerigeKommission = self::findeKommissionFuerGeschaeft($geschaeft, $kommissionsIndex);
             if ($zugehoerigeKommission === null) {
                 $statistik['ohne_kommission']++;
                 continue;
@@ -997,6 +994,30 @@ class FraktionsarbeitService
             $tokens[] = $t;
         }
         return $tokens;
+    }
+
+    /**
+     * Die Kommission eines Geschäfts, aus denselben zwei Quellen wie in der
+     * Ansicht (`Kommissionsliste.vue → geschaefteFuer`):
+     *
+     * 1. **Ausdrücklich zugewiesen:** Im Feld «Kommission» steht ihr Name. So
+     *    ordnet die Fraktion ein eigenes Geschäft zu; dessen Status ist
+     *    «Pendent» und nennt keine Kommission.
+     * 2. **Aus dem Status des Parlaments:** «Bei Kommission … pendent».
+     *
+     * @param array<int, array{kommission: Kommission, nameLower: string, tokens: string[]}> $index
+     */
+    private static function findeKommissionFuerGeschaeft(Geschaeft $geschaeft, array $index): ?Kommission
+    {
+        $zugewiesen = mb_strtolower(trim((string) $geschaeft->getKommission()));
+        if ($zugewiesen !== '') {
+            foreach ($index as $eintrag) {
+                if ($eintrag['nameLower'] === $zugewiesen) {
+                    return $eintrag['kommission'];
+                }
+            }
+        }
+        return self::findeKommissionFuerStatus((string) $geschaeft->getStatus(), $index);
     }
 
     /**

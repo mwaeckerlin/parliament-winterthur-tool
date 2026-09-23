@@ -405,7 +405,7 @@ export default {
       return (this.statusOptionen || []).map(s => ({ label: s, value: s }))
     },
     aktiveMitglieder() {
-      // Nur Fraktionsmitglieder, die auch als Nextcloud-User registriert sind,
+      // Nur Fraktionsmitglieder, die auch als Nextcloud-Benutzer registriert sind,
       // können als zuständig gewählt werden.
       return this.mitglieder
         .filter((mitglied) => mitglied.aktiv !== false)
@@ -413,7 +413,7 @@ export default {
         .sort((a, b) => this.vollerName(a).localeCompare(this.vollerName(b)))
     },
     inaktiveMitglieder() {
-      // Auch inaktive werden nur dann angeboten, wenn sie einen Nextcloud-User
+      // Auch inaktive werden nur dann angeboten, wenn sie einen Nextcloud-Benutzer
       // haben (z.B. ehemalige Mitglieder, die noch zuständig sein können).
       return this.mitglieder
         .filter((mitglied) => mitglied.aktiv === false)
@@ -465,7 +465,7 @@ export default {
       return !!key && this.ausgewaehltePersonKeys.includes(key)
     },
     // Der personKey des angemeldeten Nutzers, sofern er ein Fraktionsmitglied mit
-    // Nextcloud-Konto ist. Eine Stelle für «der Erzeuger ist per Default zuständig»
+    // Nextcloud-Konto ist. Eine Stelle für «der Erzeuger ist standardmässig zuständig»
     // UND für das Votum-Schreibrecht (keine Doppel-Logik).
     eigenerPersonKey() {
       const uid = (getCurrentUser()?.uid || '').toLowerCase()
@@ -590,7 +590,7 @@ export default {
           datum: this.geschaeft.datum || '',
         })
         const neueId = data?.id || 0
-        // Die vorausgewählte Zuständigkeit (per Default der Erzeuger) am neu
+        // Die vorausgewählte Zuständigkeit (standardmässig der Erzeuger) am neu
         // angelegten Geschäft festhalten — gleiche Payload-Bildung wie sonst.
         if (neueId && this.ausgewaehltePersonKeys.length) {
           try {
@@ -655,7 +655,7 @@ export default {
           aktionen: [],
           zustaendigkeiten: [],
         }
-        // Der Erzeuger ist per Default zuständig: als Vorauswahl sichtbar und
+        // Der Erzeuger ist standardmässig zuständig: als Vorauswahl sichtbar und
         // beim Speichern übernommen; vor dem Speichern noch änderbar.
         const eigen = this.eigenerPersonKey
         this.ausgewaehltePersonKeys = eigen ? [eigen] : []
@@ -962,7 +962,8 @@ export default {
     },
     votumGeaendert(neuerHtml) {
       // Wird von PwWysiwyg via @update:model-value ausgelöst.
-      // v-model setzt votumHtml bereits; hier nur Dirty-Flag + Autosave-Timer.
+      // v-model setzt votumHtml bereits; hier nur das Kennzeichen «geändert» und
+      // der Timer für das automatische Speichern.
       if (typeof neuerHtml === 'string') {
         this.votumHtml = neuerHtml
       }

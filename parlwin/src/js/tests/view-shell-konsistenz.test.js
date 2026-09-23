@@ -8,6 +8,7 @@ import Budgetliste from '../components/Budgetliste.vue'
 import Mitgliederliste from '../components/Mitgliederliste.vue'
 import Kommissionsliste from '../components/Kommissionsliste.vue'
 import Sitzungstypenliste from '../components/Sitzungstypenliste.vue'
+import Fragestunde from '../components/Fragestunde.vue'
 
 vi.mock('@nextcloud/auth', () => ({ getCurrentUser: () => ({ uid: 'u', displayName: 'U' }) }))
 vi.mock('../realtime', () => ({ subscribeRealtime: () => () => {} }))
@@ -26,6 +27,7 @@ const ANSICHTEN = [
   ['Mitgliederliste', Mitgliederliste],
   ['Kommissionsliste', Kommissionsliste],
   ['Sitzungstypenliste', Sitzungstypenliste],
+  ['Fragestunde', Fragestunde],
 ]
 
 describe('Ansichts-Gerüst ist konsistent', () => {

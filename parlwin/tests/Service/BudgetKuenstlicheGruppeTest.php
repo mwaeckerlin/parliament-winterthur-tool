@@ -131,15 +131,25 @@ class BudgetKuenstlicheGruppeTest extends TestCase {
         $this->assertSame('Interne Verrechnung / Abgrenzung', $k->getName());
         $this->assertSame('IV', $k->getCode());
 
-        // Die operativen Produktegruppen allein ergeben 98,3 Mio — erst die künstliche
-        // schliesst auf das deklarierte Gesamtergebnis.
+        // Die operativen Produktegruppen allein erreichen das deklarierte Ergebnis
+        // nicht — erst die künstliche schliesst die Lücke, und zwar genau. Geprüft
+        // wird dieser Zusammenhang, nicht die Zwischensumme selbst: sie ist ein
+        // Messwert des Parsers und ändert sich mit jeder Korrektur an ihm (zuletzt
+        // um 21 Mio, als der Ertrag von «Steuern und Finanzausgleich» eine Spalte
+        // zurückrutschte). Eine festgeschriebene Zwischensumme hätte den richtigen
+        // Wert als Fehler gemeldet.
         $operativ = 0;
         foreach ($this->eingefuegt as $g) {
             if ((int) $g->getKuenstlich() !== 1) {
                 $operativ += $g->getErtragSoll() - $g->getAufwandSoll();
             }
         }
-        $this->assertSame(98296708, $operativ, 'Σ nur operative Produktegruppen 2026');
+        $this->assertNotSame(113800000, $operativ, 'ohne die künstliche Gruppe fehlt etwas zum Gesamtergebnis');
+        $this->assertSame(
+            113800000 - $operativ,
+            $k->getErtragSoll() - $k->getAufwandSoll(),
+            'die künstliche Gruppe trägt genau die Differenz zum deklarierten Gesamtergebnis'
+        );
 
         // Summen-Guard: Σ aller Produktegruppen (Ertrag − Aufwand) == deklariertes Gesamtergebnis.
         $this->assertSame(113800000, $this->gesamtergebnis, 'deklariertes Gesamtergebnis 2026 (113,8 Mio)');

@@ -87,7 +87,15 @@ class SyncCommand extends Command
 
         try {
             $this->setCurrentWorkerPid(getmypid() ?: null);
-            $this->setCancelRequested(false);
+            // Ein Abbruch-Signal, das NACH dem Start dieses Prozesses geschrieben
+            // wurde, gilt diesem Lauf: Die Oberfläche meldet «gestartet», sobald
+            // der Prozess gestartet ist, und lässt den Abbruch zu — bis die Sperre
+            // hier greift, vergehen ein bis zwei Sekunden. Nur ein älteres Signal
+            // ist das Überbleibsel eines hart beendeten Laufs und wird weggeräumt.
+            $signalZeit = $this->syncLockService->abbruchZeitpunkt();
+            if ($signalZeit === null || $signalZeit < self::prozessStart()) {
+                $this->setCancelRequested(false);
+            }
             $alles = !$nurGeschaefte && !$nurSitzungen && !$nurMitglieder;
             $startZeitpunkt = new \DateTimeImmutable();
             $aktiveScopes = [];
@@ -112,6 +120,10 @@ class SyncCommand extends Command
             $sitzungenStatistik = null;
 
             try {
+                // Vor der ersten Netzarbeit: Ein Lauf, der schon beim Start
+                // abgebrochen wurde, lädt die Parlamentswebseite nicht mehr ab.
+                $this->throwIfCancelRequested($status, $startZeitpunkt, $source, $updateProgress);
+
                 $prefetchBereiche = [];
                 if ($alles || $nurGeschaefte) {
                     $prefetchBereiche[] = 'geschaefte';
@@ -473,23 +485,50 @@ class SyncCommand extends Command
         $this->realtimePublisher->publish('sync.progress', $status);
     }
 
+    /**
+     * Gelesen wird die Datei des Sperrdienstes, nicht die App-Konfiguration:
+     * Nextcloud hält deren Werte pro Aufruf im Speicher, und der Sync ist EIN
+     * Aufruf, während der Abbruch aus einem zweiten kommt.
+     */
     private function isCancelRequested(): bool
     {
-        return trim($this->config->getAppValue(self::APP_ID, self::SYNC_CANCEL_REQUESTED_KEY, '0')) === '1';
+        return $this->syncLockService->abbruchAngefordert()
+            || trim($this->config->getAppValue(self::APP_ID, self::SYNC_CANCEL_REQUESTED_KEY, '0')) === '1';
     }
 
     private function setCancelRequested(bool $requested): void
     {
+        if ($requested) {
+            $this->syncLockService->abbruchAnfordern();
+        } else {
+            $this->syncLockService->abbruchAufheben();
+        }
         $this->config->setAppValue(self::APP_ID, self::SYNC_CANCEL_REQUESTED_KEY, $requested ? '1' : '0');
     }
 
+    /**
+     * Die Prozessnummer steht an ZWEI Stellen, und beide gehören zusammen: in der
+     * App-Konfiguration und in der Datei neben der Sperre, aus der der Status sie
+     * bevorzugt liest. Wer nur die Konfiguration aufräumt, lässt die Nummer in der
+     * Datei stehen; vergibt der Container sie neu, meldet der Status für immer
+     * «läuft», und der nächste Lauf hängt sich an eine Synchronisation an, die
+     * längst fertig ist.
+     */
     private function setCurrentWorkerPid(?int $pid): void
     {
+        $this->syncLockService->pidSetzen($pid);
         $this->config->setAppValue(
             self::APP_ID,
             self::SYNC_WORKER_PID_KEY,
             ($pid !== null && $pid > 1) ? (string) $pid : ''
         );
+    }
+
+    /** Der Startzeitpunkt dieses Prozesses, so genau wie PHP ihn kennt. */
+    private static function prozessStart(): float
+    {
+        $start = $_SERVER['REQUEST_TIME_FLOAT'] ?? null;
+        return is_numeric($start) ? (float) $start : microtime(true);
     }
 
     private static function formatiereDauer(int $sekunden): string

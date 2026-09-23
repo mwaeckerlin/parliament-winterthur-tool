@@ -124,6 +124,54 @@ class BudgetRechnung {
         if ($rest !== 0 && $groessterCode !== null) {
             $verteilung[$groessterCode] += $rest;
         }
+        return $totalDelta < 0 ? self::hoechstensAufNull($verteilung, $gruppen) : $verteilung;
+    }
+
+    /**
+     * Eine Position lässt sich höchstens auf null kürzen — was nicht ausgegeben
+     * wird, kann nicht gespart werden. Was eine Position darüber hinaus tragen
+     * müsste, geht an die übrigen, solange dort Platz ist; reicht auch das nicht,
+     * bleibt der Rest liegen. Erfunden wird nichts: die Summe der Verteilung ist
+     * dann kleiner als der gewünschte Betrag, und das ist im Budget sichtbar.
+     *
+     * @param array<string, int> $verteilung
+     * @param array<int, array<string, float|int|string>> $gruppen
+     * @return array<string, int>
+     */
+    private static function hoechstensAufNull(array $verteilung, array $gruppen): array {
+        $grenze = [];
+        foreach ($gruppen as $g) {
+            $grenze[(string) $g['code']] = max(0, (int) ($g['aufwandSoll'] ?? 0));
+        }
+        // Immer wieder kappen und den Überhang auf die Positionen mit Platz
+        // verteilen, bis nichts mehr umzulegen ist.
+        for ($runde = 0; $runde < \count($verteilung) + 1; $runde++) {
+            $ueberhang = 0;
+            foreach ($verteilung as $code => $delta) {
+                $zuviel = -$delta - ($grenze[$code] ?? 0);
+                if ($delta < 0 && $zuviel > 0) {
+                    $verteilung[$code] = -($grenze[$code] ?? 0);
+                    $ueberhang += $zuviel;
+                }
+            }
+            if ($ueberhang === 0) {
+                return $verteilung;
+            }
+            $platz = [];
+            foreach ($verteilung as $code => $delta) {
+                $frei = ($grenze[$code] ?? 0) + $delta;
+                if ($frei > 0) {
+                    $platz[$code] = $frei;
+                }
+            }
+            $summePlatz = array_sum($platz);
+            if ($summePlatz <= 0) {
+                return $verteilung; // nirgends mehr Platz — der Rest bleibt liegen
+            }
+            foreach ($platz as $code => $frei) {
+                $verteilung[$code] -= (int) round(min($ueberhang, $ueberhang * $frei / $summePlatz));
+            }
+        }
         return $verteilung;
     }
 

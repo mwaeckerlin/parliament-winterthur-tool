@@ -2,6 +2,10 @@
 .agents
 .codex
 tests
+# Auch die Tests der App: dort liegen die Budgetbücher als Fixture (rund 85 MB).
+# Das Dockerfile löscht parlwin/tests nach dem Build ohnehin — ohne diese Zeile
+# wandern die PDFs bei JEDEM Build durch den Build-Kontext.
+**/tests
 LICENSE
 .env
 .env.*

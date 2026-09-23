@@ -21,7 +21,7 @@
 
     <div v-else>
       <div v-if="!gefiltert.length" class="pw-hinweis">
-        Keine Sitzungstypen vorhanden. Erstellen Sie einen neuen Typ.
+        Keine Sitzungstypen vorhanden. Lege einen neuen Typ an.
       </div>
       <div
         v-for="typ in gefiltert"

@@ -125,15 +125,16 @@ class BudgetPauschalTest extends TestCase {
     }
 
     public function testPauschalAusnahmeErzeugtKeinenAntragDort(): void {
-        // F101: Position 121 ausgenommen → kein Antrag dort, der volle Betrag
-        // (10M) geht auf 142.
+        // F101: Position 121 ausgenommen → kein Antrag dort, der Betrag geht auf
+        // 142. Weiter als bis auf null lässt sich 142 dabei nicht kürzen (F103):
+        // ihr Budget ist die Grenze, und was darüber hinausginge, bleibt liegen.
         $service = $this->serviceMitCapture();
         $service->verteilungSetzen(2026, true, 'schwarze_null', 0, 'einreichen', ['121']);
         $ziele = array_map(static fn ($a) => (string) $a->getZielRef(), $this->inserted);
         self::assertNotContains('121', $ziele, 'ausgenommene Position bekommt keinen Pauschalantrag (F101)');
         self::assertContains('142', $ziele, 'übrige Position trägt die Umverteilung (F101)');
         $summe = array_sum(array_map(static fn ($a) => (int) $a->getBetragDelta(), $this->inserted));
-        self::assertSame(-10000000, $summe, 'derselbe Gesamtbetrag wird eingespart (F101)');
+        self::assertSame(-3000000, $summe, 'höchstens das Budget der verbleibenden Position (F103)');
     }
 
     public function testFesteVerteilungVerteiltDenBetragAnteilig(): void {

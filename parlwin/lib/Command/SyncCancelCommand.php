@@ -30,8 +30,10 @@ class SyncCancelCommand extends Command {
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int {
-        $lockAktiv = $this->syncLockService->isLocked();
-        if (!$lockAktiv) {
+        // Ein Lauf läuft auch dann, wenn seine Sperre noch nicht greift: Zwischen
+        // dem Start seines Prozesses und dem Greifen der Sperre vergehen ein bis
+        // zwei Sekunden, und ein Abbruch aus diesem Fenster meint ihn.
+        if (!$this->syncLockService->isLocked() && !$this->istWorkerProzessLebendig()) {
             $this->setCancelRequested(false);
             $this->setCurrentWorkerPid(null);
             $output->writeln('<comment>Keine laufende Synchronisation gefunden.</comment>');
@@ -55,8 +57,13 @@ class SyncCancelCommand extends Command {
         );
 
         if (($stopResult['stopped'] ?? false) === true) {
-            $this->setCancelRequested(false);
-            $this->setCurrentWorkerPid(null);
+            // Solange der Prozess lebt und nicht mit einem Signal beendet wurde,
+            // bleiben Abbruch-Signal und Prozessnummer stehen: Der Lauf liest das
+            // Signal, sobald er die Sperre greift, und räumt danach selbst auf.
+            if ((bool) ($stopResult['signalled'] ?? false) || !$this->istWorkerProzessLebendig()) {
+                $this->setCancelRequested(false);
+                $this->setCurrentWorkerPid(null);
+            }
             $this->realtimePublisher->publish('sync.cancelled', [
                 'quelle' => 'occ',
                 'zeitpunkt' => (new \DateTime())->format('Y-m-d H:i:s'),
@@ -75,7 +82,19 @@ class SyncCancelCommand extends Command {
         return Command::SUCCESS;
     }
 
+    /**
+     * Das Signal geht über die Datei des Sperrdienstes, nicht über die
+     * App-Konfiguration: Der laufende Sync ist ein eigener Aufruf, und Nextcloud
+     * hält die Konfigurationswerte pro Aufruf im Speicher — er sähe bis zu seinem
+     * Ende den Stand von seinem Beginn. Der Wert in der Konfiguration steht daneben
+     * für alles, was den Stand nur nachliest.
+     */
     private function setCancelRequested(bool $requested): void {
+        if ($requested) {
+            $this->syncLockService->abbruchAnfordern();
+        } else {
+            $this->syncLockService->abbruchAufheben();
+        }
         $this->config->setAppValue(
             self::APP_ID,
             SyncCommand::SYNC_CANCEL_REQUESTED_KEY,
@@ -84,6 +103,10 @@ class SyncCancelCommand extends Command {
     }
 
     private function getCurrentWorkerPid(): ?int {
+        $ausDatei = $this->syncLockService->pidLesen();
+        if ($ausDatei !== null) {
+            return $ausDatei;
+        }
         $raw = trim((string) $this->config->getAppValue(self::APP_ID, SyncCommand::SYNC_WORKER_PID_KEY, ''));
         if ($raw === '') {
             return null;
@@ -93,10 +116,29 @@ class SyncCancelCommand extends Command {
     }
 
     private function setCurrentWorkerPid(?int $pid): void {
+        $this->syncLockService->pidSetzen($pid);
         $this->config->setAppValue(
             self::APP_ID,
             SyncCommand::SYNC_WORKER_PID_KEY,
             ($pid !== null && $pid > 1) ? (string) $pid : ''
         );
+    }
+
+    /** Ob der Sync-Prozess noch lebt, auch wenn seine Sperre noch nicht greift. */
+    private function istWorkerProzessLebendig(): bool {
+        $pid = $this->getCurrentWorkerPid();
+        if ($pid === null) {
+            return false;
+        }
+        if (function_exists('posix_kill')) {
+            if (@posix_kill($pid, 0)) {
+                return true;
+            }
+            // EPERM: Der Prozess lebt, gehört nur jemand anderem.
+            if (function_exists('posix_get_last_error') && posix_get_last_error() === 1) {
+                return true;
+            }
+        }
+        return @is_dir('/proc/' . $pid);
     }
 }

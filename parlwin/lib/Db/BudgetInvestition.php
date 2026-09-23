@@ -34,12 +34,25 @@ class BudgetInvestition extends Entity implements JsonSerializable {
     protected int $gesamtkosten = 0;
     protected int $bereitsGetaetigt = 0;
     protected int $planungskosten = 0;
+    /** @var string Konten des Projekts als JSON (Anhang «Kontrolle der Investitionskredite») */
+    protected ?string $konten = '[]';
     protected int $reihenfolge = 0;
 
     public function __construct() {
         foreach (['jahr', 'bu', 'fap1', 'fap2', 'fap3', 'gesamtkosten', 'bereitsGetaetigt', 'planungskosten', 'reihenfolge'] as $f) {
             $this->addType($f, 'integer');
         }
+    }
+
+    /**
+     * Die Konten des Projekts: je Eintrag Konto-Nummer, Bezeichnung, Betrag im
+     * Budgetjahr, bewilligter Kredit und das Datum der Bewilligung.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function getKontenArray(): array {
+        $dekodiert = json_decode($this->konten ?? '[]', true);
+        return is_array($dekodiert) ? array_values($dekodiert) : [];
     }
 
     /** @return array<string, mixed> */
@@ -57,6 +70,7 @@ class BudgetInvestition extends Entity implements JsonSerializable {
             'gesamtkosten' => $this->gesamtkosten,
             'bereitsGetaetigt' => $this->bereitsGetaetigt,
             'planungskosten' => $this->planungskosten,
+            'konten' => $this->getKontenArray(),
             'reihenfolge' => $this->reihenfolge,
         ];
     }

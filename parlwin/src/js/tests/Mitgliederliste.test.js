@@ -47,7 +47,7 @@ describe('Mitgliederliste — Sortierung nach Funktion (Standard)', () => {
     expect(ids(wrapper)).toEqual(['1', '2', '3', '4', '5'])
   })
 
-  it('sortiert den Rest (gleiche Funktionsstufe) nach Partei, dann Name', () => {
+  it('sortiert den Rest (gleiche Funktion) nach Partei, dann Name', () => {
     // Zwei funktionslose Mitglieder: unterschiedliche Partei → Partei entscheidet.
     const m = [
       { id: 10, externId: '10', vorname: 'A', name: 'A', partei: 'SP', fraktion: 'SP', aktiv: true },

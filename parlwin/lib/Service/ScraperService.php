@@ -27,6 +27,23 @@ class ScraperService
         'fraktionen' => self::BASE_URL . '/fraktionen',
     ];
 
+    /** Monatsnamen, wie sie in den Dokumenttiteln der Parlamentswebseite stehen */
+    private const MONATE = [
+        'januar' => 1,
+        'februar' => 2,
+        'märz' => 3,
+        'maerz' => 3,
+        'april' => 4,
+        'mai' => 5,
+        'juni' => 6,
+        'juli' => 7,
+        'august' => 8,
+        'september' => 9,
+        'oktober' => 10,
+        'november' => 11,
+        'dezember' => 12,
+    ];
+
     /**
      * In-memory Cache fuer bereits geladene Geschaeft-Detailseiten.
      *
@@ -253,27 +270,31 @@ class ScraperService
      */
     public function ladeTraktanden(string $sitzungUrl): array
     {
+        return $this->ladeSitzungsseite($sitzungUrl)['traktanden'];
+    }
+
+    /**
+     * Lädt eine Sitzungsdetailseite und gibt beides zurück, was sie trägt:
+     * die Traktanden und die Dokumente der Sitzung (Protokoll, Beschlüsse,
+     * Traktandenliste).
+     *
+     * @return array{traktanden: array<int, array<string, mixed>>, dokumente: array<int, array{titel: string, url: string, datum: string}>}
+     */
+    public function ladeSitzungsseite(string $sitzungUrl): array
+    {
         $url = self::absolutUrl($sitzungUrl);
         if ($url === '') {
-            return [];
+            return ['traktanden' => [], 'dokumente' => []];
         }
 
         try {
-            $html = $this->ladeHtml($url);
-            $entitaeten = $this->extrahiereEntitaeten($html, 'Traktanden');
-            $eintraege = $this->normalisiereListenEntitaeten($entitaeten);
-            $normalisiert = $this->normalisiereTraktandenEntitaeten($eintraege);
-            if (!empty($normalisiert)) {
-                return $normalisiert;
-            }
-
-            return $this->extrahiereTraktandenAusHtml($html);
+            return $this->zerlegeSitzungsseite($this->ladeHtml($url));
         } catch (\Throwable $e) {
             $this->logger->error(
                 'Parlament Winterthur: Fehler beim Laden von Traktanden: ' . $e->getMessage(),
                 ['url' => $url, 'exception' => $e]
             );
-            return [];
+            return ['traktanden' => [], 'dokumente' => []];
         }
     }
 
@@ -286,6 +307,22 @@ class ScraperService
      * @return array<string, array> Map: absolute URL → Traktanden-Array
      */
     public function ladeTraktandenJeUrlParallel(array $sitzungsUrls, ?callable $onProgress = null): array
+    {
+        return array_map(
+            static fn (array $seite): array => $seite['traktanden'],
+            $this->ladeSitzungsseitenJeUrlParallel($sitzungsUrls, $onProgress)
+        );
+    }
+
+    /**
+     * Lädt mehrere Sitzungs-Detailseiten parallel und zerlegt jede in
+     * Traktanden und Dokumente der Sitzung.
+     *
+     * @param array<int, string> $sitzungsUrls
+     * @param callable|null $onProgress Wird nach jedem geladenen Detail aufgerufen ($url, $erfolg, $erledigt, $gesamt)
+     * @return array<string, array{traktanden: array, dokumente: array}> Map: absolute URL → Seitendaten
+     */
+    public function ladeSitzungsseitenJeUrlParallel(array $sitzungsUrls, ?callable $onProgress = null): array
     {
         $absoluteUrls = [];
         foreach ($sitzungsUrls as $roh) {
@@ -305,27 +342,39 @@ class ScraperService
         foreach ($urls as $url) {
             $html = $htmlJeUrl[$url] ?? '';
             if ($html === '') {
-                $ergebnisse[$url] = [];
+                $ergebnisse[$url] = ['traktanden' => [], 'dokumente' => []];
                 continue;
             }
             try {
-                $entitaeten = $this->extrahiereEntitaeten($html, 'Traktanden');
-                $eintraege = $this->normalisiereListenEntitaeten($entitaeten);
-                $normalisiert = $this->normalisiereTraktandenEntitaeten($eintraege);
-                if ($normalisiert === []) {
-                    $normalisiert = $this->extrahiereTraktandenAusHtml($html);
-                }
-                $ergebnisse[$url] = $normalisiert;
+                $ergebnisse[$url] = $this->zerlegeSitzungsseite($html);
             } catch (\Throwable $e) {
                 $this->logger->error(
                     'Parlament Winterthur: Fehler beim parallelen Laden von Traktanden: ' . $e->getMessage(),
                     ['url' => $url, 'exception' => $e]
                 );
-                $ergebnisse[$url] = [];
+                $ergebnisse[$url] = ['traktanden' => [], 'dokumente' => []];
             }
         }
 
         return $ergebnisse;
+    }
+
+    /**
+     * @return array{traktanden: array<int, array<string, mixed>>, dokumente: array<int, array{titel: string, url: string, datum: string}>}
+     */
+    private function zerlegeSitzungsseite(string $html): array
+    {
+        $entitaeten = $this->extrahiereEntitaeten($html, 'Traktanden');
+        $eintraege = $this->normalisiereListenEntitaeten($entitaeten);
+        $traktanden = $this->normalisiereTraktandenEntitaeten($eintraege);
+        if ($traktanden === []) {
+            $traktanden = $this->extrahiereTraktandenAusHtml($html);
+        }
+
+        return [
+            'traktanden' => $traktanden,
+            'dokumente' => $this->extrahiereSitzungsdokumenteAusHtml($html),
+        ];
     }
 
     /**
@@ -957,7 +1006,11 @@ class ScraperService
             // Dokument-URL aus Titel-Zelle extrahieren (für Protokolle, Beschlüsse etc. ohne Geschäft-Link)
             $titelLink = self::extrahiereLinkAusHtml($titelHtml);
             // Nur externe Dokument-Links speichern – Geschäft-Links (/_rte/information/ID) werden via businessId abgedeckt
-            $traktandumUrl = ($titelLink['externId'] === '' && $titelLink['url'] !== '') ? $titelLink['url'] : '';
+            $istDokumentLink = $titelLink['externId'] === '' && $titelLink['url'] !== '';
+            $traktandumUrl = $istDokumentLink ? $titelLink['url'] : '';
+            // Der Titel des Dokuments nennt beim Protokoll die protokollierte Sitzung
+            // («Protokoll Stadtparlament vom 10. November 2025 - Entwurf»).
+            $dokumentTitel = $istDokumentLink ? $titelLink['titel'] : '';
             $typ = self::bereinigeHtmlText($dom->saveHTML($zellen->item(2)) ?: '');
             $geschaeftLinkNode = $xpath->query(".//a[contains(@href, '/_rte/information/')]", $zellen->item(3))->item(0);
             $geschaeftUrl = '';
@@ -979,10 +1032,141 @@ class ScraperService
                 'businessNumber' => $geschaeftNummer,
                 'url' => $geschaeftUrl,
                 'traktandumUrl' => $traktandumUrl,
+                'dokumentTitel' => $dokumentTitel,
             ];
         }
 
         return $traktanden;
+    }
+
+    /**
+     * Extrahiert die Dokumente, die an der Sitzung selbst hängen (Protokoll,
+     * Beschlüsse, Traktandenliste). Dokumente einzelner Traktanden gehören dem
+     * Traktandum und bleiben hier aussen vor.
+     *
+     * @return array<int, array{titel: string, url: string, datum: string}>
+     */
+    public function extrahiereSitzungsdokumenteAusHtml(string $html): array
+    {
+        $dom = new \DOMDocument();
+        $vorherigeErrors = libxml_use_internal_errors(true);
+        $geladen = $dom->loadHTML($html);
+        libxml_clear_errors();
+        libxml_use_internal_errors($vorherigeErrors);
+
+        if ($geladen === false) {
+            return [];
+        }
+
+        $xpath = new \DOMXPath($dom);
+        $links = $xpath->query("//a[contains(@href, '/_doc')][not(ancestor::tr[starts-with(@id, 'traktanden_')])]");
+        if ($links === false) {
+            return [];
+        }
+
+        $dokumente = [];
+        foreach ($links as $link) {
+            if (!$link instanceof \DOMElement) {
+                continue;
+            }
+            // Der Titel steht im title-Attribut; der Text ist beim zweiten Link
+            // der Zeile nur «Download».
+            $titel = self::bereinigeHtmlText($link->getAttribute('title'));
+            if ($titel === '') {
+                $titel = self::bereinigeHtmlText($link->textContent);
+            }
+            if ($titel === '' || strcasecmp($titel, 'Download') === 0) {
+                continue;
+            }
+            $url = self::absolutUrl((string) $link->getAttribute('href'));
+            if ($url === '') {
+                continue;
+            }
+            $dokumente[$url . '|' . $titel] = [
+                'titel' => $titel,
+                'url' => $url,
+                'datum' => self::datumAusText($titel),
+            ];
+        }
+
+        return array_values($dokumente);
+    }
+
+    /**
+     * Wählt aus den Dokumenten einer Sitzung ihr eigenes Protokoll: es trägt
+     * «Protokoll» im Titel und nennt darin das Datum dieser Sitzung. Das
+     * abgenommene Protokoll geht dem Entwurf vor.
+     *
+     * @param array<int, array<string, mixed>> $dokumente
+     * @return array{titel: string, url: string, datum: string}|null
+     */
+    public static function waehleProtokoll(array $dokumente, string $sitzungsDatum): ?array
+    {
+        $datum = substr(trim($sitzungsDatum), 0, 10);
+        if ($datum === '') {
+            return null;
+        }
+
+        $treffer = [];
+        foreach ($dokumente as $dokument) {
+            if (!is_array($dokument)) {
+                continue;
+            }
+            $titel = (string) ($dokument['titel'] ?? '');
+            if (!self::istProtokollTitel($titel) || (string) ($dokument['datum'] ?? '') !== $datum) {
+                continue;
+            }
+            $treffer[] = [
+                'titel' => $titel,
+                'url' => (string) ($dokument['url'] ?? ''),
+                'datum' => $datum,
+            ];
+        }
+
+        foreach ($treffer as $dokument) {
+            if (!self::istEntwurfTitel($dokument['titel'])) {
+                return $dokument;
+            }
+        }
+
+        return $treffer[0] ?? null;
+    }
+
+    /** Nennt der Titel ein Protokoll? */
+    public static function istProtokollTitel(string $titel): bool
+    {
+        return str_contains(self::kleinbuchstaben($titel), 'protokoll');
+    }
+
+    /** Nennt der Titel einen Entwurf (das noch nicht abgenommene Protokoll)? */
+    public static function istEntwurfTitel(string $titel): bool
+    {
+        return str_contains(self::kleinbuchstaben($titel), 'entwurf');
+    }
+
+    /**
+     * Liest das Datum aus einem Dokumenttitel — «vom 10. November 2025» ebenso
+     * wie «vom 02.03.2026». Ohne erkennbares Datum leer.
+     */
+    public static function datumAusText(string $text): string
+    {
+        if (preg_match('/(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})/u', $text, $treffer) === 1) {
+            return sprintf('%04d-%02d-%02d', (int) $treffer[3], (int) $treffer[2], (int) $treffer[1]);
+        }
+
+        if (preg_match('/(\d{1,2})\.\s*([A-Za-zÄÖÜäöü]+)\s+(\d{4})/u', $text, $treffer) === 1) {
+            $monat = self::MONATE[self::kleinbuchstaben($treffer[2])] ?? 0;
+            if ($monat > 0) {
+                return sprintf('%04d-%02d-%02d', (int) $treffer[3], $monat, (int) $treffer[1]);
+            }
+        }
+
+        return '';
+    }
+
+    private static function kleinbuchstaben(string $text): string
+    {
+        return function_exists('mb_strtolower') ? mb_strtolower($text, 'UTF-8') : strtolower($text);
     }
 
     /**

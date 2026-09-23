@@ -32,7 +32,7 @@ describe('e2e-Runner: Playwright-Report liegt im frischen TEMP_DIR', () => {
     expect(skript).toMatch(/docker compose run [^\n]*--build[^\n]*playwright/)
   })
 
-  it('reicht den Report dieses Laufs an den Aufrufer weiter (PW_JUNIT_OUT)', () => {
+  it('reicht den Bericht dieses Laufs an den Aufrufer weiter (PW_JUNIT_OUT)', () => {
     expect(skript).toContain('PW_JUNIT_OUT')
   })
 })

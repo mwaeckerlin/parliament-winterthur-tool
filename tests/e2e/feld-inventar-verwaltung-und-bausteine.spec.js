@@ -53,7 +53,7 @@ const KARTE_FRAKTIONSKONFIGURATION = [
   ['Zustandstext zur gewählten Gruppe', '#pw-nextcloud-gruppe-state'],
 ]
 
-/** Karte «Fraktionsmitglieder ↔ Nextcloud-User». */
+/** Karte «Fraktionsmitglieder ↔ Nextcloud-Benutzer». */
 const KARTE_MITGLIEDER = [
   ['Knopf «Ausgewählte abgleichen»', '#pw-btn-members-provision'],
   ['Statustext der Mitglieder-Zuordnung', '#pw-members-status'],
@@ -63,8 +63,8 @@ const KARTE_MITGLIEDER = [
   ['Tabellenrumpf mit den Mitglieder-Zeilen', '#pw-members-body'],
 ]
 
-/** Karte «Fraktionsmitglieder ↔ Nextcloud-User»: Spalten der Tabelle. */
-const MITGLIEDER_SPALTEN = ['Mitglied', 'E-Mail', 'Username', 'Gruppen']
+/** Karte «Fraktionsmitglieder ↔ Nextcloud-Benutzer»: Spalten der Tabelle. */
+const MITGLIEDER_SPALTEN = ['Mitglied', 'E-Mail', 'Benutzername', 'Gruppen']
 
 /** Karte «Automatische Synchronisation». */
 const KARTE_ZEITPLAN = [
@@ -230,7 +230,7 @@ test.describe('Feld-Inventar: Verwaltungsbereich', () => {
     expect(U1.pass, `Passwort für ${U1.name} fehlt`).not.toBe('')
   })
 
-  test('Karte Synchronisation: alle Bedienelemente vorhanden und am Live-Status gekoppelt', async ({ page }) => {
+  test('Karte Synchronisation: alle Bedienelemente vorhanden und an den laufenden Stand gekoppelt', async ({ page }) => {
     await login(page, ADMIN)
     await openAdmin(page)
 
@@ -302,7 +302,7 @@ test.describe('Feld-Inventar: Verwaltungsbereich', () => {
     await openAdmin(page)
 
     const karte = page.locator('.pw-admin-card', { has: page.locator('h3', { hasText: 'Fraktionsmitglieder' }) })
-    await expect(karte, 'Karte «Fraktionsmitglieder ↔ Nextcloud-User» fehlt').toBeVisible()
+    await expect(karte, 'Karte «Fraktionsmitglieder ↔ Nextcloud-Benutzer» fehlt').toBeVisible()
     await pruefeInventar(karte, KARTE_MITGLIEDER)
 
     await expect(karte.locator('#pw-btn-members-provision')).toHaveText('Ausgewählte abgleichen')
@@ -614,8 +614,8 @@ test.describe('Feld-Inventar: Notizenliste im Geschäft', () => {
       .toHaveText(/\d{1,2}\.\d{1,2}\.\d{4}\s+\d{1,2}:\d{2}/)
 
     // Löschknopf: bei der eigenen Notiz vorhanden …
-    await expect(eintrag.locator('.pw-btn-loeschen'), 'Löschknopf fehlt bei der eigenen Notiz').toBeVisible()
-    await expect(eintrag.locator('.pw-btn-loeschen')).toHaveAttribute('title', 'Notiz löschen')
+    await expect(eintrag.locator('.pw-notiz-loeschen'), 'Löschknopf fehlt bei der eigenen Notiz').toBeVisible()
+    await expect(eintrag.locator('.pw-notiz-loeschen')).toHaveAttribute('title', 'Notiz löschen')
 
     // … und bei fremden Notizen NICHT. Nur der Verfasser darf löschen. Der eigene
     // Anzeigename kommt aus der soeben selbst verfassten Notiz — verlässlicher als
@@ -626,7 +626,7 @@ test.describe('Feld-Inventar: Notizenliste im Geschäft', () => {
         .filter((e) => (e.querySelector('.pw-notiz-autor')?.textContent || '').trim() !== name)
         .map((e) => ({
           autor: (e.querySelector('.pw-notiz-autor')?.textContent || '').trim(),
-          loeschbar: !!e.querySelector('.pw-btn-loeschen'),
+          loeschbar: !!e.querySelector('.pw-notiz-loeschen'),
         })),
       eigenerName,
     )
@@ -745,16 +745,22 @@ test.describe('Feld-Inventar: formatierter Textbereich', () => {
     await prose.click()
     await page.waitForTimeout(300)
     await prose.pressSequentially('Formatierungsprobe', { delay: 25 })
-    // Markieren per Dreifachklick: das ist die Geste, die ein Nutzer macht, und
-    // die einzige, die ProseMirror zuverlässig in seine eigene Auswahl
-    // übernimmt. Weder Tastenkürzel (Ctrl+A, Shift+Home) noch selectText()
-    // setzen die interne Auswahl des Editors verlässlich.
-    await prose.click({ clickCount: 3 })
-    await expect(prose, 'Der Absatz wurde nicht markiert').toHaveText('Formatierungsprobe')
+    await expect(prose, 'Der Absatz wurde nicht geschrieben').toHaveText('Formatierungsprobe')
+
+    // «Fett» ohne Auswahl zeichnet den ganzen Absatz aus.
     await leiste.locator('[title="Fett (Ctrl+B)"]').click()
     await expect(prose.locator('strong'), '«Fett» zeichnet den Text nicht aus').toHaveCount(1)
+
+    // Der Knopf zeigt, was an der EINFÜGEMARKE gilt. Nach dem Auszeichnen steht
+    // sie am Absatzanfang, also ausserhalb der Auszeichnung. Sie wird MITTEN in
+    // das fette Wort gesetzt — mit der Tastatur, weil ein Mausklick je nach
+    // Browser am Wortende landet und dort schon wieder ausserhalb der Marke
+    // liegt (gemessen: Chromium Position 4, Firefox Position 18 von 18).
+    await prose.click()
+    await page.keyboard.press('Home')
+    for (let i = 0; i < 5; i++) { await page.keyboard.press('ArrowRight') }
     await expect(leiste.locator('[title="Fett (Ctrl+B)"]'), '«Fett» zeigt den aktiven Zustand nicht an')
-      .toHaveClass(/aktiv/)
+      .toHaveClass(/aktiv/, { timeout: 15_000 })
 
     await leiste.locator('[title="Rückgängig (Ctrl+Z)"]').click()
     await expect(prose.locator('strong'), '«Rückgängig» nimmt die Auszeichnung nicht zurück').toHaveCount(0)

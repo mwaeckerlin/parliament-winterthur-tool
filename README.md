@@ -1,19 +1,11 @@
 # Parlament Winterthur Tool
 
-Nextcloud-Plugin für die Fraktionsarbeit im Winterthurer Parlament.
-Das Plugin synchronisiert täglich die öffentlichen Daten des
-[Parlaments Winterthur](https://parlament.winterthur.ch/) und stellt sie als
-strukturierte Arbeitsoberfläche mit fraktionsinternen Notizen, Zuständigkeiten
-und Beschlüssen zur Verfügung.
+Nextcloud-Plugin für die Fraktionsarbeit im Winterthurer Parlament. Das Plugin synchronisiert täglich die öffentlichen Daten des [Parlaments Winterthur](https://parlament.winterthur.ch/) und stellt sie als strukturierte Arbeitsoberfläche mit fraktionsinternen Notizen, Zuständigkeiten und Beschlüssen zur Verfügung.
 
 
-## Warum dieses Tool?
+## Zweck
 
-Stell dir Nextcloud vor wie eine eigene, **private Version von Google Drive oder
-Microsoft 365** – aber sie läuft auf einem Server, den die Fraktion selbst
-kontrolliert. Niemand sonst hat Einsicht in eure Dokumente, Kalender oder
-Chats. Du erreichst Nextcloud über deinen Webbrowser (Chrome, Firefox, Safari)
-und optional über Apps für Handy und Computer.
+Stell dir Nextcloud vor wie eine eigene, **private Version von Google Drive oder Microsoft 365** – aber sie läuft auf einem Server, den die Fraktion selbst kontrolliert. Niemand sonst hat Einsicht in eure Dokumente, Kalender oder Chats. Du erreichst Nextcloud über deinen Webbrowser (Chrome, Firefox, Safari) und optional über Apps für Handy und Computer.
 
 Was sich vergleichen lässt:
 
@@ -23,188 +15,83 @@ Was sich vergleichen lässt:
 | Dokumente gemeinsam schreiben  | Google Docs / Word Online | **Nextcloud Office (Collabora)**   |
 | Termine                        | Google Calendar / Outlook | **Kalender**                       |
 | Adressbuch                     | Google Contacts           | **Kontakte**                       |
-| Aufgaben / To-Dos              | Google Tasks / To Do      | **Aufgaben / Deck**                |
+| Aufgabenlisten                 | Google Tasks / To Do      | **Aufgaben / Deck**                |
 | Kanban-Board (Projektplanung)  | Trello / Planner          | **Deck**                           |
 | Chat                           | Google Chat / Teams       | **Talk**                           |
 | Video-Konferenz                | Meet / Teams              | **Talk**                           |
 | Umfragen / Doodle              | Forms                     | **Forms / Polls**                  |
 
-Und zusätzlich: **dieses Plugin** – das Parlament-Winterthur-Tool. Es bringt
-alle laufenden Geschäfte, Sitzungen, Traktanden, Kommissionen und
-Fraktionsmitglieder automatisch in eure Nextcloud. Niemand muss mehr selbst
-auf der Parlamentswebseite suchen.
+Und zusätzlich: **dieses Plugin** – das Parlament-Winterthur-Tool. Es bringt alle laufenden Geschäfte, Sitzungen, Traktanden, Kommissionen und Fraktionsmitglieder automatisch in eure Nextcloud. Niemand muss mehr selbst auf der Parlamentswebseite suchen.
 
 
 ## Funktionen
 
-Das Plugin lädt einmal täglich automatisch alle öffentlichen Daten vom
-Winterthurer Parlament herunter und zeigt sie übersichtlich an. Zusätzlich
-kann die Fraktion eigene Notizen, Zuständigkeiten und Argumente dazu erfassen
-– privat, nur innerhalb der Fraktion sichtbar.
+Das Plugin lädt einmal täglich automatisch alle öffentlichen Daten vom Winterthurer Parlament herunter und zeigt sie übersichtlich an. Zusätzlich kann die Fraktion eigene Notizen, Zuständigkeiten und Argumente dazu erfassen – privat, nur innerhalb der Fraktion sichtbar.
 
-Eine vollständige, laufend nachgeführte Funktionsliste steht in
-[FEATURES.md](FEATURES.md); die dort durchnummerierten Funktionen sind über
-[TESTS.md](TESTS.md) mit allen Tests verknüpft.
+Eine vollständige, laufend nachgeführte Funktionsliste steht in [FEATURES.md](FEATURES.md); die dort durchnummerierten Funktionen sind über [TESTS.md](TESTS.md) mit allen Tests verknüpft.
 
 ### Funktionen im Überblick
 
-- **Geschäfte-Liste** – alle politischen Geschäfte (Anträge, Motionen,
-  Interpellationen …) mit Suche, Filter und aktuellem Stand.
-- **Sitzungskalender** – kommende Parlaments- und Kommissionssitzungen samt
-  Traktandenliste; automatisch in den Nextcloud-Kalender integriert.
-- **Mitgliederverzeichnis** – alle Parlamentarier mit Partei,
-  Fraktion und Kommissionszugehörigkeit; sortierbar nach Funktion (Standard),
-  Fraktion, Partei oder Name und filterbar nach Funktion (Fraktions- bzw.
-  Kommissionspräsident) sowie nach einzelner Kommission.
-- **Kommissionsübersicht** – welche Kommission behandelt welches Geschäft, wer
-  sitzt drin.
+- **Geschäfte-Liste** – alle politischen Geschäfte (Anträge, Motionen, Interpellationen …) mit Suche, Filter und aktuellem Stand.
+- **Sitzungskalender** – kommende Parlaments- und Kommissionssitzungen samt Traktandenliste; automatisch in den Nextcloud-Kalender integriert.
+- **Mitgliederverzeichnis** – alle Parlamentarier mit Partei, Fraktion und Kommissionszugehörigkeit; sortierbar nach Funktion (Standard), Fraktion, Partei oder Name und filterbar nach Funktion (Fraktions- bzw. Kommissionspräsident) sowie nach einzelner Kommission.
+- **Kommissionsübersicht** – welche Kommission behandelt welches Geschäft, wer sitzt drin.
 - **Fraktionsarbeit**
-  - Geschäften können **Zuständige** aus der eigenen Fraktion zugewiesen
-    werden (Hauptzuständige + Mitarbeitende).
-  - Die Zuweisung für Kommissionsgeschäfte erfolgt **automatisch**: Wer in der
-    zuständigen Kommission sitzt, wird vorgeschlagen.
-  - Pro Geschäft können **Notizen, Argumente, Hintergrund­dokumente** abgelegt
-    werden. Notizen lassen sich **formatieren** (Fett, Kursiv, Listen,
-    Überschriften, Zitate, Code, Links) und werden intern als Markdown
-    gespeichert.
-- **Gemeinsames Aufgaben-Board (Deck)** – ein mit der Fraktion geteiltes
-  Kanban-Board «Fraktion» wird automatisch eingerichtet (analog zum gemeinsamen
-  Ordner und Kalender); ist die Deck-App nicht installiert, bleibt die Funktion
-  inaktiv.
-- **Sitzungs-Verknüpfung & -Dokumente** – Sitzungen lassen sich miteinander
-  verknüpfen (z.B. eine Kommissions- mit der vorbereitenden Fraktionssitzung),
-  Dokumente pro Sitzung ablegen und einzelne Geschäfte mit einer Sitzung
-  verknüpfen.
-- **Automatische Geschäfts-Verknüpfung** – Sitzungstypen können «beratene»
-  Kommissionen festlegen; die in diesen Kommissionen hängigen Geschäfte werden
-  vor jeder Sitzung dieses Typs automatisch verknüpft.
-- **Sitzungs-To-dos ins Deck-Board** – aus einer Sitzung lassen sich Aufgaben
-  direkt als Karte im Fraktions-Board «Fraktion» anlegen.
-- **Vorstösse** – eigene und fremde politische Vorstösse (Motion, Postulat,
-  Interpellation …) erfassen und verwalten: Herkunft (eigene/fremde), Status,
-  Priorität, Zuständigkeit (Personen-Liste), Notizen und Inhalt im
-  Formatierungs-Editor; bei fremden Vorstössen zusätzlich die eigene
-  Beschluss-Haltung, die Herkunftsfraktion und deren Ansprechpartner. Jede
-  Eingabe speichert sofort. Dokumente lassen sich anlegen, hochladen oder aus
-  «Fraktion/40_Vorstösse» wählen; von dort werden sie auch automatisch
-  übernommen. Ein Vorstoss lässt sich durch Verknüpfung mit einem Geschäft
-  abschliessen (Ähnlichkeitssuche über den Titel; die Priorität wird übernommen).
-- **Budget** – ein eigener Bereich für den städtischen Budgetprozess mit vier
-  Tabs (Globalbudgets, Personalbestand, Investitionsrechnung, Steuerfuss),
-  Filtern (Jahr, Kommission/Departement, Kostensteigerung) und einer ständig
-  mitlaufenden Summenzeile. Eigene und fremde Anträge je Produktegruppe;
-  globale Kürzungen werden anteilig zum Aufwand verteilt (Defizit standardmässig
-  zur schwarzen Null); Personal-, Investitions- und Steuerfuss-Anträge; ein
-  Anträge-PDF je Kommission und die Live-Verfolgung der Beschlüsse in der
-  Sitzung. Die Budgetdaten stammen aus den städtischen Budgetbüchern.
-- **Priorität pro Geschäft und Vorstoss** – hoch, mittel oder tief (nicht
-  gesetzt wird als «—» angezeigt und wirkt wie mittel); einstellbar in der
-  Übersicht wie in der Detailansicht. In den Übersichten werden hohe Einträge
-  dezent hervorgehoben und tiefe abgeschwächt, mit eigenem Filter.
-- **Änderungsverlauf** – ein eigener Bereich zeigt die Versionshistorie der App
-  als aufklappbare, formatierte Liste.
-- **Live-Aktualisierung** – wenn jemand in der Fraktion etwas ändert, sehen
-  alle anderen es sofort, ohne die Seite neu zu laden.
-- **Suche & Filter** über alle Geschäfte, Sitzungen, Mitglieder und Vorstösse.
+  - Geschäften können **Zuständige** aus der eigenen Fraktion zugewiesen werden (Hauptzuständige + Mitarbeitende).
+  - Die Zuweisung für Kommissionsgeschäfte erfolgt **automatisch**: Wer in der zuständigen Kommission sitzt, wird vorgeschlagen.
+  - Pro Geschäft können **Notizen, Argumente, Hintergrund­dokumente** abgelegt werden. Notizen lassen sich **formatieren** (Fett, Kursiv, Listen, Überschriften, Zitate, Code, Links) und werden intern als Markdown gespeichert.
+- **Gemeinsames Aufgaben-Board (Deck)** – ein mit der Fraktion geteiltes Kanban-Board «Fraktion» wird automatisch eingerichtet (analog zum gemeinsamen Ordner und Kalender); ist die Deck-App nicht installiert, bleibt die Funktion inaktiv.
+- **Sitzungen verknüpfen und Dokumente ablegen** – Sitzungen lassen sich miteinander verknüpfen (z.B. eine Kommissions- mit der vorbereitenden Fraktionssitzung), Dokumente pro Sitzung ablegen und einzelne Geschäfte mit einer Sitzung verknüpfen.
+- **Automatische Geschäfts-Verknüpfung** – Sitzungstypen können «beratene» Kommissionen festlegen; die in diesen Kommissionen hängigen Geschäfte werden vor jeder Sitzung dieses Typs automatisch verknüpft.
+- **Aufgaben aus der Sitzung ins Deck-Board** – aus einer Sitzung lassen sich Aufgaben direkt als Karte im Fraktions-Board «Fraktion» anlegen.
+- **Vorstösse** – eigene und fremde politische Vorstösse (Motion, Postulat, Interpellation …) erfassen und verwalten: Herkunft (eigene/fremde), Status, Priorität, Zuständigkeit (Personen-Liste), Notizen und Inhalt im Formatierungs-Editor; bei fremden Vorstössen zusätzlich die eigene Beschluss-Haltung, die Herkunftsfraktion und deren Ansprechpartner. Jede Eingabe speichert sofort. Dokumente lassen sich anlegen, hochladen oder aus «Fraktion/40_Vorstösse» wählen; von dort werden sie auch automatisch übernommen. Ein Vorstoss lässt sich durch Verknüpfung mit einem Geschäft abschliessen (Ähnlichkeitssuche über den Titel; die Priorität wird übernommen).
+- **Budget** – ein eigener Bereich für den städtischen Budgetprozess mit den Tabs Globalbudgets, Personalbestand, Investitionsrechnung, Steuerfuss, Anträge und Grafik, Filtern (Jahr, Kommission/Departement, Kostensteigerung) und einer ständig mitlaufenden Summenzeile. Eigene und fremde Anträge je Produktegruppe; globale Kürzungen werden anteilig zum Aufwand verteilt (Defizit standardmässig zur schwarzen Null); Personal-, Investitions- und Steuerfuss-Anträge; ein Anträge-PDF je Kommission und das Mitführen der Beschlüsse während der Sitzung. Die Budgetdaten stammen aus den städtischen Budgetbüchern.
+- **Grafische Übersicht** – der letzte Budget-Tab zeigt das ganze Budget als geschachtelte Kreise, deren Fläche dem Betrag entspricht: Einnahmen und Ausgaben, darin die Departemente, darin die Produktegruppen, darin die Produkte. Ein Klick öffnet einen Kreis, der Weg im Kopf und Escape führen zurück. Beim Öffnen kommen die Kreise von weit her zusammen, schieben einander beiseite und ordnen sich; wer mit dem Zeiger darüberfährt, sieht Name, Betrag und Anteil jedes einzelnen, auch der kleinsten.
+- **Fragestunde** – ein eigener Bereich für die Fragen der Fraktion. Gesammelt wird jederzeit, auch ohne angesetzte Fragestunde: Wem etwas auffällt, trägt es ein, und die Fraktion nutzt es später in irgendeiner Fragestunde. Sie bespricht die Fragen in ihrer Sitzung, passt sie an, teilt sie einer Fragestunde zu und einander zum Einreichen — meist der Person, die sie eingebracht hat, sonst jemand anderem, weil jedes Mitglied nur eine Frage einreicht. Die Seite führt die Frist (der Donnerstag vor der Fragestunde) und die Grenze von 1'000 Zeichen mit und meldet, wenn einem Mitglied mehr als eine Frage zugeteilt ist.
+- **Priorität pro Geschäft und Vorstoss** – hoch, mittel oder tief (nicht gesetzt wird als «—» angezeigt und wirkt wie mittel); einstellbar in der Übersicht wie in der Detailansicht. In den Übersichten werden hohe Einträge dezent hervorgehoben und tiefe abgeschwächt, mit eigenem Filter.
+- **Änderungsverlauf** – ein eigener Bereich zeigt den Versionsverlauf der App als aufklappbare, formatierte Liste.
+- **Aktualisierung in Echtzeit** – wenn jemand in der Fraktion etwas ändert, sehen alle anderen es sofort, ohne die Seite neu zu laden.
+- **Suche und Filter** über alle Geschäfte, Sitzungen, Mitglieder und Vorstösse.
 
 ### Fraktionsarbeit – aktueller Stand
 
 Aktuell umgesetzt:
 
-1. **Geschäftsübersicht**: Tabellarische Darstellung aller Geschäfte mit
-   Filtermöglichkeiten nach Status, Typ, Datum, Zuständigkeit, Priorität und letztem gültigen Beschluss
-   (Status/Typ/Zuständige/Beschluss/Priorität als Mehrfachselektion). Geschäfte mit
-   hoher Priorität sind dezent hervorgehoben, solche mit tiefer abgeschwächt.
-2. **Sitzungsvorbereitung**: Für jede Sitzung werden die Traktanden angezeigt.
-   Pro Traktandum können Bemerkungen und Notizen erfasst werden.
-3. **Zuständigkeiten**: Jedem Geschäft können mehrere Personen zugewiesen werden,
-   inkl. Hauptzuständigkeit; Auswahlboxen listen aktive Mitglieder zuerst,
-   inaktive getrennt darunter.
-4. **Fraktionsentscheide**: Pro Geschäft können strukturierte Beschlüsse als
-   Timeline-Aktionen erfasst werden.
-5. **Kalenderintegration**: Alle Sitzungen werden im gemeinsamen Fraktions-Kalender
-   (`Fraktion <Name>`) als Nextcloud-Kalendereinträge gespeichert. Dieser Kalender
-   ist bewusst als allgemeiner Fraktions-Container ausgelegt und nimmt künftig auch
-   weitere Sitzungstypen auf.
-6. **Mitgliederverwaltung**: Automatische Synchronisation der Fraktionsmitglieder
-   als Nextcloud-Gruppe mit E-Mail-Einladung. Verwaiste Nextcloud-User (in der Gruppe,
-   aber nicht mehr im Parlament) werden in der Admin-UI durchgestrichen angezeigt
-   und können selektiv deaktiviert werden.
-7. **Fraktionssitzungsmodus**: Beschlüsse sind im Sitzungsmodus auf
-   Protokollführung (inkl. aktiver Stellvertretung) beschränkt; Notizen bleiben offen.
-8. **Rollenmodell**: Fraktionspräsidium, Protokollführung und Kommissionsmitgliedschaften
-   inkl. zeitlich befristeter Stellvertretungen.
-9. **Live-Kollaboration**: Änderungen von Kolleginnen/Kollegen erscheinen ohne
-   Seiten-Reload via WebSocket-Realtime.
-10. **Entscheidungsbedarf**: Filter auf Geschäfte mit offenem/neuem Fraktionsentscheid
-    basierend auf `quelle_aktualisiert_am` gegenüber letztem gültigen Beschluss.
-11. **Erledigte standardmässig ausgeblendet**: In der Geschäftsliste werden
-    `erledigt`/`abgeschlossen` standardmässig nicht angezeigt
-    (Checkbox `Erledigte anzeigen` blendet sie ein).
-12. **Notizen mit Formatierung**: Notizen zu Geschäften und Sitzungen werden in
-    einem WYSIWYG-Editor erfasst (Fett, Kursiv, Listen, Überschriften, Zitate,
-    Code, Links) und intern als Markdown gespeichert.
-13. **Sitzungen verknüpfen und dokumentieren**: Sitzungen lassen sich
-    untereinander sowie mit einzelnen Geschäften verknüpfen; pro Sitzung können
-    Dokumente abgelegt werden. Sitzungstypen mit «beratenen» Kommissionen
-    verknüpfen deren hängige Geschäfte automatisch vor der Sitzung.
-14. **Vorstösse**: Eigene und fremde Vorstösse mit Herkunft, Status, Priorität,
-    Zuständigkeit (Personen-Liste), Notizen und Inhalt (Formatierungs-Editor wie
-    bei den Notizen); bei fremden Vorstössen zusätzlich Beschluss-Haltung,
-    Herkunftsfraktion und Ansprechpartner der fremden Fraktion. Dokumente
-    anlegen/hochladen/auswählen; Filter nach Herkunft/Status, automatische
-    Übernahme aus «Fraktion/40_Vorstösse». Abschluss durch Verknüpfung mit einem
-    Geschäft (Titel-Ähnlichkeitssuche, Priorität wird übernommen). Löschen über
-    die Karte, mit Rückfrage.
-15. **Anlegen und Bearbeiten überall gleich**: Der Neu-Knopf öffnet dieselbe
-    vollständige Maske wie das Bearbeiten — mit allen Feldern, nie ein
-    reduziertes Formular. Beim Anlegen wird nichts vorab gespeichert: unten
-    stehen «Speichern» und «Abbrechen»; «Speichern» ist gesperrt, solange die
-    Pflichtangabe fehlt, und führt danach direkt in die Bearbeitung. Ein Klick
-    neben die Maske bewirkt dabei nichts, damit keine Eingabe verloren geht —
-    verworfen wird ausschliesslich über «Abbrechen». Beim Bearbeiten speichert
-    jede Eingabe sofort (keine Knöpfe, «✕» schliesst nur). Notizen, Dokumente
-    und der Verlauf beziehen sich auf einen bestehenden Eintrag und erscheinen
-    deshalb erst nach dem Speichern; ein Hinweis in der Maske sagt das. Stehen
-    Vorlagen zur Auswahl (Sitzungstypen), öffnet der Neu-Knopf ein Aktionsmenü
-    mit je einem Eintrag pro Vorlage — der Nextcloud-Standard aus der App
-    «Dateien».
-16. **Keine Änderung ohne Spur**: Jede Änderung wird nachvollziehbar
-    festgehalten — Notizen über ihren Versionsverlauf, alles Übrige (auch
-    geänderte Angaben und Prioritäten, mit Vorher- und Nachher-Wert) als
-    Eintrag in der Aktionszeitleiste.
-17. **Änderungsverlauf**: Eigener Bereich mit der Versionshistorie als
-    aufklappbare, formatierte Liste.
+1. **Geschäftsübersicht**: Tabellarische Darstellung aller Geschäfte mit Filtermöglichkeiten nach Status, Typ, Datum, Zuständigkeit, Priorität und letztem gültigen Beschluss (Status/Typ/Zuständige/Beschluss/Priorität als Mehrfachauswahl). Geschäfte mit hoher Priorität sind dezent hervorgehoben, solche mit tiefer abgeschwächt.
+2. **Sitzungsvorbereitung**: Für jede Sitzung werden die Traktanden angezeigt. Pro Traktandum können Bemerkungen und Notizen erfasst werden.
+3. **Zuständigkeiten**: Jedem Geschäft können mehrere Personen zugewiesen werden, inkl. Hauptzuständigkeit; die Auswahllisten führen aktive Mitglieder zuerst, inaktive getrennt darunter.
+4. **Fraktionsentscheide**: Pro Geschäft können strukturierte Beschlüsse als Einträge der Aktionszeitleiste erfasst werden.
+5. **Kalenderintegration**: Alle Sitzungen werden im gemeinsamen Fraktions-Kalender (`Fraktion <Name>`) als Nextcloud-Kalendereinträge gespeichert. Dieser Kalender ist bewusst als allgemeiner Kalender der Fraktion ausgelegt und nimmt künftig auch weitere Sitzungstypen auf.
+6. **Mitgliederverwaltung**: Automatische Synchronisation der Fraktionsmitglieder als Nextcloud-Gruppe mit E-Mail-Einladung. Verwaiste Nextcloud-Benutzer (in der Gruppe, aber nicht mehr im Parlament) werden in der Verwaltung durchgestrichen angezeigt und lassen sich einzeln deaktivieren.
+7. **Fraktionssitzungsmodus**: Beschlüsse sind im Sitzungsmodus auf Protokollführung (inkl. aktiver Stellvertretung) beschränkt; Notizen bleiben offen.
+8. **Rollenmodell**: Fraktionspräsidium, Protokollführung und Kommissionsmitgliedschaften inkl. zeitlich befristeter Stellvertretungen.
+9. **Gemeinsam arbeiten**: Änderungen der anderen erscheinen sofort, ohne die Seite neu zu laden.
+10. **Entscheidungsbedarf**: Filter auf Geschäfte mit offenem/neuem Fraktionsentscheid basierend auf `quelle_aktualisiert_am` gegenüber letztem gültigen Beschluss.
+11. **Erledigte standardmässig ausgeblendet**: In der Geschäftsliste werden `erledigt`/`abgeschlossen` standardmässig nicht angezeigt (der Schalter «Erledigte anzeigen» blendet sie ein).
+12. **Notizen mit Formatierung**: Notizen zu Geschäften und Sitzungen werden in einem Editor erfasst, der das Ergebnis gleich so zeigt, wie es aussieht (Fett, Kursiv, Listen, Überschriften, Zitate, Code, Links); gespeichert wird intern als Markdown.
+13. **Sitzungen verknüpfen und dokumentieren**: Sitzungen lassen sich untereinander sowie mit einzelnen Geschäften verknüpfen; pro Sitzung können Dokumente abgelegt werden. Sitzungstypen mit «beratenen» Kommissionen verknüpfen deren hängige Geschäfte automatisch vor der Sitzung.
+14. **Vorstösse**: Eigene und fremde Vorstösse mit Herkunft, Status, Priorität, Zuständigkeit (Personen-Liste), Notizen und Inhalt (Formatierungs-Editor wie bei den Notizen); bei fremden Vorstössen zusätzlich Beschluss-Haltung, Herkunftsfraktion und Ansprechpartner der fremden Fraktion. Dokumente anlegen/hochladen/auswählen; Filter nach Herkunft/Status, automatische Übernahme aus «Fraktion/40_Vorstösse». Abschluss durch Verknüpfung mit einem Geschäft (Titel-Ähnlichkeitssuche, Priorität wird übernommen). Löschen über die Karte, mit Rückfrage.
+15. **Anlegen und Bearbeiten überall gleich**: Der Neu-Knopf öffnet dieselbe vollständige Maske wie das Bearbeiten — mit allen Feldern, nie ein reduziertes Formular. Beim Anlegen wird nichts vorab gespeichert: unten stehen «Speichern» und «Abbrechen»; «Speichern» ist gesperrt, solange die Pflichtangabe fehlt, und führt danach direkt in die Bearbeitung. Ein Klick neben die Maske bewirkt dabei nichts, damit keine Eingabe verloren geht — verworfen wird ausschliesslich über «Abbrechen». Beim Bearbeiten speichert jede Eingabe sofort (keine Knöpfe, «✕» schliesst nur). Notizen, Dokumente und der Verlauf beziehen sich auf einen bestehenden Eintrag und erscheinen deshalb erst nach dem Speichern; ein Hinweis in der Maske sagt das. Stehen Vorlagen zur Auswahl (Sitzungstypen), öffnet der Neu-Knopf ein Aktionsmenü mit je einem Eintrag pro Vorlage — der Nextcloud-Standard aus der App «Dateien».
+16. **Keine Änderung ohne Spur**: Jede Änderung wird nachvollziehbar festgehalten — Notizen über ihren Versionsverlauf, alles Übrige (auch geänderte Angaben und Prioritäten, mit Vorher- und Nachher-Wert) als Eintrag in der Aktionszeitleiste.
+17. **Änderungsverlauf**: Eigener Bereich mit dem Versionsverlauf als aufklappbare, formatierte Liste.
 
 ### Geplante Funktionen
 
-- **Abstimmung zu Vorlagen und Vorstössen**: Jedes Fraktionsmitglied kann zu
-  jeder Vorlage (Geschäft) und jedem Vorstoss angeben, ob es **dafür, dagegen
-  oder neutral** ist, und die Haltung begründen. Vorteil: Themen, bei denen sich
-  die Fraktion ohnehin einig ist, müssen in der Fraktionssitzung nicht mehr
-  besprochen werden, und kurzfristige Entscheide sind auch ohne Sitzung möglich.
-  So wird die Fraktion effektiver und kann sich in der Sitzung auf die wirklich
-  strittigen Fragen konzentrieren.
+- **Abstimmung zu Vorlagen und Vorstössen**: Jedes Fraktionsmitglied kann zu jeder Vorlage (Geschäft) und jedem Vorstoss angeben, ob es **dafür, dagegen oder neutral** ist, und die Haltung begründen. Vorteil: Themen, bei denen sich die Fraktion ohnehin einig ist, müssen in der Fraktionssitzung nicht mehr besprochen werden, und kurzfristige Entscheide sind auch ohne Sitzung möglich. So wird die Fraktion effektiver und kann sich in der Sitzung auf die wirklich strittigen Fragen konzentrieren.
 
-### Wie nutzt die Fraktion das im Alltag?
+### Im Alltag
 
-1. **Vor der Fraktionssitzung**: Der Hauptzuständige liest seine Geschäfte und
-   schreibt eine Empfehlung in die Notiz.
-2. **In der Fraktionssitzung**: Die Empfehlungen werden direkt am Bildschirm
-   diskutiert; Beschlüsse werden im Geschäft notiert.
-3. **Vor der Parlamentssitzung**: Jeder ruft die eigenen Geschäfte auf und
-   hat sofort die Argumente zur Hand.
-4. **Nach der Sitzung**: Der neue Stand erscheint automatisch beim nächsten
-   Synchronisationslauf (oder manuell per Knopfdruck).
+1. **Vor der Fraktionssitzung**: Der Hauptzuständige liest seine Geschäfte und schreibt eine Empfehlung in die Notiz.
+2. **In der Fraktionssitzung**: Die Empfehlungen werden direkt am Bildschirm diskutiert; Beschlüsse werden im Geschäft notiert.
+3. **Vor der Parlamentssitzung**: Jeder ruft die eigenen Geschäfte auf und hat sofort die Argumente zur Hand.
+4. **Nach der Sitzung**: Der neue Stand erscheint automatisch beim nächsten Synchronisationslauf (oder manuell per Knopfdruck).
 
 
 ## Bedienung
 
 ### Nextcloud-Funktionen für die Fraktionsarbeit
 
-Neben unserem Plugin bringt Nextcloud viele weitere Werkzeuge mit. Die
-folgenden sind für die Fraktionsarbeit besonders nützlich. Sie alle erscheinen
-als Symbole oben in der Menüleiste, sobald sie aktiviert sind.
+Neben unserem Plugin bringt Nextcloud viele weitere Werkzeuge mit. Die folgenden sind für die Fraktionsarbeit besonders nützlich. Sie alle erscheinen als Symbole oben in der Menüleiste, sobald sie aktiviert sind.
 
 #### Empfohlene Plugins (Apps)
 
@@ -215,10 +102,10 @@ als Symbole oben in der Menüleiste, sobald sie aktiviert sind.
 | **Kalender**                     | Calendar                    | Persönliche und gemeinsame Termine. Sitzungen aus dem Plugin erscheinen automatisch.                |
 | **Kontakte**                     | Contacts                    | Gemeinsames Adressbuch der Fraktion.                                                                |
 | **Talk**                         | Talk                        | Chat und Videokonferenz innerhalb der Fraktion (Ersatz für WhatsApp-Gruppe + Zoom).                 |
-| **Deck**                         | Deck                        | Kanban-Board (To-Do-Spalten): „Zu erledigen" – „In Arbeit" – „Erledigt". Ideal pro Geschäft oder Kampagne. |
-| **Aufgaben**                     | Tasks                       | Einfache To-Do-Listen, synchronisiert mit Handy.                                                    |
+| **Deck**                         | Deck                        | Kanban-Board mit den Spalten «To-do», «In Arbeit» und «Erledigt». Ideal pro Geschäft oder Kampagne. |
+| **Aufgaben**                     | Tasks                       | Einfache Aufgabenlisten, synchronisiert mit dem Handy.                                              |
 | **Notizen**                      | Notes                       | Schnelle Notizen, ähnlich wie ein Notizbuch. Markdown-fähig.                                        |
-| **Forms**                        | Forms                       | Umfragen innerhalb der Fraktion (z. B. „Wer kommt am 15. Mai?").                                    |
+| **Forms**                        | Forms                       | Umfragen innerhalb der Fraktion (z.B. «Wer kommt am 15. Mai?»).                                     |
 | **Polls**                        | Polls                       | Terminfindung (Doodle-Ersatz).                                                                      |
 | **Mail**                         | Mail                        | E-Mail-Konto in Nextcloud einbinden (optional).                                                     |
 | **Lesezeichen**                  | Bookmarks                   | Gemeinsame Linksammlung (z. B. wichtige Artikel, Gesetzestexte).                                    |
@@ -232,28 +119,23 @@ als Symbole oben in der Menüleiste, sobald sie aktiviert sind.
 - **Fraktionsbeschlüsse dokumentieren** → Notizen pro Geschäft (direkt im Plugin)
 
 
-### Best Practices: So organisiert ihr die Fraktionsarbeit
+### Organisation der Fraktionsarbeit
 
-Damit alle die Sachen finden und niemand aus Versehen etwas Privates teilt
-oder etwas Wichtiges überschreibt, hat sich die folgende Struktur bewährt.
+Damit alle die Sachen finden und niemand aus Versehen etwas Privates teilt oder etwas Wichtiges überschreibt, hat sich die folgende Struktur bewährt.
 
-#### Grundregel: Drei Bereiche
+#### Bereiche der Ablage
 
 1. **Mein persönlicher Bereich** – nur ich sehe es.
 2. **Fraktions-Bereich** – alle Fraktionsmitglieder sehen es.
-3. **Öffentlicher Bereich** – ein Link kann nach aussen weitergegeben werden
-   (Medien, andere Parteien). Nur bewusst nutzen.
+3. **Öffentlicher Bereich** – ein Link kann nach aussen weitergegeben werden (Medien, andere Parteien). Nur bewusst nutzen.
 
-In Nextcloud erkennt man am Symbol neben dem Datei- oder Ordnernamen, in
-welchem Bereich man sich befindet (Personen-Symbol = geteilt, Welt-Symbol =
-öffentlicher Link).
+In Nextcloud erkennt man am Symbol neben dem Datei- oder Ordnernamen, in welchem Bereich man sich befindet (Personen-Symbol = geteilt, Welt-Symbol = öffentlicher Link).
 
 #### Dokumente in der Fraktion teilen
 
-**Empfohlene Ordnerstruktur** (wird einmalig vom Administrator
-angelegt und an alle Fraktionsmitglieder freigegeben):
+Der Administrator legt diese Ordnerstruktur einmal an und gibt sie an alle Fraktionsmitglieder frei:
 
-```
+```text
 Fraktion/
 ├── 00_Allgemein/           ← Statuten, Geschäftsordnung, Mitgliederliste
 ├── 10_Sitzungen/
@@ -273,18 +155,15 @@ Fraktion/
 └── 90_Archiv/
 ```
 
-Bestehende Ablagen werden beim Start automatisch auf diese Struktur gebracht:
-`40_Wahlkampf` wird zu `50_Wahlkampf`, `50_Medien` zu `60_Medien` (Inhalte bleiben
-erhalten). Erst danach entsteht `40_Vorstösse`, damit die Nummern nicht
-kollidieren. Die Nummerierung läuft lückenlos in 10er-Schritten.
+Bestehende Ablagen werden beim Start automatisch auf diese Struktur gebracht: `40_Wahlkampf` wird zu `50_Wahlkampf`, `50_Medien` zu `60_Medien` (Inhalte bleiben erhalten). Erst danach entsteht `40_Vorstösse`, damit die Nummern nicht kollidieren. Die Nummerierung läuft lückenlos in 10er-Schritten.
 
-**Wer darf was?**
+##### Berechtigungen
 
 | Ordner                | Lesen          | Schreiben                              |
 |-----------------------|----------------|----------------------------------------|
 | `00_Allgemein/`       | Alle           | Fraktionspräsidium                     |
 | `10_Sitzungen/`       | Alle           | Alle (Protokoll: Aktuar)               |
-| `20_Geschäfte/`       | Alle           | Hauptzuständige + Co-Bearbeiter        |
+| `20_Geschäfte/`       | Alle           | Hauptzuständige und Mitarbeitende      |
 | `30_Kommissionen/X/`  | Alle           | Mitglieder der Kommission X            |
 | `40_Vorstösse/`       | Alle           | Zuständige des Vorstosses              |
 | `50_Wahlkampf/`       | Alle           | Wahlkampfleitung                       |
@@ -298,28 +177,19 @@ kollidieren. Die Nummerierung läuft lückenlos in 10er-Schritten.
 
 Empfohlene Kalender:
 
-- **Fraktion `<Name>`** (vom Plugin verwaltet, mit der Fraktion geteilt) –
-  zentraler Fraktions-Kalender. Enthält automatisch alle vom Plugin
-  synchronisierten Sitzungen (Parlament, Kommissionen, künftige weitere
-  Sitzungstypen). **Plugin-generierte Einträge bitte nicht von Hand
-  bearbeiten** – sie werden beim nächsten Sync überschrieben. Eigene
-  Fraktionstermine (Fraktionssitzung, Fraktionsausflug, …) dürfen ergänzt
-  werden.
-- **Kommission X** (geteilt mit Kommissionsmitgliedern) – nur, falls die
-  Kommissionsarbeit eng koordiniert wird.
+- **Fraktion `<Name>`** (vom Plugin verwaltet, mit der Fraktion geteilt) – zentraler Fraktions-Kalender. Enthält automatisch alle vom Plugin synchronisierten Sitzungen (Parlament, Kommissionen, künftige weitere Sitzungstypen). **Vom Plugin erzeugte Einträge bitte nicht von Hand bearbeiten** – sie werden bei der nächsten Synchronisation überschrieben. Eigene Fraktionstermine (Fraktionssitzung, Fraktionsausflug, …) dürfen ergänzt werden.
+- **Kommission X** (geteilt mit Kommissionsmitgliedern) – nur, falls die Kommissionsarbeit eng koordiniert wird.
 - **Persönlich** (privat) – alles, was nur dich betrifft.
 
 So fügst du den Fraktionskalender hinzu:
 
-1. Symbol „Kalender" oben anklicken.
-2. Links unten „+ Neuer Kalender" oder „Kalender abonnieren" wählen
-   (Präsidium gibt den Link weiter).
-3. Auf dem Handy: in der Nextcloud-Smartphone-App den Kalender auswählen –
-   er erscheint dann in der Standard-Kalender-App.
+1. Symbol «Kalender» oben anklicken.
+2. Links unten «+ Neuer Kalender» oder «Kalender abonnieren» wählen (Präsidium gibt den Link weiter).
+3. Auf dem Handy: in der Nextcloud-Smartphone-App den Kalender auswählen – er erscheint dann in der Standard-Kalender-App.
 
-#### Was teilen wir, was bleibt persönlich?
+#### Geteilt und persönlich
 
-**Gemeinsam (Fraktions-Bereich):**
+##### Fraktions-Bereich
 
 - Protokolle aller Fraktionssitzungen
 - Fraktionsbeschlüsse, Positionen, Argumentarien
@@ -329,91 +199,69 @@ So fügst du den Fraktionskalender hinzu:
 - Hintergrundunterlagen zu Geschäften
 - Medienspiegel
 
-**Persönlich (mein Bereich):**
+##### Persönlicher Bereich
 
 - Eigene Recherchenotizen, Entwürfe von Reden
 - Persönliche Termine
 - Private Korrespondenz mit Wählern
 - Eigene Lesezeichen / Quellen
 
-**Faustregel:** Sobald **eine zweite Person** das Dokument irgendwann braucht
-oder sehen sollte → in den Fraktionsordner. Sobald es **nur dich** betrifft
-oder es **rohes, unfertiges Material** ist → persönlicher Bereich. Bei Zweifel:
-zuerst persönlich, später in den geteilten Ordner verschieben.
+Als Faustregel gilt: Sobald **eine zweite Person** das Dokument irgendwann braucht oder sehen sollte → in den Fraktionsordner. Sobald es **nur dich** betrifft oder es **rohes, unfertiges Material** ist → persönlicher Bereich. Bei Zweifel: zuerst persönlich, später in den geteilten Ordner verschieben.
 
 #### Goldene Regeln
 
-1. **Eine Datei, ein Ort.** Niemals Kopien per Mail; immer der Link aus
-   Nextcloud.
+1. **Eine Datei, ein Ort.** Niemals Kopien per Mail; immer der Link aus Nextcloud.
 2. **Sprechende Dateinamen** mit Datum vorne: `2026-05-20_Antrag_Velobruecke.odt`.
-3. **Nichts löschen.** Veraltetes nach `90_Archiv/` verschieben. Nextcloud
-   führt zwar eine Versionsgeschichte, aber Ordnung schadet nie.
-4. **Persönliche Daten nicht über öffentliche Links teilen.** Lieber per
-   Login-geschütztem Share.
-5. **Vor dem Schreiben kurz schauen, wer das Dokument gerade geöffnet hat.**
-   Nextcloud Office zeigt das oben rechts an (mehrere Personen können
-   gleichzeitig tippen – wie in Google Docs).
+3. **Nichts löschen.** Veraltetes nach `90_Archiv/` verschieben. Nextcloud führt zwar eine Versionsgeschichte, aber Ordnung schadet nie.
+4. **Persönliche Daten nicht über öffentliche Links teilen.** Lieber über eine Freigabe, die eine Anmeldung verlangt.
+5. **Vor dem Schreiben kurz schauen, wer das Dokument gerade geöffnet hat.** Nextcloud Office zeigt das oben rechts an (mehrere Personen können gleichzeitig tippen – wie in Google Docs).
 6. **Talk statt WhatsApp** für fraktionsinterne Themen – bleibt unter euch.
 
-### Budget: Fassungen (Begriffe)
+### Fragestunde
 
-Im Budgetprozess entstehen mehrere Fassungen desselben Budgets. Diese Begriffe
-werden durchgehend so verwendet:
+Das Parlament hält zweimal im Jahr eine Fragestunde. Der Bereich **«Fragestunde»** (in der Navigation direkt hinter «Budget») führt den Ablauf der Fraktion:
 
-- **Stadtratsbudget** – das Budget **1:1 aus der Weisung des Stadtrats**, inklusive
-  Novemberbrief, sofern ein solcher vorliegt. Es ist der unveränderte Ausgangsstand.
-- **Fraktionsbudget** – das Budget **mit allen erfassten Anträgen, welche die Fraktion
-  einreicht oder unterstützt**. Es zeigt, wie das Budget nach dem Willen der eigenen
-  Fraktion aussähe.
-- **Kommissionsbudget** – das Budget **mit allen Mehrheitsbeschlüssen aus den
-  Kommissionen**. (In diesem Tool bisher nicht eigens dargestellt — hier nur zur
-  Einordnung genannt.)
+1. **Fragen eintragen, jederzeit** – jedes Mitglied trägt seine Fragen selbst ein («+ Neue Frage»), ohne dass eine Fragestunde angesetzt sein muss: wer sie eingebracht hat (vorbelegt), die Frage, ein Kommentar für die Fraktionssitzung und Notizen. Neben dem Feld steht die Zeichenzahl; über **1'000 Zeichen** nimmt der Parlamentsdienst die Frage nicht entgegen, deshalb lässt sie sich dann auch nicht speichern.
+2. **Fragestunde anlegen, sobald sie feststeht** – «+ Neue Fragestunde» mit dem Datum. Titel und Frist ergeben sich daraus: Die Fragen müssen bis spätestens am **Donnerstag vor der Fragestunde** schriftlich beim Parlamentsdienst eingereicht werden (Art. 103 Abs. 2 der Organisationsverordnung des Stadtparlaments).
+3. **In der Fraktionssitzung besprechen** – jede Frage lässt sich anpassen, ihr Status wandert von «Neu» über «Besprochen» zu «Eingereicht» (oder «Zurückgezogen»).
+4. **Einer Fragestunde und einem Mitglied zuteilen** – im Feld «Fragestunde» entscheidet die Fraktion, in welcher Fragestunde die Frage gestellt wird, im Feld «Einzureichen von», wer sie einreicht. Meist ist das die Person, die sie eingebracht hat; weil **jedes Mitglied nur eine Frage einreicht**, manchmal jemand anderes. Ist einem Mitglied mehr als eine Frage zugeteilt, meldet es die Seite mit Namen.
+
+Jede Änderung speichert sofort, und alle in der Fraktion sehen sie in Echtzeit. Sobald das Parlament die Fragestunde als Geschäft veröffentlicht hat, steht der Verweis darauf auf der Karte.
+
+### Budget-Fassungen
+
+Im Budgetprozess entstehen mehrere Fassungen desselben Budgets. Diese Begriffe werden durchgehend so verwendet:
+
+- **Stadtratsbudget** – das Budget **1:1 aus der Weisung des Stadtrats**, inklusive Novemberbrief, sofern ein solcher vorliegt. Es ist der unveränderte Ausgangsstand.
+- **Fraktionsbudget** – das Budget **mit allen erfassten Anträgen, welche die Fraktion einreicht oder unterstützt**. Es zeigt, wie das Budget nach dem Willen der eigenen Fraktion aussähe.
+- **Kommissionsbudget** – das Budget **mit allen Mehrheitsbeschlüssen aus den Kommissionen**. (In diesem Tool bisher nicht eigens dargestellt — hier nur zur Einordnung genannt.)
 - **Parlamentsbudget** – das vom **Parlament beschlossene, finale und gültige** Budget.
 
-### Budget: Pauschalanträge und Steuerfuss
+### Pauschalanträge und Steuerfuss
 
-Im Budget-Bereich fasst der Kasten **«Pauschalanträge»** (Tab Globalbudgets) den
-automatischen Ausgleich und die frei angelegten Pauschalanträge zusammen:
+Im Budget-Bereich fasst der Kasten **«Pauschalanträge»** (Tab Globalbudgets) den automatischen Ausgleich und die frei angelegten Pauschalanträge zusammen:
 
-- **Defizit automatisch verteilen:** Ist der Schalter «Defizit automatisch als
-  Pauschalkürzung verteilen» eingeschaltet, wird ein Defizit anteilig zum Aufwand auf
-  die Produktegruppen verteilt, bis das gewählte **Ziel** erreicht ist (Standard:
-  schwarze Null; wahlweise ein Zielbetrag). Mit «Pauschalantrag einreichen» entscheidet
-  man, ob die so erzeugten Einzelanträge tatsächlich eingereicht werden — nur dann
-  stehen sie im Antrags-PDF.
-- **Weitere Pauschalanträge:** Über «+ Pauschalantrag» lassen sich beliebig viele,
-  voneinander unabhängige Pauschalanträge anlegen (Einsparung in Franken oder Prozent,
-  Antragsteller-Fraktion, Ausnahmen, Begründung). Ihre Kürzungen summieren sich; der
-  automatische Ausgleich rechnet zuletzt, auf dem bereits gekürzten Stand.
+- **Defizit automatisch verteilen:** Ist der Schalter «Defizit automatisch als Pauschalkürzung verteilen» eingeschaltet, wird ein Defizit anteilig zum Aufwand auf die Produktegruppen verteilt, bis das gewählte **Ziel** erreicht ist (Standard: schwarze Null; wahlweise ein Zielbetrag). Mit «Pauschalantrag einreichen» entscheidet man, ob die so erzeugten Einzelanträge tatsächlich eingereicht werden — nur dann stehen sie im Antrags-PDF.
+- **Weitere Pauschalanträge:** Über «+ Pauschalantrag» lassen sich beliebig viele, voneinander unabhängige Pauschalanträge anlegen (Einsparung in Franken oder Prozent, Antragsteller-Fraktion, Ausnahmen, Begründung). Ihre Kürzungen summieren sich; der automatische Ausgleich rechnet zuletzt, auf dem bereits gekürzten Stand.
 
-**Steuerfuss bei Überschuss (Tab Steuerfuss).** Bleibt am Ende ein **Überschuss**, senkt
-die App den Steuerfuss automatisch in ganzen Prozent-Schritten, bis der Überschuss
-aufgebraucht ist — der Ertrag geht damit auf (nahe) null. Ein Steuerprozent ist so viel
-wert wie «Steuerertrag geteilt durch Steuerfuss». Die Senkung ist ein **echter Antrag**:
-Sie reduziert die Einnahmen in der Summenzeile und steht am Ende der Antragsliste und des
-Antrags-PDF. Wer den Steuerfuss selbst festlegen will, schaltet die Automatik auf dem
-Steuerfuss-Tab ab und stellt einen manuellen Steuerfuss-Antrag; dieser verdrängt die
-Automatik.
+Über das Budget hinaus wird nichts gekürzt. In keinem Feld — Produktegruppe, Produkt, Kostenzeile, Investitionsprojekt, Personalbestand — lässt sich mehr sparen, als dort budgetiert ist; die Untergrenze ist null. Die Grenze gilt für die Summe aller Anträge auf dasselbe Feld: Wer sie überschreitet, bekommt eine Meldung mit dem Budget, dem bereits Beantragten und dem verbleibenden Rest. Eine Pauschalkürzung, die ein Feld unter null drücken würde, kürzt es auf null und verteilt den Rest auf die übrigen Felder.
 
-**Wenn beides zusammenkommt (gewünschter Ertrag und Steuerfuss-Senkung).** Beide
-Automatiken dürfen gleichzeitig laufen. Der automatische Defizit-Ausgleich verteilt nur
-**Defizite** als Kürzungen und rührt einen Überschuss nie an. Ein Überschuss — auch ein
-als Zielbetrag gewünschter Ertrag — wird stattdessen über die **Steuerfuss-Senkung**
-ausgeglichen: Man gibt den Zielbetrag ein und verteilt den Überschuss, dieser Betrag
-fliesst in die Steuerfuss-Senkung, und der Gesamtertrag ist wieder null. So ist eindeutig,
-was mit einem Überschuss geschieht, wenn beide Schalter aktiv sind.
+Auf dem Tab Steuerfuss entscheidet sich, was mit einem Überschuss geschieht. Bleibt am Ende ein **Überschuss**, senkt die App den Steuerfuss automatisch in ganzen Prozent-Schritten, bis der Überschuss aufgebraucht ist — der Ertrag geht damit auf (nahe) null. Ein Steuerprozent ist so viel wert wie «Steuerertrag geteilt durch Steuerfuss». Die Senkung ist ein **echter Antrag**: Sie reduziert die Einnahmen in der Summenzeile und steht am Ende der Antragsliste und des Antrags-PDF. Wer den Steuerfuss selbst festlegen will, schaltet die Automatik auf dem Steuerfuss-Tab ab und stellt einen manuellen Steuerfuss-Antrag; dieser verdrängt die Automatik.
+
+Gewünschter Ertrag und Steuerfuss-Senkung kommen zusammen vor, und beide Automatiken dürfen gleichzeitig laufen. Der automatische Defizit-Ausgleich verteilt nur **Defizite** als Kürzungen und rührt einen Überschuss nie an. Ein Überschuss — auch ein als Zielbetrag gewünschter Ertrag — wird stattdessen über die **Steuerfuss-Senkung** ausgeglichen: Man gibt den Zielbetrag ein und verteilt den Überschuss, dieser Betrag fliesst in die Steuerfuss-Senkung, und der Gesamtertrag ist wieder null. So ist eindeutig, was mit einem Überschuss geschieht, wenn beide Schalter aktiv sind.
 
 
 ## Administration
 
-### Deployment auf einer Ubuntu-VM (Beispiel)
+### Inbetriebnahme auf einer Ubuntu-VM (Beispiel)
 
-Diese Anleitung zeigt, wie das Tool auf einer Ubuntu-VM mit automatischem HTTPS
-(Let's Encrypt via Traefik) produktiv betrieben wird.
+Diese Anleitung zeigt, wie das Tool auf einer Ubuntu-VM mit automatischem HTTPS (Let's Encrypt über Traefik) produktiv betrieben wird.
 
 #### Einmalige Einrichtung
 
-**1. Ubuntu-VM bereitstellen, Docker Engine + Compose installieren:**
+##### Docker installieren
+
+Auf der bereitgestellten Ubuntu-VM kommen Docker Engine und Compose aus der offiziellen Quelle:
 
 ```bash
 # Offizielle Docker-Quelle einrichten (Ubuntu 22.04/24.04)
@@ -429,20 +277,24 @@ sudo apt-get update
 sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 ```
 
-**2. Docker für den Nicht-Root-User erlauben (danach neu einloggen):**
+##### Docker ohne Root-Rechte
+
+Der Benutzer darf Docker danach ohne `sudo` aufrufen; dafür meldet er sich einmal neu an:
 
 ```bash
 sudo usermod -aG docker $USER
 newgrp docker
 ```
 
-**3. Projekt klonen:**
+##### Projekt klonen
 
 ```bash
 git clone git@github.com:mwaeckerlin/parliament-winterthur-tool.git
 ```
 
-**4. Konfigurationsdatei `.env` anlegen:**
+##### Konfigurationsdatei anlegen
+
+Die Datei `.env` trägt Adresse, Mailadresse für Let's Encrypt und die erzeugten Kennwörter:
 
 ```bash
 cd parliament-winterthur-tool/example
@@ -454,11 +306,9 @@ NEXTCLOUD_ADMIN_PASSWORD=$(pwgen -s 40 1)
 EOF
 ```
 
-`HOST` ist der öffentliche Domainname (z. B. `fraktion.example.com`).
-`LETSENCRYPT_EMAIL` erhält die Let's-Encrypt-Zertifikatsbenachrichtigungen.
-Die beiden Passwörter werden von `pwgen` als sichere Zufallsstrings erzeugt.
+`HOST` ist der öffentliche Domainname (z. B. `fraktion.example.com`). `LETSENCRYPT_EMAIL` erhält die Let's-Encrypt-Zertifikatsbenachrichtigungen. Die beiden Passwörter erzeugt `pwgen` als sichere Zufallszeichenketten.
 
-#### Starten – und bei jedem Update
+#### Starten – und bei jeder Aktualisierung
 
 ```bash
 cd parliament-winterthur-tool/example
@@ -466,44 +316,25 @@ git pull
 docker compose up -d --build --remove-orphans --force-recreate --pull always
 ```
 
-Das genügt für den ersten Start und für alle zukünftigen Updates:
-`git pull` holt die aktuellste Version, `--pull always` lädt die neuen
-Docker-Images automatisch nach, und `--build` erzeugt den Edge-Proxy neu.
+Das genügt für den ersten Start und für alle künftigen Aktualisierungen: `git pull` holt die aktuellste Version, `--pull always` lädt die neuen Docker-Images automatisch nach, und `--build` erzeugt den vorgelagerten Proxy neu.
 
-**Warum der Edge-Proxy gebaut wird:** Seine Routing-Konfiguration
-(`example/traefik/dynamic.yml`) wird per `COPY` in sein Abbild aufgenommen,
-statt sie als Verzeichnis des Wirts in den Container einzublenden. Kein
-Container bekommt so ein Host-Verzeichnis zu sehen, und der Docker-Socket bleibt
-ebenfalls draussen — deshalb ist der Docker-Provider von Traefik abgeschaltet
-und das Routing kommt aus dieser Datei. Wer das Routing ändert, baut den Proxy
-neu:
+Der vorgelagerte Proxy wird gebaut, weil seine Weiterleitungen (`example/traefik/dynamic.yml`) werden per `COPY` in sein Abbild aufgenommen, statt sie als Verzeichnis des Wirts in den Container einzublenden. Kein Container bekommt so ein Verzeichnis des Wirts zu sehen, und der Docker-Socket bleibt ebenfalls draussen — deshalb ist der Docker-Provider von Traefik abgeschaltet und die Weiterleitungen kommen aus dieser Datei. Wer sie ändert, baut den Proxy neu:
 
 ```bash
 docker compose up -d --build traefik
 ```
 
-#### Nach dem ersten Start: Konfiguration in Nextcloud
+#### Konfiguration in Nextcloud
 
-1. Nextcloud unter `https://your-site.com` aufrufen und mit dem Admin-Account
-   einloggen (Passwort = `NEXTCLOUD_ADMIN_PASSWORD`).
-2. Unter **Administration → Parlament Winterthur** die Fraktion, die Nextcloud-Gruppe
-   und die E-Mail-Einstellungen konfigurieren.
+1. Nextcloud unter `https://your-site.com` aufrufen und mit dem Administratorkonto anmelden (Passwort = `NEXTCLOUD_ADMIN_PASSWORD`).
+2. Unter **Administration → Parlament Winterthur** die Fraktion, die Nextcloud-Gruppe und die E-Mail-Einstellungen konfigurieren.
 3. **Jetzt synchronisieren** klicken, um die Parlamentsdaten erstmals zu laden.
 
-#### Hinweis: «Fraktionsmitglieder ↔ Nextcloud-User» — verwaiste User
+#### Verwaiste Benutzer
 
-In der Admin-Einstellungsseite unter **«Fraktionsmitglieder ↔ Nextcloud-User»**
-werden alle User der konfigurierten Nextcloud-Gruppe angezeigt. User die in der
-Gruppe sind, aber keinen aktuellen Parlamentseintrag haben, erscheinen
-**durchgestrichen** (Name und E-Mail). Username und Gruppen werden normal angezeigt.
-Mit «Ausgewählte abgleichen» werden nur die angewählten verwaisten User aus der
-Gruppe entfernt und deaktiviert — die Anderen bleiben unberührt.
+In der Verwaltung unter **«Fraktionsmitglieder ↔ Nextcloud-Benutzer»** werden alle Benutzer der konfigurierten Nextcloud-Gruppe angezeigt. Wer in der Gruppe ist, aber keinen aktuellen Parlamentseintrag hat, erscheint **durchgestrichen** (Name und E-Mail). Benutzername und Gruppen werden normal angezeigt. Mit «Ausgewählte abgleichen» werden nur die angewählten verwaisten Benutzer aus der Gruppe entfernt und deaktiviert — die anderen bleiben unberührt.
 
-**Wichtig:** Der automatische Sync entfernt niemanden aus der Gruppe. Nur über
-«Ausgewählte abgleichen» mit expliziter Admin-Auswahl werden User entfernt/deaktiviert.
-Damit ein User als verwaist erscheint, muss er manuell in die NC-Gruppe aufgenommen worden
-sein (Beispiel: ein ehemaliger Fraktionsmitarbeiter in der Gruppe — er erscheint als
-verwaister Eintrag, solange er kein aktives Parlamentsmandat hat).
+Die automatische Synchronisation entfernt niemanden aus der Gruppe. Nur über «Ausgewählte abgleichen» mit ausdrücklicher Auswahl durch die Verwaltung werden Benutzer entfernt oder deaktiviert. Damit jemand als verwaist erscheint, muss er von Hand in die Nextcloud-Gruppe aufgenommen worden sein (Beispiel: ein ehemaliger Fraktionsmitarbeiter in der Gruppe — er erscheint als verwaister Eintrag, solange er kein aktives Parlamentsmandat hat).
 
 
 ### Voraussetzungen
@@ -511,7 +342,7 @@ verwaister Eintrag, solange er kein aktives Parlamentsmandat hat).
 - Nextcloud ≥ 25
 - PHP ≥ 8.0
 - Composer
-- Node.js ≥ 16 & npm
+- Node.js ≥ 16 und npm
 
 ### Installation im Nextcloud-Apps-Verzeichnis
 
@@ -524,53 +355,41 @@ npm ci
 npm run build
 ```
 
-In der Nextcloud-Administrationsoberfläche unter **Apps** das Plugin
-**Parlament Winterthur Tool** aktivieren.
+In der Nextcloud-Administrationsoberfläche unter **Apps** das Plugin **Parlament Winterthur Tool** aktivieren.
 
 ### Konfiguration
 
-Nach der Aktivierung unter **Einstellungen → Parlament Winterthur** die
-gewünschte Fraktion und Nextcloud-Gruppe konfigurieren.
+Nach der Aktivierung unter **Einstellungen → Parlament Winterthur** die gewünschte Fraktion und Nextcloud-Gruppe konfigurieren.
 
-In den Plugin-Einstellungen kann folgendes konfiguriert werden:
+In den Einstellungen des Plugins lässt sich Folgendes einstellen:
 
 - **Fraktion**: Für welche Fraktion ist das Tool konfiguriert? (Pflichtauswahl aus den synchronisierten aktiven Fraktionen)
-- **Nextcloud-Gruppe**: Automatisches Erstellen und Synchronisieren einer
-  Nextcloud-Gruppe für die Fraktionsmitglieder (Einladung per E-Mail)
-- **Cron-Intervall**: Wie oft sollen die Daten synchronisiert werden?
+- **Nextcloud-Gruppe**: Automatisches Erstellen und Synchronisieren einer Nextcloud-Gruppe für die Fraktionsmitglieder (Einladung per E-Mail)
+- **Automatische Synchronisation**: Zeitplan, wann die Daten geholt werden
 - **Fraktionssitzung**: Modus aktiv/inaktiv
 - **Fraktionspräsident**: primäre Präsidiumsrolle
 - **Protokollführer**: primäre Rolle für Beschlussprotokollierung
 - **Stellvertretungen**: befristete Delegation mit `gueltig_von` und `gueltig_bis`
-- **Realtime WebSocket**: immer aktiv, ohne manuelle URL-Konfiguration
-  (Authentisierung über die aktuelle Nextcloud-Anmeldung)
-- **Fraktionsmitglieder ↔ Nextcloud-User**: Abgleich der Parlamentsmitglieder mit
-  lokalen Nextcloud-Usern. Alle Mitglieder der konfigurierten Nextcloud-Gruppe
-  werden angezeigt – auch User die in der Gruppe sind, aber keinen Parlamentseintrag
-  haben (verwaiste User, durchgestrichen dargestellt). Selektiv abgleichen:
-  nur markierte User werden deaktiviert/entfernt.
+- **Verbindung in Echtzeit (WebSocket)**: immer aktiv, ohne eigene Adresse in der Konfiguration (angemeldet wird über die laufende Nextcloud-Sitzung)
+- **Fraktionsmitglieder ↔ Nextcloud-Benutzer**: Abgleich der Parlamentsmitglieder mit den lokalen Nextcloud-Benutzern. Alle Mitglieder der konfigurierten Nextcloud-Gruppe werden angezeigt – auch die, die in der Gruppe sind, aber keinen Parlamentseintrag haben (verwaiste Benutzer, durchgestrichen dargestellt). Abgeglichen wird gezielt: nur die markierten Benutzer werden deaktiviert oder entfernt.
 
-Wichtige UI-Regeln der Admin-Seite:
-- **Nextcloud-Gruppe** kann als bestehende Gruppe gewählt oder als neuer Gruppenname eingetragen werden; die UI markiert sichtbar, ob der Name bereits existiert.
-- **Fraktionsraum** (gemeinsamer Ordner und Kalender) wird automatisch über das Admin-Konto bereitgestellt und mit der Fraktionsgruppe geteilt – beim Öffnen der App und bei jeder Änderung der Fraktionsgruppe. Es gibt dafür weder eine «Kalender-Benutzer»-Einstellung noch einen manuellen Knopf. Hat ein Mitglied bereits einen eigenen «Fraktion»-Ordner mit der Gruppe geteilt, wird dieser übernommen: der bisherige Ordner bleibt beim Eigentümer als «Fraktion.bak» erhalten, sein Inhalt wandert in den offiziellen Ordner.
-- **Fraktionsmitglieder-Mapping** zeigt nach Fraktionswahl alle aktiven Mitglieder:
-  - Default-Username-Vorschlag: `vorname-nachname` (klein, normalisiert)
-  - Username ist editierbar und wird in `pw_mitglieder.nextcloud_uid` gespeichert
-  - Lokale Existenzprüfung zeigt vorhandene Gruppen des Users
-  - Sammelaktion **Ausgewählte anlegen**: erstellt fehlende User und ergänzt sie in die gewählte Fraktionsgruppe
-  - **Verwaiste User**: Nextcloud-User die in der Gruppe sind, aber keinen aktuellen
-    Parlamentseintrag haben, werden durchgestrichen angezeigt. Mit «Ausgewählte abgleichen»
-    werden nur die markierten verwaisten User aus der Gruppe entfernt und deaktiviert.
-- Die Konfigurationsseite ist responsiv (Desktop/Mobil) im Nextcloud-Settings-Layout.
-- Die Admin-Einstellungsseite verwendet das standardisierte Nextcloud-Settings-Layout
-  (`section` + Standard-Formfelder) ohne app-spezifische Input-Styling-Klassen.
+Wichtige Regeln der Verwaltungsseite:
+- **Nextcloud-Gruppe** kann als bestehende Gruppe gewählt oder als neuer Gruppenname eingetragen werden; die Seite zeigt sichtbar an, ob der Name bereits existiert.
+- **Fraktionsraum** (gemeinsamer Ordner und Kalender) wird automatisch über das Administratorkonto bereitgestellt und mit der Fraktionsgruppe geteilt – beim Öffnen der App und bei jeder Änderung der Fraktionsgruppe. Es gibt dafür weder eine «Kalender-Benutzer»-Einstellung noch einen manuellen Knopf. Hat ein Mitglied bereits einen eigenen «Fraktion»-Ordner mit der Gruppe geteilt, wird dieser übernommen: der bisherige Ordner bleibt beim Eigentümer als «Fraktion.bak» erhalten, sein Inhalt wandert in den offiziellen Ordner.
+- **Fraktionsmitglieder zuordnen:** Nach der Fraktionswahl erscheinen alle aktiven Mitglieder:
+  - Vorgeschlagener Benutzername: `vorname-nachname` (klein, normalisiert)
+  - Der Benutzername lässt sich ändern und wird in `pw_mitglieder.nextcloud_uid` gespeichert
+  - Die Prüfung vor Ort zeigt, in welchen Gruppen der Benutzer bereits ist
+  - Sammelaktion **Ausgewählte anlegen**: legt fehlende Benutzer an und nimmt sie in die gewählte Fraktionsgruppe auf
+  - **Verwaiste Benutzer**: Wer in der Gruppe ist, aber keinen aktuellen Parlamentseintrag hat, wird durchgestrichen angezeigt. Mit «Ausgewählte abgleichen» werden nur die markierten verwaisten Benutzer aus der Gruppe entfernt und deaktiviert.
+- Die Konfigurationsseite passt sich der Fensterbreite an und folgt dem Aufbau der Nextcloud-Einstellungen.
+- Die Verwaltungsseite verwendet den Standardaufbau der Nextcloud-Einstellungen (`section` und die üblichen Formularfelder) ohne eigene Klassen für die Gestaltung der Eingabefelder.
 
-### Lokales Docker-Setup (mwaeckerlin/nextcloud + Plugin)
+### Lokale Docker-Umgebung (mwaeckerlin/nextcloud und Plugin)
 
-Im Projektroot liegt eine eigenständige `docker-compose.yml` ohne externe
-`extends`-Referenzen.
+Im Wurzelverzeichnis des Projekts liegt eine eigenständige `docker-compose.yml` ohne externe `extends`-Verweise.
 
-Netzwerkaufteilung im Compose (wie im Parent-Projekt-Muster, je Verbindung ein Netz):
+Aufteilung der Netze im Compose (wie im Muster des übergeordneten Projekts, je Verbindung ein Netz):
 - `nxinx-php`: `nextcloud-nginx` ↔ `nextcloud-php-fpm`
 - `php-db`: `nextcloud-php-fpm` ↔ `nextcloud-db`
 - `php-smtp`: `nextcloud-php-fpm` ↔ `smtp-relay`
@@ -579,29 +398,27 @@ Netzwerkaufteilung im Compose (wie im Parent-Projekt-Muster, je Verbindung ein N
 - `php-realtime`: `nextcloud-php-fpm` ↔ `parlwin-realtime`
 - `nginx-realtime`: `nextcloud-nginx` ↔ `parlwin-realtime`
 
-Alle Netze sind wie im Referenz-Setup mit `driver_opts.encrypted=1` definiert.
+Alle Netze sind wie in der Vorlage mit `driver_opts.encrypted=1` definiert.
 
-Pflicht-Umgebungsvariablen (z. B. in `.env` im Projektroot):
+Pflicht-Umgebungsvariablen (z.B. in `.env` im Wurzelverzeichnis des Projekts):
 - `NEXTCLOUD_DB_PASSWORD`
 - `NEXTCLOUD_ADMIN_PASSWORD`
 
-Realtime-Variablen (werden automatisch vorbelegt):
-- `PARLWIN_REALTIME_WS_URL` (Default: leer → automatisch aus aktuellem
-  Origin: `ws(s)://<host>[<WEBROOT>]/ws/parlwin/`; nur setzen, falls
-  Nextcloud unter einem abweichenden öffentlichen Origin erreichbar ist)
-- `PARLWIN_REALTIME_PUBLISH_URL` (Default: `http://parlwin-realtime:3001/publish`)
-- `PARLWIN_REALTIME_SECRET` (optional, Shared Secret für `/publish`)
-- `PARLWIN_REALTIME_AUTH_REQUIRED` (Default: `1`, WS-Auth ist aktiv)
-- `PARLWIN_NEXTCLOUD_BASE_URL` (Default: `http://nextcloud-nginx:8080`, für WS-Auth-Check)
-- `PARLWIN_NEXTCLOUD_AUTH_URL` (optional, überschreibt die Auth-URL vollständig)
+Variablen des Dienstes `parlwin-realtime` (werden automatisch vorbelegt):
+- `PARLWIN_REALTIME_WS_URL` (Standard: leer → automatisch aus der aktuellen Herkunft (Origin): `ws(s)://<host>[<WEBROOT>]/ws/parlwin/`; nur setzen, falls Nextcloud unter einer abweichenden öffentlichen Adresse erreichbar ist)
+- `PARLWIN_REALTIME_PUBLISH_URL` (Standard: `http://parlwin-realtime:3001/publish`)
+- `PARLWIN_REALTIME_SECRET` (optional, gemeinsames Geheimnis für `/publish`)
+- `PARLWIN_REALTIME_AUTH_REQUIRED` (Standard: `1`, die Anmeldung an der WebSocket-Verbindung ist verlangt)
+- `PARLWIN_NEXTCLOUD_BASE_URL` (Standard: `http://nextcloud-nginx:8080`, für die Prüfung dieser Anmeldung)
+- `PARLWIN_NEXTCLOUD_AUTH_URL` (optional, ersetzt die Adresse für die Anmeldung vollständig)
 
-Sync-Performance-Variablen:
-- `PARLWIN_SYNC_SECTION_PARALLEL` (Default: `6`)  
-  Parallelität für das Vorladen der Hauptlisten (`geschäfte`, `sitzungen`,
-  `mitglieder`, `kommissionen`, `fraktionen`).
-- `PARLWIN_SYNC_GESCHAEFTE_PARALLEL` (Default: `10`)  
-  Anzahl gleichzeitiger Requests auf Geschäfts-Detailseiten
-  (`/_rte/information/{id}`).
+Variablen für die Geschwindigkeit der Synchronisation:
+- `PARLWIN_SYNC_SECTION_PARALLEL` (Standard: `6`) Wie viele Hauptlisten gleichzeitig vorgeladen werden (`geschäfte`, `sitzungen`, `mitglieder`, `kommissionen`, `fraktionen`).
+- `PARLWIN_SYNC_GESCHAEFTE_PARALLEL` (Standard: `10`) Anzahl gleichzeitiger Abfragen auf die Detailseiten der Geschäfte (`/_rte/information/{id}`).
+
+Variablen für den Speicher:
+- `PARLWIN_PHP_MEMORY_LIMIT` (Standard: `1024M`) Die Speichergrenze von PHP im Container, gültig für die Oberfläche, die Kommandozeile (`occ`) und den Hintergrundauftrag. Das Basis-Abbild liefert 512 MB; ein Budgetbuch braucht beim Einlesen mehr (gemessen am Buch 2027: 574,7 MB), und in der laufenden Instanz brach der automatische Import genau daran ab. Der Bootstrap schreibt den Wert beim Start in ein eigenes ini-Verzeichnis, das `PHP_INI_SCAN_DIR` zusätzlich zum Standard nennt.
+- `PARLWIN_BUDGET_MEMORY_LIMIT` (Standard: `1024M`) Die Speichergrenze, die während des Lesens eines Budgetbuchs gilt; danach gilt wieder die der Installation. Sie greift dort, wo die Installation weniger gibt als das Buch braucht, etwa ausserhalb des mitgelieferten Containers. Ein Buch belegt beim Lesen mehrere hundert Megabyte — mehr, als Nextcloud einer Anfrage standardmässig zugesteht. Wächst das Buch weiter, gehört der Wert hier herauf; eine bereits höhere oder aufgehobene Grenze der Installation bleibt unangetastet.
 
 Schnellstart:
 
@@ -620,21 +437,16 @@ npm start
 Skript-Konvention:
 - `npm run build`: `docker compose build`
 - `npm start`: `docker compose up -d --build --force-recreate --remove-orphans`
-- `npm run start:dev`: Alias auf denselben Compose-Start
-- `npm stop`: stoppt den Stack ohne Volume-Löschung
+- `npm run start:dev`: derselbe Compose-Start unter zweitem Namen
+- `npm stop`: hält die Container an, ohne die Volumes zu löschen
 
-`npm start` macht absichtlich nur den normalen Compose-Start und keine
-zusätzliche Logik.
+`npm start` macht absichtlich nur den normalen Compose-Start und sonst nichts.
 
 Hinweis:
-- Der NGINX-`fastcgi_read_timeout` im Projekt-Image ist auf `36000s` gesetzt,
-  damit manuelle Vollsynchronisationen nicht nach 60s mit HTTP 504 abbrechen.
-- Nach Updates am `Dockerfile` immer mit Build neu starten (`npm start` oder
-  `docker compose up -d --build`).
+- Der NGINX-`fastcgi_read_timeout` im Projekt-Image ist auf `36000s` gesetzt, damit manuelle Vollsynchronisationen nicht nach 60s mit HTTP 504 abbrechen.
+- Nach Änderungen am `Dockerfile` immer mit Neubau starten (`npm start` oder `docker compose up -d --build`).
 - Die App wird beim Compose-Start automatisch aktiviert (`parlwin-app-init`).
-- Es gibt absichtlich **kein** persistentes `custom_apps`-Volume; damit wird bei
-  jedem Rebuild garantiert die aktuelle App-Version aus dem Image ausgeliefert
-  (kein veraltetes Frontend aus alten Volumes).
+- Es gibt absichtlich **kein** dauerhaftes `custom_apps`-Volume; damit kommt bei jedem Neubau die aktuelle Version der App aus dem Abbild (keine veraltete Oberfläche aus alten Volumes).
 
 Stoppen:
 
@@ -643,122 +455,82 @@ cd /home/marc/git/mwaeckerlin/parliament-winterthur-tool
 npm stop
 ```
 
-Standard-HTTP-Port lokal: `29824` (anpassbar über `NEXTCLOUD_HTTP_PORT`).
-Der WebSocket-Server (`parlwin-realtime`) wird **nicht** nach aussen exponiert;
-der Browser erreicht ihn am gleichen Port wie Nextcloud über
-`ws://localhost:29824/ws/parlwin/`.
+Standard-HTTP-Port lokal: `29824` (anpassbar über `NEXTCLOUD_HTTP_PORT`). Der WebSocket-Server (`parlwin-realtime`) wird **nicht** nach aussen freigegeben; der Browser erreicht ihn am gleichen Port wie Nextcloud über `ws://localhost:29824/ws/parlwin/`.
 
-Plugin manuell aktivieren (nur falls Init-Service deaktiviert wurde):
+Plugin von Hand aktivieren (nur falls `parlwin-app-init` abgeschaltet wurde):
 
 ```bash
 docker compose exec nextcloud-php-fpm \
   php occ app:enable parlwin
 ```
 
-Das Compose nutzt segmentierte Service-Netze (analog zum `nextcloud`-Projekt):
-`nxinx-php`, `php-db`, `php-smtp`, `nginx-collabora`, `php-collabora`,
-`php-realtime`, `nginx-realtime`.
-Die Subnetzvergabe erfolgt vollständig durch Docker Compose (keine statischen
-`ipam`-Subnetze im Projekt).
+Das Compose nutzt getrennte Netze je Verbindung (analog zum `nextcloud`-Projekt): `nxinx-php`, `php-db`, `php-smtp`, `nginx-collabora`, `php-collabora`, `php-realtime`, `nginx-realtime`. Die Subnetzvergabe erfolgt vollständig durch Docker Compose (keine statischen `ipam`-Subnetze im Projekt).
 
-### WebSocket-Backend (`parlwin-realtime`)
+### WebSocket-Dienst (`parlwin-realtime`)
 
-Die App folgt der **WebSocket-App-Convention** von `mwaeckerlin/nextcloud:nginx`
-(siehe README dort, Abschnitt „WebSocket Apps"):
+Die App folgt der **Regel für WebSocket-Apps** von `mwaeckerlin/nextcloud:nginx` (siehe README dort, Abschnitt «WebSocket Apps»):
 
-- Compose-Service heisst **`parlwin-realtime`** und hört intern auf Port **`3001`**.
-- Kein externer Port-Mapping nötig — der Browser erreicht den WS-Server
-  **am gleichen Host und Port wie Nextcloud selbst** über den Pfad
-  **`/ws/parlwin/`**. `nextcloud-nginx` macht den WebSocket-Upgrade
-  transparent und proxied auf `http://parlwin-realtime:3001/`.
-- Das eliminiert Cross-Port-CSP-Probleme: die Browser-Verbindung läuft
-  same-origin, und Nextclouds Default-CSP (`connect-src 'self'`) deckt sie
-  ohne Override automatisch ab.
-- Service-zu-Service-Calls aus PHP (z.B. Event-Publish) verwenden
-  weiterhin den internen Hostnamen direkt (`http://parlwin-realtime:3001/publish`),
-  nginx wird hier umgangen.
+- Der Dienst im Compose heisst **`parlwin-realtime`** und hört intern auf Port **`3001`**.
+- Kein Port muss nach aussen freigegeben werden — der Browser erreicht den WebSocket-Server **am gleichen Rechner und Port wie Nextcloud selbst** über den Pfad **`/ws/parlwin/`**. `nextcloud-nginx` schaltet die Verbindung auf WebSocket um und reicht sie unverändert an `http://parlwin-realtime:3001/` weiter.
+- Damit entfallen die CSP-Probleme über zwei verschiedene Ports: die Verbindung des Browsers geht an dieselbe Herkunft, und die vorgegebene CSP von Nextcloud (`connect-src 'self'`) deckt sie ab, ohne dass etwas überschrieben werden muss.
+- Aufrufe von Dienst zu Dienst aus PHP (etwa das Veröffentlichen eines Ereignisses) verwenden weiterhin den internen Hostnamen direkt (`http://parlwin-realtime:3001/publish`), nginx wird hier umgangen.
 
-Wer Parlwin in einem bestehenden Nextcloud-Setup einsetzt, muss
-**keinen nginx editieren** — es reicht, den `parlwin-realtime`-Service zur
-eigenen Compose-Datei hinzuzufügen und ans gleiche Netzwerk wie
-`nextcloud-nginx` zu hängen.
+Wer Parlwin in einer bestehenden Nextcloud-Installation einsetzt, muss **nginx nicht anpassen** — es reicht, den Dienst `parlwin-realtime` in die eigene Compose-Datei aufzunehmen und ans gleiche Netz wie `nextcloud-nginx` zu hängen.
 
-Die Services `nextcloud-nginx` und `nextcloud-php-fpm` werden aus
-`Dockerfile.nginx` bzw. `Dockerfile.php-fpm` gebaut und basieren auf:
-- `mwaeckerlin/nodejs-build` (Build-Stage für Frontend-Build in `Dockerfile.php-fpm` und `Dockerfile.realtime`)
-  - Build-Artefakte werden mit dem dedizierten Build-User (`BUILD_USER`) erzeugt.
-- `mwaeckerlin/nodejs` (Runtime-Basis für `parlwin-realtime`, dedizierter Runtime-User `RUN_USER`)
+Die Dienste `nextcloud-nginx` und `nextcloud-php-fpm` werden aus `Dockerfile.nginx` bzw. `Dockerfile.php-fpm` gebaut und bauen auf:
+- `mwaeckerlin/nodejs-build` (Bau-Stufe für die Oberfläche in `Dockerfile.php-fpm` und `Dockerfile.realtime`)
+  - Die gebauten Dateien entstehen unter einem eigenen Benutzer (`BUILD_USER`).
+- `mwaeckerlin/nodejs` (Grundlage für den Betrieb von `parlwin-realtime`, mit eigenem Benutzer `RUN_USER`)
 - `mwaeckerlin/nextcloud:nginx`
 - `mwaeckerlin/nextcloud:php-fpm`
 - `mariadb` (`latest`)
 - `collabora/code`
-- `parlwin-realtime` (Node-WebSocket-Broker, gebaut aus `Dockerfile.realtime`)
+- `parlwin-realtime` (WebSocket-Verteiler auf Node, gebaut aus `Dockerfile.realtime`)
 
 ### Synchronisation
 
-**Manuell:**
+Von Hand startet der Administrator die Synchronisation auf der Kommandozeile:
 
 ```bash
 php /path/to/nextcloud/occ parlwin:sync
 ```
 
-Laufenden Sync abbrechen:
+Laufende Synchronisation abbrechen:
 
 ```bash
 php /path/to/nextcloud/occ parlwin:sync:cancel
 ```
 
-Ein Budgetjahr sauber neu aus dem Budgetbuch einlesen (etwa nach einer
-fehlerhaften früheren Fassung in der Datenbank) — ersetzt Produktegruppen,
-Investitionen und Kennzahlen, die eigenen Anträge bleiben erhalten:
+Ein Budgetjahr sauber neu aus dem Budgetbuch einlesen (etwa nach einer fehlerhaften früheren Fassung in der Datenbank) — ersetzt Produktegruppen, Investitionen und Kennzahlen, die eigenen Anträge bleiben erhalten:
 
 ```bash
 php /path/to/nextcloud/occ parlwin:budget-reimport 2026
 ```
 
-Mit `--purge` werden zusätzlich alle Anträge und Pauschalanträge des Jahres
-gelöscht (voller Clean-Slate):
+Mit `--purge` werden zusätzlich alle Anträge und Pauschalanträge des Jahres gelöscht, das Jahr beginnt also vollständig von vorn:
 
 ```bash
 php /path/to/nextcloud/occ parlwin:budget-reimport 2026 --purge
 ```
 
-Im Admin-UI startet `Jetzt synchronisieren` denselben Sync-Flow und stellt live
-Fortschritt bereit:
-- aktueller Bereich inkl. betroffener Tabellen
+In der Verwaltung startet «Jetzt synchronisieren» denselben Ablauf und zeigt den Fortschritt laufend an:
+- den aktuellen Bereich samt betroffenen Tabellen
 - `processed/total`
-- Laufzeit und ETA (`hh:mm:ss`)
-- API-Status: `GET /apps/parlwin/sync/status`
-- API-Abbruch: `POST /apps/parlwin/sync/cancel`
+- die bisherige Laufzeit und die voraussichtliche Restzeit (`hh:mm:ss`)
+- Stand über die Schnittstelle: `GET /apps/parlwin/sync/status`
+- Abbruch über die Schnittstelle: `POST /apps/parlwin/sync/cancel`
 
-**Typen für eigene Geschäfte:**
+#### Typen für eigene Geschäfte
 
-Die Typen, die beim Anlegen eines eigenen Geschäfts zur Auswahl stehen, pflegt
-der Administrator im Bereich «Typen für eigene Geschäfte» (App-Einstellung
-`eigene_typen`, JSON-Liste von Bezeichnungen). Ohne Eintrag bleibt es beim Typ
-«Eigenes Geschäft». Der Status eines eigenen Geschäfts wird aus den Werten
-vorgeschlagen, die in der Datenbank bereits vorkommen
-(`GET /apps/parlwin/geschaefte/statuswerte`), bleibt aber frei überschreibbar.
+Die Typen, die beim Anlegen eines eigenen Geschäfts zur Auswahl stehen, pflegt der Administrator im Bereich «Typen für eigene Geschäfte» (App-Einstellung `eigene_typen`, JSON-Liste von Bezeichnungen). Ohne Eintrag bleibt es beim Typ «Eigenes Geschäft». Der Status eines eigenen Geschäfts wird aus den Werten vorgeschlagen, die in der Datenbank bereits vorkommen (`GET /apps/parlwin/geschaefte/statuswerte`), bleibt aber frei überschreibbar.
 
-**Automatische Synchronisation (Hintergrund-Job):**
+#### Hintergrundauftrag
 
-Das Plugin registriert einen Hintergrund-Job, der die Daten automatisch
-synchronisiert. Der Zeitplan ist in den Admin-Einstellungen konfigurierbar:
-beliebige Einträge mit Wochentagen (Mo–So) und Uhrzeit (App-Einstellung
-`sync_zeitplan`, JSON `[{"tage":[1,3],"zeit":"06:30"}]`, 1 = Montag …
-7 = Sonntag, Europe/Zurich); verpasste Zeitpunkte werden nachgeholt. Ohne
-konfigurierten Zeitplan gilt der Standard: **zwei Läufe an allen Wochentagen,
-um 10:00 und um 18:00 Uhr**; dieser Standard erscheint im Admin-UI vorbelegt
-und lässt sich dort bearbeiten.
+Das Plugin registriert einen Hintergrundauftrag, der die Daten automatisch synchronisiert. Den Zeitplan stellt die Verwaltung ein: beliebige Einträge mit Wochentagen (Mo–So) und Uhrzeit (App-Einstellung `sync_zeitplan`, JSON `[{"tage":[1,3],"zeit":"06:30"}]`, 1 = Montag … 7 = Sonntag, Europe/Zurich); verpasste Zeitpunkte werden nachgeholt. Ohne konfigurierten Zeitplan gilt der Standard: **zwei Läufe an allen Wochentagen, um 10:00 und um 18:00 Uhr**; dieser Standard erscheint in der Verwaltung vorbelegt und lässt sich dort bearbeiten.
 
-Der mitgelieferte Container bringt den nötigen Cron-Takt selbst mit: der
-parlwin-Watcher setzt `backgroundjobs_mode=cron` und tickt den Nextcloud-Cron
-periodisch (Intervall über `PARLWIN_CRON_INTERVAL`, Standard 300 s) – ein
-externer Cron-Daemon ist nicht erforderlich.
+Der mitgelieferte Container bringt den nötigen Takt selbst mit: `parlwin-watcher.php` setzt `backgroundjobs_mode=cron` und ruft den Cron von Nextcloud regelmässig auf (Abstand über `PARLWIN_CRON_INTERVAL`, Standard 300 s) – ein externer Cron-Daemon ist nicht nötig.
 
-Der Hintergrund-Job nutzt denselben Sync-Command wie das Admin-UI
-(`--source=background-job`). Damit erscheint ein automatisch gestarteter Lauf
-ebenfalls im Admin-Progress (`/sync/status`) inkl. Quelle/Progress/ETA.
+Der Hintergrundauftrag nutzt denselben Befehl wie die Verwaltung (`--source=background-job`). Damit erscheint ein automatisch gestarteter Lauf ebenfalls im Fortschritt der Verwaltung (`/sync/status`), mit Quelle, Stand und voraussichtlicher Restzeit.
 
 
 ## Entwicklung
@@ -767,16 +539,14 @@ ebenfalls im Admin-Progress (`/sync/status`) inkl. Quelle/Progress/ETA.
 cd parlwin
 composer install
 npm install
-npm run dev   # Frontend im Watch-Modus
+npm run dev   # baut die Oberfläche bei jeder Änderung neu
 ```
 
 ### Tests ausführen
 
-Ein vollständiges Verzeichnis aller Tests, nach Testart gruppiert und je Test
-mit der abgedeckten Funktionsnummer aus [FEATURES.md](FEATURES.md), steht in
-[TESTS.md](TESTS.md).
+Ein vollständiges Verzeichnis aller Tests, nach Testart gruppiert und je Test mit der abgedeckten Funktionsnummer aus [FEATURES.md](FEATURES.md), steht in [TESTS.md](TESTS.md).
 
-Alle Tests (Unit/Service + Live-Endpoint + E2E) vom Projektroot:
+Alle Tests (Klassen und Dienste, Abfragen gegen die echte Webseite, e2e) im Wurzelverzeichnis des Projekts:
 
 ```bash
 cd /home/marc/git/mwaeckerlin/parliament-winterthur-tool
@@ -790,18 +560,18 @@ cd /home/marc/git/mwaeckerlin/parliament-winterthur-tool/parlwin
 composer test
 ```
 
-Live-Parser-Test gegen echte Endpoints (ohne DB):
+Test des Parsers gegen die echten Adressen (ohne Datenbank):
 
 ```bash
 cd parlwin
 phpunit --bootstrap tests/bootstrap.php --group live tests/Service/ScraperLiveEndpointTest.php
 ```
 
-Hinweis: Dieser Test macht echte HTTP-Requests auf `parlament.winterthur.ch` und prueft nur das HTML-Parsing (`data-entities`), nicht den DB-Sync.
+Hinweis: Dieser Test ruft `parlament.winterthur.ch` wirklich auf und prüft nur, wie das HTML gelesen wird (`data-entities`), nicht den Abgleich mit der Datenbank.
 
-Strikter Testmodus:
-- `npm run test` ist absichtlich **strict** konfiguriert.
-- `skip`, `warning`, `deprecation`, `notice`, `risky`, `incomplete` gelten als **Fail**.
+Strenger Testlauf:
+- `npm run test` ist absichtlich **streng** eingestellt.
+- `skip`, `warning`, `deprecation`, `notice`, `risky` und `incomplete` gelten als **Fehler**.
 
 ### Automatischer E2E-Test (Compose-basiert)
 
@@ -813,31 +583,29 @@ cd /home/marc/git/mwaeckerlin/parliament-winterthur-tool
 ```
 
 Der Test führt bewusst einen vollständigen End-to-End-Ablauf aus:
-- erzeugt bei jedem Lauf eine **neue leere DB** (`docker compose down -v` + `up`)
-- aktiviert die App und legt dedizierte E2E-Nutzer an
-- synchronisiert reale Parlamentsdaten über den gleichen API-Endpoint wie der UI-Button `Jetzt synchronisieren` (`POST /apps/parlwin/sync`)
-- prüft Plausibilität der importierten Listen (Geschäfte, Sitzungen, Mitglieder, Kommissionen, Fraktionen)
-- prüft die Frontend-Startseite (`/apps/parlwin/`)
-- prüft den Realtime-Broker (`/health`) und die Frontend-Auslieferung der Realtime-Config
-- prüft die ausgelieferte App-CSS auf responsive Breakpoints (Desktop/Mobile) und zentrale Layout-Klassen (`80rem`, `54rem`, Admin-Card- und mobile Tabellenansicht)
-- prüft den Realtime-Runtime-Sicherheitsmodus (nicht-root, Build-Artefakte im Runtime-Container nicht schreibbar)
-- prüft den manuellen Sync inkl. Fortschritt (`POST /sync` + `GET /sync/status`) mit Live-Zählwerten `processed/total`
-- führt frontend-nahe Schreibaktionen via API aus (Notiz, Beschluss, Votum, Zuständigkeiten)
-- testet Fraktionssitzungsmodus inkl. Rechte/Verbote (Mitglied vs. Protokollführung/Stellvertretung)
-- aktualisiert Sitzungs-/Traktandumsfelder und verifiziert Persistenz
-- validiert Daten sowohl über API-Antworten als auch direkt per SQL auf den Tabellen
-- räumt den Stack am Ende wieder auf (`down -v`)
-- läuft standardmässig in einem separaten Compose-Projekt `parlwin_e2e` und
-  ohne veröffentlichte Host-Ports (nur interne Docker-Netze), damit
-  Dev-Volumes (`parlwin_dev`) nicht gelöscht werden
+- erzeugt bei jedem Lauf eine **neue leere Datenbank** (`docker compose down -v` und `up`)
+- aktiviert die App und legt eigene Benutzer für den Test an
+- synchronisiert echte Parlamentsdaten über dieselbe Schnittstelle wie der Knopf `Jetzt synchronisieren` in der Oberfläche (`POST /apps/parlwin/sync`)
+- prüft, ob die eingelesenen Listen plausibel sind (Geschäfte, Sitzungen, Mitglieder, Kommissionen, Fraktionen)
+- prüft die Startseite der Oberfläche (`/apps/parlwin/`)
+- prüft `parlwin-realtime` (`/health`) und ob die Oberfläche dessen Konfiguration ausgeliefert bekommt
+- prüft das ausgelieferte CSS der App auf die Umschaltpunkte für breite und schmale Fenster und auf die zentralen Klassen des Layouts (`80rem`, `54rem`, die Karten der Verwaltung und die Tabellenansicht für schmale Fenster)
+- prüft die Sicherheit des laufenden Containers `parlwin-realtime` (läuft nicht als root, die gebauten Dateien sind dort nicht schreibbar)
+- prüft die von Hand ausgelöste Synchronisation samt Fortschritt (`POST /sync` und `GET /sync/status`) mit den laufenden Zählwerten `processed/total`
+- schreibt über dieselbe Schnittstelle wie die Oberfläche (Notiz, Beschluss, Votum, Zuständigkeiten)
+- prüft den Fraktionssitzungsmodus samt Rechten und Verboten (Mitglied gegenüber Protokollführung und Stellvertretung)
+- ändert Felder von Sitzungen und Traktanden und prüft, dass sie gespeichert bleiben
+- prüft die Daten über die Antworten der Schnittstelle und zusätzlich direkt per SQL auf den Tabellen
+- räumt die Container am Ende wieder auf (`down -v`)
+- läuft standardmässig in einem eigenen Compose-Projekt `parlwin_e2e` und ohne nach aussen veröffentlichte Ports (nur interne Docker-Netze), damit die Volumes der Entwicklung (`parlwin_dev`) nicht gelöscht werden
 
-Optionale Laufzeitbegrenzung für den Live-Sync im E2E (nur Testzwecke, keine Produktivlogik):
-- `PARLWIN_SYNC_LIMIT_GESCHAEFTE` (Default im Script: `30`)
-- `PARLWIN_SYNC_LIMIT_SITZUNGEN` (Default: `60`)
-- `PARLWIN_SYNC_LIMIT_MITGLIEDER` (Default: `80`)
-- `PARLWIN_SYNC_LIMIT_KOMMISSIONEN` (Default: `30`)
-- `PARLWIN_SYNC_LIMIT_FRAKTIONEN` (Default: `20`)
-- alternativ global: `PARLWIN_SYNC_LIMIT_ALL`
+Der Abgleich gegen die echte Webseite lässt sich für den Test begrenzen (nur für Tests, im Betrieb gilt das nicht):
+- `PARLWIN_SYNC_LIMIT_GESCHAEFTE` (im Skript bewusst **ohne** Grenze: die Quelle liefert ihre Liste unsortiert, und jede Grenze schneidet irgendwann das Budget-Geschäft weg, aus dem der Budget-Import sein Buch holt)
+- `PARLWIN_SYNC_LIMIT_SITZUNGEN` (Standard: `60`)
+- `PARLWIN_SYNC_LIMIT_MITGLIEDER` (Standard: `80`)
+- `PARLWIN_SYNC_LIMIT_KOMMISSIONEN` (Standard: `30`)
+- `PARLWIN_SYNC_LIMIT_FRAKTIONEN` (Standard: `20`)
+- oder für alles zusammen: `PARLWIN_SYNC_LIMIT_ALL`
 
 Beispiel:
 
@@ -851,73 +619,48 @@ Kompatibilitätshinweis (Nextcloud 33):
 - `OCP\AppFramework\Db\Entity` enthält kein eingebautes `jsonSerialize()` mehr.
 - Die App-Entities implementieren deshalb `jsonSerialize()` explizit, damit REST-Endpunkte (`/geschaefte`, `/sitzungen`, `/mitglieder`, `/kommissionen`, `/fraktionen`) stabil JSON liefern.
 
-Weiterführende Modellierung Vorstoss-Lifecycle:
+Wie ein Vorstoss seinen Weg nimmt, im Einzelnen:
 - `parlwin/docs/vorstoss-modell.md`
 
 ### Dokumentationsregel
 
-- Jede funktionale Änderung (Importer, Parser, DB-Schema, Rollen, Rechte,
-  Workflows, Sync, Test-Setup) muss im gleichen Commit im README dokumentiert
-  oder angepasst werden.
-- Änderungen am Vorstoss-Lifecycle zusätzlich in
-  `parlwin/docs/vorstoss-modell.md` nachführen.
+- Jede fachliche Änderung (Einlesen, Parser, Aufbau der Datenbank, Rollen, Rechte, Abläufe, Synchronisation, Testaufbau) wird im selben Commit im README beschrieben oder dort nachgeführt.
+- Änderungen am Weg eines Vorstosses zusätzlich in `parlwin/docs/vorstoss-modell.md` nachführen.
 
 
-## Internas
+## Interna
 
 ### Datensynchronisation
 
-- Ein täglicher Cron-Job lädt alle relevanten Daten von der Parlamentswebseite
-  herunter und speichert sie in der Nextcloud-Datenbank.
-- Es werden **keine Einträge gelöscht**. Elemente, die auf der Webseite verschwinden,
-  werden als `gelöscht` markiert (Spalte `geloescht = true`), bleiben aber in der
-  Datenbank erhalten.
-- Die Daten werden aus den HTML-Attributen `data-entities="..."` der jeweiligen
-  Seiten extrahiert (JSON-Format).
-- Für Geschäfte wird der Link aus dem Titel (`/_rte/information/{id}`) verfolgt,
-  damit zusätzliche Detailfelder (`<dt>/<dd>`) in strukturierter Form importiert werden.
-- Relevante Schreibvorgänge werden als Realtime-Events publiziert; offene Frontends
-  aktualisieren sich über WebSocket automatisch.
-- robust gegen lange Läufe: kein hartes Script-Limit (`set_time_limit(0)`) im Worker
-- Heartbeat-/Stale-Erkennung: wenn der Sync-Prozess nicht mehr aktiv ist, wird der Lauf
-  sofort als `abgebrochen` markiert (kein langes „Hängenbleiben" im alten Prozentstand)
-- Fortsetzen über mehrere Läufe: bei `abgebrochen`/`fehler` wird mit Cursor pro Bereich (`mitglieder`, `fraktionen`, `kommissionen`, `geschaefte`, `sitzungen`) automatisch weitergemacht
-- bereits verarbeitete Datensätze bleiben persistiert (inkrementelle Updates pro Element, kein „alles-oder-nichts"-Commit)
-- Bereits lokal als `erledigt`/`abgeschlossen` markierte Geschäfte werden beim
-  Sync nicht erneut überschrieben; abgeschlossene Geschäfte gelten als final.
-- Singleton-Lock: systemweit läuft immer nur **ein** Sync gleichzeitig
-  (egal ob manuell oder via Cron).
-- Startet ein zweiter Benutzer während eines laufenden Syncs, wird der Aufruf
-  an den bestehenden Lauf „angehängt" statt einen Parallel-Run zu starten.
-- Auch nach Seitenwechsel wird ein bereits laufender Singleton-Sync sofort
-  wieder angezeigt.
-  Primär erfolgt das Update eventbasiert über WebSocket (`sync.progress`);
-  HTTP-Polling dient nur als Fallback bei temporärem WS-Ausfall.
-- Im Admin-UI kann ein laufender Lauf über `Synchronisierung abbrechen`
-  angehalten werden. Der Worker beendet sich kontrolliert; falls er nicht reagiert,
-  wird er nach kurzer Frist hart beendet (TERM/KILL), danach Status `abgebrochen`
-  und Freigabe des Singleton-Locks.
-- Im Admin-UI wird ein einfacher Global-Fortschritt (0-100%) über alle aktiven
-  Sync-Bereiche angezeigt (`100% = alle Bereiche vollständig synchronisiert`).
+- Ein Hintergrundauftrag lädt nach Zeitplan alle nötigen Daten von der Parlamentswebseite herunter und speichert sie in der Nextcloud-Datenbank.
+- Es werden **keine Einträge gelöscht**. Elemente, die auf der Webseite verschwinden, werden als `gelöscht` markiert (Spalte `geloescht = true`), bleiben aber in der Datenbank erhalten.
+- Die Daten stehen als JSON im HTML-Attribut `data-entities="…"` der jeweiligen Seiten und werden von dort ausgelesen.
+- Für Geschäfte wird der Link aus dem Titel (`/_rte/information/{id}`) verfolgt, damit zusätzliche Detailfelder (`<dt>/<dd>`) strukturiert eingelesen werden.
+- Wichtige Schreibvorgänge werden als Ereignis veröffentlicht; offene Fenster aktualisieren sich über die WebSocket-Verbindung von selbst.
+- gerüstet für lange Läufe: keine Zeitgrenze für das Skript (`set_time_limit(0)`) im Arbeitsprozess
+- Lebt der Arbeitsprozess nicht mehr, wird der Lauf sofort als `abgebrochen` markiert, statt lange im alten Prozentstand hängen zu bleiben
+- Fortsetzen über mehrere Läufe: nach `abgebrochen` oder `fehler` macht jeder Bereich (`mitglieder`, `fraktionen`, `kommissionen`, `geschaefte`, `sitzungen`) dort weiter, wo er stehen geblieben ist
+- bereits verarbeitete Datensätze bleiben gespeichert: geschrieben wird Element für Element, nicht alles oder nichts
+- Bereits lokal als `erledigt`/`abgeschlossen` markierte Geschäfte werden beim Abgleich nicht erneut überschrieben; abgeschlossene Geschäfte gelten als endgültig.
+- Eine einzige Sperre: systemweit läuft immer nur **eine** Synchronisation gleichzeitig (gleich ob von Hand oder nach Zeitplan).
+- Startet ein zweiter Benutzer während eines laufenden Abgleichs, hängt sich sein Aufruf an den bestehenden Lauf an, statt einen zweiten zu starten.
+- Auch nach einem Seitenwechsel erscheint ein bereits laufender Abgleich sofort wieder. In erster Linie kommt die Aktualisierung als Ereignis über die WebSocket-Verbindung (`sync.progress`); regelmässiges Nachfragen über HTTP springt nur ein, wenn diese Verbindung vorübergehend ausfällt.
+- In der Verwaltung lässt sich ein laufender Abgleich über «Synchronisierung abbrechen» anhalten. Der Arbeitsprozess beendet sich geordnet; reagiert er nicht, wird er nach kurzer Frist hart beendet (TERM/KILL), danach steht der Status auf `abgebrochen` und die Sperre ist wieder frei. Das gilt auch gleich nach dem Start: Zwischen dem Start des Arbeitsprozesses und dem Greifen seiner Sperre liegen ein bis zwei Sekunden. Das Abbruch-Signal (die Datei neben der Sperrdatei) trägt seinen Zeitpunkt, der startende Lauf nimmt an, was nach seinem Start kam, und räumt nur weg, was von einem früheren Lauf übrig blieb.
+- Die Verwaltung zeigt einen Gesamtfortschritt von 0 bis 100% über alle laufenden Bereiche (`100% = alle Bereiche vollständig synchronisiert`).
 
-Sync-Start via API:
-- `POST /apps/parlwin/sync` startet den Lauf asynchron (`202 Accepted`).
-- `POST /apps/parlwin/sync/cancel` fordert den Abbruch des laufenden
-  Singleton-Syncs an. Wenn der Lauf sofort beendet werden konnte, kommt die Antwort direkt
-  mit `abgebrochen=true`; sonst bleibt `abbruch_angefragt=true` (`202 Accepted`).
-- Wenn bereits ein Lauf aktiv ist, liefert der Endpoint `bereits_laufend=true`;
-  der Client hängt sich an den bestehenden Lauf an.
+Synchronisation über die Schnittstelle starten:
+- `POST /apps/parlwin/sync` startet den Lauf im Hintergrund (`202 Accepted`).
+- `POST /apps/parlwin/sync/cancel` fordert den Abbruch des laufenden Abgleichs an. Wenn der Lauf sofort beendet werden konnte, kommt die Antwort direkt mit `abgebrochen=true`; sonst bleibt `abbruch_angefragt=true` (`202 Accepted`).
+- Wenn bereits ein Lauf aktiv ist, liefert die Schnittstelle `bereits_laufend=true`; der Aufrufer hängt sich an den bestehenden Lauf an.
 - Die Arbeit läuft im selben PHP-FPM-Container ohne Shell-Aufruf (kein `bash`/`sh` erforderlich).
 - Fortschritt und Abschluss werden über `GET /apps/parlwin/sync/status` geliefert.
-- `sync/status` zeigt laufende Syncs unabhängig von der Startquelle (`admin-ui`, `background-job`, `occ`).
-- Die Hauptlisten (`Geschäfte`, `Sitzungen`, `Mitglieder`, `Kommissionen`,
-  `Fraktionen`) werden vorab parallel geladen.
+- `sync/status` zeigt laufende Abgleiche unabhängig davon, wer sie gestartet hat (`admin-ui`, `background-job`, `occ`).
+- Die Hauptlisten (`Geschäfte`, `Sitzungen`, `Mitglieder`, `Kommissionen`, `Fraktionen`) werden vorab parallel geladen.
 - Der Fortschritt für `Geschäfte` ist zweiphasig:
-  - Phase 1: externe Detailseiten laden (Parlamentswebseite)
-  - Phase 2: DB-Write/Upsert in `pw_geschaefte` und `pw_geschaeft_ereignisse`
-  - Dadurch bleibt der Zähler nicht mehr lange auf `0/0`, sondern zeigt bereits während des externen Downloads laufende Werte.
-  - Auch ohne `curl_multi` (sequenzieller Fallback) wird der Zähler pro geladenem
-    Geschäft erhöht und nicht erst am Ende.
+  - Phase 1: die Detailseiten der Parlamentswebseite laden
+  - Phase 2: in `pw_geschaefte` und `pw_geschaeft_ereignisse` schreiben
+  - Dadurch bleibt der Zähler nicht mehr lange auf `0/0`, sondern zeigt schon beim Herunterladen laufende Werte.
+  - Auch ohne `curl_multi`, wenn die Seiten nacheinander geladen werden, wird der Zähler pro geladenem Geschäft erhöht und nicht erst am Ende.
 
 ### Datenquellen
 
@@ -934,7 +677,7 @@ Sync-Start via API:
 
 #### Geschäfte (Politische Geschäfte)
 
-Importierte Felder aus der Parlamentswebseite (read-only):
+Importierte Felder aus der Parlamentswebseite (nur lesbar):
 - `id` / `extern_id` – numerische ID aus `/_rte/information/{id}` (kanonische technische ID)
 - `titel` – Bezeichnung des Geschäfts
 - `nummer` – Geschäftsnummer
@@ -945,8 +688,7 @@ Importierte Felder aus der Parlamentswebseite (read-only):
 - `quelle_hash` – Hash der zuletzt importierten öffentlichen Quellversion
 - `quelle_aktualisiert_am` – Zeitpunkt der letzten inhaltlichen externen Änderung
 
-Hinweis: Es werden keine kompletten Roh-JSON-Blobs (`roh_daten`) gespeichert.
-Der Import übernimmt nur fachlich relevante, normalisierte Felder.
+Hinweis: Das rohe JSON der Quelle wird nicht als Ganzes gespeichert (`roh_daten`). Der Import übernimmt nur fachlich relevante, normalisierte Felder.
 
 #### Entwürfe ohne Geschäftsnummer
 
@@ -981,61 +723,21 @@ Interne, beschreibbare Felder liegen nicht in den Importfeldern, sondern in sepa
   - `entschieden` (kein neuer externer Änderungsstand seit letztem Beschluss)
 - Daraus wird `entscheidungsbedarf` (bool) für Fraktionssitzungslisten abgeleitet
 
-#### Rich-Text-Votum (WYSIWYG)
+#### Votum mit Formatierung
 
-Das «Votum im Rat» wird mit einem TipTap/ProseMirror-basierten Editor
-(`PwWysiwyg.vue`) erfasst. TipTap ist der gleiche Industriestandard, den u. a.
-Nextcloud Text intern nutzt; es liefert sauberes, semantisches HTML ohne
-Office-Detour. Verfügbar sind: Fett/Kursiv/Unterstrichen/Durchgestrichen,
-Überschriften H2/H3, ungeordnete/geordnete Listen, Blockzitat, Links mit
-Auto-Erkennung, Undo/Redo und «Formatierung entfernen». Die Toolbar verwendet
-inline SVG-Icons (Material Design Icons, Apache 2.0), so dass keine externen
-Icon-Fonts oder zusätzliche Webserver-Requests nötig sind.
+Das «Votum im Rat» wird in einem Editor erfasst, der das Ergebnis gleich so zeigt, wie es aussieht (`PwWysiwyg.vue`, auf TipTap und ProseMirror aufgebaut). TipTap nutzt auch Nextcloud Text; es liefert sauberes, semantisches HTML, ohne den Umweg über ein Office-Format. Verfügbar sind: fett, kursiv, unterstrichen, durchgestrichen, Überschriften H2 und H3, Aufzählungen und nummerierte Listen, Blockzitat, Verweise mit automatischer Erkennung, Rückgängig und Wiederholen sowie «Formatierung entfernen». Die Werkzeugleiste zeichnet ihre Symbole direkt als SVG (Material Design Icons, Apache 2.0), sodass weder Schriftarten für Symbole noch zusätzliche Aufrufe an den Webserver nötig sind.
 
 #### Votum als PDF herunterladen
 
-Über einen PDF-Button in der WYSIWYG-Toolbar (nur sichtbar, sobald Inhalt
-vorhanden ist) öffnet sich `/apps/parlwin/geschaefte/{id}/votum/pdf` in einem
-neuen Tab. Diese Route rendert das aktuelle Votum als druckoptimiertes A4-HTML
-(Helvetica 11pt, Header/Footer mit Linien, Meta-Tabelle mit Geschäfts-Daten und
-letztem gültigen Beschluss) und triggert automatisch `window.print()` —
-moderne Browser bieten dort «Als PDF speichern» an. Dieser Weg vermeidet eine
-zusätzliche PHP-PDF-Bibliothek inkl. Composer-Abhängigkeit.
+Über den PDF-Knopf in der Werkzeugleiste (er erscheint, sobald Inhalt vorhanden ist) öffnet sich `/apps/parlwin/geschaefte/{id}/votum/pdf` in einem neuen Tab. Diese Route gibt das aktuelle Votum als HTML für den Druck auf A4 aus (Helvetica 11pt, Kopf- und Fusszeile mit Linien, eine Tabelle mit den Angaben zum Geschäft und dem letzten gültigen Beschluss) und ruft `window.print()` von selbst auf — dort bieten die Browser «Als PDF speichern» an. Dieser Weg spart eine zusätzliche PHP-Bibliothek für PDF samt ihrer Abhängigkeit in Composer.
 
-**Wichtig — CSP-Nonce:** Das Skript der Druckseite MUSS ein
-`nonce="<?php p($votumNonce); ?>"` tragen (gleiche Herleitung wie in
-`main.php`/`admin.php`). Die Content-Security-Policy von Nextcloud blockiert
-Inline-Skripte ohne Nonce ersatzlos und ohne sichtbaren Fehler: ohne ihn öffnet
-sich weder der Druck-Dialog automatisch, noch reagiert der Knopf «Als PDF
-speichern / drucken». Aus demselben Grund darf der Knopf kein Inline-`onclick`
-verwenden, sondern bekommt seinen Listener im nonce-tragenden Skript. Der
-Dialog wird zusätzlich über ein Zeitlimit ausgelöst, damit er auch dann
-erscheint, wenn `document.fonts.ready` nicht auslöst (nicht ladbare Schrift).
+Das Skript der Druckseite muss ein `nonce="<?php p($votumNonce); ?>"` tragen (gleiche Herleitung wie in `main.php`/`admin.php`). Die Content-Security-Policy von Nextcloud blockiert Inline-Skripte ohne Nonce ersatzlos und ohne sichtbaren Fehler: ohne ihn öffnet sich weder der Druck-Dialog automatisch, noch reagiert der Knopf «Als PDF speichern / drucken». Aus demselben Grund darf der Knopf kein Inline-`onclick` verwenden, sondern wird im Skript mit der Nonce auf den Klick gesetzt. Der Dialog wird zusätzlich über ein Zeitlimit ausgelöst, damit er auch dann erscheint, wenn `document.fonts.ready` nicht auslöst (nicht ladbare Schrift).
 
-**Wichtig — Positivliste statt Negativliste:** Der Wortlaut wird als HTML
-ausgegeben, damit die Formatierung im Ausdruck erhalten bleibt. Dafür ist
-`Service\HtmlSanitizer` zuständig: Er parst den Text und behält ausschliesslich
-die dort aufgezählten Elemente und Attribute; Verweise dürfen nur `http`,
-`https`, `mailto` oder `tel` als Schema tragen. Eine Negativliste («entferne
-`script`, entferne `on…`-Attribute») ist hier untauglich und war der zuvor
-verwendete Ansatz: `<img/onerror=…>` umgeht die Prüfung auf ein Leerzeichen vor
-dem Attribut, und `href="javascript:…"` kommt darin gar nicht vor. Der Text
-stammt zwar aus dem Editor, wird aber über die Schnittstelle gespeichert und ist
-damit frei wählbar — die Positivliste ist die einzige verlässliche Grenze.
-Festgenagelt ist das doppelt: `parlwin/tests/Templates/VotumPdfSicherheitTest.php`
-rendert die ausgelieferte Vorlage, und der e2e-Lauf prüft die Ausgabe des realen
-Endpunkts.
+Der Wortlaut wird als HTML ausgegeben, damit die Formatierung im Ausdruck erhalten bleibt. Dafür ist `Service\HtmlSanitizer` zuständig: Er parst den Text und behält ausschliesslich die dort aufgezählten Elemente und Attribute; Verweise dürfen nur `http`, `https`, `mailto` oder `tel` als Schema tragen. Eine Negativliste («entferne `script`, entferne `on…`-Attribute») ist hier untauglich und war der zuvor verwendete Ansatz: `<img/onerror=…>` umgeht die Prüfung auf ein Leerzeichen vor dem Attribut, und `href="javascript:…"` kommt darin gar nicht vor. Der Text stammt zwar aus dem Editor, wird aber über die Schnittstelle gespeichert und ist damit frei wählbar — die Positivliste ist die einzige verlässliche Grenze. Festgenagelt ist das doppelt: `parlwin/tests/Templates/VotumPdfSicherheitTest.php` rendert die ausgelieferte Vorlage, und der e2e-Lauf prüft die Ausgabe des realen Endpunkts.
 
 #### Automatische Zuständigkeit über Kommissionsmitgliedschaft
 
-Wenn ein Geschäft aktuell in einer Kommission hängig ist (letztes
-Verfahrensereignis nennt das Kommissions-Organ) und niemand der eigenen
-Fraktion zugewiesen ist, weist der Sync nach erfolgreichem Mitglieder- und
-Geschäftsabgleich automatisch alle Mitglieder dieser Kommission zu, die zur
-eigenen Fraktion gehören. Die erste gefundene Person wird als Hauptzuständige
-markiert; jede Zuweisung wird als reguläre Aktion (Typ `zuweisung`) in der
-Geschäftszeitleiste protokolliert. Bereits vorhandene Zuständigkeiten werden
-nie überschrieben.
+Wenn ein Geschäft aktuell in einer Kommission hängig ist (letztes Verfahrensereignis nennt das Kommissions-Organ) und niemand der eigenen Fraktion zugewiesen ist, weist die Synchronisation nach erfolgreichem Mitglieder- und Geschäftsabgleich automatisch alle Mitglieder dieser Kommission zu, die zur eigenen Fraktion gehören. Die erste gefundene Person wird als Hauptzuständige markiert; jede Zuweisung wird als reguläre Aktion (Typ `zuweisung`) in der Aktionszeitleiste des Geschäfts protokolliert. Bereits vorhandene Zuständigkeiten werden nie überschrieben.
 
 #### Fraktionssitzungsmodus
 
@@ -1058,17 +760,19 @@ Zusätzliche Rollenverwaltung:
 
 Zwei Typen von Sitzungen werden in `pw_sitzungen` gespeichert:
 
-**Parlamentssitzungen** (scraper-synchronisiert):
+Eine Parlamentssitzung kommt von der Webseite:
+
 - `extern_id` ist gesetzt (ID der Parlamentswebseite)
 - Felder: `extern_id`, `titel`, `datum`, `zeit_von`, `zeit_bis`, `ort`, `url`
 - Für jede Sitzung wird automatisch ein **Kalendereintrag** im Fraktions-Kalender (`Fraktion <Name>`) erstellt
 
-**Interne Fraktionssitzungen** (manuell angelegt):
+Eine interne Fraktionssitzung legt die Fraktion selbst an:
+
 - `extern_id` ist NULL, `typ_id` verweist auf einen `pw_sitzungstypen`-Eintrag
 - Felder: `titel`, `datum`, `zeit_von`, `zeit_bis`, `ort`, `bemerkungen` (Zweck)
 - Traktanden in `pw_traktanden` (ohne Parlamentsgeschäfts-Verknüpfung)
 - Optionaler Kalender-Eintrag: DESCRIPTION = Zweck + Traktanden-Liste
-- Parliament-Sync löscht interne Sitzungen nie (nur Zeilen mit `extern_id IS NOT NULL` werden berücksichtigt)
+- Der Abgleich mit dem Parlament löscht interne Sitzungen nie (er berücksichtigt nur Zeilen mit `extern_id IS NOT NULL`)
 
 #### Traktanden
 
@@ -1082,16 +786,16 @@ Fraktionsinterne Felder:
 
 #### Mitglieder
 
-- Name, Vorname, Partei, Fraktion, E-Mail, Foto-URL, Aktiv-Flag
-- `nextcloud_uid`: Verknüpfung auf den lokalen Nextcloud-User
+- Name, Vorname, Partei, Fraktion, E-Mail, Adresse des Fotos, Kennzeichen «aktiv»
+- `nextcloud_uid`: Verknüpfung auf den lokalen Nextcloud-Benutzer
 
-#### Kommissionen & Fraktionen
+#### Kommissionen und Fraktionen
 
 - Name, Beschreibung, Mitgliederliste (extern_id)
 
 ### Datenbankmodell
 
-```
+```text
 pw_geschaefte               pw_geschaeft_ereignisse
 ────────────────────────    ───────────────────────
 id (=_rte information id)   id
@@ -1190,33 +894,43 @@ automatisch (0|1)                    status (neu|entwurf|bereit|
                                      inhalt, dokument
                                      geloescht
                                      erstellt_am, aktualisiert_am
+
+pw_fragestunden                      pw_fragestunde_fragen
+─────────────────────────────        ──────────────────────────────────
+id                                   id
+datum                                fragestunde_id -> pw_fragestunden
+titel                                urheber_key, urheber_name
+frist (Donnerstag davor)             frage (höchstens 1'000 Zeichen)
+geschaeft_id -> pw_geschaefte        kommentar
+erstellt_am                          einreicher_key, einreicher_name
+aktualisiert_am                      status (neu|besprochen|
+                                       eingereicht|zurueckgezogen)
+                                     geloescht
+                                     erstellt_am, aktualisiert_am
 ```
 
 Zusätzliche Spalten für die Sitzungs-Verknüpfung:
 
 - `pw_sitzungen.verknuepfung_id` – Gruppen-ID verknüpfter Sitzungen.
 - `pw_sitzungstypen.verknuepfen` – beim Anlegen Verknüpfung anbieten.
-- `pw_sitzungstypen.kommissionen` – JSON-Liste der «beratenen» Kommissions-IDs,
-  deren hängige Geschäfte automatisch über `pw_sitzung_geschaeft` verknüpft werden.
+- `pw_sitzungstypen.kommissionen` – JSON-Liste der «beratenen» Kommissions-IDs, deren hängige Geschäfte automatisch über `pw_sitzung_geschaeft` verknüpft werden.
 
-Hinweis: `pw_vorstoesse` ist die fraktionsintern gepflegte Vorstoss-Verwaltung
-(Tab «Vorstösse»); davon zu unterscheiden ist `pw_vorstoss_entwuerfe`, das die
-aus der Parlamentsquelle importierten, noch nicht nummerierten Vorstösse hält.
+Hinweis: `pw_vorstoesse` ist die fraktionsintern gepflegte Vorstoss-Verwaltung (Tab «Vorstösse»); davon zu unterscheiden ist `pw_vorstoss_entwuerfe`, das die aus der Parlamentsquelle importierten, noch nicht nummerierten Vorstösse hält.
 
-### Realtime-Collaboration (WebSocket)
+### Gemeinsam arbeiten in Echtzeit (WebSocket)
 
-- Backend-Events bei Änderungen:
+- Ereignisse, die der Server bei Änderungen sendet:
   - `geschaefte.updated`, `geschaefte.action`
   - `sitzungen.updated`, `traktanden.updated`
   - `fraktionssitzung.updated`, `fraktion.roles.updated`
+  - `fragestunde.updated`
   - `sync.progress`, `sync.cancel.requested`, `sync.cancelled`
   - `sync.completed`
-- Das Frontend verbindet sich immer mit dem Realtime-Broker (`ws://.../ws`).
-- Jeder WebSocket-Handshake wird gegen die aktuelle Nextcloud-Anmeldung validiert
-  (Session-Cookie oder App-Token/Basic-Auth).
-- Offene Clients abonnieren diese Events und laden betroffene Ansichten automatisch neu.
+- Die Oberfläche verbindet sich immer mit dem Dienst `parlwin-realtime` (`ws://.../ws`).
+- Jeder Verbindungsaufbau wird gegen die laufende Nextcloud-Anmeldung geprüft (Sitzungs-Cookie, App-Passwort oder HTTP-Basisauthentifizierung).
+- Offene Fenster hören auf diese Ereignisse und laden die betroffenen Ansichten von selbst neu.
 
-### Erkenntnisse zur Datenstruktur und zum Geschäftsablauf
+### Datenstruktur und Geschäftsablauf
 
 Stand der Analyse: 2026-05-12
 
@@ -1227,13 +941,10 @@ Stand der Analyse: 2026-05-12
   - `aktiv = true`, wenn `datumBis` leer oder in der Zukunft liegt (und `datumVon` nicht in der Zukunft liegt).
   - `aktiv = false`, wenn `datumBis` in der Vergangenheit liegt.
   - Die Statusauswahl der Quelle (`Aktiv`/`Inaktiv`) spiegelt genau diese Logik.
-- Bei `/stadtparlament/27428` (Mitglieder) wird `aktiv` aus mehreren Quellsignalen
-  robust abgeleitet:
+- Bei `/stadtparlament/27428` (Mitglieder) wird `aktiv` aus mehreren Angaben der Quelle abgeleitet:
   - Primär über `_funktionAktiv` / `_funktionInaktiv` (falls gesetzt).
-  - Fallback über `_mandatPersonDatumVon` / `_mandatPersonDatumBis` mit derselben
-    Datumslogik wie bei Fraktionen.
-  - Der resultierende boolesche Wert wird in `pw_mitglieder.aktiv` geschrieben
-    (kein hartes `true` mehr).
+  - Ersatzweise über `_mandatPersonDatumVon` / `_mandatPersonDatumBis` mit derselben Datumslogik wie bei Fraktionen.
+  - Der resultierende boolesche Wert wird in `pw_mitglieder.aktiv` geschrieben (kein hartes `true` mehr).
 - Bei Geschäften enthält `title` typischerweise einen HTML-Link auf `/_rte/information/{id}`.
 - Dieser Link wird als technische Primäridentität verwendet (`extern_id`, DB-`id`).
 - `_nummer` bzw. `number` ist die fachliche Geschäftsnummer und bleibt ein eigenes Feld.
@@ -1255,14 +966,14 @@ Fazit:
 
 - Nummerierte Geschäfte laufen in `pw_geschaefte`.
 - Nicht nummerierte oder noch nicht eingereichte Vorstösse laufen in `pw_vorstoss_entwuerfe`.
-- Bei späterer Nummerierung wird zuerst über `extern_id` gematcht, sonst über `titel_normalisiert + typ`.
+- Bekommt ein Vorstoss später seine Nummer, wird er zuerst über `extern_id` zugeordnet, sonst über `titel_normalisiert` und `typ`.
 
 #### Modellierung der Fraktionsarbeit
 
-- Importfelder sind read-only und kommen nur aus dem Sync.
-- Fraktionsinterne Bearbeitung läuft über `pw_geschaeft_zustaendigkeiten` (mehrere Zuständige + Hauptzuständige Person) und `pw_geschaeft_aktionen` (Timeline: Notizen, Beschlüsse, Voten, Zuweisungsänderungen).
-- Jede Aktion enthält Autor und Zeitstempel.
-- Standardansicht zeigt den letzten gültigen Beschluss; Detailansicht zeigt die vollständige Aktionshistorie.
+- Die eingelesenen Felder sind nur lesbar und kommen ausschliesslich aus der Synchronisation.
+- Fraktionsintern gearbeitet wird über `pw_geschaeft_zustaendigkeiten` (mehrere Zuständige und eine hauptzuständige Person) und `pw_geschaeft_aktionen` (die Zeitleiste: Notizen, Beschlüsse, Voten, Änderungen der Zuweisung).
+- Jede Aktion trägt Autor und Zeitstempel.
+- Die Standardansicht zeigt den letzten gültigen Beschluss; das Detail zeigt alle Aktionen.
 - Fraktionsstatus wird implizit berechnet:
   - letzter gültiger Fraktionsbeschluss (`pw_geschaeft_aktionen.erstellt_am`)
   - letzte inhaltliche externe Änderung (`pw_geschaefte.quelle_aktualisiert_am`)
@@ -1271,16 +982,13 @@ Fazit:
 #### Fraktionssitzungsmodus
 
 - Notizen bleiben jederzeit für alle möglich.
-- Beschlüsse sind im Modus `Fraktionssitzung` nur durch die aktive Protokollführung
-  (Protokollführer oder befristete Protokoll-Stellvertretung) erfassbar.
-- Fraktionspräsident oder aktive Präsidiums-Stellvertretung dürfen den Modus umstellen
-  und den Protokollführer setzen.
+- Beschlüsse sind im Modus `Fraktionssitzung` nur durch die aktive Protokollführung (Protokollführer oder befristete Protokoll-Stellvertretung) erfassbar.
+- Fraktionspräsident oder aktive Präsidiums-Stellvertretung dürfen den Modus umstellen und den Protokollführer setzen.
 
 #### Rollenmodell in der Fraktion
 
 - `kommissionsmitglied`:
-  - Wird als eigene Rolle geführt (optional befristet), damit Kommissionsarbeit
-    unabhängig von Geschäfts-Zuständigkeiten auswertbar bleibt.
+  - Wird als eigene Rolle geführt (optional befristet), damit Kommissionsarbeit unabhängig von Geschäfts-Zuständigkeiten auswertbar bleibt.
 - `fraktionspraesident`:
   - Primäre Leitungsrolle.
   - Darf befristete Präsidiums-Stellvertretungen setzen.
@@ -1294,19 +1002,21 @@ Fazit:
   - Zeitlich befristete Delegation durch Protokollführung oder Präsidium.
   - Während Gültigkeit können Protokollführer und Stellvertretung parallel handeln.
 
-#### Rechtlicher Rahmen (Kurzbezug)
+#### Rechtlicher Rahmen (Überblick)
 
 - Kanton Zürich, Gemeindegesetz (GG), insbesondere §§ 34-35.
 - Stadt Winterthur, Organisationsverordnung Stadtparlament (OV Parl), insbesondere Art. 77 ff.
 
-#### Abgeleitete Entscheidpfade (fachlich)
+#### Geschäftsgang nach Vorstossart
 
 - **Motion:** Einreichung -> Überweisung/Ablehnung -> Bericht/Antrag -> Erheblicherklärung oder Abschreibung.
 - **Postulat:** Einreichung -> Überweisung/Ablehnung -> Bericht -> Kenntnisnahme, ggf. Nachbericht.
 - **Interpellation / schriftliche Anfrage:** Einreichung -> Beantwortung -> Kenntnisnahme.
-- Die Website zeigt reale Abläufe teils in mehreren Schritten innerhalb eines Geschäfts; deshalb bleibt die Prozesssicht ereignisbasiert statt als einzelnes Statusfeld.
+- Die Webseite zeigt die tatsächlichen Abläufe teils in mehreren Schritten innerhalb eines Geschäfts; deshalb bleibt die Prozesssicht ereignisbasiert statt als einzelnes Statusfeld.
 
-#### Kategoriemapping für Fraktions-Beschlüsse (Stand 2026-05-12)
+#### Geschäftsarten je Kategorie
+
+Die Zuordnung hat den Stand vom 2026-05-12:
 
 - `motion`: `Motion`, `Dringliche Motion`, `Budget-Motion`
 - `postulat`: `Postulat`, `Dringliches Postulat`, `Budget-Postulat`

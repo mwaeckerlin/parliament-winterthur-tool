@@ -5,9 +5,10 @@ import { test, expect } from '@playwright/test'
  * (Nextcloud + DB + API). Ergänzt tests/e2e/vorstoss-datenfluss.spec.js: dort
  * sind bereits abgedeckt Erstellen→Bearbeiten (Titel bleibt erhalten), Notiz beim
  * Verlassen speichern, Notiz bearbeiten/löschen/wiederherstellen durch den Autor
- * und der Verknüpfen-Happy-Path. Hier stehen ausschliesslich die verbleibenden
- * Lücken — Gut-, Schlecht- (Berechtigung/leer/ungültig/kein Treffer) und
- * Grenzfälle über den echten Nutzerpfad (Frontend mit Playwright).
+ * und der Normalfall des Verknüpfens. Hier stehen ausschliesslich die
+ * verbleibenden Lücken — Normalfall, Fehlerfall (Berechtigung, leer, ungültig,
+ * kein Treffer) und Grenzfälle über den echten Weg des Benutzers durch die
+ * Oberfläche (Playwright).
  */
 
 const BASE_URL = process.env.PARLWIN_BASE_URL || 'http://nextcloud-nginx:8080'
@@ -101,7 +102,26 @@ const feld = (page, label) =>
   page.locator(`${MODAL} .pw-field:has(.pw-field-label:text-is(${JSON.stringify(label)}))`)
 
 // Karte in der Übersicht (eindeutiger Titel pro Test).
-const karte = (page, titel) => page.locator('.pw-vorstoesse .pw-data-card', { hasText: titel }).first()
+// Ein Vorstoss in der Übersicht — seit F119 je nach Fensterbreite eine
+// Tabellenzeile (breit) oder eine Karte (schmal). Gesucht wird, was gerade
+// sichtbar ist, damit die Tests an beiden Darstellungen gelten.
+const karte = (page, titel) => page
+  .locator('.pw-vorstoesse .pw-tabelle-vorstoesse tbody tr, .pw-vorstoesse .pw-data-card')
+  .filter({ hasText: titel })
+  .locator('visible=true')
+  .first()
+
+/**
+ * Schaltet auf eine Breite, auf der die Übersicht ihre KARTEN zeigt (F119).
+ * Nötig für die Tests, die den Aufbau der Karte selbst prüfen — Kicker,
+ * Status-Marke, Wertepaare —, denn in der Tabellenzeile stehen dieselben
+ * Angaben in anderer Form.
+ */
+async function kartenAnsicht(page) {
+  await page.setViewportSize({ width: 700, height: 900 })
+  await page.locator('.pw-vorstoesse .pw-card-mobile .pw-data-card').first()
+    .waitFor({ state: 'visible', timeout: 20_000 })
+}
 
 // Whitespace normalisieren (NcEllipsisedOption verteilt lange Labels auf zwei
 // Spans mit Zeilenumbruch).
@@ -196,7 +216,12 @@ async function schliesseDialog(page) {
 async function oeffneKarte(page, titel) {
   const k = karte(page, titel)
   await k.waitFor({ state: 'visible', timeout: 30_000 })
-  await k.click()
+  // In der Tabellenzeile (F119) steht in der Mitte eine Auswahlliste; ein Klick
+  // dorthin gehört ihr und öffnet die Maske bewusst nicht. Geklickt wird darum
+  // in den freien Bereich — die Titelzelle, sofern es sie gibt.
+  const titelzelle = k.locator('.pw-col-titel')
+  const ziel = await titelzelle.count() > 0 ? titelzelle.first() : k
+  await ziel.click()
   await page.locator('.pw-modal h3', { hasText: 'Vorstoss bearbeiten' })
     .waitFor({ state: 'visible', timeout: 30_000 })
 }
@@ -234,6 +259,8 @@ test.describe('Vorstösse: Liste, Karten, Suche & Filter', () => {
     await ncLeeren(feld(page, 'Zuständigkeit'))
     const person = await ncWaehleErste(page, feld(page, 'Zuständigkeit'))
 
+    // Geprüft wird der Aufbau der KARTE; sie erscheint auf schmalen Breiten (F119).
+    await kartenAnsicht(page)
     const k = karte(page, titel)
     // Kicker = Herkunft · Art (tolerant gegenüber exaktem Trennzeichen/Whitespace).
     await expect(k.locator('.pw-data-card-kicker')).toContainText('Eigene')
@@ -255,6 +282,7 @@ test.describe('Vorstösse: Liste, Karten, Suche & Filter', () => {
     await beschlussSetzen(feld(page, 'Beschluss (Haltung zum fremden Vorstoss)'), 'Ablehnen')
     const fraktion = await ncWaehleErste(page, feld(page, 'Herkunft (fremde Fraktion)'))
 
+    await kartenAnsicht(page)
     const k = karte(page, titel)
     const herkunftPaar = k.locator('.pw-data-pair', { hasText: 'Herkunftsfraktion' }).locator('strong')
     await expect(herkunftPaar).toContainText(fraktion)
@@ -429,6 +457,8 @@ test.describe('Vorstösse: Felder speichern sofort', () => {
   test('Art: bekannte Auswahl und freie Überschreibung landen auf der Karte', async ({ page }) => {
     await login(page, U1)
     const titel = await erstelleVorstossUndOeffne(page, 'Art')
+    // Geprüft wird der Kicker der KARTE (F119).
+    await kartenAnsicht(page)
     const k = karte(page, titel)
 
     await beschlussSetzen(feld(page, 'Art'), 'Postulat')
@@ -441,6 +471,8 @@ test.describe('Vorstösse: Felder speichern sofort', () => {
   test('Statuswechsel spiegelt sich sofort im Karten-Badge', async ({ page }) => {
     await login(page, U1)
     const titel = await erstelleVorstossUndOeffne(page, 'StatusBadge')
+    // Geprüft wird die Status-Marke der KARTE (F119).
+    await kartenAnsicht(page)
     const k = karte(page, titel)
 
     await expect(k.locator('.pw-data-card-header > span')).toHaveText('Neu')
@@ -469,11 +501,11 @@ test.describe('Vorstösse: Felder speichern sofort', () => {
     await expect(feld(page, 'Ansprechpartner')).toHaveCount(0)
   })
 
-  test('Zuständigkeit bietet nur aktive Mitglieder mit Nextcloud-User an', async ({ page }) => {
+  test('Zuständigkeit bietet nur aktive Mitglieder mit Nextcloud-Benutzer an', async ({ page }) => {
     await login(page, U1)
     await erstelleVorstossUndOeffne(page, 'ZustaendigOpt')
 
-    // Erlaubte (aktiv + Nextcloud-User) und verbotene (inaktiv bzw. ohne NC-User)
+    // Erlaubte (aktiv und mit Nextcloud-Benutzer) und verbotene (inaktiv oder ohne Benutzer)
     // Namen aus derselben Quelle wie die Komponente (App lädt /mitglieder).
     const daten = await page.evaluate(async () => {
       const tok = (window.OC && window.OC.requestToken) || ''
@@ -487,12 +519,12 @@ test.describe('Vorstösse: Felder speichern sofort', () => {
         verboten: data.filter(m => (m.aktiv === false || !hatNc(m))).map(voll).filter(Boolean),
       }
     })
-    expect(daten.erlaubt.length, 'Es sollten aktive Mitglieder mit Nextcloud-User existieren').toBeGreaterThan(0)
+    expect(daten.erlaubt.length, 'Es sollten aktive Mitglieder mit Nextcloud-Benutzer existieren').toBeGreaterThan(0)
 
     await ncLeeren(feld(page, 'Zuständigkeit'))
     const optionen = await ncOptionen(page, feld(page, 'Zuständigkeit'))
     expect(optionen.length).toBeGreaterThan(0)
-    // Jede angebotene Option gehört zu einem aktiven Mitglied mit Nextcloud-User
+    // Jede angebotene Option gehört zu einem aktiven Mitglied mit Nextcloud-Benutzer
     // (der Optionstext enthält den Namen; NcEllipsisedOption ergänzt evtl. einen Zusatz).
     for (const o of optionen) {
       expect(daten.erlaubt.some(name => o.includes(name)), `Unerlaubte Option: ${o}`).toBe(true)
@@ -538,6 +570,8 @@ test.describe('Vorstösse: Fremde Vorstösse', () => {
     await ncWaehle(page, feld(page, 'Herkunft'), 'Fremde')
 
     await beschlussSetzen(feld(page, 'Beschluss (Haltung zum fremden Vorstoss)'), 'Unterstützen')
+    // Geprüft wird das Wertepaar der KARTE (F119).
+    await kartenAnsicht(page)
     const k = karte(page, titel)
     await expect(k.locator('.pw-data-pair', { hasText: 'Beschluss' }).locator('strong'))
       .toHaveText('Unterstützen')
@@ -663,7 +697,7 @@ test.describe('Vorstösse: Notizen (Versionen & Berechtigung)', () => {
       // Löschen-Knopf, der Notiztext ist nicht klickbar (keine role=button, keine
       // Klickbar-Klasse) — die Notiz lässt sich also weder löschen noch bearbeiten.
       const inhaltB = eintragB.locator('.pw-notiz-inhalt')
-      await expect(eintragB.locator('.pw-btn-loeschen'), 'Nicht-Autor darf keinen Löschen-Knopf sehen').toHaveCount(0)
+      await expect(eintragB.locator('.pw-notiz-loeschen'), 'Nicht-Autor darf keinen Löschen-Knopf sehen').toHaveCount(0)
       await expect(inhaltB).not.toHaveClass(/pw-notiz-text-klickbar/)
       await expect(inhaltB).not.toHaveAttribute('role', 'button')
       // Ein Klick auf den Notiztext öffnet keinen Editor.

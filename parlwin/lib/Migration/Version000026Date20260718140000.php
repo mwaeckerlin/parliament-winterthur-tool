@@ -10,7 +10,7 @@ use OCP\Migration\IOutput;
 use OCP\Migration\SimpleMigrationStep;
 
 /**
- * Fügt die Priorität (hoch/mittel/tief, Default undefiniert) zu den Vorstössen
+ * Fügt die Priorität (hoch/mittel/tief, standardmässig nicht gesetzt) zu den Vorstössen
  * hinzu – analog zu den Geschäften.
  */
 class Version000026Date20260718140000 extends SimpleMigrationStep

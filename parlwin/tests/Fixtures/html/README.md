@@ -1,4 +1,4 @@
-Lokale HTML-Fixtures fuer Scraper-Tests
+Gespeicherte HTML-Seiten als Testdaten für das Lesen der Parlamentswebseite
 
 Quelle: `https://parlament.winterthur.ch`
 
@@ -17,6 +17,8 @@ Dateien:
 - `geschaeft-detail-2567131.html`
 - `sitzung-list.html`
 - `sitzung-detail-4855958.html`
+- `sitzung-detail-6866848.html` (heruntergeladen am 2026-09-05: die Sitzung vom
+  1. Dezember 2025 mit ihrem eigenen Protokoll und dem Traktandum, das das Protokoll der Sitzung vom 10. November 2025 abnimmt)
 - `mitglieder-list.html`
 - `mitglied-detail-285922.html`
 - `kommissionen-list.html`
@@ -25,4 +27,4 @@ Dateien:
 - `fraktion-detail-28072.html`
 
 Zweck:
-- Reproduzierbare, offline-faehige Tests fuer HTML-Scraping und Import-Normalisierung.
+- Tests, die ohne Netz laufen und jedes Mal dasselbe Ergebnis liefern: für das Lesen des HTML und für das Vereinheitlichen der eingelesenen Werte.

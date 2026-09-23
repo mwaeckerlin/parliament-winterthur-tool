@@ -229,7 +229,21 @@
           </div>
           <p v-if="sitzung.typId > 0 && sitzung.bemerkungen" class="pw-sitzung-zweck">{{ sitzung.bemerkungen }}</p>
           <div class="pw-sitzung-ort">{{ sitzung.ort }}</div>
-          <a v-if="sitzung.url" :href="sitzung.url" target="_blank" @click.stop class="pw-extern-link">Extern</a>
+          <!-- Beide Links teilen eine Spalte. «Protokoll» steht davor, damit
+               «Extern» — auf jeder Karte vorhanden — in jeder Karte an
+               derselben Stelle steht. -->
+          <div v-if="sitzung.url || sitzung.protokollUrl" class="pw-sitzung-links">
+            <a
+              v-if="sitzung.protokollUrl"
+              :href="sitzung.protokollUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              :title="sitzung.protokollTitel"
+              class="pw-protokoll-link"
+              @click.stop
+            >Protokoll</a>
+            <a v-if="sitzung.url" :href="sitzung.url" target="_blank" @click.stop class="pw-extern-link">Extern</a>
+          </div>
           <span class="pw-toggle">{{ offeneSitzungen.includes(sitzung.id) ? '▲' : '▼' }}</span>
         </div>
 
@@ -411,7 +425,7 @@
                           tabindex="0"
                           role="button"
                           :aria-label="`Traktandum ${t.nummer} öffnen`"
-                          @click="oeffneGeschaeft(t, sitzung)"
+                          @click="oeffneGeschaeft(t, sitzung, $event)"
                           @keydown.enter.prevent="oeffneGeschaeft(t, sitzung)"
                           @keydown.space.prevent="oeffneGeschaeft(t, sitzung)"
                         >
@@ -447,6 +461,15 @@
                               title="Originaltraktandum extern öffnen (kein verknüpftes Geschäft)"
                             >↗</a>
                             {{ t.geschaeft?.titel || t.titel }}
+                            <a
+                              v-if="t.protokoll"
+                              :href="t.protokoll.url"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              :title="t.protokoll.titel"
+                              class="pw-traktandum-protokoll"
+                              @click.stop
+                            >{{ protokollBeschriftung(t.protokoll) }}</a>
                           </td>
                           <td v-if="t.geschaeft" data-label="Zuständig" class="pw-col-inline-edit pw-col-zustaendig" @click.stop>
                             <PwMultiSelect
@@ -521,7 +544,7 @@
                       role="button"
                       tabindex="0"
                       :aria-label="`Traktandum ${t.nummer} öffnen`"
-                      @click="oeffneGeschaeft(t, sitzung)"
+                      @click="oeffneGeschaeft(t, sitzung, $event)"
                       @keydown.enter.prevent="oeffneGeschaeft(t, sitzung)"
                       @keydown.space.prevent="oeffneGeschaeft(t, sitzung)"
                     >
@@ -555,6 +578,15 @@
                           title="Originaltraktandum extern öffnen"
                         >↗</a>
                         {{ t.geschaeft?.titel || t.titel }}
+                        <a
+                          v-if="t.protokoll"
+                          :href="t.protokoll.url"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          :title="t.protokoll.titel"
+                          class="pw-traktandum-protokoll"
+                          @click.stop
+                        >{{ protokollBeschriftung(t.protokoll) }}</a>
                       </span>
                       <div class="pw-traktandum-karte-meta">
                         <span
@@ -1379,7 +1411,13 @@ export default {
         console.error('Fehler beim Speichern des Beschlusses:', fehler)
       }
     },
-    oeffneGeschaeft(traktandum, sitzung) {
+    // Ein Klick in die Zeile öffnet das Geschäft. Die Links darin gehören sich
+    // selbst: «↗» führt zur Quelle, «Protokoll» zum Protokoll. Geprüft wird das
+    // am Ziel des Klicks, weil der Protokoll-Link hinter dem Titel steht und bei
+    // einem kurzen Titel mitten in der Zelle liegt — dort, wo auch die Zeile
+    // angeklickt wird (F115).
+    oeffneGeschaeft(traktandum, sitzung, event) {
+      if (event && event.target && event.target.closest('a, button, input, select, textarea, label')) { return }
       const id = Number(traktandum?.geschaeftId || traktandum?.geschaeft?.id || 0)
       if (id > 0) {
         this.ausgewaehlteGeschaeftId = id
@@ -1419,6 +1457,14 @@ export default {
       } catch {
         return datum
       }
+    },
+    // Beschriftung des Protokoll-Links am Traktandum (F115): «Protokoll» und das
+    // Datum der Sitzung, die es protokolliert.
+    protokollBeschriftung(protokoll) {
+      const datum = (protokoll && protokoll.datum) || ''
+      if (!datum) return 'Protokoll'
+      const [jahr, monat, tag] = datum.split('-')
+      return `Protokoll ${tag}.${monat}.${jahr}`
     },
     formatieredatumKurz(datum) {
       if (!datum) return ''

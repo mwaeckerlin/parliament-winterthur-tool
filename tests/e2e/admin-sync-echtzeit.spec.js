@@ -14,9 +14,10 @@ import { test, expect } from '@playwright/test'
  *  - Abbruch einer laufenden Synchronisation (Status-API bestätigt den Stopp),
  *  - Fraktion/Gruppe: Optionen, Autosave, Persistenz, Gruppen-Status,
  *  - Kürzel über die UI (hinzufügen/löschen) und Datalist-Vorschläge,
- *  - Mitglieder-Zuordnung (Hinweise, Zeilen, Username-Autosave),
+ *  - Mitglieder-Zuordnung (Hinweise, Zeilen, der Benutzername speichert von selbst),
  *  - Änderungsverlauf (Karten, neueste offen, ältere zugeklappt, Toggle),
- *  - Echtzeit: ein aus Kontext B gestarteter Sync erscheint in Kontext A ohne Reload.
+ *  - Echtzeit: eine in Kontext B gestartete Synchronisation erscheint in Kontext A,
+ *    ohne dass die Seite neu geladen wird.
  *
  * Die Sync-Tests verändern globalen Zustand; jeder stellt zu Beginn und am Ende
  * sicher, dass KEIN Lauf hängen bleibt (ensureSyncIdle + afterAll-Sicherung).
@@ -237,7 +238,7 @@ test.describe('Administration, Sync, Echtzeit, Änderungsverlauf (e2e)', () => {
       expect(eintrag, 'hinzugefügte Zeile nicht persistiert').toBeTruthy()
       expect(eintrag.tage, 'falsche Wochentage persistiert').toEqual([6])
 
-      // Diese Zeile wieder löschen → nach Reload verschwunden.
+      // Diese Zeile wieder löschen → nach dem Neuladen verschwunden.
       const idx = info.findIndex((e) => e.zeit === '07:07')
       await page.locator(rowSel).nth(idx).locator('.pw-zeitplan-delete').click()
       await expect(status).toHaveText(/Gespeichert/i, { timeout: 15_000 })
@@ -290,7 +291,7 @@ test.describe('Administration, Sync, Echtzeit, Änderungsverlauf (e2e)', () => {
       await selectFraktion.selectOption(ziel)
       await expect(page.locator('#pw-admin-autosave')).toHaveText(/gespeichert/i, { timeout: 15_000 })
 
-      // Persistenz: nach Reload ist die gewählte Fraktion gesetzt.
+      // Persistenz: nach dem Neuladen ist die gewählte Fraktion gesetzt.
       await page.reload()
       await page.waitForSelector('#parlwin-admin-settings', { timeout: 30_000 })
       await expect(page.locator('#pw-fraktion')).toHaveValue(ziel)
@@ -383,7 +384,7 @@ test.describe('Administration, Sync, Echtzeit, Änderungsverlauf (e2e)', () => {
         .poll(async () => (await zeilen()).some((r) => r.suche === suche && r.wert === wert), { timeout: 15_000 })
         .toBe(true)
 
-      // Löschen → nach Reload verschwunden.
+      // Löschen → nach dem Neuladen verschwunden.
       const idx = (await zeilen()).findIndex((r) => r.suche === suche)
       expect(idx, 'gespeicherte Kürzel-Zeile nicht gefunden').toBeGreaterThanOrEqual(0)
       await page.locator(rowSel).nth(idx).locator('.pw-kuerzel-delete').click()
@@ -401,7 +402,7 @@ test.describe('Administration, Sync, Echtzeit, Änderungsverlauf (e2e)', () => {
   })
 
   test.describe('Mitglieder-Zuordnung', () => {
-    test('Provision ohne Fraktion warnt; mit Fraktion rendern Zeilen; Username-Änderung speichert automatisch', async ({ page }) => {
+    test('Der Abgleich ohne Fraktion warnt; mit Fraktion erscheinen Zeilen; ein geänderter Benutzername speichert automatisch', async ({ page }) => {
       test.setTimeout(120_000)
       await login(page, ADMIN)
       await openAdmin(page)
@@ -413,7 +414,7 @@ test.describe('Administration, Sync, Echtzeit, Änderungsverlauf (e2e)', () => {
       const original = await selectFraktion.inputValue()
       const membersStatus = page.locator('#pw-members-status')
 
-      // Provision ohne Fraktion → Hinweis.
+      // Abgleich ohne Fraktion → Hinweis.
       await selectFraktion.selectOption('')
       await page.locator('#pw-btn-members-provision').click()
       await expect(membersStatus).toHaveText(/Bitte zuerst eine Fraktion wählen\./i, { timeout: 10_000 })
@@ -424,7 +425,7 @@ test.describe('Administration, Sync, Echtzeit, Änderungsverlauf (e2e)', () => {
       await selectFraktion.selectOption(ziel)
       await expect(page.locator('#pw-members-body tr').first()).toBeVisible({ timeout: 30_000 })
 
-      // Username-Autosave an einer nicht gesperrten Zeile (falls vorhanden).
+      // Der Benutzername speichert von selbst, an einer nicht gesperrten Zeile (falls vorhanden).
       const editierbar = page.locator('#pw-members-body tr input.pw-member-username:not([disabled])').first()
       if ((await editierbar.count()) > 0) {
         const alt = await editierbar.inputValue()
@@ -482,12 +483,12 @@ test.describe('Administration, Sync, Echtzeit, Änderungsverlauf (e2e)', () => {
   })
 
   test.describe('Synchronisation', () => {
-    test('Manuell starten: Live-Fortschritt und «läuft bereits»; danach Abbruch und Idle', async ({ page }) => {
+    test('Manuell starten: laufender Fortschritt und «läuft bereits»; danach Abbruch und Ruhe', async ({ page }) => {
       test.setTimeout(360_000)
       await login(page, ADMIN)
       await openAdmin(page)
       await ensureSyncIdle(page)
-      // Nach dem Idle-Stellen neu laden, damit der Button-Zustand garantiert der
+      // Nachdem der Sync zur Ruhe gebracht ist, neu laden, damit der Button-Zustand garantiert der
       // Realität entspricht (kein veralteter «running»-Snapshot, der den
       // Start-Button deaktiviert hielte).
       await openAdmin(page)
@@ -565,12 +566,12 @@ test.describe('Administration, Sync, Echtzeit, Änderungsverlauf (e2e)', () => {
       expect(jsFehler, `JS-Fehler: ${jsFehler.join(' | ')}`).toEqual([])
     })
 
-    test('Laufenden Sync abbrechen: UI meldet Abbruch, Status-API bestätigt den Stopp', async ({ page }) => {
+    test('Laufende Synchronisation abbrechen: die Oberfläche meldet den Abbruch, die Schnittstelle bestätigt den Stopp', async ({ page }) => {
       test.setTimeout(360_000)
       await login(page, ADMIN)
       await openAdmin(page)
       await ensureSyncIdle(page)
-      await openAdmin(page) // frischer Button-Zustand nach dem Idle-Stellen
+      await openAdmin(page) // frischer Button-Zustand, nachdem der Sync ruht
 
       const btnSync = page.locator('#pw-btn-sync')
       const btnCancel = page.locator('#pw-btn-sync-cancel')
@@ -606,7 +607,7 @@ test.describe('Administration, Sync, Echtzeit, Änderungsverlauf (e2e)', () => {
   })
 
   test.describe('Echtzeit', () => {
-    test('Ein aus Kontext B gestarteter Sync erscheint in Kontext A ohne Reload', async ({ browser }) => {
+    test('Eine in Kontext B gestartete Synchronisation erscheint in Kontext A, ohne dass die Seite neu geladen wird', async ({ browser }) => {
       test.setTimeout(300_000)
       const ctxA = await browser.newContext()
       const ctxB = await browser.newContext()
@@ -629,17 +630,17 @@ test.describe('Administration, Sync, Echtzeit, Änderungsverlauf (e2e)', () => {
         const res = await apiPost(pageB, '/sync')
         expect(res.ok(), 'Sync-Start aus Kontext B fehlgeschlagen').toBeTruthy()
 
-        // A aktualisiert sich ohne Reload: Status läuft, Fortschritt bewegt sich.
+        // A aktualisiert sich ohne Neuladen: Status läuft, Fortschritt bewegt sich.
         await expect(statusA).toHaveText(/Synchronisiere|gestartet|läuft/i, { timeout: 30_000 })
         await expect.poll(progressA, { timeout: 90_000, intervals: [500] }).toBeGreaterThan(0)
         await expect(pageA.locator('#pw-sync-details')).toHaveText(FORTSCHRITT_RE, { timeout: 30_000 })
 
         expect(fehlerA, `JS-Fehler Kontext A: ${fehlerA.join(' | ')}`).toEqual([])
       } finally {
-        // Zuerst den gestarteten Sync sicher abbrechen und Idle bestätigen, DANN
+        // Zuerst den gestarteten Sync sicher abbrechen und die Ruhe bestätigen, DANN
         // die beiden Kontexte (inkl. ihrer offenen WebSocket-Verbindungen) und
         // Seiten schliessen. Das innere finally garantiert das Schliessen auch
-        // dann, wenn die Idle-Bestätigung fehlschlägt.
+        // dann, wenn die Bestätigung der Ruhe fehlschlägt.
         try {
           await ensureSyncIdle(pageB)
         } finally {

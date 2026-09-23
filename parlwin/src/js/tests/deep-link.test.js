@@ -13,7 +13,7 @@ describe('Deep-Linking', () => {
     expect(w.vm.aktiveAnsicht).toBe('budget')
   })
 
-  it('ignoriert einen unbekannten Hash und bleibt beim Default', () => {
+  it('ignoriert einen unbekannten Hash und bleibt beim Standardbereich', () => {
     window.location.hash = '#gibtsnicht'
     const w = shallowMount(App)
     expect(w.vm.aktiveAnsicht).toBe('geschaefte')

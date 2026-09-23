@@ -11,7 +11,7 @@ use OCP\Migration\IOutput;
 use OCP\Migration\SimpleMigrationStep;
 
 /**
- * Notizen erhalten eine Versions-History und ein Lösch-Flag:
+ * Notizen erhalten einen Versionsverlauf und ein Kennzeichen für das Löschen:
  *
  * - pw_notiz_revisionen: archivierte Vorversionen einer Notiz (beim Bearbeiten).
  * - pw_geschaeft_aktionen.geloescht: Löschen entfernt die Notiz nicht mehr aus der

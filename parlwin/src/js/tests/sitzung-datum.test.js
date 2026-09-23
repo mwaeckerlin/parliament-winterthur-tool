@@ -8,7 +8,7 @@ function mount() {
   return shallowMount(Sitzungsliste, { props: { mitglieder: [], fraktionen: [], kommissionen: [] } })
 }
 
-describe('Sitzungsliste — Default-Datum neue Sitzung', () => {
+describe('Sitzungsliste — vorbelegtes Datum einer neuen Sitzung', () => {
   it('setzt beim Öffnen das Datum auf heute + 1 Woche', async () => {
     const wrapper = mount()
     wrapper.vm.waehleTypFuerNeueSitzung({ id: 1, name: 'Test' })

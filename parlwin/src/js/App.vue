@@ -62,6 +62,10 @@
         :mitglieder="mitglieder"
         :fraktionen="fraktionen"
       />
+      <Fragestunde
+        v-else-if="aktiveAnsicht === 'fragestunde'"
+        :mitglieder="mitglieder"
+      />
       <Sitzungstypenliste
         v-else-if="aktiveAnsicht === 'sitzungstypen'"
         :mitglieder="mitglieder"
@@ -94,6 +98,7 @@ import {
   mdiBookOpenOutline,
   mdiHistory,
   mdiClipboardListOutline,
+  mdiCommentQuestionOutline,
 } from '@mdi/js'
 import { subscribeRealtime } from './realtime'
 import Geschaeftsliste from './components/Geschaeftsliste.vue'
@@ -103,6 +108,7 @@ import Kommissionsliste from './components/Kommissionsliste.vue'
 import Vorstoesseliste from './components/Vorstoesseliste.vue'
 import Sitzungstypenliste from './components/Sitzungstypenliste.vue'
 import Budgetliste from './components/Budgetliste.vue'
+import Fragestunde from './components/Fragestunde.vue'
 import Bedienungsanleitung from './components/Bedienungsanleitung.vue'
 import Changelog from './components/Changelog.vue'
 import Protokoll from './components/Protokoll.vue'
@@ -122,6 +128,7 @@ export default {
     Vorstoesseliste,
     Sitzungstypenliste,
     Budgetliste,
+    Fragestunde,
     Bedienungsanleitung,
     Changelog,
     Protokoll,
@@ -141,6 +148,7 @@ export default {
         { key: 'kommissionen', bezeichnung: 'Kommissionen', icon: mdiBankOutline },
         { key: 'vorstoesse', bezeichnung: 'Vorstösse', icon: mdiBullhornOutline },
         { key: 'budget', bezeichnung: 'Budget', icon: mdiCashMultiple },
+        { key: 'fragestunde', bezeichnung: 'Fragestunde', icon: mdiCommentQuestionOutline },
         { key: 'mitglieder', bezeichnung: 'Mitglieder', icon: mdiAccountGroupOutline },
         { key: 'sitzungstypen', bezeichnung: 'Sitzungstypen', icon: mdiFileDocumentEditOutline },
         { key: 'protokoll', bezeichnung: 'Protokoll', icon: mdiClipboardListOutline },

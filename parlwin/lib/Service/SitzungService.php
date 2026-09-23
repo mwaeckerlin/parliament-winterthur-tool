@@ -67,7 +67,7 @@ class SitzungService
                 $detailUrls[] = $url;
             }
         }
-        $traktandenCache = [];
+        $seitenCache = [];
         if ($detailUrls !== []) {
             $prefetchGesamt = count(array_unique($detailUrls));
             $progressCallback = null;
@@ -82,7 +82,7 @@ class SitzungService
                     ]);
                 };
             }
-            $traktandenCache = $this->scraper->ladeTraktandenJeUrlParallel($detailUrls, $progressCallback);
+            $seitenCache = $this->scraper->ladeSitzungsseitenJeUrlParallel($detailUrls, $progressCallback);
         }
 
         $syncFehler = 0;
@@ -125,22 +125,25 @@ class SitzungService
             }
 
             try {
+                // Die Sitzungsseite trägt beides: die Traktanden und die
+                // Dokumente der Sitzung, darunter ihr Protokoll (F115).
+                $detailUrl = (string) ScraperService::wert($daten, ['url', 'Url', 'URL', 'detailUrl', 'link']);
+                $seite = $this->holeSitzungsseite($daten, $detailUrl, $seitenCache);
+
                 try {
                     $sitzung = $this->sitzungMapper->findByExternId($externId);
                     $this->aktualisiereOeffentlicheFelder($sitzung, $daten);
+                    $this->uebernehmeProtokoll($sitzung, $seite['dokumente']);
                     $this->sitzungMapper->update($sitzung);
                     $statistik['aktualisiert']++;
                 } catch (DoesNotExistException) {
                     $sitzung = $this->erstelleAusRohdaten($externId, $daten);
+                    $this->uebernehmeProtokoll($sitzung, $seite['dokumente']);
                     $this->sitzungMapper->insert($sitzung);
                     $statistik['neu']++;
                 }
 
-                // Traktanden laden, wenn eine Detail-URL vorhanden ist
-                $detailUrl = (string) ScraperService::wert($daten, ['url', 'Url', 'URL', 'detailUrl', 'link']);
-                if (!empty($detailUrl)) {
-                    $this->synchronisiereTraktanden($sitzung, $detailUrl, $daten, $traktandenCache);
-                }
+                $this->synchronisiereTraktanden($sitzung, $seite['traktanden']);
             } catch (\Throwable $e) {
                 $syncFehler++;
                 $this->logger->error(
@@ -206,25 +209,57 @@ class SitzungService
     }
 
     /**
-     * Synchronisiert die Traktanden einer einzelnen Sitzung.
+     * Holt Traktanden und Dokumente einer Sitzung: aus den Sitzungsdaten selbst,
+     * aus dem parallel vorgeladenen Cache oder direkt von der Detailseite.
      *
-     * @param array<string, array> $traktandenCache Map: absolute URL → vorab geladene Traktanden
+     * @param array<string, mixed> $sitzungsDaten
+     * @param array<string, array{traktanden: array, dokumente: array}> $seitenCache Map: absolute URL → Seitendaten
+     * @return array{traktanden: array, dokumente: array}
      */
-    private function synchronisiereTraktanden(Sitzung $sitzung, string $url, array $sitzungsDaten, array $traktandenCache = []): void
+    private function holeSitzungsseite(array $sitzungsDaten, string $url, array $seitenCache): array
     {
         // Traktanden können direkt in den Sitzungsdaten enthalten sein
         $traktandenDaten = ScraperService::wert($sitzungsDaten, ['agenda', 'Agenda', 'traktanden', 'items'], []);
-
-        // Oder von der Detailseite laden (bevorzugt aus dem parallelen Cache)
-        if (empty($traktandenDaten) && !empty($url)) {
-            $absUrl = ScraperService::absolutUrl($url);
-            if ($absUrl !== '' && array_key_exists($absUrl, $traktandenCache)) {
-                $traktandenDaten = $traktandenCache[$absUrl];
-            } else {
-                $traktandenDaten = $this->scraper->ladeTraktanden($url);
-            }
+        if (!empty($traktandenDaten)) {
+            return ['traktanden' => $traktandenDaten, 'dokumente' => []];
         }
 
+        if (empty($url)) {
+            return ['traktanden' => [], 'dokumente' => []];
+        }
+
+        $absUrl = ScraperService::absolutUrl($url);
+        if ($absUrl !== '' && array_key_exists($absUrl, $seitenCache)) {
+            return $seitenCache[$absUrl];
+        }
+
+        return $this->scraper->ladeSitzungsseite($url);
+    }
+
+    /**
+     * Übernimmt das Protokoll der Sitzung aus ihren Dokumenten (F115). Ohne
+     * veröffentlichtes Protokoll bleibt das Feld leer.
+     *
+     * @param array<int, array<string, mixed>> $dokumente
+     */
+    private function uebernehmeProtokoll(Sitzung $sitzung, array $dokumente): void
+    {
+        $protokoll = ScraperService::waehleProtokoll($dokumente, $sitzung->getDatum());
+        if ($protokoll === null) {
+            return;
+        }
+
+        $sitzung->setProtokollUrl($protokoll['url']);
+        $sitzung->setProtokollTitel($protokoll['titel']);
+    }
+
+    /**
+     * Synchronisiert die Traktanden einer einzelnen Sitzung.
+     *
+     * @param array<int, array<string, mixed>> $traktandenDaten
+     */
+    private function synchronisiereTraktanden(Sitzung $sitzung, array $traktandenDaten): void
+    {
         if (empty($traktandenDaten)) {
             return;
         }
@@ -263,6 +298,7 @@ class SitzungService
             }
 
             $traktandumUrl = (string) ScraperService::wert($tDaten, ['traktandumUrl'], '');
+            $dokumentTitel = (string) ScraperService::wert($tDaten, ['dokumentTitel'], '');
 
             // Bestehendes Traktandum suchen (auch gelöschte) — nie neu anlegen wenn eines existiert.
             $traktandum = $this->traktandumMapper->findErstesBySitzungUndNummer($sitzung->getId(), $tNummer);
@@ -279,6 +315,7 @@ class SitzungService
             $traktandum->setTitel($titel);
             $traktandum->setBeschreibung($beschreibung);
             $traktandum->setUrl($traktandumUrl);
+            $traktandum->setDokumentTitel($dokumentTitel);
             $traktandum->setGeloescht(false);
             $traktandum->setAktualisiertAm($jetzt);
 
@@ -346,6 +383,47 @@ class SitzungService
     public function traktanden(int $sitzungId): array
     {
         return $this->traktandumMapper->findBySitzung($sitzungId);
+    }
+
+    /**
+     * Das Protokoll, das an einem Traktandum hängt (F115).
+     *
+     * Das Traktandum «Abnahme Parlaments-Protokolle» der Folgesitzung trägt den
+     * Entwurf des Protokolls; sein Titel nennt die protokollierte Sitzung. Ist
+     * diese Sitzung bekannt und ihr abgenommenes Protokoll veröffentlicht, führt
+     * der Link dorthin, sonst auf das Dokument des Traktandums selbst.
+     *
+     * @return array{url: string, titel: string, datum: string}|null
+     */
+    public function protokollFuerTraktandum(Traktandum $traktandum): ?array
+    {
+        $dokumentTitel = (string) $traktandum->getDokumentTitel();
+        if (!ScraperService::istProtokollTitel($dokumentTitel)) {
+            return null;
+        }
+
+        $datum = ScraperService::datumAusText($dokumentTitel);
+        if ($datum === '') {
+            return null;
+        }
+
+        foreach ($this->sitzungMapper->findByDatum($datum) as $sitzung) {
+            $protokollUrl = (string) $sitzung->getProtokollUrl();
+            if ($protokollUrl !== '') {
+                return [
+                    'url' => $protokollUrl,
+                    'titel' => (string) $sitzung->getProtokollTitel(),
+                    'datum' => $datum,
+                ];
+            }
+        }
+
+        $eigeneUrl = (string) $traktandum->getUrl();
+        if ($eigeneUrl === '') {
+            return null;
+        }
+
+        return ['url' => $eigeneUrl, 'titel' => $dokumentTitel, 'datum' => $datum];
     }
 
     /**

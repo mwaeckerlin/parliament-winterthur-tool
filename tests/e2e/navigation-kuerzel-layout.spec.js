@@ -157,9 +157,23 @@ const ANSICHTEN = [
   { name: 'Sitzungen', rows: '.pw-sitzungen .pw-sitzung-karte', button: '+ Neue Sitzung' },
   { name: 'Mitglieder', rows: '.pw-mitglieder .pw-mitglied-karte', button: null },
   { name: 'Kommissionen', rows: '.pw-kommissionen .pw-kommission-karte', button: null },
-  { name: 'Vorstösse', rows: '.pw-vorstoesse article.pw-data-card', button: '+ Neuer Vorstoss' },
+  // Seit F119 zeigt die Übersicht auf breiten Fenstern eine Tabelle, wie bei
+  // den Geschäften; die Karten bleiben für schmale.
+  { name: 'Vorstösse', rows: '.pw-vorstoesse .pw-table-desktop tbody tr', button: '+ Neuer Vorstoss' },
   { name: 'Sitzungstypen', rows: '.pw-sitzungstypen .pw-sitzungstyp-karte', button: '+ Neuer Typ' },
+  { name: 'Protokoll', rows: '.pw-protokoll .pw-protokoll-eintrag', button: null },
   { name: 'Änderungsverlauf', rows: '.pw-changelog .pw-data-card', button: null },
+]
+
+// Alle Einträge der Navigation, in der Reihenfolge von App.vue (ansichten). Die
+// Liste ist breiter als ANSICHTEN: «Budget» und «Fragestunde» sind getabbte bzw.
+// eigene Sonderansichten (im Detail in budget-datenfluss.spec.js und
+// fragestunde.spec.js geprüft) und die «Bedienungsanleitung» ein Dokument ohne
+// Zähler — sie gehören in die Navigation, aber nicht in den Zähler-Test. Wer der
+// App einen Eintrag hinzufügt, ergänzt ihn hier an derselben Stelle.
+const NAV_EINTRAEGE = [
+  'Geschäfte', 'Sitzungen', 'Kommissionen', 'Vorstösse', 'Budget', 'Fragestunde',
+  'Mitglieder', 'Sitzungstypen', 'Protokoll', 'Bedienungsanleitung', 'Änderungsverlauf',
 ]
 
 // ---------------------------------------------------------------------------
@@ -178,11 +192,10 @@ test.describe('Navigation: aktiver Eintrag und App-Version', () => {
     await expect(version).toBeVisible()
     await expect(version).toHaveText(/^v\d+\.\d+\.\d+/)
 
-    // Die sieben Standard-Listenansichten plus «Budget» (getabbte Sonderansicht,
-    // im Detail in budget-datenfluss.spec.js geprüft) = acht Navigationseinträge.
-    await expect(page.locator('.app-navigation-entry')).toHaveCount(ANSICHTEN.length + 1)
+    // Jeder Eintrag der Navigation ist da — und beim Öffnen ist genau er aktiv.
+    await expect(page.locator('.app-navigation-entry')).toHaveCount(NAV_EINTRAEGE.length)
 
-    for (const { name } of [...ANSICHTEN, { name: 'Budget' }]) {
+    for (const name of NAV_EINTRAEGE) {
       await gotoView(page, name)
       // Genau ein aktiver Eintrag, und zwar der gerade geöffnete.
       await expect(page.locator('.app-navigation-entry.active')).toHaveCount(1)
@@ -234,7 +247,7 @@ test.describe('Suche: Trefferfall, Leerzustände und ✕-Leeren', () => {
   let jsFehler
   test.beforeEach(({ page }) => { jsFehler = []; page.on('pageerror', (e) => jsFehler.push(e.message)) })
 
-  test('Geschäfte: Titel-Token filtert, Gibberish zeigt «Keine Geschäfte gefunden», ✕ stellt her', async ({ page }) => {
+  test('Geschäfte: ein Wort aus dem Titel filtert, Unsinn zeigt «Keine Geschäfte gefunden», ✕ stellt her', async ({ page }) => {
     await login(page, U1)
     await openApp(page)
     await gotoView(page, 'Geschäfte')
@@ -273,7 +286,7 @@ test.describe('Suche: Trefferfall, Leerzustände und ✕-Leeren', () => {
     expect(jsFehler, `JavaScript-Fehler: ${jsFehler.join(' | ')}`).toEqual([])
   })
 
-  test('Mitglieder: Namens-Token filtert, Gibberish zeigt «Keine Mitglieder gefunden», ✕ stellt her', async ({ page }) => {
+  test('Mitglieder: ein Wort aus dem Namen filtert, Unsinn zeigt «Keine Mitglieder gefunden», ✕ stellt her', async ({ page }) => {
     await login(page, U1)
     await openApp(page)
     await gotoView(page, 'Mitglieder')
@@ -308,7 +321,7 @@ test.describe('Suche: Trefferfall, Leerzustände und ✕-Leeren', () => {
     expect(jsFehler, `JavaScript-Fehler: ${jsFehler.join(' | ')}`).toEqual([])
   })
 
-  test('Kommissionen: Namens-Token klappt Treffer auf, Gibberish zeigt «Keine Kommissionen gefunden», ✕ stellt her', async ({ page }) => {
+  test('Kommissionen: ein Wort aus dem Namen klappt Treffer auf, Unsinn zeigt «Keine Kommissionen gefunden», ✕ stellt her', async ({ page }) => {
     await login(page, U1)
     await openApp(page)
     await gotoView(page, 'Kommissionen')
@@ -329,7 +342,7 @@ test.describe('Suche: Trefferfall, Leerzustände und ✕-Leeren', () => {
     }, { timeout: 15_000 }).toBe(true)
     const treffer = page.locator('.pw-kommissionen .pw-kommission-karte', { hasText: token }).first()
     await expect(treffer).toBeVisible()
-    // Suche klappt die Treffer-Kommission automatisch auf.
+    // Der Inhalt der Treffer-Karte steht offen da (F118).
     await expect(treffer.locator('.pw-kommission-details')).toBeVisible()
 
     await leereSuche(page)
@@ -344,7 +357,7 @@ test.describe('Suche: Trefferfall, Leerzustände und ✕-Leeren', () => {
     expect(jsFehler, `JavaScript-Fehler: ${jsFehler.join(' | ')}`).toEqual([])
   })
 
-  test('Vorstösse: Titel-Token filtert, Gibberish zeigt «Keine Vorstösse vorhanden», ✕ stellt her', async ({ page }) => {
+  test('Vorstösse: ein Wort aus dem Titel filtert, Unsinn zeigt «Keine Vorstösse vorhanden», ✕ stellt her', async ({ page }) => {
     await login(page, U1)
     await openApp(page)
 
@@ -357,7 +370,8 @@ test.describe('Suche: Trefferfall, Leerzustände und ✕-Leeren', () => {
     const basis = await headerCount(page)
     expect(basis).toBeGreaterThan(0)
 
-    const karten = page.locator('.pw-vorstoesse article.pw-data-card')
+    // Auf der Breite dieses Laufs steht die Tabelle (F119).
+    const karten = page.locator('.pw-vorstoesse .pw-table-desktop tbody tr')
     await tippeSuche(page, token)
     await expect.poll(async () => {
       const c = await headerCount(page)
@@ -378,7 +392,7 @@ test.describe('Suche: Trefferfall, Leerzustände und ✕-Leeren', () => {
     expect(jsFehler, `JavaScript-Fehler: ${jsFehler.join(' | ')}`).toEqual([])
   })
 
-  test('Sitzungen: Titel-Token filtert, Gibberish zeigt «Keine Sitzungen gefunden.», ✕ stellt her', async ({ page }) => {
+  test('Sitzungen: ein Wort aus dem Titel filtert, Unsinn zeigt «Keine Sitzungen gefunden.», ✕ stellt her', async ({ page }) => {
     await login(page, U1)
     await openApp(page)
 
@@ -423,7 +437,7 @@ test.describe('Suche: Trefferfall, Leerzustände und ✕-Leeren', () => {
     expect(jsFehler, `JavaScript-Fehler: ${jsFehler.join(' | ')}`).toEqual([])
   })
 
-  test('Sitzungstypen: Namens-Token filtert, Gibberish zeigt «Keine Sitzungstypen vorhanden…», ✕ stellt her', async ({ page }) => {
+  test('Sitzungstypen: ein Wort aus dem Namen filtert, Unsinn zeigt «Keine Sitzungstypen vorhanden…», ✕ stellt her', async ({ page }) => {
     await login(page, U1)
     await openApp(page)
 
@@ -466,7 +480,7 @@ test.describe('Sofort-Speichern-Dialoge und Minimal-Erstellung', () => {
   let jsFehler
   test.beforeEach(({ page }) => { jsFehler = []; page.on('pageerror', (e) => jsFehler.push(e.message)) })
 
-  test('Sitzungstyp: Neu öffnet die volle Maske mit Speichern/Abbrechen, danach speichert jede Eingabe sofort und bleibt nach Reload', async ({ page }) => {
+  test('Sitzungstyp: Neu öffnet die volle Maske mit Speichern/Abbrechen, danach speichert jede Eingabe sofort und bleibt nach dem Neuladen', async ({ page }) => {
     await login(page, U1)
     await openApp(page)
     await gotoView(page, 'Sitzungstypen')
@@ -506,7 +520,7 @@ test.describe('Sofort-Speichern-Dialoge und Minimal-Erstellung', () => {
     await editModal.locator('.pw-btn-schliessen').click()
     await expect(page.locator('.pw-modal', { hasText: 'Sitzungstyp bearbeiten' })).toHaveCount(0)
 
-    // Reload → Karte erneut öffnen → Wert ist persistent.
+    // Neu laden →Karte erneut öffnen → Wert ist persistent.
     await page.reload()
     await page.waitForSelector('.pw-view-content', { timeout: 30_000 })
     await gotoView(page, 'Sitzungstypen')
@@ -520,7 +534,7 @@ test.describe('Sofort-Speichern-Dialoge und Minimal-Erstellung', () => {
     expect(jsFehler, `JavaScript-Fehler: ${jsFehler.join(' | ')}`).toEqual([])
   })
 
-  test('Geschäft-Detail: keine Abbrechen/Speichern-Knöpfe, ✕ schliesst ohne Zeile neu zu öffnen, Priorität bleibt nach Reload', async ({ page }) => {
+  test('Geschäft-Detail: keine Abbrechen/Speichern-Knöpfe, ✕ schliesst ohne Zeile neu zu öffnen, Priorität bleibt nach dem Neuladen', async ({ page }) => {
     await login(page, U1)
     await openApp(page)
     await gotoView(page, 'Geschäfte')
@@ -555,7 +569,7 @@ test.describe('Sofort-Speichern-Dialoge und Minimal-Erstellung', () => {
     await page.waitForTimeout(400)
     await expect(page.locator('.pw-geschaeft-detail')).toHaveCount(0)
 
-    // Reload → dasselbe Geschäft (Standardsortierung nach Datum unverändert) → Priorität persistent.
+    // Neu laden →dasselbe Geschäft (Standardsortierung nach Datum unverändert) → Priorität persistent.
     await page.reload()
     await page.waitForSelector('.pw-view-content', { timeout: 30_000 })
     await gotoView(page, 'Geschäfte')

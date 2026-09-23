@@ -53,6 +53,23 @@ const ZIEL_TYPEN = [
   { value: 'festes_defizit', label: 'Festes Defizit' },
 ]
 
+// Die lokalen Editorfelder aus dem Pauschalantrag ableiten. Dieselbe Zuordnung
+// beim Erzeugen und bei jeder Änderung von aussen, damit beide Wege nie
+// auseinanderlaufen.
+function felderAus(pauschal, eigeneFraktion) {
+  return {
+    zielTyp: pauschal.zielTyp || 'einsparungen',
+    betragMag: pauschal.betrag ? String(Math.abs(pauschal.betrag)) : '',
+    prozentMag: pauschal.prozent ? String(Math.abs(pauschal.prozent)) : '',
+    zielBetragMag: pauschal.zielBetrag ? String(Math.abs(pauschal.zielBetrag)) : '',
+    einreichen: (pauschal.haltung || 'einreichen') !== 'nicht_einreichen',
+    // Antragsteller ist eine Fraktion (F94), vorbelegt mit der eigenen Fraktion.
+    antragsteller: pauschal.antragsteller || eigeneFraktion || '',
+    begruendung: pauschal.begruendung || '',
+    ausnahmen: Array.isArray(pauschal.ausnahmen) ? [...pauschal.ausnahmen] : [],
+  }
+}
+
 /**
  * Editor für einen einzelnen Pauschalantrag (F100). Ziel-Typ wählbar: eine
  * Einsparung (CHF oder Prozent des ursprünglichen Aufwands) oder ein absolutes
@@ -72,18 +89,7 @@ export default {
   },
   emits: ['save', 'delete'],
   data() {
-    return {
-      zielTyp: this.pauschal.zielTyp || 'einsparungen',
-      betragMag: this.pauschal.betrag ? String(Math.abs(this.pauschal.betrag)) : '',
-      prozentMag: this.pauschal.prozent ? String(Math.abs(this.pauschal.prozent)) : '',
-      zielBetragMag: this.pauschal.zielBetrag ? String(Math.abs(this.pauschal.zielBetrag)) : '',
-      einreichen: (this.pauschal.haltung || 'einreichen') !== 'nicht_einreichen',
-      // Antragsteller ist eine Fraktion (F94), vorbelegt mit der eigenen Fraktion.
-      antragsteller: this.pauschal.antragsteller || this.eigeneFraktion || '',
-      begruendung: this.pauschal.begruendung || '',
-      ausnahmen: Array.isArray(this.pauschal.ausnahmen) ? [...this.pauschal.ausnahmen] : [],
-      speichernTimer: null,
-    }
+    return { ...felderAus(this.pauschal, this.eigeneFraktion), speichernTimer: null }
   },
   computed: {
     zielTypen() { return ZIEL_TYPEN },
@@ -100,10 +106,31 @@ export default {
       return this.fraktionOptionen.find(o => o.value === this.antragsteller) || null
     },
   },
+  watch: {
+    // F101: derselbe Pauschalantrag wird auch anderswo geändert — über den
+    // Ausnahme-Schalter an der Produktegruppe, in einer parallelen Sitzung. Der
+    // neue Stand kommt als Prop und wird hier übernommen, sonst zeigt der Editor
+    // weiter den Stand vom Öffnen und schreibt ihn beim nächsten Speichern zurück.
+    // Eine noch nicht gespeicherte Eingabe hat Vorrang: solange der Entprell-Timer
+    // läuft, bleibt stehen, was gerade getippt wird.
+    pauschal: {
+      deep: true,
+      handler() { this.uebernehmen() },
+    },
+    // Die eigene Fraktion kommt aus der Ansicht und kann nach dem Erzeugen
+    // eintreffen; sie belegt den Antragsteller vor, solange keiner gesetzt ist.
+    eigeneFraktion() { this.uebernehmen() },
+  },
   beforeUnmount() {
     if (this.speichernTimer) { clearTimeout(this.speichernTimer) }
   },
   methods: {
+    // Den Stand von aussen übernehmen. Eine noch nicht gespeicherte Eingabe hat
+    // Vorrang: solange der Entprell-Timer läuft, bleibt stehen, was getippt wird.
+    uebernehmen() {
+      if (this.speichernTimer) { return }
+      Object.assign(this, felderAus(this.pauschal, this.eigeneFraktion))
+    },
     ausnahmenSetzen(liste) {
       this.ausnahmen = (Array.isArray(liste) ? liste : []).map(o => (o && o.value) || o)
     },
@@ -114,6 +141,10 @@ export default {
       this.speichernTimer = setTimeout(() => this.speichern(), 600)
     },
     speichern() {
+      // Der Timer ist abgelaufen: ab jetzt hat wieder der Stand von aussen Vorrang.
+      // Bleibt er stehen, blockiert er «uebernehmen» für immer — dann kommt eine
+      // Ausnahme, die unten an der Produktegruppe gesetzt wird, oben nie an.
+      this.speichernTimer = null
       const felder = {
         zielModus: this.zielTyp,
         haltung: this.einreichen ? 'einreichen' : 'nicht_einreichen',

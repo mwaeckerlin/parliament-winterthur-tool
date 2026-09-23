@@ -59,17 +59,17 @@ describe('Geschaeftsliste — Filter, Sortierung, Eigenes Geschäft', () => {
     expect(wrapper.vm.gefilterteGeschaefte.map(g => g.id)).toEqual([1])
   })
 
-  // Bug: Ein fremdes Realtime-Update darf keinen Lade-Zustand auslösen (sonst
-  // verschwindet die Liste kurz und Scrollbalken/Fokus springen bei allen).
-  it('lädt bei einem Realtime-Update ohne Lade-Flackern (kein Scroll-/Fokus-Springen)', async () => {
+  // Fehler: Die Änderung eines anderen darf keinen Lade-Zustand auslösen (sonst
+  // verschwindet die Liste kurz und Scrollbalken und Fokus springen bei allen).
+  it('lädt bei einer Änderung in Echtzeit ohne Lade-Flackern (kein Springen von Bildlauf und Fokus)', async () => {
     const wrapper = await mountMit(daten)
     const spy = vi.spyOn(wrapper.vm, 'ladeGeschaefte')
     wrapper.vm.handleRealtimeEvent({ type: 'geschaefte.updated' })
     await new Promise(r => setTimeout(r, 300))
-    expect(spy, 'Realtime hat keinen Reload ausgelöst').toHaveBeenCalled()
+    expect(spy, 'das Ereignis hat kein Neuladen ausgelöst').toHaveBeenCalled()
     expect(
       spy.mock.calls.every(c => c[0] === false),
-      'Realtime-Reload lief mit Lade-Zustand (verursacht das Scroll-Springen)',
+      'das Neuladen lief mit Lade-Zustand (verursacht das Springen des Bildlaufs)',
     ).toBe(true)
   })
 

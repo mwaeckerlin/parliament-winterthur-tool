@@ -16,7 +16,7 @@ use OCP\Migration\SimpleMigrationStep;
  *
  * - `objekt_typ` (neu): trennt Geschäfts- von Vorstoss-Notizen, damit beide über
  *   denselben geteilten Code (NotizService) in dieser Tabelle liegen.
- * - `geloescht`: das Soft-Delete-Flag wurde in V23 per Raw-SQL
+ * - `geloescht`: das Kennzeichen für das Löschen wurde in V23 per rohem SQL
  *   (`postSchemaChange`) ergänzt. Raw-SQL-Spalten sind NICHT im Doctrine-Modell —
  *   in frischen Installationen wurde `geloescht` dadurch nie zuverlässig angelegt
  *   (der Soft-Delete/Undo warf dort HTTP 500). Beide Spalten werden hier über

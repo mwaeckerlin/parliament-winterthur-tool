@@ -158,6 +158,27 @@ class GeschaeftMapper extends QBMapper
     }
 
     /**
+     * Das Geschäft einer Fragestunde — das Parlament führt jede als eigenes
+     * Geschäft «Fragestunde vom 2. März 2026 (Beginn 20.00 Uhr)». Gesucht wird
+     * über das Wort «Fragestunde» und das Datum in seiner langen Form, wie es im
+     * Titel steht. Liefert null, solange das Parlament sie noch nicht
+     * veröffentlicht hat (die Fraktion sammelt ihre Fragen vorher).
+     */
+    public function findeFragestunde(string $datumLang): ?Geschaeft
+    {
+        $qb = $this->db->getQueryBuilder();
+        $qb->select('*')
+            ->from($this->getTableName())
+            ->where($qb->expr()->eq('geloescht', $qb->createNamedParameter(false, IQueryBuilder::PARAM_BOOL)))
+            ->andWhere($qb->expr()->iLike('titel', $qb->createNamedParameter('%' . $this->db->escapeLikeParameter('Fragestunde') . '%')))
+            ->andWhere($qb->expr()->iLike('titel', $qb->createNamedParameter('%' . $this->db->escapeLikeParameter($datumLang) . '%')))
+            ->orderBy('id', 'DESC')
+            ->setMaxResults(1);
+        $treffer = $this->findEntities($qb);
+        return $treffer[0] ?? null;
+    }
+
+    /**
      * Gibt ein Geschäft anhand seiner ID zurück.
      *
      * @throws DoesNotExistException wenn nicht gefunden

@@ -17,6 +17,8 @@ use OCP\AppFramework\Db\Entity;
  * @method string getZeitBis()
  * @method string getOrt()
  * @method string getUrl()
+ * @method string getProtokollUrl()
+ * @method string getProtokollTitel()
  * @method bool   getGeloescht()
  * @method string getBemerkungen()
  * @method string getNotizen()
@@ -47,6 +49,12 @@ class Sitzung extends Entity implements \JsonSerializable
 
     /** @var string Direkter Link auf der Parlamentswebseite */
     protected string $url = '';
+
+    /** @var string Adresse des Protokolls dieser Sitzung auf der Parlamentswebseite (leer, solange keines veröffentlicht ist) */
+    protected string $protokollUrl = '';
+
+    /** @var string Titel des Protokolls, wie ihn die Parlamentswebseite führt */
+    protected string $protokollTitel = '';
 
     /** @var bool Wurde die Sitzung von der Webseite entfernt? */
     protected bool $geloescht = false;
@@ -104,6 +112,18 @@ class Sitzung extends Entity implements \JsonSerializable
         $this->url = $url;
     }
 
+    public function setProtokollUrl(?string $protokollUrl): void
+    {
+        $this->markFieldUpdated('protokollUrl');
+        $this->protokollUrl = (string) ($protokollUrl ?? '');
+    }
+
+    public function setProtokollTitel(?string $protokollTitel): void
+    {
+        $this->markFieldUpdated('protokollTitel');
+        $this->protokollTitel = (string) ($protokollTitel ?? '');
+    }
+
     public function setGeloescht(bool $geloescht): void
     {
         $this->markFieldUpdated('geloescht');
@@ -136,6 +156,8 @@ class Sitzung extends Entity implements \JsonSerializable
             'zeitBis' => $this->getZeitBis(),
             'ort' => $this->getOrt(),
             'url' => $this->getUrl(),
+            'protokollUrl' => $this->getProtokollUrl(),
+            'protokollTitel' => $this->getProtokollTitel(),
             'geloescht' => $this->getGeloescht(),
             'bemerkungen' => $this->getBemerkungen(),
             'notizen' => $this->getNotizen(),

@@ -69,6 +69,11 @@ COPY --from=iconv /preloadable_libiconv.so /usr/lib/preloadable_libiconv.so
 COPY --from=iconv /usr/lib/libiconv.so.2 /usr/lib/libiconv.so.2
 COPY --from=iconv /usr/lib/libcharset.so.1 /usr/lib/libcharset.so.1
 ENV LD_PRELOAD=/usr/lib/preloadable_libiconv.so
+# Zusaetzliches Verzeichnis fuer php.ini-Einstellungen: Der fuehrende Doppelpunkt
+# haelt den eingebauten Standard (/etc/php*/conf.d) in der Liste, der Bootstrap
+# schreibt dort die Speichergrenze hinein (parlwin-bootstrap.php).  Ein fester
+# Pfad nach /etc/php85 wuerde die PHP-Version des Basis-Images festschreiben.
+ENV PHP_INI_SCAN_DIR=":/tmp/parlwin-php.d"
 COPY --from=app-build /build/parlwin /usr/local/share/nextcloud/seed/custom_apps/parlwin
 # Composer-vendor (smalot/pdfparser) — von Application.php via vendor/autoload.php geladen.
 COPY --from=php-deps /deps/vendor /usr/local/share/nextcloud/seed/custom_apps/parlwin/vendor

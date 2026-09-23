@@ -5,6 +5,7 @@
     "ext-dom": "*",
     "ext-json": "*",
     "ext-libxml": "*",
+    "league/commonmark": "^2.7",
     "smalot/pdfparser": "^2.0"
   },
   "require-dev": {

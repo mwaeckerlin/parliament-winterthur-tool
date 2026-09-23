@@ -36,13 +36,25 @@ ensure_junit() {
 }
 
 section "Unit-Tests (PHPUnit)"
-# Gruppe «pdf» (Budget-Parser, braucht vendor/smalot) läuft separat über
-# `npm run test:pdf`, «generate» (Referenzdaten schreiben) über
-# `npm run test:budget-data` — beide sind nicht Teil des Host-Regressionslaufs.
+# Aussen vor bleiben «generate» (schreibt Referenzdaten), «pruefung» (das
+# Werkzeug der Prüfung von Hand, `npm run test:pruefung`) und «messung» (zeigt
+# eine Buchzeile mit ihren x-Positionen, `npm run test:messung`) — keines davon
+# ist ein Test. «live» läuft weiter unten gegen die echten Endpunkte.
 ( cd "${ROOT}/parlwin" && phpunit "${PHPUNIT_FLAGS[@]}" --exclude-group live \
-    --exclude-group pdf --exclude-group generate \
+    --exclude-group pdf --exclude-group generate --exclude-group pruefung \
+    --exclude-group messung \
     --log-junit "${JUNIT_DIR}/php-unit.xml" tests )
 ensure_junit "php-unit" "${JUNIT_DIR}/php-unit.xml" "$?"
+
+section "Budget-Parser (PHPUnit, Gruppe pdf)"
+# Diese Gruppe lief früher NUR von Hand über `npm run test:pdf` und fehlte im
+# Regressionslauf. Damit blieb der ganze Weg «Budget-Geschäft → Drehbuch →
+# Budgetbuch» ungeprüft: Ein Aufruf mit falscher Argumentzahl kam so bis in die
+# laufende Instanz und liess jede Budget-Ansicht mit Serverfehler enden
+# (2026-08-28). Der Lauf braucht rund acht Minuten und 300 MB.
+( cd "${ROOT}/parlwin" && phpunit "${PHPUNIT_FLAGS[@]}" --group pdf \
+    --log-junit "${JUNIT_DIR}/php-pdf.xml" tests )
+ensure_junit "php-pdf" "${JUNIT_DIR}/php-pdf.xml" "$?"
 
 section "Komponenten-/JS-Tests (Vitest)"
 ( cd "${ROOT}" && npx vitest run --reporter=default --reporter=junit \

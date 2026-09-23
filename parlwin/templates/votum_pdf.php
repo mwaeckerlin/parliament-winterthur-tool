@@ -195,12 +195,15 @@ $autor = (string) ($votum['autorName'] ?? '');
             <p class="leer">— Noch kein Votum erfasst —</p>
         <?php else: ?>
             <?php
-            // Der Wortlaut behaelt seine Formatierung, verliert aber jedes
-            // ausfuehrbare Element: erlaubt ist nur, was HtmlSanitizer auf
-            // seiner Positivliste fuehrt. Der Text stammt zwar aus dem Editor,
-            // wird aber ueber die Schnittstelle gespeichert und ist damit frei
-            // waehlbar - eine Positivliste ist deshalb Pflicht.
-            echo \OCA\ParliamentWinterthur\Service\HtmlSanitizer::sauber($votumText);
+            // Der Editor speichert Markdown; RichText wandelt es in HTML und
+            // bereinigt es anschliessend. Ohne die Wandlung stuende «**fett**»
+            // woertlich im PDF und jede Leerzeile waere verloren.
+            //
+            // Bereinigt wird immer: Der Text stammt zwar aus dem Editor, wird
+            // aber ueber die Schnittstelle gespeichert und ist damit frei
+            // waehlbar - erlaubt bleibt nur, was HtmlSanitizer auf seiner
+            // Positivliste fuehrt.
+            echo \OCA\ParliamentWinterthur\Service\RichText::alsHtml($votumText);
             ?>
         <?php endif; ?>
     </div>

@@ -76,6 +76,29 @@ describe('Vorstoesseliste — jede Eingabe speichert sofort', () => {
     expect(axios.put.mock.calls[0][1].inhalt).toBe('Neuer Inhalt')
   })
 
+  // Bug 2026-08-31: Wer den Inhalt tippt und gleich schliesst, verlor ihn. Der
+  // Editor speichert beim Verlassen; die Maske schloss über die laufende Anfrage
+  // hinweg, und beim nächsten Öffnen stand der Stand von davor da.
+  it('das Schliessen wartet auf das laufende Speichern', async () => {
+    const wrapper = mountFn()
+    let fertig
+    axios.put = vi.fn(() => new Promise(aufloesen => { fertig = () => aufloesen({ data: { id: 7, titel: 'Test', inhalt: 'Neuer Inhalt' } }) }))
+    wrapper.vm.bearbeiten({ id: 7, titel: 'Test' })
+    await wrapper.vm.$nextTick()
+
+    wrapper.vm.bearbeitung.inhalt = 'Neuer Inhalt'
+    wrapper.vm.inhaltAbschliessen()
+    const geschlossen = wrapper.vm.schliessen()
+    // Solange die Anfrage läuft, bleibt die Maske offen.
+    await Promise.resolve()
+    expect(wrapper.vm.bearbeitung, 'Die Maske schliesst über das Speichern hinweg').not.toBeNull()
+
+    fertig()
+    await geschlossen
+    expect(wrapper.vm.bearbeitung).toBeNull()
+    expect(axios.put.mock.calls[0][1].inhalt).toBe('Neuer Inhalt')
+  })
+
   it('ein leerer Titel wird nie weggespeichert', async () => {
     const wrapper = mountFn()
     wrapper.vm.bearbeiten({ id: 7, titel: '' })

@@ -47,8 +47,12 @@ class BudgetAntragErstellenTest extends TestCase {
         return $g;
     }
 
-    /** Service mit Insert-Durchreichung; Automatik aus, damit nur der Antrag entsteht. */
-    private function service(?NotizService $notiz = null): BudgetService {
+    /**
+     * Service mit Insert-Durchreichung; Automatik aus, damit nur der Antrag entsteht.
+     *
+     * @param list<BudgetAntrag> $bestehende Anträge, die schon auf den Zielen liegen
+     */
+    private function service(?NotizService $notiz = null, array $bestehende = []): BudgetService {
         $jahre = $this->createStub(BudgetJahrMapper::class);
         $jahrRow = new BudgetJahr();
         $jahrRow->setJahr(2026);
@@ -68,7 +72,7 @@ class BudgetAntragErstellenTest extends TestCase {
         $investitionen->method('findByJahr')->willReturn([$inv]);
 
         $antraege = $this->createStub(BudgetAntragMapper::class);
-        $antraege->method('findByJahr')->willReturn([]);
+        $antraege->method('findByJahr')->willReturn($bestehende);
         $antraege->method('insert')->willReturnArgument(0);
 
         $entscheide = $this->createStub(BudgetAntragEntscheidMapper::class);
@@ -121,6 +125,106 @@ class BudgetAntragErstellenTest extends TestCase {
         $a = $this->service()->antragErstellen(2026, ['bereich' => 'steuerfuss', 'zielTyp' => 'steuerfuss', 'prozentDelta' => -2]);
         self::assertEqualsWithDelta(-2.0, $a->getProzentDelta(), 0.001, 'Prozentpunkte werden geführt');
         self::assertSame(-16000, $a->getBetragDelta(), 'Ertrag-Effekt = Ertrag × Prozentpunkte / Steuerfuss (F96)');
+    }
+
+    /**
+     * Ein Budget lässt sich höchstens auf null kürzen — was nicht ausgegeben wird,
+     * kann nicht gespart werden. Die Grenze gilt für die SUMME aller Anträge auf
+     * dasselbe Ziel, nicht für den einzelnen: drei Anträge zu je 40% eines Budgets
+     * kürzen zusammen um 120% und sind damit unmöglich.
+     */
+    public function testKuerzungHoechstensAufNull(): void {
+        // Genau auf null geht.
+        $a = $this->service()->antragErstellen(2026, ['bereich' => 'globalbudget', 'zielRef' => '121', 'betragDelta' => -100000]);
+        self::assertSame(-100000, $a->getBetragDelta(), 'die Kürzung auf genau null ist erlaubt');
+
+        // Einen Franken weiter nicht.
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/mehr gekürzt|höchstens auf null|100/u');
+        $this->service()->antragErstellen(2026, ['bereich' => 'globalbudget', 'zielRef' => '121', 'betragDelta' => -100001]);
+    }
+
+    public function testKuerzungsgrenzeGiltFuerDieSummeAllerAntraege(): void {
+        $vorhanden = new BudgetAntrag();
+        $vorhanden->setJahr(2026);
+        $vorhanden->setBereich('globalbudget');
+        $vorhanden->setZielTyp('produktegruppe');
+        $vorhanden->setZielRef('121');
+        $vorhanden->setBetragDelta(-60000);
+        $vorhanden->setPhase('fraktion');
+
+        // −60'000 liegen schon auf der Gruppe; −50'000 mehr wären zusammen −110'000
+        // auf ein Budget von 100'000.
+        $this->expectException(\RuntimeException::class);
+        $this->service(null, [$vorhanden])->antragErstellen(
+            2026,
+            ['bereich' => 'globalbudget', 'zielRef' => '121', 'betragDelta' => -50000],
+        );
+    }
+
+    /**
+     * Bug 2026-08-31: Das Einlesen der Sitzungsanträge aus dem Drehbuch scheiterte
+     * an der Kürzungsgrenze. In einer Sitzung stellen mehrere Fraktionen Anträge
+     * auf dieselbe Produktegruppe; zusammengezählt kürzen sie weit über das Budget
+     * hinaus, ohne dass davon je mehr als einer angenommen würde. Die Grenze gilt
+     * für die Anträge, die ZUSAMMEN WIRKEN — die eigenen und die unterstützten —,
+     * nicht für konkurrierende fremde Anträge, die nur festhalten, was im Rat
+     * gestellt wurde.
+     */
+    public function testFremdeAntraegeBlockierenEinanderNicht(): void {
+        $fremd = new BudgetAntrag();
+        $fremd->setJahr(2026);
+        $fremd->setBereich('globalbudget');
+        $fremd->setZielTyp('produktegruppe');
+        $fremd->setZielRef('121');
+        $fremd->setBetragDelta(-90000);
+        $fremd->setPhase('sitzung');
+        $fremd->setHerkunft('fremde');
+
+        // Ein zweiter fremder Antrag auf dieselbe Gruppe, zusammen weit über dem
+        // Budget von 100'000 — er wird trotzdem angelegt.
+        $a = $this->service(null, [$fremd])->antragErstellen(2026, [
+            'bereich' => 'globalbudget',
+            'zielRef' => '121',
+            'betragDelta' => -80000,
+            'herkunft' => 'fremde',
+            'phase' => 'sitzung',
+        ]);
+        self::assertSame(-80000, $a->getBetragDelta(), 'ein fremder Antrag wird an der Grenze abgewiesen');
+    }
+
+    /** Ein unterstützter fremder Antrag zählt dagegen mit. */
+    public function testUnterstuetzteFremdeAntraegeZaehlenZurGrenze(): void {
+        $fremd = new BudgetAntrag();
+        $fremd->setJahr(2026);
+        $fremd->setBereich('globalbudget');
+        $fremd->setZielTyp('produktegruppe');
+        $fremd->setZielRef('121');
+        $fremd->setBetragDelta(-90000);
+        $fremd->setPhase('fraktion');
+        $fremd->setHerkunft('fremde');
+        $fremd->setHaltung('unterstuetzen');
+
+        $this->expectException(\RuntimeException::class);
+        $this->service(null, [$fremd])->antragErstellen(2026, [
+            'bereich' => 'globalbudget',
+            'zielRef' => '121',
+            'betragDelta' => -20000,
+        ]);
+    }
+
+    public function testKuerzungsgrenzeGiltAuchFuerInvestitionen(): void {
+        $this->expectException(\RuntimeException::class);
+        $this->service()->antragErstellen(
+            2026,
+            ['bereich' => 'investition', 'zielTyp' => 'investition', 'zielRef' => '7', 'betragDelta' => -500001],
+        );
+    }
+
+    public function testErhoehungBleibtUnbegrenzt(): void {
+        // Nach oben gibt es keine Grenze — nur das Sparen ist bei null zu Ende.
+        $a = $this->service()->antragErstellen(2026, ['bereich' => 'globalbudget', 'zielRef' => '121', 'betragDelta' => 900000]);
+        self::assertSame(900000, $a->getBetragDelta());
     }
 
     public function testHerkunftUndHaltungStandard(): void {

@@ -2,6 +2,17 @@ export function vollerName(m) {
   return `${m.vorname || ''} ${m.name || ''}`.trim()
 }
 
+/**
+ * Ein Frankenbetrag in Schweizer Schreibweise: Tausender mit ’ getrennt, kein
+ * Rappen, negative Beträge mit dem echten Minuszeichen. Eine Quelle für alle
+ * Ansichten — die Zahlen im Budget sehen überall gleich aus.
+ */
+export function frankenFormat(n) {
+  const v = Math.round(Number(n) || 0)
+  const ziffern = Math.abs(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '’')
+  return (v < 0 ? '−' : '') + ziffern
+}
+
 export function personKey(m) {
   const externId = m.externId || m.extern_id || ''
   if (externId) return `mitglied:${externId}`
@@ -31,7 +42,7 @@ export function markdownZuHtml(text) {
   return DOMPurify.sanitize(markdownRenderer.render(String(text)))
 }
 
-// Prioritätsstufen für Geschäfte UND Vorstösse; Default ist nicht gesetzt (leer).
+// Prioritätsstufen für Geschäfte UND Vorstösse; der Standard ist nicht gesetzt (leer).
 export const PRIORITAETEN = [
   { value: 'hoch', label: 'Hoch' },
   { value: 'mittel', label: 'Mittel' },

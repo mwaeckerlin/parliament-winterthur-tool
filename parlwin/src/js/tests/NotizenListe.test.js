@@ -71,7 +71,7 @@ describe('Häkchen speichert, X verwirft', () => {
     expect(wrapper.vm.editorOffen).toBe(false)
   })
 
-  it('Häkchen an einer bestehenden Notiz aktualisiert sie (PUT) OHNE zwischenspeichern-Flag', async () => {
+  it('Häkchen an einer bestehenden Notiz aktualisiert sie (PUT) OHNE das Kennzeichen zwischenspeichern', async () => {
     const wrapper = mountComponent({ editorOffen: true, editorModus: 'edit', aktiveNotizId: 42, aktiveNotizText: 'Endstand' })
     await wrapper.vm.notizBestaetigen()
     expect(axios.put).toHaveBeenCalledOnce()

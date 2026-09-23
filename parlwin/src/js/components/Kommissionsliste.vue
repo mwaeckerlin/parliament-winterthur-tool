@@ -27,14 +27,13 @@
           class="pw-kommission-karte"
           :class="{ 'ist-inaktiv': !istAktiv(k) }"
         >
-        <div class="pw-kommission-kopf" @click="toggleKommission(k.id)">
+        <div class="pw-kommission-kopf">
           <div>
             <h3>{{ kuerze(k.name) }}</h3>
             <p class="pw-kommission-status">{{ istAktiv(k) ? 'Aktiv' : 'Aufgelöst oder inaktiv' }}</p>
           </div>
-          <span class="pw-toggle">{{ offene.includes(k.id) ? '▲' : '▼' }}</span>
         </div>
-        <div v-if="offene.includes(k.id)" class="pw-kommission-details">
+        <div class="pw-kommission-details">
           <p v-if="k.beschreibung">{{ k.beschreibung }}</p>
           <div v-if="geschaefteFuer(k).length" class="pw-kommission-geschaefte">
             <strong>Pendente Geschäfte ({{ geschaefteFuer(k).length }}):</strong>
@@ -56,8 +55,21 @@
             </ul>
           </div>
           <div v-if="sichtbareMitglieder(k).length" class="pw-kommission-mitglieder">
-            <strong>Mitglieder ({{ sichtbareMitglieder(k).length }}<template v-if="!nurAktiveMitglieder && aktiveMitgliederZahl(k) !== sichtbareMitglieder(k).length"> / {{ aktiveMitgliederZahl(k) }} aktiv</template>):</strong>
-            <div class="pw-kommission-mitglied-liste">
+            <!-- Die Mitglieder füllen die Karte und stehen darum eingeklappt;
+                 ihre Zahl ist auch zugeklappt zu lesen (F118). -->
+            <div
+              class="pw-kommission-mitglieder-kopf"
+              role="button"
+              tabindex="0"
+              :aria-expanded="String(offeneMitglieder.includes(k.id))"
+              @click="toggleMitglieder(k.id)"
+              @keydown.enter.prevent="toggleMitglieder(k.id)"
+              @keydown.space.prevent="toggleMitglieder(k.id)"
+            >
+              <strong>Mitglieder ({{ sichtbareMitglieder(k).length }}<template v-if="!nurAktiveMitglieder && aktiveMitgliederZahl(k) !== sichtbareMitglieder(k).length"> / {{ aktiveMitgliederZahl(k) }} aktiv</template>):</strong>
+              <span class="pw-toggle">{{ offeneMitglieder.includes(k.id) ? '▲' : '▼' }}</span>
+            </div>
+            <div v-if="offeneMitglieder.includes(k.id)" class="pw-kommission-mitglied-liste">
               <article
                 v-for="mitglied in sichtbareMitglieder(k)"
                 :key="mitglied.externId || mitglied.label"
@@ -76,7 +88,8 @@
           </div>
           <p v-else class="pw-hinweis">Keine Mitglieder synchronisiert.</p>
           <p v-if="!geschaefteFuer(k).length" class="pw-hinweis">
-            Keine Geschäfte mit Status „Bei Kommission {{ kuerze(k.name) }} pendent“.
+            Keine Geschäfte mit Status „Bei Kommission {{ kuerze(k.name) }} pendent“
+            und keines, das dieser Kommission zugewiesen ist.
           </p>
           <div v-if="!istAktiv(k)" class="pw-inline-note">
             Diese Kommission erscheint nur, weil historische Daten vorhanden sind.
@@ -132,7 +145,7 @@ export default {
       suche: '',
       nurAktive: true,
       nurAktiveMitglieder: true,
-      offene: [],
+      offeneMitglieder: [],
       unsubRealtime: null,
       ausgewaehlteGeschaeftId: null,
     }
@@ -189,14 +202,25 @@ export default {
       this.aktualisiereMitgliederArrays()
     },
     suche(neu) {
-      // Bei aktiver Suche alle Treffer-Kommissionen automatisch aufklappen,
-      // damit die gefundenen Mitglieder/Geschäfte sichtbar werden.
-      const term = (neu || '').trim()
+      // Die Geschäfte stehen ohnehin offen; aufzuklappen sind allein die
+      // Mitglieder, und auch nur dort, wo einer von ihnen der Treffer ist —
+      // sonst öffnete eine Suche nach einem Geschäft überall die Mitglieder.
+      const term = (neu || '').trim().toLowerCase()
       if (!term) return
-      const treffer = this.gefilterteKommissionen.map(k => k.id)
-      const zusaetzlich = treffer.filter(id => !this.offene.includes(id))
+      const trifftMitglied = (k) => {
+        const mitglieder = Array.isArray(k.mitgliederArray) ? k.mitgliederArray : []
+        return mitglieder.some(m =>
+          (m.label || '').toLowerCase().includes(term) ||
+          (m.partei || '').toLowerCase().includes(term) ||
+          (m.fraktion || '').toLowerCase().includes(term) ||
+          (m.email || '').toLowerCase().includes(term) ||
+          (m.funktion || '').toLowerCase().includes(term),
+        )
+      }
+      const treffer = this.gefilterteKommissionen.filter(trifftMitglied).map(k => k.id)
+      const zusaetzlich = treffer.filter(id => !this.offeneMitglieder.includes(id))
       if (zusaetzlich.length) {
-        this.offene = [...this.offene, ...zusaetzlich]
+        this.offeneMitglieder = [...this.offeneMitglieder, ...zusaetzlich]
       }
     },
   },
@@ -239,13 +263,30 @@ export default {
         mitgliederArray: this.parseMitglieder(k.mitglieder),
       }))
     },
+    /**
+     * Lädt ALLE Geschäfte, seitenweise. Ein fester Deckel (früher 1000) lässt bei
+     * einem gewachsenen Bestand pendente Geschäfte einer Kommission stillschweigend
+     * verschwinden — die Ansicht zeigte dann eine kürzere Liste, ohne das zu sagen.
+     * Die Schleife hört auf, sobald eine Seite nicht mehr voll ist.
+     */
     async ladeGeschaefte() {
+      const proSeite = 1000
+      const alle = []
       try {
-        const { data } = await axios.get(generateUrl('/apps/parlwin/geschaefte'), { params: { show_erledigt: 1, limit: 1000 } })
-        this.geschaefte = Array.isArray(data) ? data : []
+        // Grenze gegen eine endlose Schleife, falls der Server immer volle Seiten
+        // liefert: 50 Seiten sind 50'000 Geschäfte und weit jenseits des Bestands.
+        for (let seite = 0; seite < 50; seite++) {
+          const { data } = await axios.get(generateUrl('/apps/parlwin/geschaefte'), {
+            params: { show_erledigt: 1, limit: proSeite, offset: seite * proSeite },
+          })
+          const teil = Array.isArray(data) ? data : []
+          alle.push(...teil)
+          if (teil.length < proSeite) { break }
+        }
+        this.geschaefte = alle
       } catch (e) {
         console.error('Fehler beim Laden der Geschäfte:', e)
-        this.geschaefte = []
+        this.geschaefte = alle
       }
     },
     parseMitglieder(raw) {
@@ -335,7 +376,7 @@ export default {
     },
     istAktiv(kommission) {
       if (!kommission || kommission.geloescht === true) return false
-      // Primär: explizites aktiv-Flag aus dem Scraper (vom Parlamentsserver)
+      // Zuerst: das ausdrückliche Kennzeichen «aktiv» aus der Parlamentswebseite
       if (kommission.aktiv === false) return false
       // Sekundär: datumBis in der Vergangenheit ⇒ aufgelöst
       const bis = kommission.datumBis || ''
@@ -346,7 +387,12 @@ export default {
       return true
     },
     /**
-     * Liefert alle Geschäfte, deren Status auf diese Kommission verweist.
+     * Liefert alle Geschäfte dieser Kommission, aus zwei Quellen:
+     *
+     * 1. **Ausdrücklich zugewiesen:** Im Feld «Kommission» des Geschäfts steht
+     *    der Name dieser Kommission. So weist die Fraktion ein eigenes Geschäft
+     *    zu; dessen Status ist «Pendent» und nennt keine Kommission.
+     * 2. **Aus dem Status des Parlaments**, nach der folgenden Strategie.
      *
      * Beispiel-Status-Strings vom Parlament:
      *   - "Bei der Aufsichtskommission pendent"
@@ -385,6 +431,7 @@ export default {
       const knameRaw = (kommission.name || '').toLowerCase().trim()
       const knameTokens = tokenize(kommission.name)
       return this.geschaefte.filter(g => {
+        if ((g.kommission || '').toLowerCase().trim() === knameRaw) return true
         const s = (g.status || '').toLowerCase()
         if (!/\S*kommission\S*/.test(s)) return false
         if (knameTokens.length === 0) {
@@ -403,11 +450,11 @@ export default {
         this.ladeGeschaefte()
       }
     },
-    toggleKommission(id) {
-      if (this.offene.includes(id)) {
-        this.offene = this.offene.filter(i => i !== id)
+    toggleMitglieder(id) {
+      if (this.offeneMitglieder.includes(id)) {
+        this.offeneMitglieder = this.offeneMitglieder.filter(i => i !== id)
       } else {
-        this.offene.push(id)
+        this.offeneMitglieder.push(id)
       }
     },
     oeffneDetail(geschaeftId) {

@@ -25,7 +25,7 @@ use OCP\IUserSession;
 class BudgetService {
     private const CONFIG_BETRAG_PRO_STELLE = 'budget_betrag_pro_stelle';
     private const DEFAULT_BETRAG_PRO_STELLE = 200000;
-    /** Pro Jahr gespeichert: ist die automatische Steuerfuss-Senkung an (F88)? Default: ja. */
+    /** Pro Jahr gespeichert: ist die automatische Steuerfuss-Senkung an (F88)? Standard: ja. */
     private const CONFIG_STEUERFUSS_AUTOMATIK = 'budget_steuerfuss_automatik';
     /** Objekttyp für die geteilten Notizen (F103), wie 'vorstoss' beim Vorstoss. */
     private const NOTIZ_OBJEKT_TYP = 'budget-antrag';
@@ -167,7 +167,7 @@ class BudgetService {
                 'steuerfussAutomatik' => $this->steuerfussAutomatikAn($jahr),
             ]),
             'departemente' => $this->departementListe($alleGruppen),
-            'produktegruppen' => array_map(static fn ($g) => $g->jsonSerialize(), $gefiltert),
+            'produktegruppen' => $this->gruppenMitFraktionswert($gefiltert, $summenAntraege),
             'investitionen' => array_map(
                 static fn ($i) => $i->jsonSerialize(),
                 array_values(array_filter(
@@ -263,6 +263,42 @@ class BudgetService {
         return false;
     }
 
+    /**
+     * Produktegruppen für die Ansicht, jede zusätzlich mit dem Wert der Fraktion
+     * (F116): dem Betrag und den Stellen, die nach unseren Anträgen bleiben. Es
+     * zählen dieselben Anträge wie in der Übersicht (F102) — in der Vorbereitung
+     * die unterstützten, in der Sitzung die angenommenen —, weshalb hier die
+     * bereits gefilterte Antragsliste der Summenzeile eingeht und keine zweite
+     * Regel entsteht.
+     *
+     * @param list<BudgetProduktegruppe> $gruppen
+     * @param list<array<string, float|int|string>> $summenAntraege
+     * @return list<array<string, mixed>>
+     */
+    private function gruppenMitFraktionswert(array $gruppen, array $summenAntraege): array {
+        $delta = [];
+        foreach ($summenAntraege as $a) {
+            $bereich = (string) ($a['bereich'] ?? '');
+            // Beide Bereiche wirken auf den Globalkredit der Produktegruppe: ein
+            // Personalantrag senkt neben den Stellen auch ihren Betrag.
+            if ($bereich !== 'globalbudget' && $bereich !== 'personal') {
+                continue;
+            }
+            $code = (string) ($a['zielRef'] ?? '');
+            $delta[$code] ??= ['betrag' => 0, 'stellen' => 0.0];
+            $delta[$code]['betrag'] += (int) ($a['betragDelta'] ?? 0);
+            $delta[$code]['stellen'] += (float) ($a['stellenDelta'] ?? 0);
+        }
+
+        return array_map(static function ($g) use ($delta): array {
+            $daten = $g->jsonSerialize();
+            $eigen = $delta[(string) $g->getCode()] ?? ['betrag' => 0, 'stellen' => 0.0];
+            $daten['globalkredit']['sollFraktion'] = (int) $daten['globalkredit']['soll'] + $eigen['betrag'];
+            $daten['stellen']['sollFraktion'] = (float) $daten['stellen']['soll'] + $eigen['stellen'];
+            return $daten;
+        }, $gruppen);
+    }
+
     /** @return array<string, float|int|string> */
     private function antragFuerRechnung(BudgetAntrag $a): array {
         return [
@@ -340,15 +376,18 @@ class BudgetService {
         $this->felderSetzen($a, $daten);
         // F109: fehlt oben ein Betrag, wird die Summe der Aufteilung eingesetzt.
         $this->aufteilungSummeAnwenden($a);
+        // Phase (F93): «fraktion» (Vorbereitung) oder «sitzung» (offizielle
+        // Sitzungsanträge). Sie steht VOR der Kürzungsprüfung, denn diese
+        // vergleicht die Phase — mit einer noch leeren verglich sie ins Leere.
+        $phase = (string) ($daten['phase'] ?? 'fraktion');
+        $a->setPhase($phase === 'sitzung' ? 'sitzung' : 'fraktion');
+        $this->kuerzungPruefen($a, $jahr, null);
         // Ein Steuerfussantrag ist ein Antrag der eigenen Fraktion (F88/F96): fehlt
         // der Antragsteller, tragen wir den eigenen Fraktionsnamen ein, damit er im
         // Antrags-PDF nicht leer bleibt.
         if ($a->getBereich() === 'steuerfuss' && trim((string) $a->getAntragsteller()) === '') {
             $a->setAntragsteller($this->eigeneFraktion());
         }
-        // Phase (F93): «fraktion» (Vorbereitung) oder «sitzung» (offizielle Sitzungsanträge).
-        $phase = (string) ($daten['phase'] ?? 'fraktion');
-        $a->setPhase($phase === 'sitzung' ? 'sitzung' : 'fraktion');
         $a->setReihenfolge((int) ($daten['reihenfolge'] ?? $this->naechsteReihenfolge($jahr)));
         $a->setErstelltVon($this->aktuellerNutzer());
         $a->setErstelltAm($this->time->getTime());
@@ -453,11 +492,74 @@ class BudgetService {
         } elseif (!$hatChf && $hatProzent && $basis > 0) {
             $chf = (int) round($basis * $prozent / 100);
         }
-        if (!$hatProzent && $basis > 0) {
+        // Betrag und Prozentsatz sind zwei Schreibweisen desselben Antrags und
+        // dürfen einander nie widersprechen. Der CHF-Betrag ist führend: wo er
+        // mitgeschickt wurde, folgt der Prozentsatz ihm, auch wenn zugleich ein
+        // Prozentsatz ankommt — sonst bliebe nach einer Betragsänderung der alte
+        // Prozentsatz stehen und machte sie beim nächsten Speichern rückgängig
+        // (F117).
+        if ($basis > 0 && ($hatChf || !$hatProzent)) {
             $prozent = $chf / $basis * 100;
         }
         $a->setBetragDelta($chf);
         $a->setProzentDelta($prozent);
+    }
+
+    /**
+     * Ein Budget lässt sich höchstens auf null kürzen — was nicht ausgegeben wird,
+     * kann nicht gespart werden. Die Grenze gilt für die SUMME aller Anträge auf
+     * dasselbe Ziel: drei Anträge zu je 40% kürzen zusammen um 120% und sind damit
+     * unmöglich, auch wenn jeder für sich passt. Nach oben gibt es keine Grenze.
+     *
+     * Geprüft wird beim Anlegen und beim Ändern; beim Ändern zählt der eigene
+     * bisherige Betrag nicht mit (er wird ja ersetzt).
+     */
+    private function kuerzungPruefen(BudgetAntrag $a, int $jahr, ?int $eigeneId): void {
+        $neu = (int) $a->getBetragDelta();
+        if ($neu >= 0 || (string) $a->getBereich() === 'steuerfuss') {
+            return;
+        }
+        // Gezählt wird nur, was ZUSAMMEN WIRKT: die eigenen Anträge und die
+        // fremden, die die Fraktion unterstützt. In einer Sitzung stellen mehrere
+        // Fraktionen Anträge auf dieselbe Produktegruppe; zusammengezählt kürzen
+        // sie weit über das Budget hinaus, ohne dass davon je mehr als einer
+        // angenommen würde. Ein fremder, offener Antrag hält nur fest, was im Rat
+        // gestellt wurde — an ihm scheiterte das Einlesen des ganzen Drehbuchs.
+        if (!$a->wirdUnterstuetzt()) {
+            return;
+        }
+        $budget = $this->basisFuerPosition((string) $a->getBereich(), (string) $a->getZielRef(), $jahr);
+        if ($budget <= 0) {
+            return; // ohne bekannten Budgetwert gibt es keine Grenze zu prüfen
+        }
+        $bereits = 0;
+        foreach ($this->antraege->findByJahr($jahr) as $vorhanden) {
+            if ((int) $vorhanden->getId() === $eigeneId
+                || !$vorhanden->wirdUnterstuetzt()
+                || (string) $vorhanden->getBereich() !== (string) $a->getBereich()
+                || (string) $vorhanden->getZielRef() !== (string) $a->getZielRef()
+                || (string) $vorhanden->getPhase() !== (string) $a->getPhase()) {
+                continue;
+            }
+            $bereits += min(0, (int) $vorhanden->getBetragDelta());
+        }
+        if ($bereits + $neu >= -$budget) {
+            return;
+        }
+        throw new \RuntimeException(sprintf(
+            'Es kann nicht mehr gekürzt werden, als budgetiert ist: %s stehen zur Verfügung, '
+            . 'davon sind %s bereits beantragt, und dieser Antrag kürzt um weitere %s. '
+            . 'Höchstens auf null — also noch %s.',
+            $this->franken($budget),
+            $this->franken(-$bereits),
+            $this->franken(-$neu),
+            $this->franken($budget + $bereits),
+        ));
+    }
+
+    /** Ein Betrag in Schweizer Schreibweise, für Meldungen an den Nutzer. */
+    private function franken(int $betrag): string {
+        return number_format($betrag, 0, '.', "'") . ' CHF';
     }
 
     /**
@@ -657,6 +759,7 @@ class BudgetService {
         $this->felderSetzen($a, $daten);
         // F109: fehlt oben ein Betrag, wird die Summe der Aufteilung eingesetzt.
         $this->aufteilungSummeAnwenden($a);
+        $this->kuerzungPruefen($a, $jahr, $id);
         $gespeichert = $this->antraege->update($a);
         $this->nachAenderung($jahr);
         return $gespeichert;
@@ -711,7 +814,7 @@ class BudgetService {
 
     /**
      * Ist die automatische Steuerfuss-Senkung für dieses Jahr eingeschaltet (F88)?
-     * Default: ja. Der Schalter wird pro Budgetjahr gespeichert, damit der Zustand
+     * Standard: ja. Der Schalter wird pro Budgetjahr gespeichert, damit der Zustand
      * einen Reload überlebt (früher nur clientseitig, darum kam der Auto-Antrag
      * nach dem Neuladen zurück).
      */

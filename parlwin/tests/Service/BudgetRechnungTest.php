@@ -57,6 +57,27 @@ class BudgetRechnungTest extends TestCase {
         $this->assertSame(9200000, $s['ausgaben']); // 10.0M - 0.5M - 0.3M
     }
 
+    public function testKuerzungGehtHoechstensAufNull(): void {
+        // Eine Position lässt sich höchstens auf null kürzen. Was sie nicht mehr
+        // tragen kann, geht auf die übrigen; reicht auch das nicht, bleibt der Rest
+        // liegen — erfunden wird nichts.
+        $eine = BudgetRechnung::verteileAnteiligAufwand(-9000000, [self::gruppen()[1]]);
+        $this->assertSame(-3000000, $eine['142'], 'die Position trägt nur ihr eigenes Budget');
+
+        // Anteilig zum Aufwand bleibt jede Position von selbst im Rahmen, solange
+        // der Gesamtbetrag das Gesamtbudget nicht übersteigt.
+        $beide = BudgetRechnung::verteileAnteiligAufwand(-9500000, self::gruppen());
+        $this->assertSame(-9500000, array_sum($beide), 'zusammen tragen sie den ganzen Betrag');
+        foreach ($beide as $code => $delta) {
+            $this->assertGreaterThanOrEqual(-10000000, $delta, "Position $code unter null");
+        }
+
+        $zuviel = BudgetRechnung::verteileAnteiligAufwand(-12000000, self::gruppen());
+        $this->assertSame(-10000000, array_sum($zuviel), 'mehr als das ganze Budget geht nicht');
+        $this->assertSame(-7000000, $zuviel['121'], 'die grosse Position steht auf null');
+        $this->assertSame(-3000000, $zuviel['142'], 'die kleine Position steht auf null');
+    }
+
     public function testAusnahmeVerteiltDenGesamtbetragNeu(): void {
         // F101: wird eine Position ausgenommen, verteilt sich derselbe Gesamt-
         // betrag vollständig auf die übrigen — die eingesparte Summe bleibt gleich.
@@ -94,10 +115,12 @@ class BudgetRechnungTest extends TestCase {
     }
 
     public function testVerteilungRundungsrestGehtAnGroessteGruppe(): void {
+        // Gleiche Aufwände, damit der Rundungsrest entsteht; gross genug, dass die
+        // Kürzung nicht an der Nullgrenze der Positionen hängen bleibt.
         $gruppen = [
-            ['code' => 'A', 'aufwandSoll' => 1, 'ertragSoll' => 0, 'stellenSoll' => 0],
-            ['code' => 'B', 'aufwandSoll' => 1, 'ertragSoll' => 0, 'stellenSoll' => 0],
-            ['code' => 'C', 'aufwandSoll' => 1, 'ertragSoll' => 0, 'stellenSoll' => 0],
+            ['code' => 'A', 'aufwandSoll' => 1000, 'ertragSoll' => 0, 'stellenSoll' => 0],
+            ['code' => 'B', 'aufwandSoll' => 1000, 'ertragSoll' => 0, 'stellenSoll' => 0],
+            ['code' => 'C', 'aufwandSoll' => 1000, 'ertragSoll' => 0, 'stellenSoll' => 0],
         ];
         $d = BudgetRechnung::verteileAnteiligAufwand(-100, $gruppen);
         // Summe exakt, kein Rappen geht verloren.

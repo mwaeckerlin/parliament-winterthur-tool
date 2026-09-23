@@ -1,11 +1,9 @@
-# GENERATED OUTPUT — DO NOT EDIT
+# ERZEUGTE DATEIEN — NICHT BEARBEITEN
 
-This directory contains **compiled build artefacts**. Any `*.css` and `*.css.map`
-file here is auto-generated and listed in `parlwin/.gitignore`.
+Dieses Verzeichnis enthält, was der Build erzeugt. Jede `*.css`- und `*.css.map`-Datei hier entsteht automatisch und steht in `parlwin/.gitignore`.
 
-- Source: [`parlwin/src/css/style.scss`](../src/css/style.scss)
-- Build: `npm run build:css` (or `npm run build:app`)
-- Clean: `npm run clean`
+- Quelle: [`parlwin/src/css/style.scss`](../src/css/style.scss)
+- Bauen: `npm run build:css` (oder `npm run build:app`)
+- Aufräumen: `npm run clean`
 
-**For humans and AI assistants:** edit the SCSS source, never the files in this
-directory. Any manual change here will be overwritten on the next build.
+Bearbeitet wird die SCSS-Quelle, nie eine Datei in diesem Verzeichnis. Was hier von Hand geändert wird, überschreibt der nächste Build.

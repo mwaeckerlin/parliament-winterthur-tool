@@ -94,14 +94,14 @@ describe('Zeitleiste — aktive Notizen raus, gelöschte als Lösch-Vermerk', ()
     expect(wrapper.text()).not.toContain('Weg damit')
   })
 
-  it('bietet dem Autor einen Undo-Knopf, anderen nicht', () => {
+  it('bietet dem Autor einen Knopf zum Wiederherstellen, anderen nicht', () => {
     const eigen = mountZeitleiste([NOTIZ_GELOESCHT], 'testuser')
     expect(eigen.find('button[title="Löschen rückgängig machen"]').exists()).toBe(true)
     const fremd = mountZeitleiste([NOTIZ_GELOESCHT], 'jemandanderes')
     expect(fremd.find('button[title="Löschen rückgängig machen"]').exists()).toBe(false)
   })
 
-  it('stellt die Notiz per Undo wieder her und meldet sie an die Elternansicht', async () => {
+  it('stellt die Notiz wieder her und meldet sie an die Elternansicht', async () => {
     const axios = (await import('@nextcloud/axios')).default
     axios.post.mockResolvedValueOnce({ data: { ...NOTIZ_GELOESCHT, geloescht: false } })
     const wrapper = mountZeitleiste([NOTIZ_GELOESCHT])

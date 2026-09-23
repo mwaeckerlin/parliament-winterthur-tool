@@ -12,13 +12,14 @@ use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\IUserSession;
 
 /**
- * Der EINE, geteilte Notiz-Code für alle Objektarten (Geschäft und Vorstoss).
+ * Der EINE, geteilte Notiz-Code für alle Objektarten — Geschäft, Vorstoss,
+ * Traktandum, Budgetantrag und die Frage einer Fragestunde.
  *
- * Notizen führen eine Versions-History (wie git): beim Bearbeiten wird der
- * bisherige Text als Revision archiviert. Löschen ist ein Soft-Delete (nur ein
- * Flag) mit Undo. Alles liegt in pw_geschaeft_aktionen (aktion_typ = «notiz»),
- * getrennt nach objekt_typ. Weder Geschäft noch Vorstoss haben eigenen
- * Notiz-Code — beide rufen ausschliesslich diesen Service.
+ * Notizen führen einen Versionsverlauf (wie git): beim Bearbeiten wird der
+ * bisherige Text als Revision archiviert. Löschen setzt nur ein Kennzeichen und
+ * lässt sich rückgängig machen. Alles liegt in pw_geschaeft_aktionen (aktion_typ = «notiz»),
+ * getrennt nach objekt_typ. Keine dieser Objektarten hat eigenen Notiz-Code —
+ * alle rufen ausschliesslich diesen Service.
  */
 class NotizService
 {
@@ -132,7 +133,8 @@ class NotizService
 
     /**
      * Löschen entfernt die Notiz NICHT aus der Datenbank: es wird nur das
-     * Lösch-Flag gesetzt. Text und History bleiben erhalten (Undo möglich).
+     * Kennzeichen gesetzt. Text und Verlauf bleiben erhalten, das Löschen lässt
+     * sich rückgängig machen.
      */
     public function loeschen(string $objektTyp, int $objektId, int $aktionId, string $kategorie = 'notiz'): void
     {

@@ -56,6 +56,23 @@ class SitzungMapper extends QBMapper
     }
 
     /**
+     * Gibt alle nicht gelöschten Sitzungen eines Datums zurück (an einem Tag
+     * können mehrere stattfinden).
+     *
+     * @return Sitzung[]
+     */
+    public function findByDatum(string $datum): array
+    {
+        $qb = $this->db->getQueryBuilder();
+        $qb->select('*')
+            ->from($this->getTableName())
+            ->where($qb->expr()->eq('geloescht', $qb->createNamedParameter(false, IQueryBuilder::PARAM_BOOL)))
+            ->andWhere($qb->expr()->eq('datum', $qb->createNamedParameter($datum)))
+            ->orderBy('id', 'ASC');
+        return $this->findEntities($qb);
+    }
+
+    /**
      * Gibt alle Sitzungen einer Verknüpfungs-Gruppe zurück (gleiche
      * verknuepfung_id), inklusive gelöschter ausgenommen.
      *

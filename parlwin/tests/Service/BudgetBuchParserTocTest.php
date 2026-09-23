@@ -56,6 +56,276 @@ class BudgetBuchParserTocTest extends TestCase {
         self::assertSame('Behörden und Stadtkanzlei', $nachCode['110']['departement']);
     }
 
+    /**
+     * Jedes Produkt bekommt SEINE Kostentabelle. Im Buch folgt auf jedes «Produkt
+     * <N> <Name>» eine Tabelle «Nettokosten / Kosten / Erlös / Nettokosten /
+     * Kostendeckungsgrad». Der Parser hängte die Zeilen an das zuletzt ANGELEGTE
+     * Produkt statt an das zuletzt gelesene: Weil der Anhang am Buchende alle
+     * Produkte einer Gruppe bereits aufführt, landeten im Informationsteil sämtliche
+     * Tabellen beim letzten Produkt — gemessen am Budget 2026 hatte «Individuelle
+     * Unterstützung» (622) fünf Produkte ohne Tabelle und eines mit 24 Zeilen.
+     */
+    public function testJedesProduktBekommtSeineEigeneKostentabelle(): void {
+        $text = implode("\n", [
+            'Inhaltsverzeichnis',
+            'Soziales',
+            'Individuelle Unterstützung (622) ....................... 255',
+            'Einleitung Produktegruppe',
+            'Individuelle Unterstützung (622)',
+            // Der Anhang/die Übersicht nennt die Produkte einmal ohne Zahlen …
+            'Produkt 1 Sozialhilfe gemäss SHG',
+            'Produkt 2 Asylfürsorge',
+            // … der Informationsteil bringt sie dann je mit ihrer Kostentabelle.
+            'Produkt 1 Sozialhilfe gemäss SHG',
+            'Leistungen',
+            'Finanzielle Leistungen an Bezügerinnen und Bezüger von Sozialhilfe.',
+            'Nettokosten                       Ist 2024   Soll 2025   Soll 2026',
+            'Kosten                        117’643’652 120’568’000 120’981’224',
+            'Erlös                          72’143’270  69’318’000  68’811’022',
+            'Nettokosten                    45’500’381  51’250’000  52’170’202',
+            'Kostendeckungsgrad in %                61          57          57',
+            'Operative Ziele                   Ist 2024   Soll 2025   Soll 2026',
+            'Produkt 2 Asylfürsorge',
+            'Leistungen',
+            'Finanzielle Leistungen an Asylsuchende.',
+            'Nettokosten                       Ist 2024   Soll 2025   Soll 2026',
+            'Kosten                         42’151’166  32’469’698  44’792’583',
+            'Erlös                          32’070’625  26’035’937  36’773’370',
+            'Nettokosten                    10’080’541   6’433’760   8’019’213',
+            'Kostendeckungsgrad in %                76          80          82',
+        ]);
+
+        $nachCode = [];
+        foreach ($this->parseTeilB($text) as $g) {
+            $nachCode[$g['code']] = $g;
+        }
+        $produkte = $nachCode['622']['produkte'] ?? [];
+
+        self::assertCount(2, $produkte, 'zwei Produkte, jedes genau einmal');
+        $kosten = static function (array $produkt): int {
+            foreach ($produkt['kostentabelle'] as $z) {
+                if ($z['label'] === 'Kosten') {
+                    return (int) $z['werte'][2];
+                }
+            }
+            return 0;
+        };
+        self::assertCount(4, $produkte[0]['kostentabelle'], 'Produkt 1 trägt seine eigene Tabelle');
+        self::assertCount(4, $produkte[1]['kostentabelle'], 'Produkt 2 trägt seine eigene Tabelle');
+        self::assertSame(120981224, $kosten($produkte[0]), 'Kosten von Produkt 1');
+        self::assertSame(44792583, $kosten($produkte[1]), 'Kosten von Produkt 2');
+        self::assertSame(52170202, $produkte[0]['nettokosten']['soll'], 'Nettokosten von Produkt 1');
+    }
+
+    /**
+     * Ein Fliesstext, der zufällig auf eine Produktegruppen-Nummer endet, ist keine
+     * Überschrift. Im Budget 2026 steht in der Begründung der Stadtkanzlei (865):
+     * «Der Jahresbeitrag … wurde aus der PG Stadtkanzlei in die PG Stadtrat (805)»
+     * — der Satz geht auf der nächsten Zeile weiter. Der Parser wechselte dort
+     * zurück zu 805 und schrieb die Kostentabelle des nächsten Produkts (865,
+     * Kanzleifunktionen) dem Stadtparlament gut (+532%).
+     */
+    public function testFliesstextMitGruppennummerAmZeilenendeWechseltNichtDieGruppe(): void {
+        $text = implode("\n", [
+            'Inhaltsverzeichnis',
+            'Behörden und Stadtkanzlei',
+            'Stadtparlament (805) ....................... 339',
+            'Stadtkanzlei (865) ......................... 365',
+            'Einleitung Produktegruppe',
+            'Stadtparlament (805)',
+            'Produkt 1 Stadtparlament',
+            'Nettokosten                       Ist 2024   Soll 2025   Soll 2026',
+            'Kosten                          1’439’212   1’773’592   1’737’564',
+            'Stadtkanzlei (865)',
+            'Begründung Abweichung Budget 2025/2026',
+            'Der Jahresbeitrag für die Stiftung Winterthur wurde aus der PG Stadtkanzlei in die PG Stadtrat (805)',
+            'übertragen.',
+            'Produkt 1 Kanzleifunktionen',
+            'Nettokosten                       Ist 2024   Soll 2025   Soll 2026',
+            'Kosten                          5’721’290   6’188’326   7’924’292',
+        ]);
+
+        $nachCode = [];
+        foreach ($this->parseTeilB($text) as $g) {
+            $nachCode[$g['code']] = $g;
+        }
+
+        $kosten = static function (array $gruppe, int $produkt): int {
+            foreach (($gruppe['produkte'][$produkt]['kostentabelle'] ?? []) as $z) {
+                if ($z['label'] === 'Kosten') {
+                    return (int) $z['werte'][2];
+                }
+            }
+            return 0;
+        };
+        self::assertSame(1737564, $kosten($nachCode['805'], 0), 'Das Stadtparlament behält seine eigene Tabelle');
+        self::assertCount(1, $nachCode['805']['produkte'][0]['kostentabelle'], 'und bekommt keine fremde dazu');
+        self::assertSame(7924292, $kosten($nachCode['865'], 0), 'Die Kanzleifunktionen bekommen ihre Tabelle');
+    }
+
+    /**
+     * Ein umgebrochener Satz, der mit «Produkt <N> …» beginnt, ist keine
+     * Produktüberschrift. Im Budget 2026 endet der Leistungstext von PG 651,
+     * Produkt 3 mit «Die Kosten für die Pflegeleistungen werden im | Produkt 4
+     * abgebildet.» — der Parser wechselte dort auf Produkt 4 und schrieb ihm die
+     * Kostentabelle von Produkt 3 gut.
+     */
+    public function testUmgebrochenerSatzIstKeineProduktUeberschrift(): void {
+        $text = implode("\n", [
+            'Inhaltsverzeichnis',
+            'Soziales',
+            'Beiträge an Organisationen (651) ....................... 295',
+            'Einleitung Produktegruppe',
+            'Beiträge an Organisationen (651)',
+            'Produkt 3 Alter und Gesundheit',
+            'Leistungen',
+            'Beiträge an Organisationen im Gesundheitsbereich. Die Kosten für die Pflegeleistungen werden im',
+            'Produkt 4 abgebildet.',
+            'Nettokosten                       Ist 2024   Soll 2025   Soll 2026',
+            'Kosten                          1’639’455   1’727’473   1’831’090',
+            'Erlös                             118’525     120’400     109’150',
+            'Produkt 4 Pflegefinanzierung',
+            'Leistungen',
+            'Beiträge an die Pflegekosten.',
+            'Nettokosten                       Ist 2024   Soll 2025   Soll 2026',
+            'Kosten                         59’683’779  64’008’001  65’630’500',
+        ]);
+
+        $nachCode = [];
+        foreach ($this->parseTeilB($text) as $g) {
+            $nachCode[$g['code']] = $g;
+        }
+        $produkte = $nachCode['651']['produkte'] ?? [];
+
+        self::assertCount(2, $produkte, 'genau die zwei echten Produkte');
+        self::assertSame('Alter und Gesundheit', $produkte[0]['name']);
+        self::assertSame('Pflegefinanzierung', $produkte[1]['name']);
+        $kosten = static function (array $p): int {
+            foreach ($p['kostentabelle'] as $z) {
+                if ($z['label'] === 'Kosten') {
+                    return (int) $z['werte'][2];
+                }
+            }
+            return 0;
+        };
+        self::assertSame(1831090, $kosten($produkte[0]), 'Produkt 3 behält seine Tabelle');
+        self::assertSame(65630500, $kosten($produkte[1]), 'Produkt 4 bekommt seine eigene');
+    }
+
+    /**
+     * Ein Produktname darf klein geschrieben sein: Die IDW (222) führen «Produkt 2
+     * elektronischer Arbeitsplatz». Er steht — wie jeder echte Produktname — an
+     * mehreren Stellen im Buch (Informationsteil und Anhang «Gliederung»), ein
+     * umgebrochener Satz dagegen nur an einer.
+     */
+    public function testKleingeschriebenerProduktnameBleibtEinProdukt(): void {
+        $text = implode("\n", [
+            'Inhaltsverzeichnis',
+            'Finanzen',
+            'Informatikdienste (IDW) (222) ....................... 60',
+            'Einleitung Produktegruppe',
+            'Informatikdienste (IDW) (222)',
+            'Produkt 2 elektronischer Arbeitsplatz',
+            'Leistungen',
+            'Betrieb der Arbeitsplätze. Die Kosten stehen im',
+            'Produkt 3 und sind dort ausgewiesen.',
+            'Nettokosten                       Ist 2024   Soll 2025   Soll 2026',
+            'Kosten                          9’332’336   8’812’053  10’897’629',
+            'Anhang',
+            'Informatikdienste (IDW) (222)',
+            'Produkt 2 elektronischer Arbeitsplatz',
+        ]);
+
+        $nachCode = [];
+        foreach ($this->parseTeilB($text) as $g) {
+            $nachCode[$g['code']] = $g;
+        }
+        $produkte = $nachCode['222']['produkte'] ?? [];
+
+        self::assertCount(1, $produkte, 'nur das echte Produkt, nicht der umgebrochene Satz');
+        self::assertSame('elektronischer Arbeitsplatz', $produkte[0]['name']);
+        self::assertSame(10897629, (int) $produkte[0]['kostentabelle'][0]['werte'][2]);
+    }
+
+    /**
+     * Nicht jede Kostentabelle hat alle drei Jahre: Ein neues Produkt trägt nur
+     * die aktuellen Zahlen. Im Budget 2026 hat PG 855 «Schulpflege» keine
+     * Ist-Werte (zwei Spalten) und PG 731 «Anteil Pensionskassenstabilisierung»
+     * nur den Soll-Wert (eine Spalte). Der Parser verlangte drei Zahlen und
+     * verwarf beide Tabellen ganz — die Produkte standen ohne Kosten da. Die
+     * vorhandenen Werte füllen die Spalten von rechts: Der letzte Wert ist immer
+     * das Budgetjahr.
+     */
+    public function testUnvollstaendigeKostentabelleWirdRechtsbuendigGelesen(): void {
+        $text = implode("\n", [
+            'Inhaltsverzeichnis',
+            'Behörden und Stadtkanzlei',
+            'Schulpflege (855) ....................... 364',
+            'Einleitung Produktegruppe',
+            'Schulpflege (855)',
+            'Produkt 1 Schulpflege',
+            'Nettokosten                       Ist 2024   Soll 2025   Soll 2026',
+            'Kosten                                        689’041     660’884',
+            'Erlös                                               0           0',
+            'Nettokosten                                   689’041     660’884',
+            'Produkt 2 Anteil Pensionskassenstabilisierung',
+            'Nettokosten                       Ist 2024   Soll 2025   Soll 2026',
+            'Kosten                                                     96’786',
+            'Erlös                                                      96’786',
+            'Nettokosten                                                     0',
+        ]);
+
+        $nachCode = [];
+        foreach ($this->parseTeilB($text) as $g) {
+            $nachCode[$g['code']] = $g;
+        }
+        $produkte = $nachCode['855']['produkte'] ?? [];
+
+        $werte = static function (array $p, string $label): array {
+            foreach ($p['kostentabelle'] as $z) {
+                if ($z['label'] === $label) {
+                    return $z['werte'];
+                }
+            }
+            return [];
+        };
+        self::assertSame([0, 689041, 660884], $werte($produkte[0], 'Kosten'), 'zwei Werte: Ist bleibt leer');
+        self::assertSame([0, 689041, 660884], $werte($produkte[0], 'Nettokosten'), 'Nettokosten-Zeile');
+        self::assertSame(660884, $produkte[0]['nettokosten']['soll'], 'Nettokosten des Budgetjahres');
+        self::assertSame([0, 0, 96786], $werte($produkte[1], 'Kosten'), 'ein Wert: nur das Budgetjahr');
+    }
+
+    /**
+     * Im Buchtext klebt die erste Kostenzeile manchmal an der Kopfzeile:
+     * «Nettokosten Ist 2024 Soll 2025 Soll 2026 Kosten 689'041 660'884» steht im
+     * Budget 2026 (PG 855) als EINE Zeile. Der Parser verwarf die Kopfzeile samt
+     * der angehängten Kosten — das Produkt stand ohne Kosten da.
+     */
+    public function testKostenzeileAnDerKopfzeileWirdGelesen(): void {
+        $text = implode("\n", [
+            'Inhaltsverzeichnis',
+            'Behörden und Stadtkanzlei',
+            'Schulpflege (855) ....................... 364',
+            'Einleitung Produktegruppe',
+            'Schulpflege (855)',
+            'Produkt 1 Schulpflege',
+            "Nettokosten \tIst 2024 Soll 2025 Soll 2026 Kosten  \t689'041 660’884",
+            "Erlös  \t0 0",
+            "Nettokosten  \t689'041 660’884",
+        ]);
+
+        $nachCode = [];
+        foreach ($this->parseTeilB($text) as $g) {
+            $nachCode[$g['code']] = $g;
+        }
+        $tabelle = $nachCode['855']['produkte'][0]['kostentabelle'] ?? [];
+        $labels = array_column($tabelle, 'label');
+
+        self::assertContains('Kosten', $labels, 'die an der Kopfzeile klebende Kostenzeile fehlt');
+        $kosten = $tabelle[array_search('Kosten', $labels, true)]['werte'];
+        self::assertSame([0, 689041, 660884], $kosten);
+    }
+
     public function testParstParlamentarischeZielvorgabenJeMessgroesse(): void {
         // Struktur wie im Buch (PG 121): nummerierte Ziele, je Messgrösse eine
         // Wertzeile aus sechs Jahresspalten; entscheidbar ist «Soll aktuell» (Index 2).
@@ -270,5 +540,83 @@ class BudgetBuchParserTocTest extends TestCase {
         self::assertArrayNotHasKey('Operative Ziele Ist', $nachLabel);
         // Die prominente Nettokosten-Soll-Zahl der Karte bleibt korrekt.
         self::assertSame(1135916, $p1['nettokosten']['soll']);
+    }
+
+    /**
+     * Eine Zeile, in der auf den ersten Betrag lauter Nullen folgen. Wörtlich aus
+     * dem Buch 2017, Produktegruppe «Beiträge an Organisationen» (645): «Total
+     * effektive Erlöse -565 0 0 0 0 0 0 0 0» — die Gruppe hat einmalig einen
+     * kleinen negativen Ist-Wert und danach nichts mehr.
+     *
+     * Der Ertrag wird paarweise gelesen (Betrag, Anteil). Zählt ein Paar erst, wenn
+     * der Anteil ECHT kleiner ist als der Betrag, endet die Zählung hier nach dem
+     * ersten Paar — und der einzige gefundene Betrag rutschte als Soll-Wert des
+     * Budgetjahres ans Ende, statt Ist zu bleiben.
+     */
+    public function testNullspaltenBeendenDieWertzeileNicht(): void {
+        $text = implode("\n", [
+            'Inhaltsverzeichnis',
+            'Soziales',
+            'Beiträge an Organisationen (645) ....................... 273',
+            'Einleitung Produktegruppe',
+            'Beiträge an Organisationen (645)',
+            'Nettokosten / Globalkredit Ist 2015 in% Soll 2016 in% Soll 2017 in% Plan 2018 Plan 2019 Plan 2020',
+            "Total effektive Kosten 20'902'180 100 43'404'548 100 45'360'076 100 46'555'076 47'784'076 49'046'076",
+            'Total effektive Erlöse -565 0 0 0 0 0 0 0 0',
+        ]);
+        $nachCode = [];
+        foreach ($this->parseTeilB($text) as $gr) {
+            $nachCode[$gr['code']] = $gr;
+        }
+
+        $g = $nachCode['645'];
+        self::assertSame(-565, $g['ertrag']['ist'], 'Ist-Wert bleibt in der ersten Spalte');
+        self::assertSame(0, $g['ertrag']['sollVorjahr'], 'Soll Vorjahr ist null');
+        self::assertSame(0, $g['ertrag']['soll'], 'Soll des Budgetjahres ist null');
+        self::assertSame(45360076, $g['aufwand']['soll'], 'Kosten des Budgetjahres unverändert');
+    }
+
+    /**
+     * Das PDF zerreisst Beträge mitten in der Zahl: «960’00» und «0» stehen als
+     * zwei Fragmente nebeneinander und ergeben 960'000 — einzeln gelesen 960 und
+     * 0, also den tausendsten Teil. Erkennbar ist der Bruch am Ende des ersten
+     * Stücks: Nach einem Tausender-Apostroph stehen dort weniger als drei Ziffern.
+     * In der Investitionsplanung 2025 betraf das 24 Zeilen.
+     *
+     * @param list<array{x: float, t: string}> $frags
+     * @return list<string>
+     */
+    private function verschmolzen(array $frags): array {
+        $parser = new BudgetBuchParser();
+        $zusammen = (new \ReflectionMethod($parser, 'fragmenteVerschmelzen'))->invoke($parser, $frags);
+        return array_map(static fn ($f) => $f['t'], $zusammen);
+    }
+
+    public function testZerrisseneZahlWirdZusammengesetzt(): void {
+        self::assertSame(
+            ["960’000", " 240’000", ' 0'],
+            $this->verschmolzen([
+                ['x' => 300.0, 't' => '960’00'],
+                ['x' => 330.0, 't' => '0'],
+                ['x' => 370.0, 't' => ' 240’00'],
+                ['x' => 400.0, 't' => '0'],
+                ['x' => 440.0, 't' => ' 0'],
+            ]),
+            'Ein nach dem Apostroph abgeschnittener Betrag wird mit seinem Rest zusammengesetzt'
+        );
+    }
+
+    public function testVollstaendigeBetraegeBleibenGetrennt(): void {
+        // Gegenprobe: Wo keine Zahl zerrissen ist, wird nichts zusammengezogen —
+        // sonst verschmölzen benachbarte Spalten zu einem Betrag.
+        self::assertSame(
+            ["960’000", " 240’000", ' 0'],
+            $this->verschmolzen([
+                ['x' => 300.0, 't' => '960’000'],
+                ['x' => 370.0, 't' => ' 240’000'],
+                ['x' => 440.0, 't' => ' 0'],
+            ]),
+            'Vollständige Beträge bleiben eigene Fragmente'
+        );
     }
 }

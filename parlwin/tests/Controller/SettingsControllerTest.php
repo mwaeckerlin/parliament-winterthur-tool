@@ -30,6 +30,326 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 class SettingsControllerTest extends TestCase {
+    /**
+     * Der laufende Sync und der Abbruch sind zwei getrennte Aufrufe. Über die
+     * App-Konfiguration erreichte das Signal den laufenden Sync nie: Nextcloud
+     * hält deren Werte pro Aufruf im Speicher, und er las bis zu seinem Ende den
+     * Stand von seinem Beginn — der Abbruch-Knopf blieb wirkungslos.
+     *
+     * Geprüft wird die ganze Kette: Der abbrechende Aufruf schreibt das Signal,
+     * ein zweiter Controller mit EIGENEM Konfigurations-Zwischenspeicher (wie ihn
+     * der laufende Sync hat) sieht es trotzdem.
+     */
+    public function testAbbruchErreichtDenLaufendenSyncTrotzKonfigurationsCache(): void {
+        $sperrdatei = '/tmp/parlwin-sync-abbruch-test-' . uniqid('', true) . '.lock';
+        $lock = new SyncLockService($sperrdatei);
+        $lesen = new \ReflectionMethod(SettingsController::class, 'isCancelRequested');
+        $setzen = new \ReflectionMethod(SettingsController::class, 'setCancelRequested');
+
+        try {
+            // Der laufende Sync: seine Konfiguration steht auf dem Stand von seinem
+            // Beginn und ändert sich nicht mehr.
+            $laufend = $this->minimalController(['sync_cancel_requested' => '0'], $lock);
+            self::assertFalse($lesen->invoke($laufend), 'ohne Anforderung kein Abbruch');
+
+            // Der abbrechende Aufruf, mit eigener Konfiguration.
+            $abbrechend = $this->minimalController([], $lock);
+            $setzen->invoke($abbrechend, true);
+
+            self::assertTrue(
+                $lesen->invoke($laufend),
+                'Der laufende Sync sieht den Abbruch nicht und läuft weiter'
+            );
+
+            $setzen->invoke($abbrechend, false);
+            self::assertFalse($lesen->invoke($laufend), 'Der aufgehobene Abbruch wirkt weiter');
+        } finally {
+            @unlink($sperrdatei);
+            @unlink($sperrdatei . '.abbruch');
+        }
+    }
+
+    /**
+     * Der harte Stopp braucht die Prozessnummer des laufenden Syncs, und er läuft in
+     * einem anderen Aufruf als der Sync selbst. Über die App-Konfiguration kam sie
+     * dort nicht zuverlässig an: Nextcloud hält deren Werte pro Aufruf im Speicher.
+     * Ohne die Nummer traf der Stopp niemanden, und der Sync lief weiter, bis er von
+     * selbst fertig war — der Abbruch-Knopf war wirkungslos.
+     */
+    public function testDieProzessnummerErreichtDenAbbrechendenAufruf(): void {
+        $sperrdatei = '/tmp/parlwin-sync-pid-test-' . uniqid('', true) . '.lock';
+        $lock = new SyncLockService($sperrdatei);
+        $setzen = new \ReflectionMethod(SettingsController::class, 'setCurrentWorkerPid');
+        $lesen = new \ReflectionMethod(SettingsController::class, 'getCurrentWorkerPid');
+
+        try {
+            $laufenderSync = $this->minimalController([], $lock);
+            $setzen->invoke($laufenderSync, 4242);
+
+            // Der abbrechende Aufruf mit EIGENEM Konfigurationsstand: leer.
+            $abbrechend = $this->minimalController([], $lock);
+            self::assertSame(
+                4242,
+                $lesen->invoke($abbrechend),
+                'Der abbrechende Aufruf kennt die Prozessnummer des laufenden Syncs nicht'
+            );
+
+            $setzen->invoke($laufenderSync, null);
+            self::assertNull($lesen->invoke($abbrechend), 'Die Prozessnummer bleibt nach dem Ende stehen');
+        } finally {
+            @unlink($sperrdatei);
+            @unlink($sperrdatei . '.abbruch');
+            @unlink($sperrdatei . '.pid');
+        }
+    }
+
+    /**
+     * Ein Status, der «läuft» behauptet, während weder eine Sperre gehalten wird
+     * noch ein Worker lebt: Der Sync ist beendet, sein Fortschritt sagt es nur
+     * nicht. Der Abbruch räumte bisher nur das Signal und die Prozessnummer auf
+     * und liess den Fortschritt stehen — die Oberfläche zeigte danach für immer
+     * eine laufende Synchronisation, und kein weiterer Abbruch half.
+     */
+    public function testAbbruchRaeumtEinenStehengebliebenenStatusAuf(): void {
+        $request = $this->createStub(IRequest::class);
+        $request->method('getParam')->willReturn(null);
+        $request->method('offsetExists')->willReturn(false);
+
+        $stand = [
+            'sync_progress' => json_encode([
+                'running' => true,
+                'phase' => 'geschaefte',
+                'phaseLabel' => 'Geschäfte',
+            ], JSON_UNESCAPED_UNICODE),
+        ];
+        $config = $this->createStub(IConfig::class);
+        $config->method('getAppValue')->willReturnCallback(
+            static fn(string $_app, string $key, string $default = ''): string => $stand[$key] ?? $default
+        );
+        $config->method('setAppValue')->willReturnCallback(
+            static function (string $_app, string $key, string $value) use (&$stand): void {
+                $stand[$key] = $value;
+            }
+        );
+
+        $sperrdatei = '/tmp/parlwin-sync-status-test-' . uniqid('', true) . '.lock';
+        try {
+            $controller = new SettingsController(
+                $request,
+                $config,
+                $this->createStub(GeschaeftService::class),
+                $this->createStub(SitzungService::class),
+                $this->createStub(MitgliedService::class),
+                $this->createStub(ScraperService::class),
+                $this->createStub(KalenderService::class),
+                $this->createStub(FraktionsarbeitService::class),
+                $this->createStub(RealtimePublisherService::class),
+                new SyncLockService($sperrdatei),
+                $this->createStub(SyncProcessService::class),
+                $this->createStub(FraktionMapper::class),
+                $this->createStub(IGroupManager::class),
+                $this->createStub(IUserManager::class),
+                $this->createStub(FraktionsraumService::class),
+                $this->createStub(EreignisService::class),
+            );
+
+            $antwort = $controller->cancelSync();
+            self::assertSame(Http::STATUS_OK, $antwort->getStatus());
+            $daten = $antwort->getData();
+            self::assertIsArray($daten);
+            self::assertTrue((bool) ($daten['bereits_beendet'] ?? false), 'der Sync gilt nicht als beendet');
+
+            $status = json_decode((string) ($stand['sync_progress'] ?? '{}'), true);
+            self::assertIsArray($status);
+            self::assertFalse(
+                $status['running'] ?? true,
+                'Der Fortschritt behauptet weiter, die Synchronisation laufe'
+            );
+        } finally {
+            @unlink($sperrdatei);
+            @unlink($sperrdatei . '.abbruch');
+        }
+    }
+
+    /**
+     * Der Abbruch im STARTFENSTER: Der Sync-Prozess läuft schon (seine
+     * Prozessnummer steht), hat seine Sperre aber noch nicht gegriffen — dazwischen
+     * liegen ein bis zwei Sekunden, in denen die Oberfläche «gestartet» meldet und
+     * den Abbruch zulässt. Der Stopp meldet in diesem Moment «beendet», weil keine
+     * Sperre gehalten wird.
+     *
+     * Das Abbruch-Signal muss dann STEHEN BLEIBEN: Der Prozess liest es, sobald er
+     * die Sperre greift. Wer es hier aufräumt, lässt die Synchronisation zu Ende
+     * laufen, während die Oberfläche «abgebrochen» meldet.
+     */
+    public function testAbbruchImStartfensterBleibtStehenSolangeDerWorkerLebt(): void {
+        $request = $this->createStub(IRequest::class);
+        $request->method('getParam')->willReturn(null);
+        $request->method('offsetExists')->willReturn(false);
+
+        $stand = [
+            'sync_progress' => json_encode([
+                'running' => true,
+                'phase' => 'queued',
+                'phaseLabel' => 'Synchronisation gestartet',
+            ], JSON_UNESCAPED_UNICODE),
+        ];
+        $config = $this->createStub(IConfig::class);
+        $config->method('getAppValue')->willReturnCallback(
+            static fn(string $_app, string $key, string $default = ''): string => $stand[$key] ?? $default
+        );
+        $config->method('setAppValue')->willReturnCallback(
+            static function (string $_app, string $key, string $value) use (&$stand): void {
+                $stand[$key] = $value;
+            }
+        );
+
+        // Der Stopp findet keine Sperre und meldet «beendet» — genau das tut der
+        // echte Dienst, solange der Prozess seine Sperre noch nicht gegriffen hat.
+        $prozesse = $this->createStub(SyncProcessService::class);
+        $prozesse->method('ensureStopped')->willReturn(['stopped' => true, 'forced' => false, 'signalled' => false]);
+
+        $sperrdatei = '/tmp/parlwin-sync-startfenster-test-' . uniqid('', true) . '.lock';
+        $lock = new SyncLockService($sperrdatei);
+        try {
+            $controller = new SettingsController(
+                $request,
+                $config,
+                $this->createStub(GeschaeftService::class),
+                $this->createStub(SitzungService::class),
+                $this->createStub(MitgliedService::class),
+                $this->createStub(ScraperService::class),
+                $this->createStub(KalenderService::class),
+                $this->createStub(FraktionsarbeitService::class),
+                $this->createStub(RealtimePublisherService::class),
+                $lock,
+                $prozesse,
+                $this->createStub(FraktionMapper::class),
+                $this->createStub(IGroupManager::class),
+                $this->createStub(IUserManager::class),
+                $this->createStub(FraktionsraumService::class),
+                $this->createStub(EreignisService::class),
+            );
+
+            // Der Worker lebt: Als seine Nummer dient die des Testprozesses.
+            (new \ReflectionMethod(SettingsController::class, 'setCurrentWorkerPid'))
+                ->invoke($controller, getmypid());
+
+            $antwort = $controller->cancelSync();
+            self::assertSame(Http::STATUS_OK, $antwort->getStatus());
+
+            self::assertTrue(
+                $lock->abbruchAngefordert(),
+                'Das Abbruch-Signal ist weg, bevor der startende Lauf es lesen konnte'
+            );
+            self::assertNotNull(
+                $lock->pidLesen(),
+                'Die Prozessnummer des noch laufenden Workers ist weg'
+            );
+        } finally {
+            @unlink($sperrdatei);
+            @unlink($sperrdatei . '.abbruch');
+            @unlink($sperrdatei . '.pid');
+        }
+    }
+
+    /**
+     * Der harte Stopp dagegen räumt auf: Wer den Lauf mit einem Signal beendet
+     * hat, hinterlässt weder Abbruch-Signal noch Prozessnummer — nach einem KILL
+     * läuft das Aufräumen des Laufs nicht mehr, und eine stehengebliebene
+     * Prozessnummer meldet für immer «läuft».
+     */
+    public function testHarterStoppRaeumtSignalUndProzessnummerWeg(): void {
+        $request = $this->createStub(IRequest::class);
+        $request->method('getParam')->willReturn(null);
+        $request->method('offsetExists')->willReturn(false);
+
+        $stand = [
+            'sync_progress' => json_encode([
+                'running' => true,
+                'phase' => 'geschaefte',
+                'phaseLabel' => 'Geschäfte',
+            ], JSON_UNESCAPED_UNICODE),
+        ];
+        $config = $this->createStub(IConfig::class);
+        $config->method('getAppValue')->willReturnCallback(
+            static fn(string $_app, string $key, string $default = ''): string => $stand[$key] ?? $default
+        );
+        $config->method('setAppValue')->willReturnCallback(
+            static function (string $_app, string $key, string $value) use (&$stand): void {
+                $stand[$key] = $value;
+            }
+        );
+
+        $prozesse = $this->createStub(SyncProcessService::class);
+        $prozesse->method('ensureStopped')->willReturn(['stopped' => true, 'forced' => true, 'signalled' => true]);
+
+        $sperrdatei = '/tmp/parlwin-sync-hartstopp-test-' . uniqid('', true) . '.lock';
+        $lock = new SyncLockService($sperrdatei);
+        try {
+            $controller = new SettingsController(
+                $request,
+                $config,
+                $this->createStub(GeschaeftService::class),
+                $this->createStub(SitzungService::class),
+                $this->createStub(MitgliedService::class),
+                $this->createStub(ScraperService::class),
+                $this->createStub(KalenderService::class),
+                $this->createStub(FraktionsarbeitService::class),
+                $this->createStub(RealtimePublisherService::class),
+                $lock,
+                $prozesse,
+                $this->createStub(FraktionMapper::class),
+                $this->createStub(IGroupManager::class),
+                $this->createStub(IUserManager::class),
+                $this->createStub(FraktionsraumService::class),
+                $this->createStub(EreignisService::class),
+            );
+
+            (new \ReflectionMethod(SettingsController::class, 'setCurrentWorkerPid'))
+                ->invoke($controller, getmypid());
+
+            $controller->cancelSync();
+
+            self::assertFalse($lock->abbruchAngefordert(), 'Das Abbruch-Signal bleibt nach dem harten Stopp stehen');
+            self::assertNull($lock->pidLesen(), 'Die Prozessnummer bleibt nach dem harten Stopp stehen');
+        } finally {
+            @unlink($sperrdatei);
+            @unlink($sperrdatei . '.abbruch');
+            @unlink($sperrdatei . '.pid');
+        }
+    }
+
+    /** Ein Controller mit festem Konfigurationsstand und echtem Sperrdienst. */
+    private function minimalController(array $stand, SyncLockService $lock): SettingsController {
+        $request = $this->createStub(IRequest::class);
+        $request->method('getParam')->willReturn(null);
+        $request->method('offsetExists')->willReturn(false);
+        $config = $this->createStub(IConfig::class);
+        $config->method('getAppValue')->willReturnCallback(
+            static fn(string $_app, string $key, string $default = ''): string => $stand[$key] ?? $default
+        );
+
+        return new SettingsController(
+            $request,
+            $config,
+            $this->createStub(GeschaeftService::class),
+            $this->createStub(SitzungService::class),
+            $this->createStub(MitgliedService::class),
+            $this->createStub(ScraperService::class),
+            $this->createStub(KalenderService::class),
+            $this->createStub(FraktionsarbeitService::class),
+            $this->createStub(RealtimePublisherService::class),
+            $lock,
+            $this->createStub(SyncProcessService::class),
+            $this->createStub(FraktionMapper::class),
+            $this->createStub(IGroupManager::class),
+            $this->createStub(IUserManager::class),
+            $this->createStub(FraktionsraumService::class),
+            $this->createStub(EreignisService::class),
+        );
+    }
+
     public function testRunHaengtAnLaufendeSynchronisationAnWennLockAktiv(): void {
         $request = $this->createStub(IRequest::class);
         $request->method('getParam')->willReturn(null);
@@ -405,7 +725,7 @@ class SettingsControllerTest extends TestCase {
     }
 
     /**
-     * Requirement: Alle NC-Gruppe-User werden in «Fraktionsmitglieder ↔ Nextcloud-User» angezeigt.
+     * Anforderung: Alle Benutzer der Nextcloud-Gruppe werden in «Fraktionsmitglieder ↔ Nextcloud-Benutzer» angezeigt.
      * Wer NICHT in der Fraktion ist, erscheint als «verwaist» (wird im Frontend durchgestrichen).
      */
     public function testFraktionMitgliederZeigtVerwaisteNCGruppenUserOhneParlamentseintrag(): void

@@ -481,7 +481,7 @@ test.describe('F26 Votum im Rat', () => {
 
       await zustaendigkeitAufMichSetzen(page, id, USERS.u1.name)
 
-      // Schlechtfall: eine nicht zuständige Person wird abgewiesen. Für sie ist das
+      // Fehlerfall: eine nicht zuständige Person wird abgewiesen. Für sie ist das
       // Votum-Feld schreibgeschützt; der Schreibzugriff wird serverseitig mit 403
       // abgewiesen (kein UI-Weg für eine nicht zuständige Person).
       fremd = await neuerKontext(browser, USERS.u3)
@@ -490,7 +490,7 @@ test.describe('F26 Votum im Rat', () => {
       expect(abgewiesen.status(), 'Nicht zuständige Person darf kein Votum erfassen').toBe(403)
       expect(JSON.stringify(await abgewiesen.json())).toContain('zuständige')
 
-      // Gutfall: die zuständige Person erfasst das Votum über das Feld «Votum im Rat».
+      // Normalfall: die zuständige Person erfasst das Votum über das Feld «Votum im Rat».
       const votumText = 'E2E Votum zum Archivieren'
       await votumUeberFeldErfassen(page, votumText)
 
@@ -585,13 +585,13 @@ test.describe('F27 Dokumente am Geschäft', () => {
       await expect(nameInput, 'Dateiname ist nicht mit dem Geschäftstitel vorbelegt').toHaveValue(erwartet)
 
       const erstellen = dialog.getByRole('button', { name: 'Erstellen' })
-      // Schlechtfall: ohne Namen lässt sich nichts erstellen.
+      // Fehlerfall: ohne Namen lässt sich nichts erstellen.
       await nameInput.fill('')
       await expect(erstellen, 'Leerer Dateiname muss «Erstellen» sperren').toBeDisabled()
       await nameInput.fill('   ')
       await expect(erstellen, 'Nur Leerzeichen müssen «Erstellen» sperren').toBeDisabled()
 
-      // Gutfall: kurzer, eindeutiger Name.
+      // Normalfall: kurzer, eindeutiger Name.
       await nameInput.fill(name)
       await expect(erstellen).toBeEnabled()
       // Das Dokument öffnet sich in einem eigenen Tab — dieser wird sofort geschlossen.
@@ -768,7 +768,7 @@ test.describe('F41 Kalendereintrag zur Sitzung', () => {
         expect(ics, 'Teilnehmer fehlen im Kalendereintrag').toContain('ATTENDEE')
       }
 
-      // Schlechtfall: für eine Sitzung ohne Eintrag liefert der Kalender nichts.
+      // Fehlerfall: für eine Sitzung ohne Eintrag liefert der Kalender nichts.
       const leer = await admin.page.request.get(kalenderEintragUrl(sitzungId + 987654))
       expect(leer.ok(), 'Kalender liefert einen Eintrag für eine nicht existierende Sitzung').toBeFalsy()
     } finally {
@@ -804,7 +804,7 @@ test.describe('F51 Benutzer anlegen und Einladung', () => {
 
     try {
       // Eine Fraktion wählen, in der mindestens ein Mitglied noch keinen lokalen
-      // Benutzer hat (freies Username-Feld). Fraktionen ohne solche Mitglieder
+      // Benutzer hat (freies Feld für den Benutzernamen). Fraktionen ohne solche Mitglieder
       // werden übersprungen.
       const optionen = await selectFraktion
         .locator('option')
@@ -829,17 +829,17 @@ test.describe('F51 Benutzer anlegen und Einladung', () => {
       expect(mitgliedId, 'Zeile ohne Mitglieds-Kennung').toBeTruthy()
       const zeileNachId = page.locator(`#pw-members-body tr[data-member-id="${mitgliedId}"]`)
 
-      // Username setzen; die Zuordnung speichert automatisch und rendert die
+      // Benutzernamen setzen; die Zuordnung speichert automatisch und zeigt die
       // Tabelle neu — deshalb wird danach immer über die Kennung gesucht.
       await zeileNachId.locator('input.pw-member-username').fill(neuerBenutzer)
       await expect(membersStatus).toHaveText(/Zuordnungen gespeichert/i, { timeout: 30_000 })
 
-      // Schlechtfall: ohne Auswahl weist die Oberfläche darauf hin.
+      // Fehlerfall: ohne Auswahl weist die Oberfläche darauf hin.
       await page.locator('#pw-members-select-all').uncheck()
       await page.locator('#pw-btn-members-provision').click()
       await expect(membersStatus).toHaveText(/Bitte mindestens einen Eintrag auswählen/i, { timeout: 15_000 })
 
-      // Gutfall: genau diese eine Zeile auswählen und abgleichen.
+      // Normalfall: genau diese eine Zeile auswählen und abgleichen.
       await zeileNachId.locator('input.pw-member-select').check()
       await page.locator('#pw-btn-members-provision').click()
       await expect(membersStatus).toHaveText(/Angelegt:/i, { timeout: 60_000 })
@@ -926,7 +926,7 @@ test.describe('F62 Rollen und befristete Stellvertretungen', () => {
       mitglied = await neuerKontext(browser, USERS.u3)
       await gotoGeschaefte(mitglied.page)
 
-      // Schlechtfall: «bis» vor «von» wird abgewiesen.
+      // Fehlerfall: «bis» vor «von» wird abgewiesen.
       const ungueltig = await api(page, 'post', '/settings/praesidium-stellvertretung', {
         uid: USERS.u3.name,
         name: 'E2E Stellvertretung',
@@ -936,7 +936,7 @@ test.describe('F62 Rollen und befristete Stellvertretungen', () => {
       expect(ungueltig.status(), 'Ungültige Gültigkeitsspanne wird nicht abgewiesen').toBe(400)
       expect(JSON.stringify(await ungueltig.json())).toContain('gueltig_bis')
 
-      // Schlechtfall: eine bereits abgelaufene Stellvertretung wirkt nicht. Bewusst
+      // Fehlerfall: eine bereits abgelaufene Stellvertretung wirkt nicht. Bewusst
       // auf den rechtlosen Nutzer (u2), der im ganzen Test KEINE gültige Präsidiums-
       // rolle erhält. u3 taugt dafür nicht: er bekommt unten eine gültige
       // Stellvertretung, die mangels Entfernungs-Endpunkt aus einem früheren Lauf
@@ -952,7 +952,7 @@ test.describe('F62 Rollen und befristete Stellvertretungen', () => {
       const weiterhinVerweigert = await api(rechtlos.page, 'post', '/settings/fraktionssitzung', { aktiv: '1' })
       expect(weiterhinVerweigert.status(), 'Eine abgelaufene Stellvertretung darf nicht wirken').toBe(403)
 
-      // Gutfall: eine gültige Stellvertretung wirkt sofort — das Mitglied schaltet
+      // Normalfall: eine gültige Stellvertretung wirkt sofort — das Mitglied schaltet
       // den Sitzungsmodus ein.
       const gueltig = await api(page, 'post', '/settings/praesidium-stellvertretung', {
         uid: USERS.u3.name,

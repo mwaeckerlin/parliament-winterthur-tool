@@ -1,44 +1,49 @@
 ---
 name: project-overview
-description: Tech-Stack, wichtigste Dateien und Architektur-Überblick von parlwin
+description: Technik, wichtigste Dateien und Aufbau von parlwin
 metadata:
   type: project
 ---
 
-## Tech-Stack
+## Technik
 
-- Nextcloud 33.0.3, PHP 8 AppFramework
-- Vue 3 + @nextcloud/vue 9.8.0 (Options API, kein Composition API)
-- Pinia ist NICHT in parlwin selbst – nur in NC Calendar
-- Build: Webpack via `npm start` / `npm run build:app`
-- Source: `parlwin/src/js/` → Build-Output: `parlwin/js/parlwin-main.js` (nie direkt editieren)
+- Nextcloud 33.0.3, PHP 8, AppFramework
+- Vue 3 mit @nextcloud/vue 9.8.0 (Options API, nicht Composition API)
+- Pinia wird in parlwin NICHT verwendet, nur im Kalender von Nextcloud
+- Gebaut wird mit Webpack über `npm start` oder `npm run build:app`
+- Quellen: `parlwin/src/js/`, erzeugt wird `parlwin/js/parlwin-main.js` (nie von Hand ändern)
 
 ## Wichtigste Dateien
 
 | Datei | Zweck |
 |-------|-------|
-| `parlwin/src/js/App.vue` | Root-Komponente, Navigation, lädt Mitglieder/Fraktionen/Kommissionen |
-| `parlwin/src/js/components/Sitzungsliste.vue` | Sitzungsliste mit Traktanden, Notizen |
-| `parlwin/src/js/components/Sitzungstypenliste.vue` | CRUD für Sitzungs-Vorlagen |
-| `parlwin/lib/Service/SitzungstypService.php` | Vorlage-Logik; **fehlt noch**: `materialisiereTeilnehmer()` |
-| `parlwin/lib/Service/KalenderService.php` | CalDAV-Integration via `CalDavBackend` direkt (bypassed Sabre-Stack) |
-| `parlwin/lib/Controller/SitzungstypController.php` | REST-API für Sitzungstypen |
-| `parlwin/appinfo/routes.php` | Alle API-Routen |
+| `parlwin/src/js/App.vue` | oberste Komponente, Navigation, lädt Mitglieder, Fraktionen und Kommissionen |
+| `parlwin/src/js/components/Sitzungsliste.vue` | Sitzungsliste mit Traktanden und Notizen |
+| `parlwin/src/js/components/Sitzungstypenliste.vue` | Sitzungsvorlagen anlegen, ändern und löschen |
+| `parlwin/lib/Service/SitzungstypService.php` | Vorlagen; **fehlt noch**: `materialisiereTeilnehmer()` |
+| `parlwin/lib/Service/KalenderService.php` | nutzt `CalDavBackend` direkt und umgeht damit Sabre |
+| `parlwin/lib/Controller/SitzungstypController.php` | Schnittstelle für Sitzungstypen |
+| `parlwin/appinfo/routes.php` | alle Routen der Schnittstelle |
 
 ## Datenmodell (Sitzungstyp)
 
 - `name`, `zweck`, `standardOrt`, `standardZeitVon`, `standardZeitBis`, `einladungVersenden`
 - `traktanden`: [{titel, beschreibung, position}]
-- `teilnehmer`: [{art, referenzId, referenzName}] – Regeln, noch nicht materialisiert
+- `teilnehmer`: [{art, referenzId, referenzName}] — Regeln, noch nicht aufgelöst
   - Arten: `mitglied`, `fraktion`, `kommission`, `rolle`, `eigeneFraktion`, `ncGruppe`, `ncUser`
-- Ziel-Kalender: `parlwin-fraktion-kalender` (URI), Kalender-User aus App-Config `kalender_nutzer`
+- Zielkalender: `parlwin-fraktion-kalender` (URI), der zugehörige Benutzer steht in den
+  Einstellungen der App unter `kalender_nutzer`
 
-## Dokumentationssprache
+## Sprache der Dokumentation
 
-CHANGELOG, README und alle Dokumentationsdateien in diesem Projekt: **Deutsch** (Schweizer Rechtschreibung).
-Code, Variablen, Kommentare im Code: Englisch.
+CHANGELOG, README und alle weiteren Dokumente dieses Projekts sind **deutsch**
+(Schweizer Rechtschreibung), ebenso die Kommentare im Code und die Namen der Tests.
+Die Bezeichner im Code sind englisch, ausser den Begriffen des Parlaments
+(Traktandum, Vorstoss, Geschäft, Fraktion). Commit-Meldungen sind englisch.
 
-## Wichtige Constraints
+## Wichtige Einschränkung
 
-**Why:** `KalenderService` nutzt `CalDavBackend` direkt → kein iTIP-Scheduling → keine automatischen Einladungen.
-Einladungen sollen NUR über den NC-Calendar-Editor-Save laufen (Standard-Verhalten).
+`KalenderService` spricht `CalDavBackend` direkt an, also läuft kein Versand nach
+iTIP: parlwin verschickt selbst keine Einladungen. Einladungen entstehen NUR, wenn
+ein Termin im Kalender von Nextcloud gespeichert wird — so verhält sich Nextcloud
+von Haus aus, und dabei soll es bleiben.

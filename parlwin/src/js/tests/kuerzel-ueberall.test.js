@@ -32,7 +32,7 @@ describe('Kürzel gelten überall (Status, Parteien, Fraktionen, Kommissionen)',
     expect(kuerze('Sozialdemokratische Partei', KUERZEL)).toBe('SP')
     expect(kuerze('Kommission Bildung, Sport und Kultur', KUERZEL)).toBe('BSKK')
     expect(kuerze('Grüne', KUERZEL)).toBe('Grüne')
-    // Default-Liste kommt aus der App-Konfiguration.
+    // Die vorgegebene Liste kommt aus der Konfiguration der App.
     expect(kuerze('Sozialdemokratische Partei')).toBe('SP')
   })
 

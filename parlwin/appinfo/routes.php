@@ -107,6 +107,23 @@ return [
         ['name' => 'vorstoss#dokumentErstellen', 'url' => '/vorstoesse/{id}/dokumente', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
         ['name' => 'vorstoss#dokumentHochladen', 'url' => '/vorstoesse/{id}/dokumente/upload', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
 
+        // Fragestunde (F114)
+        ['name' => 'fragestunde#index', 'url' => '/fragestunden', 'verb' => 'GET'],
+        ['name' => 'fragestunde#create', 'url' => '/fragestunden', 'verb' => 'POST'],
+        ['name' => 'fragestunde#update', 'url' => '/fragestunden/{id}', 'verb' => 'PUT', 'requirements' => ['id' => '\d+']],
+        // Fragen stehen für sich: Die Fraktion sammelt sie jederzeit und teilt sie
+        // später einer Fragestunde zu (Feld «fragestundeId», 0 = noch keiner).
+        ['name' => 'fragestunde#frageErstellen', 'url' => '/fragen', 'verb' => 'POST'],
+        ['name' => 'fragestunde#frageAendern', 'url' => '/fragen/{frageId}', 'verb' => 'PUT', 'requirements' => ['frageId' => '\d+']],
+        ['name' => 'fragestunde#frageLoeschen', 'url' => '/fragen/{frageId}', 'verb' => 'DELETE', 'requirements' => ['frageId' => '\d+']],
+        // Notizen an einer Frage — GLEICHE Endpunkte wie am Geschäft (geteilter Notiz-Code)
+        ['name' => 'fragestunde#notizen', 'url' => '/fragen/{frageId}/notizen', 'verb' => 'GET', 'requirements' => ['frageId' => '\d+']],
+        ['name' => 'fragestunde#addNotiz', 'url' => '/fragen/{frageId}/notizen', 'verb' => 'POST', 'requirements' => ['frageId' => '\d+']],
+        ['name' => 'fragestunde#updateNotiz', 'url' => '/fragen/{frageId}/notizen/{aktionId}', 'verb' => 'PUT', 'requirements' => ['frageId' => '\d+', 'aktionId' => '\d+']],
+        ['name' => 'fragestunde#deleteNotiz', 'url' => '/fragen/{frageId}/notizen/{aktionId}', 'verb' => 'DELETE', 'requirements' => ['frageId' => '\d+', 'aktionId' => '\d+']],
+        ['name' => 'fragestunde#restoreNotiz', 'url' => '/fragen/{frageId}/notizen/{aktionId}/wiederherstellen', 'verb' => 'POST', 'requirements' => ['frageId' => '\d+', 'aktionId' => '\d+']],
+        ['name' => 'fragestunde#notizRevisionen', 'url' => '/fragen/{frageId}/notizen/{aktionId}/revisionen', 'verb' => 'GET', 'requirements' => ['frageId' => '\d+', 'aktionId' => '\d+']],
+
         // Mitglieder
         ['name' => 'mitglied#index', 'url' => '/mitglieder', 'verb' => 'GET'],
         ['name' => 'mitglied#show', 'url' => '/mitglieder/{id}', 'verb' => 'GET'],

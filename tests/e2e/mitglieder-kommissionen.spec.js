@@ -145,6 +145,29 @@ async function ncWaehlenIndex(page, labelText, idx) {
   return txt
 }
 
+/**
+ * Öffnet eine vue-select-Auswahl AUSSERHALB der Seitenleiste (z.B. im Geschäft)
+ * und wählt die Option mit diesem Text. «vs--open» steht erst nach dem nächsten
+ * Durchlauf von Vue am Element: Wer sofort nachsieht, hält die geöffnete Liste
+ * für geschlossen und klappt sie mit dem Klick auf den Umschalter wieder zu.
+ */
+async function ncWaehleImFeld(page, feld, optionText) {
+  const suchfeld = feld.locator('.vs__search, .vs__dropdown-toggle').first()
+  await suchfeld.scrollIntoViewIfNeeded().catch(() => {})
+  await suchfeld.focus().catch(() => {})
+  await page.keyboard.press('ArrowDown')
+  try {
+    await expect(feld).toHaveClass(/vs--open/, { timeout: 4_000 })
+  } catch {
+    const box = await feld.locator('.vs__dropdown-toggle').first().boundingBox()
+    if (box) await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
+    await expect(feld).toHaveClass(/vs--open/, { timeout: 6_000 })
+  }
+  const menu = page.locator('.vs__dropdown-menu').first()
+  await menu.waitFor({ state: 'visible', timeout: 15_000 })
+  await menu.locator('li.vs__dropdown-option', { hasText: optionText }).first().click()
+}
+
 /** The NcCheckboxRadioSwitch renders a real checkbox; targets it via its label. */
 function switchCheckbox(page, name) {
   return page.locator('#pw-filter-slot').getByRole('checkbox', { name, exact: true })
@@ -164,14 +187,19 @@ async function karteFraktionen(page) {
   }))
 }
 
-/** Expands every currently rendered Kommission card. */
+/**
+ * Expands the member list of every currently rendered Kommission card. Since
+ * F118 the card itself is always open — only the members are collapsed.
+ */
 async function alleAufklappen(page) {
   const n = await page.locator('.pw-kommission-karte').count()
   for (let i = 0; i < n; i++) {
     const karte = page.locator('.pw-kommission-karte').nth(i)
-    if (await karte.locator('.pw-kommission-details').count() === 0) {
-      await karte.locator('.pw-kommission-kopf').click()
-      await karte.locator('.pw-kommission-details').waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {})
+    const schalter = karte.locator('.pw-kommission-mitglieder-kopf')
+    if (await schalter.count() === 0) { continue }
+    if (await karte.locator('.pw-kommission-mitglied-liste').count() === 0) {
+      await schalter.click()
+      await karte.locator('.pw-kommission-mitglied-liste').waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {})
     }
   }
 }
@@ -451,7 +479,7 @@ test.describe('Mitglieder: Ansicht end-to-end', () => {
 
     try {
       expect((await setzeKuerzel(regeln)).ok(), 'Kürzel speichern fehlgeschlagen').toBeTruthy()
-      // Reload so window.PARLWIN_CONFIG carries the new shortenings.
+      // Neu laden, damit window.PARLWIN_CONFIG die neuen Kürzel trägt.
       await oeffneMitglieder(page)
 
       if (partei) {
@@ -501,23 +529,28 @@ test.describe('Kommissionen: Ansicht end-to-end', () => {
     expect(jsFehler, jsFehler.join(' | ')).toEqual([])
   })
 
-  test('Aufklappen zeigt Mitglieder mit Funktion/Partei/Fraktion/E-Mail; Toggle-Glyph kippt; Zuklappen', async ({ page }) => {
+  // F118: Die Geschäfte stehen ohne Zutun da; aufgeklappt werden die Mitglieder.
+  test('Geschäfte stehen ohne Aufklappen da; die Mitglieder klappen auf und zu', async ({ page }) => {
     await login(page, USERS.u1)
     await oeffneKommissionen(page)
 
-    // Find a card that actually has members by expanding candidates.
+    // Der Inhalt der Karte steht sofort da, ohne dass irgendwo geklickt wurde.
     const karten = page.locator('.pw-kommission-karte')
-    const n = await karten.count()
-    let ziel = null
-    for (let i = 0; i < n; i++) {
-      const k = karten.nth(i)
-      await k.locator('.pw-kommission-kopf').click()
-      await k.locator('.pw-kommission-details').waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {})
-      if (await k.locator('.pw-kommission-mitglied-karte').count() > 0) { ziel = k; break }
-      await k.locator('.pw-kommission-kopf').click()
-    }
-    expect(ziel, 'Keine Kommission mit Mitgliedern gefunden').not.toBeNull()
+    await expect(karten.first().locator('.pw-kommission-details'), 'Karteninhalt ist nicht ohne Zutun sichtbar (F118)').toBeVisible()
+    // Die Geschäfte werden seitenweise nachgeladen; gewartet wird auf den ersten
+    // Eintrag, ohne dass dafür irgendwo geklickt würde — das ist die Aussage.
+    await expect(page.locator('.pw-kommission-geschaeft-eintrag').first(),
+      'kein pendentes Geschäft ohne Aufklappen sichtbar (F118)').toBeVisible({ timeout: 30_000 })
 
+    // Die Mitglieder dagegen sind zugeklappt: die Zahl steht da, die Karten nicht.
+    const ziel = karten.filter({ has: page.locator('.pw-kommission-mitglieder-kopf') }).first()
+    await expect(ziel, 'Keine Kommission mit Mitgliedern gefunden').toBeVisible()
+    await expect(ziel.locator('.pw-kommission-mitglieder-kopf strong'), 'die Zahl der Mitglieder fehlt (F118)').toContainText('Mitglieder (')
+    await expect(ziel.locator('.pw-kommission-mitglied-karte'), 'Mitglieder stehen ungefragt offen (F118)').toHaveCount(0)
+    await expect(ziel.locator('.pw-toggle')).toHaveText('▼')
+
+    // Ein Klick auf den Schalter zeigt sie.
+    await ziel.locator('.pw-kommission-mitglieder-kopf').click()
     await expect(ziel.locator('.pw-toggle')).toHaveText('▲')
     await expect(ziel.locator('.pw-kommission-mitglied-karte').first().locator('.pw-kommission-mitglied-kopf strong')).not.toHaveText('')
 
@@ -528,10 +561,11 @@ test.describe('Kommissionen: Ansicht end-to-end', () => {
     expect(await page.locator('.pw-kommission-mitglied-zeile:not(.pw-kommission-mitglied-kopf):not(.pw-kommission-mitglied-email)').count(),
       'keine Partei-/Fraktionszeile angezeigt').toBeGreaterThan(0)
 
-    // Collapse: glyph flips back and details are removed.
-    await ziel.locator('.pw-kommission-kopf').click()
+    // Ein zweiter Klick verbirgt sie wieder; der Karteninhalt bleibt stehen.
+    await ziel.locator('.pw-kommission-mitglieder-kopf').click()
     await expect(ziel.locator('.pw-toggle')).toHaveText('▼')
-    await expect(ziel.locator('.pw-kommission-details')).toHaveCount(0)
+    await expect(ziel.locator('.pw-kommission-mitglied-karte')).toHaveCount(0)
+    await expect(ziel.locator('.pw-kommission-details'), 'der Karteninhalt verschwindet beim Zuklappen der Mitglieder (F118)').toBeVisible()
     expect(jsFehler, jsFehler.join(' | ')).toEqual([])
   })
 
@@ -588,12 +622,18 @@ test.describe('Kommissionen: Ansicht end-to-end', () => {
       // Vorbedingung: das seeded «Gemischte»-Geschäft muss in die Kommissionsliste
       // geladen worden sein (es überlebt den Sync, weil eigene Geschäfte davon
       // ausgenommen sind). Fehlt es, kann der Eintrag nie erscheinen.
-      const letzte = geladeneGeschaefte[geladeneGeschaefte.length - 1] || []
-      const gem = letzte.filter((g) => String(g.status || '').includes('Gemischte')).map((g) => `${g.id}=${g.status}`)
-      expect(
-        gem.length,
-        `Das seeded «Gemischte»-Geschäft fehlt in der Kommissionsliste (${letzte.length} Geschäfte geladen: ${JSON.stringify(gem)})`,
-      ).toBeGreaterThan(0)
+      //
+      // Die Ansicht lädt die Geschäfte SEITENWEISE zu je 1000, und der Bestand des
+      // Parlaments füllt mehrere Seiten: Gesucht wird deshalb in allen bisher
+      // eingetroffenen Antworten, und zwar so lange, bis die letzte Seite da ist.
+      const gemischte = () => geladeneGeschaefte
+        .flat()
+        .filter((g) => String(g.status || '').includes('Gemischte'))
+        .map((g) => `${g.id}=${g.status}`)
+      await expect.poll(() => gemischte().length, {
+        timeout: 25_000,
+        message: 'Das seeded «Gemischte»-Geschäft wurde nie in die Kommissionsliste geladen',
+      }).toBeGreaterThan(0)
       await expect.poll(async () => await eintrag.count(), {
         timeout: 25_000,
         message: 'Kein pendentes Kommissions-Geschäft (kein .pw-kommission-geschaeft-eintrag) gefunden',
@@ -660,7 +700,7 @@ test.describe('Kommissionen: Ansicht end-to-end', () => {
     if (inaktiveKom > 0) {
       const inaktivCard = page.locator('.pw-kommission-karte.ist-inaktiv').first()
       await expect(inaktivCard).toBeVisible()
-      await inaktivCard.locator('.pw-kommission-kopf').click()
+      // Der Hinweis steht seit F118 ohne Aufklappen in der Karte.
       await expect(inaktivCard.locator('.pw-kommission-status')).toHaveText('Aufgelöst oder inaktiv')
       await expect(inaktivCard.locator('.pw-inline-note')).toBeVisible()
     }
@@ -688,7 +728,9 @@ test.describe('Kommissionen: Ansicht end-to-end', () => {
     expect(jsFehler, jsFehler.join(' | ')).toEqual([])
   })
 
-  test('Suche klappt Treffer-Karten automatisch auf; ohne Treffer Leermeldung; ✕ setzt zurück', async ({ page }) => {
+  // F118: Aufzuklappen sind allein die Mitglieder, und nur dort, wo einer von
+  // ihnen der Treffer ist — die Geschäfte stehen ohnehin offen.
+  test('Suche nach einem Mitglied klappt dessen Mitgliederliste auf; ohne Treffer Leermeldung; ✕ setzt zurück', async ({ page }) => {
     await login(page, USERS.u1)
     await oeffneKommissionen(page)
     const koms = await apiGet(page, '/kommissionen')
@@ -697,13 +739,29 @@ test.describe('Kommissionen: Ansicht end-to-end', () => {
     const ziel = koms.find(istAktiv) || koms[0]
     const base = await zaehler(page)
     const such = page.locator('#pw-search-slot input').first()
-    const token = (ziel.name || '').split(/\s+/).filter((w) => w.length >= 5)[0] || ziel.name
 
+    // Ein Treffer im Kommissionsnamen filtert die Liste, klappt aber nichts auf.
+    const token = (ziel.name || '').split(/\s+/).filter((w) => w.length >= 5)[0] || ziel.name
     await such.fill(token)
     await expect.poll(async () => await zaehler(page)).toBeLessThanOrEqual(base)
     const treffer = page.locator('.pw-kommission-karte', { hasText: token }).first()
     await expect(treffer).toBeVisible()
-    await expect(treffer.locator('.pw-kommission-details'), 'Treffer-Karte wird nicht automatisch aufgeklappt').toBeVisible()
+    await expect(treffer.locator('.pw-kommission-details'), 'der Karteninhalt steht nicht offen (F118)').toBeVisible()
+    await expect(treffer.locator('.pw-kommission-mitglied-karte'),
+      'ein Treffer im Kommissionsnamen klappt die Mitglieder auf (F118)').toHaveCount(0)
+
+    // Ein Treffer in einem Mitglied klappt dessen Mitgliederliste auf.
+    await such.fill('')
+    const mitKopf = page.locator('.pw-kommission-karte', { has: page.locator('.pw-kommission-mitglieder-kopf') }).first()
+    await mitKopf.locator('.pw-kommission-mitglieder-kopf').click()
+    const name = (await mitKopf.locator('.pw-kommission-mitglied-karte').first()
+      .locator('.pw-kommission-mitglied-kopf strong').innerText()).trim()
+    await mitKopf.locator('.pw-kommission-mitglieder-kopf').click()
+    await expect(mitKopf.locator('.pw-kommission-mitglied-karte')).toHaveCount(0)
+
+    await such.fill(name)
+    await expect(page.locator('.pw-kommission-karte', { hasText: name }).first().locator('.pw-kommission-mitglied-karte').first(),
+      'ein Treffer im Mitglied klappt die Mitglieder nicht auf (F118)').toBeVisible({ timeout: 15_000 })
 
     await such.fill(`zzz-keintreffer-${Date.now()}`)
     await expect(page.locator('.pw-view-count').first()).toHaveText('0')
@@ -730,12 +788,68 @@ test.describe('Kommissionen: Ansicht end-to-end', () => {
       if (await d.locator('.pw-kommission-mitglied-karte').count() === 0) {
         await expect(d.getByText('Keine Mitglieder synchronisiert.')).toBeVisible()
       }
-      if (await d.locator('.pw-kommission-geschaeft-eintrag').count() === 0) {
-        await expect(d.locator('.pw-hinweis', { hasText: 'Keine Geschäfte mit Status' })).toBeVisible()
-        ohneGeschaefte++
-      }
+      // Entweder pendente Geschäfte ODER der Hinweis — in EINEM Zugriff gelesen:
+      // Die Ansicht lädt die Geschäfte seitenweise nach, und zwischen Zählen und
+      // Prüfen wechselt die Karte sonst von «kein Geschäft» zu «Geschäfte da».
+      const zustand = await d.evaluate((el) => ({
+        eintraege: el.querySelectorAll('.pw-kommission-geschaeft-eintrag').length,
+        hinweis: [...el.querySelectorAll('.pw-hinweis')]
+          .some((p) => (p.textContent || '').includes('Keine Geschäfte mit Status')),
+      }))
+      expect(
+        zustand.eintraege > 0 || zustand.hinweis,
+        'Eine Kommission ohne pendente Geschäfte sagt es nicht (weder Eintrag noch Hinweis)',
+      ).toBe(true)
+      if (zustand.eintraege === 0) { ohneGeschaefte++ }
     }
     expect(ohneGeschaefte, 'Kein Geschäfte-Hinweis exerziert').toBeGreaterThan(0)
     expect(jsFehler, jsFehler.join(' | ')).toEqual([])
+  })
+
+  /**
+   * Der Weg aus der Fraktion, gemeldet aus der Produktion: ein eigenes Geschäft
+   * anlegen, es im Feld «Kommission» einer Kommission zuweisen — und es dann in
+   * der Lasche «Kommissionen» bei genau dieser Kommission wiederfinden.
+   *
+   * Ein eigenes Geschäft trägt den Status «Pendent» und nennt darin keine
+   * Kommission; gesucht wurde bisher nur im Status, und deshalb erschien das
+   * zugewiesene Geschäft dort nie.
+   */
+  test('Ein eigenes Geschäft, einer Kommission zugewiesen, erscheint bei ihr in der Lasche «Kommissionen»', async ({ page }) => {
+    const KOMMISSION = 'E2E Gemischte Kommission'
+    const titel = `E2E Zugewiesen ${Date.now()}`
+    await login(page, USERS.u1)
+
+    // 1. Anlegen und zuweisen — über die Maske, wie es die Fraktion tut.
+    await page.goto(`${BASE_URL}/index.php/apps/parlwin/`)
+    await page.waitForLoadState('networkidle')
+    await page.getByRole('link', { name: 'Geschäfte', exact: true }).click()
+    await page.getByRole('button', { name: /Eigenes Geschäft/ }).click()
+
+    const detail = page.locator('.pw-geschaeft-detail')
+    await detail.waitFor({ state: 'visible', timeout: 30_000 })
+    await detail.getByLabel('Titel').fill(titel)
+    await ncWaehleImFeld(page, detail.locator('tr', { hasText: 'Kommission' }).locator('.v-select'), KOMMISSION)
+    await expect(detail.locator('tr', { hasText: 'Kommission' }).locator('.vs__selected')).toContainText(KOMMISSION)
+
+    await page.locator('.pw-modal').first().locator('.pw-modal-footer')
+      .getByRole('button', { name: 'Speichern' }).click()
+    await expect(detail.locator('.pw-btn-neue-notiz').first()).toBeVisible({ timeout: 30_000 })
+    await page.locator('.pw-modal .pw-btn-schliessen').first().click()
+
+    // 2. Wiederfinden: in der Lasche «Kommissionen», in der Karte dieser Kommission.
+    await oeffneKommissionen(page)
+    const karte = page.locator('.pw-kommission-karte', { hasText: KOMMISSION }).first()
+    await expect(karte, `Die Kommission «${KOMMISSION}» fehlt in der Ansicht`).toBeVisible()
+    // Seit F118 steht die Geschäftsliste ohne Aufklappen in der Karte.
+    await expect(
+      karte.locator('.pw-kommission-geschaeft-eintrag', { hasText: titel }),
+      'Das zugewiesene Geschäft erscheint nicht bei seiner Kommission',
+    ).toHaveCount(1, { timeout: 30_000 })
+
+    // Und es öffnet von dort aus seine Detailansicht.
+    await karte.locator('.pw-kommission-geschaeft-eintrag', { hasText: titel }).locator('.pw-titel').click()
+    await expect(page.locator('.pw-modal-overlay .pw-geschaeft-detail')).toBeVisible({ timeout: 30_000 })
+    await expect(page.locator('.pw-modal-overlay .pw-geschaeft-detail').getByLabel('Titel')).toHaveValue(titel)
   })
 })

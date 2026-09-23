@@ -20,9 +20,11 @@ services:
     # Änderung am Routing: docker compose up -d --build traefik
     build:
       context: traefik
-    image: mwaeckerlin/parliament-winterthur-tool:traefik
-    # Dieses Abbild entsteht ausschliesslich lokal beim Bauen und liegt in keiner
-    # Registry — ohne diese Angabe würde ein «--pull always» es dort suchen.
+    # Der Name trägt keinen Registry-Namensraum: Dieses Abbild entsteht
+    # ausschliesslich hier beim Bauen, Docker Hub kennt es nicht. Mit
+    # «mwaeckerlin/…» hätte es wie ein herunterladbares Abbild ausgesehen.
+    image: parlwin-traefik
+    # Ohne diese Angabe würde ein «--pull always» es in einer Registry suchen.
     pull_policy: build
     command:
       # Kein Docker-Provider: er verlangte den Docker-Socket im Container.
@@ -57,7 +59,11 @@ services:
     restart: unless-stopped
 
   nextcloud-nginx:
-    image: mwaeckerlin/nextcloud:nginx
+    # Das nginx-Abbild DIESES Projekts. Es baut auf mwaeckerlin/nextcloud:nginx
+    # auf und legt den Reverse-Proxy /ws/parlwin/ dazu; dieselbe Marke läuft in
+    # allen Tests, sodass die Auslieferung dasselbe Abbild fährt wie der Lauf,
+    # der sie prüft.
+    image: mwaeckerlin/parliament-winterthur-tool:nginx
     environment:
       WEBROOT:
     volumes:
@@ -80,6 +86,7 @@ services:
       MYSQL_HOST: nextcloud-db
       MYSQL_USER: nextcloud
       MYSQL_DATABASE: nextcloud
+      PARLWIN_PHP_MEMORY_LIMIT: ${PARLWIN_PHP_MEMORY_LIMIT:-1024M}
     secrets:
       - nextcloud_db_password
       - nextcloud_admin_password
@@ -99,9 +106,10 @@ services:
       - collabora-network
       - realtime-network
 
-  # Realtime broadcaster for parlwin. Reached by browsers through the
-  # generic /ws/<appid>/ reverse-proxy in mwaeckerlin/nextcloud:nginx
-  # (same-origin, no CSP / certificate work needed).
+  # Realtime broadcaster for parlwin. Reached by browsers same-origin under
+  # /ws/parlwin/, proxied by nextcloud-nginx (this project's image carries that
+  # location; the alias parlwin-ws below also satisfies the generic
+  # /ws/<appid>/ rule of the base image).
   parlwin-realtime:
     image: mwaeckerlin/parliament-winterthur-tool:realtime
     networks:

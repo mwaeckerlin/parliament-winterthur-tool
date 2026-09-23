@@ -20,16 +20,20 @@ describe('NotizenListe — readonly (verknüpfte Sitzungen)', () => {
       },
     })
     expect(wrapper.find('.pw-btn-neue-notiz').exists()).toBe(false)
-    expect(wrapper.find('.pw-btn-loeschen').exists()).toBe(false)
+    expect(wrapper.find('.pw-notiz-loeschen').exists()).toBe(false)
     // Auch die eigene Notiz ist im readonly-Modus nicht bearbeitbar.
     expect(wrapper.vm.darfBearbeiten({ autorUid: 'me' })).toBe(false)
   })
 
-  it('zeigt ohne readonly den «+ Neue Notiz»-Knopf', () => {
+  it('zeigt ohne readonly den «+ Neue Notiz»-Knopf und den Löschknopf der eigenen Notiz', () => {
     const wrapper = shallowMount(NotizenListe, {
-      props: { basisUrl: 'sitzungen/2', notizen: [], aktuelleUid: 'me', readonly: false },
+      props: { basisUrl: 'sitzungen/2', notizen: [{ id: 1, text: 'x', autorUid: 'me' }], aktuelleUid: 'me', readonly: false },
     })
     expect(wrapper.find('.pw-btn-neue-notiz').exists()).toBe(true)
+    // Der Gegenpol zum readonly-Fall: ohne ihn prüft die Abwesenheit oben nichts.
+    // Bis 2026-08-28 stand dort die Klasse .pw-btn-loeschen, die das Markup seit
+    // der Vereinheitlichung des Löschknopfs nirgends mehr trägt.
+    expect(wrapper.find('.pw-notiz-loeschen').exists()).toBe(true)
   })
 })
 

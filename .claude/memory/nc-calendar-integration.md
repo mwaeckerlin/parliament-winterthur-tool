@@ -1,52 +1,76 @@
 ---
 name: nc-calendar-integration
-description: Erkenntnisse zur NC Calendar Integration – was geht, was nicht, warum
+description: Anbindung an den Kalender von Nextcloud — was geht, was nicht, warum
 metadata:
   type: project
 ---
 
-## Offizielle NC-Calendar-API: Keine
+## Eine offizielle Schnittstelle gibt es nicht
 
-Kein `window.OCA.Calendar`, kein Event-Bus, keine URL-Parameter für Titel/Ort/Beschreibung/Teilnehmer/Kalender.
-URL-Schema `/apps/calendar/dayGridMonth/{datum}/new/popover/0/{dtStart}/{dtEnd}` → nur Datum/Zeit setzbar.
+Es gibt kein `window.OCA.Calendar`, keinen Kanal für Ereignisse und keine Parameter in
+der URL für Titel, Ort, Beschreibung, Teilnehmer oder Kalender. Über die Adresse
+`/apps/calendar/dayGridMonth/{datum}/new/popover/0/{dtStart}/{dtEnd}` lassen sich nur
+Datum und Zeit setzen.
 
-## DOM-Prefill (Layer A) – stabil für Text-Felder
+## Weg A: die Felder im DOM vorbelegen — stabil für Textfelder
 
-**Funktioniert für:** `NcTextField` (title, location) und `NcRichContenteditable` (description)
+**Funktioniert für:** `NcTextField` (Titel, Ort) und `NcRichContenteditable` (Beschreibung)
 
-**Korrekte Strategie:**
-- Script muss auf der Calendar-Seite laufen, nicht auf der parlwin-Seite. `OCP\Util::addScript` registriert nur für die aktuelle Seite. Beim Navigieren via `window.location` = neue HTTP-Anfrage.
-- `MutationObserver` auf `document.body` (Teleport rendert direkt in body, nicht in parent-Container)
-- NcTextField: `Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, val); el.dispatchEvent(new Event('input', {bubbles:true}))` – Vue 3 v-model hört auf native `input`-Events
-- NcRichContenteditable: `el.focus(); document.execCommand('selectAll'); document.execCommand('insertText', false, text)`
+**So geht es:**
 
-**Warum vorheriger Versuch scheiterte:**
-1. Selektoren-Scope falsch (Teleport schiebt aus parent raus)
-2. Script lief auf parlwin-Seite, nicht auf Calendar-Seite
-3. Keine console.debug-Logs erschienen = Script hat nicht ausgeführt
+- Das Skript muss auf der Kalenderseite laufen, nicht auf der Seite von parlwin.
+  `OCP\Util::addScript` registriert es nur für die aktuelle Seite, und der Wechsel über
+  `window.location` ist eine neue HTTP-Anfrage.
+- `MutationObserver` auf `document.body` ansetzen: Teleport hängt den Inhalt direkt an
+  `body`, nicht in das übergeordnete Element.
+- `NcTextField`:
+  `Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, val); el.dispatchEvent(new Event('input', {bubbles:true}))`
+  — `v-model` von Vue 3 hört auf das native Ereignis `input`.
+- `NcRichContenteditable`:
+  `el.focus(); document.execCommand('selectAll'); document.execCommand('insertText', false, text)`
 
-**Funktioniert NICHT für:** Attendees (async autocomplete), Kalender-Selektor (NcSelect)
+**Warum der erste Versuch scheiterte:**
 
-## Pinia-Store-Injektion (Layer B) – fragil, einzige Option für Attendees/Kalender
+1. Die Selektoren suchten im falschen Element (Teleport hängt den Inhalt nach aussen).
+2. Das Skript lief auf der Seite von parlwin statt auf der Kalenderseite.
+3. Es erschien keine Ausgabe von `console.debug`, also lief das Skript gar nicht.
+
+**Funktioniert NICHT für:** die Teilnehmer (die Vorschläge kommen asynchron nach) und
+die Kalenderauswahl (`NcSelect`).
+
+## Weg B: in den Pinia-Speicher schreiben — anfällig, aber die einzige Möglichkeit für Teilnehmer und Kalender
 
 **Zugriff:** `document.querySelector('#app-content').__vue_app__.config.globalProperties.$pinia`
-- `__vue_app__` wird von Vue 3 auch in Production-Builds gesetzt
-- Store-IDs: müssen einmal im Live-System via Browser-DevTools ermittelt werden
-  (`pinia._s.forEach((v,k) => console.log(k))`)
-- `pinia._s` ist private Pinia-API (nicht öffentlich dokumentiert)
 
-**Bruchstellen:**
-1. `pinia._s` – private API, kann in Pinia v3 ändern
-2. Store-IDs (Magic Strings) – können bei NC-Calendar-Refactoring ändern
-3. Draft-Event-Datenstruktur (Verschachtelung `vevent.*`) – kann ändern
-4. Vue-Reaktivität: muss in-place mutiert werden, nicht ersetzt
+- `__vue_app__` setzt Vue 3 auch in der gebauten Fassung für den Betrieb.
+- Die Namen der Speicher müssen einmal in der laufenden Instanz mit den
+  Entwicklerwerkzeugen des Browsers ermittelt werden
+  (`pinia._s.forEach((v,k) => console.log(k))`).
+- `pinia._s` gehört nicht zum öffentlich dokumentierten Teil von Pinia.
 
-**Kein stabiler Fallback für Attendees:** Wenn Layer B versagt, gibt es keine automatische Alternative – nur "Liste anzeigen, User tippt manuell" (inakzeptabel als primäre Lösung).
+**Was daran brechen kann:**
 
-## iTIP / CalDAV-SCHEDULE
+1. `pinia._s` ist nicht öffentlich und kann sich in Pinia 3 ändern.
+2. Die Namen der Speicher stehen als feste Zeichenketten im Code und können sich bei
+   einem Umbau des Kalenders ändern.
+3. Die Datenstruktur des noch nicht gespeicherten Termins (verschachtelt unter
+   `vevent.*`) kann sich ändern.
+4. Vue verfolgt Änderungen nur an Ort und Stelle: der Wert muss geändert, nicht ersetzt
+   werden.
 
-`KalenderService::erstelleOderAktualisiere()` nutzt `CalDavBackend::createCalendarObject()` **direkt** → bypassed Sabre-Stack → **keine iTIP-Einladungen**.
+**Für die Teilnehmer gibt es keinen stabilen Ausweichweg:** versagt Weg B, bleibt nur
+«Liste anzeigen, der Benutzer tippt von Hand» — als Hauptweg nicht brauchbar.
 
-Für Einladungen via Code wäre HTTP PUT auf `/remote.php/dav/calendars/{user}/...` nötig (= voller Sabre-Stack). Erfordert App-Token für den Kalender-User.
+## iTIP und CalDAV
 
-**Deshalb:** Einladungen sollen über den NC-Calendar-Editor-Save laufen (Standard-Verhalten, keine eigene Implementierung nötig).
+`KalenderService::erstelleOderAktualisiere()` ruft `CalDavBackend::createCalendarObject()`
+**direkt** auf und umgeht damit Sabre, also verschickt parlwin keine Einladungen nach
+iTIP.
+
+Einladungen aus dem Code heraus bräuchten ein HTTP PUT auf
+`/remote.php/dav/calendars/{user}/…`, also den vollen Weg über Sabre, und dafür ein
+App-Passwort des Kalenderbenutzers.
+
+**Deshalb:** Einladungen entstehen, wenn ein Termin im Kalender von Nextcloud
+gespeichert wird — so verhält sich Nextcloud von Haus aus, und eigener Code ist dafür
+nicht nötig.

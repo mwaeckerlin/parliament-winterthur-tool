@@ -600,6 +600,11 @@
   border-color: color-mix(in srgb, var(--color-error) 60%, var(--pw-border));
 }
 
+.pw-sync-meldung.warnung,
+.pw-meldung.warnung {
+  border-color: color-mix(in srgb, var(--color-warning, var(--color-primary-element)) 60%, var(--pw-border));
+}
+
 .pw-admin-grid,
 .pw-data-card-grid,
 .pw-mitglieder-grid,
@@ -695,6 +700,25 @@
 .pw-data-pair {
   display: grid;
   gap: var(--pw-space-xs);
+}
+
+// Die Aktionen einer Karte stehen rechts unten, und zwei Felder nebeneinander
+// brechen erst um, wenn eines schmaler als 14rem würde. Beide Regeln gelten für
+// jede Karte und jede Maske der App — Vorstösse wie Fragestunde.
+.pw-data-card-aktionen {
+  display: flex;
+  justify-content: flex-end;
+  margin-block-start: var(--pw-space-sm);
+}
+
+.pw-von-bis {
+  display: flex;
+  gap: var(--pw-space-md);
+  flex-wrap: wrap;
+}
+
+.pw-von-bis > * {
+  flex: 1 1 14rem;
 }
 
 .pw-data-pair span {
@@ -857,6 +881,23 @@
   }
 }
 
+/* Vorstösse-Ansicht: dieselbe Tabelle und derselbe Umschaltpunkt wie bei den
+   Geschäften (F119) — dieselben Spalten brauchen dieselbe Breite. */
+.pw-vorstoesse {
+  container-type: inline-size;
+  container-name: pw-vorstoesse;
+}
+
+@container pw-vorstoesse (max-width: 60em) {
+  .pw-vorstoesse .pw-table-desktop {
+    display: none !important;
+  }
+
+  .pw-vorstoesse .pw-card-mobile {
+    display: grid !important;
+  }
+}
+
 /* Sitzungen-Ansicht: Container für responsive Traktanden-Tabelle */
 .pw-sitzungen {
   container-type: inline-size;
@@ -1004,9 +1045,19 @@
 
 .pw-inline-link,
 .pw-extern-link,
+.pw-protokoll-link,
 .pw-mitglied-email {
   color: var(--color-primary-element);
   text-decoration: none;
+}
+
+// Protokoll-Link beim Traktandum der Protokollabnahme (F115): steht hinter dem
+// Titel und bleibt auf einer Zeile.
+.pw-traktandum-protokoll {
+  margin-inline-start: var(--pw-gap-1);
+  color: var(--color-primary-element);
+  text-decoration: none;
+  white-space: nowrap;
 }
 
 [class^="pw-status-"] {
@@ -1863,16 +1914,37 @@ tr.pw-prio-hoch > td {
 
 .pw-sitzung-kopf,
 .pw-kommission-kopf {
-  cursor: pointer;
   padding: var(--pw-gap-2);
   background: var(--pw-surface-soft);
   border-radius: var(--pw-radius) var(--pw-radius) 0 0;
 }
 
+// Die Sitzungskarte klappt als Ganzes auf; die Kommissionskarte zeigt ihre
+// Geschäfte immer und klappt allein die Mitglieder (F118).
+.pw-sitzung-kopf {
+  cursor: pointer;
+}
+
+// Kopf und Inhalt der Kommissionskarte bringen je ihr eigenes Polster; unter
+// dem Kopf stünden sie sonst übereinander und rissen ein Loch zwischen Titel
+// und Geschäften. Ein Abstand hat genau eine Quelle: der Kopf gibt seinen
+// unteren ab, der Inhalt behält seinen.
+.pw-kommission-kopf {
+  padding-block-end: 0;
+}
+
 .pw-sitzung-kopf {
   display: grid;
+  // Datum, Titel, Ort, Links («Extern», «Protokoll»), Auf-/Zuklapp-Zeichen
   grid-template-columns: minmax(10rem, 12rem) minmax(0, 1fr) minmax(8rem, auto) auto auto;
   gap: var(--pw-gap-1) var(--pw-gap-2);
+}
+
+// «Extern» und «Protokoll» teilen eine Spalte und stehen darin nebeneinander,
+// damit «Extern» in jeder Karte dieselbe Kante hat.
+.pw-sitzung-links {
+  display: flex;
+  gap: var(--pw-gap-2);
 }
 
 .pw-sitzung-datum,
@@ -2091,6 +2163,36 @@ tr.pw-prio-hoch > td {
 .pw-kommission-mitglieder {
   display: grid;
   gap: var(--pw-space-xs);
+}
+
+// Der Mitgliederblock beginnt mit seiner Überschrift und braucht darum den
+// Raum einer solchen zum vorangehenden Geschäft: viel darüber, wenig darunter.
+// Innen hält der Block --pw-space-xs, darüber steht das Sechsfache davon. Der
+// Abstand steht am Block, nicht an der Überschrift darin: sonst käme er zum
+// Rasterabstand des Karteninhalts hinzu, und zwei Quellen ergäben eine
+// Lücke (F118).
+.pw-kommission-details > .pw-kommission-mitglieder {
+  margin-block-start: var(--pw-gap-3);
+}
+
+// Der Schalter, der die Mitglieder zeigt und wieder verbirgt (F118): die Zahl
+// links, das Zeichen rechts an der Kante der Karte.
+.pw-kommission-mitglieder-kopf {
+  cursor: pointer;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--pw-gap-2);
+}
+
+.pw-kommission-mitglieder-kopf:hover {
+  color: var(--color-primary-element);
+}
+
+.pw-kommission-mitglieder-kopf:focus-visible {
+  outline: 2px solid var(--color-primary-element);
+  outline-offset: 2px;
+  border-radius: var(--pw-radius-small, 0.25rem);
 }
 
 .pw-kommission-geschaefte {
@@ -2573,6 +2675,25 @@ tr.pw-prio-hoch > td {
   padding: 0;
   max-block-size: none;
   block-size: auto;
+}
+
+/* Fragestunde (F114): Die Fragen stehen als dieselben Karten wie überall
+   (.pw-data-card) in der Karte ihrer Fragestunde; hier nur, was die Liste
+   zusammenhält und den Fragetext umbrechen lässt. */
+.pw-fragen-liste {
+  display: grid;
+  gap: var(--pw-gap-2);
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.pw-frage-text {
+  white-space: pre-wrap;
+}
+
+.pw-frage-eingabe {
+  min-block-size: 10em;
 }
 
 @media (max-width: 80rem) {

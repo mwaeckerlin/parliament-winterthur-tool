@@ -42,4 +42,26 @@ describe('Aktionszeitleiste — eine geteilte Komponente für Geschäft und Vors
     const wrapper = mount(Aktionszeitleiste, { props: { aktionen: [] } })
     expect(wrapper.text()).toContain('Noch keine Aktionen vorhanden.')
   })
+
+  // Soft-Delete: eine gelöschte Notiz verschwindet aus der Notizenliste und
+  // erscheint hier als Vermerk mit Wiederherstellen — für Geschäftsnotizen wie
+  // für Sitzungsnotizen (der Browser-Test dazu scheiterte am 2026-08-28).
+  it.each(['notiz', 'sitzungsnotiz'])('zeigt eine gelöschte %s als Lösch-Vermerk', (aktionTyp) => {
+    const geloescht = {
+      id: 11, aktionTyp, text: 'Text', autorUid: 'testuser', autorName: 'Test User',
+      erstelltAm: '2026-08-28T09:00:00+00:00', geloescht: true,
+    }
+    const wrapper = mount(Aktionszeitleiste, { props: { aktionen: [geloescht] } })
+    expect(wrapper.text()).toContain('hat seine Notiz gelöscht')
+    expect(wrapper.text()).not.toContain('Noch keine Aktionen vorhanden.')
+  })
+
+  it('lässt eine aktive Notiz aus der Zeitleiste heraus (sie lebt in der Notizenliste)', () => {
+    const aktiv = {
+      id: 12, aktionTyp: 'sitzungsnotiz', text: 'Text', autorUid: 'testuser',
+      erstelltAm: '2026-08-28T09:00:00+00:00', geloescht: false,
+    }
+    const wrapper = mount(Aktionszeitleiste, { props: { aktionen: [aktiv] } })
+    expect(wrapper.text()).toContain('Noch keine Aktionen vorhanden.')
+  })
 })

@@ -160,7 +160,7 @@ class SettingsController extends Controller
     }
 
     /**
-     * Speichert Username-Mappings für Fraktionsmitglieder.
+     * Speichert die Zuordnung der Benutzernamen zu den Fraktionsmitgliedern.
      */
     #[AuthorizedAdminSetting(settings: \OCA\ParliamentWinterthur\Settings\AdminSettings::class)]
     public function saveFraktionMitgliederMapping(): DataResponse
@@ -200,7 +200,7 @@ class SettingsController extends Controller
     }
 
     /**
-     * Legt ausgewählte Fraktionsmitglieder als Nextcloud-User an (falls nötig)
+     * Legt ausgewählte Fraktionsmitglieder als Nextcloud-Benutzer an (falls nötig)
      * und weist sie der gewählten Nextcloud-Gruppe zu.
      */
     #[AuthorizedAdminSetting(settings: \OCA\ParliamentWinterthur\Settings\AdminSettings::class)]
@@ -474,13 +474,22 @@ class SettingsController extends Controller
     public function cancelSync(): DataResponse
     {
         $status = $this->getSyncProgress();
-        $laeuft = ($status['running'] ?? false) === true
-            || $this->syncLockService->isLocked()
-            || $this->istWorkerProzessLebendig();
+        // Ob eine Synchronisation läuft, sagen die Sperre und der Worker, nicht der
+        // Fortschritt: Er ist eine Notiz, die ein hart beendeter Lauf stehen lässt.
+        // Ein solcher Eintrag hielt sich selbst am Leben — der Abbruch räumte nur
+        // Signal und Prozessnummer auf, der Fortschritt behauptete weiter «läuft»,
+        // und die Oberfläche zeigte für immer eine laufende Synchronisation.
+        $laeuft = $this->syncLockService->isLocked() || $this->istWorkerProzessLebendig();
 
         if (!$laeuft) {
             $this->setCancelRequested(false);
             $this->setCurrentWorkerPid(null);
+            if (($status['running'] ?? false) === true) {
+                $status = $this->markiereSyncAlsAbgebrochen(
+                    $status,
+                    'Die Synchronisation ist beendet; ihr Fortschritt war stehengeblieben'
+                );
+            }
             return new DataResponse([
                 'erfolg' => true,
                 'bereits_beendet' => true,
@@ -520,8 +529,20 @@ class SettingsController extends Controller
         );
 
         if (($stopResult['stopped'] ?? false) === true) {
-            $this->setCancelRequested(false);
-            $this->setCurrentWorkerPid(null);
+            // Das Signal und die Prozessnummer bleiben stehen, solange der Worker
+            // lebt: Zwischen dem Start seines Prozesses und dem Greifen seiner
+            // Sperre vergehen ein bis zwei Sekunden, und in diesem Fenster meldet
+            // der Stopp «beendet», weil keine Sperre gehalten wird. Wer hier
+            // aufräumt, nimmt dem startenden Lauf sein Abbruch-Signal weg, und die
+            // Synchronisation läuft zu Ende, während die Oberfläche «abgebrochen»
+            // meldet. Der Lauf räumt beides selbst auf, wenn er endet. Wurde er
+            // dagegen hart beendet (signalled), räumt hier auf, wer ihn beendet
+            // hat: Nach einem KILL läuft sein eigenes Aufräumen nicht mehr, und
+            // eine stehengebliebene Prozessnummer meldet für immer «läuft».
+            if ((bool) ($stopResult['signalled'] ?? false) || !$this->istWorkerProzessLebendig()) {
+                $this->setCancelRequested(false);
+                $this->setCurrentWorkerPid(null);
+            }
             $status = $this->markiereSyncAlsAbgebrochen(
                 $status,
                 (($stopResult['forced'] ?? false) === true)
@@ -878,7 +899,7 @@ class SettingsController extends Controller
     }
 
     /**
-     * Sucht einen passenden lokalen Nextcloud-User für ein Mitglied via drei Strategien:
+     * Sucht einen passenden lokalen Nextcloud-Benutzer für ein Mitglied via drei Strategien:
      * 1. Gespeicherte/normalisierte UID stimmt überein.
      * 2. E-Mail-Adresse stimmt überein.
      * 3. Anzeigename stimmt überein.
@@ -1357,14 +1378,16 @@ class SettingsController extends Controller
 
     private function starteSyncImHintergrund(): bool
     {
-        // Der Sync MUSS in einem eigenständigen Prozess laufen: Ein im FPM-Worker
-        // weiterlaufender Sync (fastcgi_finish_request + Shutdown-Handler) gilt für
-        // PHP-FPM als *idle*, obwohl er noch arbeitet. Beim Abräumen überzähliger
-        // Idle-Worker (pm=dynamic, pm.max_spare_servers) killt FPM ihn mitten im
-        // Lauf — der Sync bricht dann ohne Status-Update ab ("Synchronisationsprozess
-        // nicht mehr aktiv"). Der occ-Prozess wird von init adoptiert und ist von
-        // FPMs Worker-Verwaltung unabhängig; seine Ausgaben gehen über php://fd/{1,2}
-        // trotzdem in den docker-logs-Stream. Singleton garantiert der SyncLockService.
+        // Die Synchronisation MUSS in einem eigenständigen Prozess laufen: Ein im
+        // Arbeitsprozess von FPM weiterlaufender Abgleich (fastcgi_finish_request und
+        // Shutdown-Handler) gilt für PHP-FPM als *idle*, obwohl er noch arbeitet. Beim
+        // Abräumen überzähliger wartender Arbeitsprozesse (pm=dynamic,
+        // pm.max_spare_servers) beendet FPM ihn mitten im Lauf — der Abgleich bricht
+        // dann ohne Meldung ab («Synchronisationsprozess nicht mehr aktiv»). Der
+        // occ-Prozess wird von init übernommen und ist von der Verwaltung der
+        // Arbeitsprozesse in FPM unabhängig; seine Ausgaben gehen über php://fd/{1,2}
+        // trotzdem in die Logs von Docker. Dass es nur einen gibt, garantiert der
+        // SyncLockService.
         if ($this->starteSyncUeberOccProzess()) {
             return true;
         }
@@ -1984,13 +2007,27 @@ class SettingsController extends Controller
             . ' (db=' . self::SYNC_SECTION_META[$scope]['db'] . ')');
     }
 
+    /**
+     * Der laufende Sync fragt hier, ob er aufhören soll. Gelesen wird die Datei des
+     * Sperrdienstes, nicht die App-Konfiguration: Nextcloud hält deren Werte pro
+     * Aufruf im Speicher, und der Sync ist EIN Aufruf, der Abbruch kommt aus einem
+     * zweiten — der Sync sah bis zu seinem Ende den Stand von seinem Beginn und
+     * lief trotz Abbruch weiter. Die Konfiguration wird weiter mitgeschrieben; sie
+     * überlebt einen Neustart des Containers, die Datei nicht.
+     */
     private function isCancelRequested(): bool
     {
-        return trim($this->config->getAppValue(Application::APP_ID, self::SYNC_CANCEL_REQUESTED_KEY, '0')) === '1';
+        return $this->syncLockService->abbruchAngefordert()
+            || trim($this->config->getAppValue(Application::APP_ID, self::SYNC_CANCEL_REQUESTED_KEY, '0')) === '1';
     }
 
     private function setCancelRequested(bool $requested): void
     {
+        if ($requested) {
+            $this->syncLockService->abbruchAnfordern();
+        } else {
+            $this->syncLockService->abbruchAufheben();
+        }
         $this->config->setAppValue(
             Application::APP_ID,
             self::SYNC_CANCEL_REQUESTED_KEY,
@@ -1998,8 +2035,19 @@ class SettingsController extends Controller
         );
     }
 
+    /**
+     * Gelesen wird zuerst die Datei neben der Sperre: Der abbrechende Aufruf muss
+     * den Prozess des laufenden Syncs beenden können, und über die App-Konfiguration
+     * kam dessen Nummer nicht zuverlässig an — Nextcloud hält deren Werte pro Aufruf
+     * im Speicher. Ohne die richtige Nummer traf der harte Stopp niemanden, und der
+     * Sync lief weiter, bis er von selbst fertig war.
+     */
     private function getCurrentWorkerPid(): ?int
     {
+        $ausDatei = $this->syncLockService->pidLesen();
+        if ($ausDatei !== null) {
+            return $ausDatei;
+        }
         $raw = trim((string) $this->config->getAppValue(Application::APP_ID, self::SYNC_WORKER_PID_KEY, ''));
         if ($raw === '') {
             return null;
@@ -2035,6 +2083,7 @@ class SettingsController extends Controller
 
     private function setCurrentWorkerPid(?int $pid): void
     {
+        $this->syncLockService->pidSetzen($pid);
         $this->config->setAppValue(
             Application::APP_ID,
             self::SYNC_WORKER_PID_KEY,

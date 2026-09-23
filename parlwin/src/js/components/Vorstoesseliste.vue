@@ -27,10 +27,92 @@
 
     <template v-else>
       <NcEmptyContent v-if="!gefiltert.length" name="Keine Vorstösse vorhanden" />
-      <div v-else class="pw-card-grid">
+      <!-- F119: Die Übersicht ist gebaut wie die der Geschäfte — breit eine
+           Tabelle, schmal Karten. In der Zeile stehen die Angaben, nach denen
+           man sucht und entscheidet; alles Weitere zeigt die geöffnete Maske. -->
+      <div v-else class="pw-table-wrap pw-table-desktop">
+        <!-- Dieselbe Tabelle wie bei den Geschäften und darum auch deren Klasse:
+             Spaltenbreiten, Zeilenhöhen und die eingebetteten Auswahllisten sind
+             an EINER Stelle definiert. «pw-tabelle-vorstoesse» benennt nur diese
+             Ausprägung, für Tests und allfällige Eigenheiten. -->
+        <table class="pw-tabelle pw-tabelle-geschaefte pw-tabelle-vorstoesse" lang="de">
+          <thead>
+            <tr>
+              <th class="pw-col-nr">Art</th>
+              <th class="pw-col-titel">Titel</th>
+              <th class="pw-col-prio">Prio</th>
+              <th class="pw-col-status">Status</th>
+              <th class="pw-col-zustaendig">Zuständig</th>
+              <th class="pw-col-beschluss">Beschluss</th>
+              <!-- Ohne sichtbare Beschriftung: die Spalte trägt nur den
+                   Löschknopf, der seine Benennung für Hilfstechnologien selbst
+                   mitbringt. -->
+              <th class="pw-col-loeschen" aria-label="Löschen"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="vorstoss in gefiltert"
+              :key="vorstoss.id"
+              :class="['pw-table-row-clickable', { 'pw-prio-hoch': prioritaetEffektiv(vorstoss) === 'hoch', 'pw-prio-tief': prioritaetEffektiv(vorstoss) === 'tief' }]"
+              tabindex="0"
+              role="button"
+              :aria-label="`Vorstoss ${vorstoss.titel || 'ohne Titel'} bearbeiten`"
+              @click="zeilenKlick(vorstoss, $event)"
+              @keydown.enter.prevent="bearbeiten(vorstoss)"
+              @keydown.space.prevent="bearbeiten(vorstoss)"
+            >
+              <td data-label="Art" class="pw-col-nr">
+                <strong>{{ vorstoss.art || '—' }}</strong>
+                <span class="pw-col-nr-typ">{{ herkunftLabel(vorstoss.herkunft) }}</span>
+                <span class="pw-col-nr-datum">{{ formatieredatumKurz(vorstoss.erstelltAm) }}</span>
+              </td>
+              <td class="pw-titel pw-col-titel" data-label="Titel">
+                {{ vorstoss.titel || 'Ohne Titel' }}
+                <span v-if="vorstoss.herkunft === 'fremde' && vorstoss.herkunftFraktion" class="pw-col-einreicher pw-col-herkunftsfraktion">{{ kuerze(vorstoss.herkunftFraktion) }}</span>
+              </td>
+              <td data-label="Prio" class="pw-col-inline-edit pw-col-prio" @click.stop>
+                <PwPrioritaetSelect
+                  class="pw-inline-select"
+                  :model-value="vorstoss.prioritaet"
+                  @update:model-value="feldDirektSpeichern(vorstoss, 'prioritaet', $event)"
+                />
+              </td>
+              <td data-label="Status" class="pw-col-status">
+                <span :class="['pw-status-' + vorstossStatusKlasse(vorstoss.status), 'pw-status-text']">{{ statusLabel(vorstoss.status) }}</span>
+              </td>
+              <td data-label="Zuständig" class="pw-col-inline-edit pw-col-zustaendig" @click.stop>
+                <PwMultiSelect
+                  class="pw-inline-select"
+                  :model-value="zustaendigOptionenFuer(vorstoss)"
+                  :options="mitgliederOptionen"
+                  :clearable="true"
+                  placeholder="—"
+                  label="label"
+                  @update:model-value="zustaendigkeitInZeile(vorstoss, $event || [])"
+                />
+              </td>
+              <td data-label="Beschluss" class="pw-col-inline-edit pw-col-beschluss" @click.stop>
+                <BeschlussWidget
+                  class="pw-inline-beschluss"
+                  :model-value="beschlussWertFuer(vorstoss)"
+                  :options="beschlussOptionen"
+                  placeholder="—"
+                  @update:model-value="feldDirektSpeichern(vorstoss, 'beschluss', $event ? $event.label : '')"
+                />
+              </td>
+              <td data-label="Löschen" class="pw-col-loeschen" @click.stop>
+                <PwLoeschen label="Vorstoss löschen" @click="loeschen(vorstoss)" />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div v-if="!laden" class="pw-card-grid pw-card-mobile">
         <article
           v-for="vorstoss in gefiltert"
-          :key="vorstoss.id"
+          :key="`card-${vorstoss.id}`"
           class="pw-data-card"
           :class="{ 'pw-prio-hoch': prioritaetEffektiv(vorstoss) === 'hoch', 'pw-prio-tief': prioritaetEffektiv(vorstoss) === 'tief' }"
           tabindex="0"
@@ -268,6 +350,9 @@ export default {
     fraktionen: { type: Array, default: () => [] },
   },
   data() {
+    // Das laufende Speichern ist kein Anzeigezustand und steht deshalb ausserhalb
+    // der Reaktivität; Schliessen und Wechseln warten darauf.
+    this.laufendesSpeichern = null
     return {
       vorstoesse: [],
       laden: true,
@@ -330,7 +415,12 @@ export default {
       const b = this.bearbeitung?.beschluss || ''
       return b ? { label: b, value: b } : null
     },
-    // Wählbare Personen: aktive Fraktionsmitglieder mit Nextcloud-User.
+    // Für die Tabelle der Übersicht (F119): dieselben Werte, die auch die
+    // geöffnete Maske anbietet — dieselbe Auswahl an beiden Orten.
+    beschlussOptionen() {
+      return FREMD_BESCHLUESSE.map(b => ({ label: b, value: b }))
+    },
+    // Wählbare Personen: aktive Fraktionsmitglieder mit Nextcloud-Benutzer.
     mitgliederOptionen() {
       return this.mitglieder
         .filter(m => m.aktiv !== false && !!(m.nextcloudUid || m.nextcloud_uid))
@@ -573,7 +663,10 @@ export default {
       if (!this.istEntwurf) this.schliessen()
     },
     bearbeiten(vorstoss) {
-      this.bearbeitung = this.leereBearbeitung(vorstoss)
+      // Die Maske öffnet sofort und nimmt den Stand aus der Liste: Das Speichern
+      // schreibt seine Antwort dorthin zurück, und das Schliessen wartet darauf.
+      const frisch = this.vorstoesse.find(v => v.id === vorstoss?.id) || vorstoss
+      this.bearbeitung = this.leereBearbeitung(frisch)
       this.istEntwurf = false
     },
     async loeschen(vorstoss) {
@@ -585,12 +678,16 @@ export default {
         showError('Vorstoss konnte nicht gelöscht werden: ' + (e?.response?.data?.fehler || e?.message || ''))
       }
     },
-    schliessen() {
+    async schliessen() {
       // Warnung, wenn im Notiz-Editor ungespeicherte Änderungen offen sind.
       if (this.$refs.notizenListe?.hatUngespeicherteAenderungen?.()) {
         // eslint-disable-next-line no-alert
         if (!window.confirm('Die Notiz ist noch nicht gespeichert. Trotzdem schliessen?')) return
       }
+      // Ein Feld, das beim Verlassen gerade speichert, wird abgewartet: sonst
+      // schliesst die Maske über die laufende Anfrage hinweg und die Liste behält
+      // den Stand von davor.
+      await this.laufendesSpeichern
       this.bearbeitung = null
       this.istEntwurf = false
     },
@@ -608,7 +705,68 @@ export default {
     },
     // Speichert den aktuellen Bearbeitungsstand SOFORT (bei jeder Eingabe).
     // Ein leerer Titel wird nie weggespeichert.
-    async feldSpeichern() {
+    /**
+     * Speichert und merkt sich den laufenden Vorgang, damit das Schliessen und der
+     * Wechsel auf einen anderen Vorstoss ihn abwarten können. Ohne dieses Warten
+     * ging der zuletzt getippte Inhalt verloren: Der Editor speichert beim
+     * Verlassen, und wer gleich darauf schliesst, bekam beim nächsten Öffnen den
+     * Stand aus der Liste — den von vor dem Speichern.
+     */
+    feldSpeichern() {
+      this.laufendesSpeichern = this.feldSpeichernJetzt()
+      return this.laufendesSpeichern
+    },
+    // Die Zuständigkeit als Optionen der Auswahlliste (F119) — in derselben
+    // Form wie in der Geschäfteliste, damit dieselbe Komponente dieselben Daten
+    // bekommt und gleich aussieht.
+    zustaendigOptionenFuer(vorstoss) {
+      const liste = Array.isArray(vorstoss.zustaendigkeit) ? vorstoss.zustaendigkeit : []
+      return liste.map(z =>
+        this.mitgliederOptionen.find(o => o.value === z.key) || { label: z.name || z.key, value: z.key })
+    },
+    zustaendigkeitInZeile(vorstoss, optionen) {
+      const zustaendigkeit = (optionen || []).map(o => ({ key: o.value, name: o.label }))
+      return this.feldDirektSpeichern(vorstoss, 'zustaendigkeit', zustaendigkeit)
+    },
+    beschlussWertFuer(vorstoss) {
+      const b = vorstoss.beschluss || ''
+      return b ? { label: b, value: b } : null
+    },
+    // Datum kurz für die Tabellenzeile (F119) — wie in der Geschäfteliste.
+    formatieredatumKurz(wert) {
+      const roh = String(wert || '').slice(0, 10)
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(roh)) return ''
+      const [jahr, monat, tag] = roh.split('-')
+      return `${tag}.${monat}.${jahr.slice(2)}`
+    },
+    /**
+     * Ein Klick in die Zeile öffnet den Vorstoss. Ein Klick auf ein Bedienelement
+     * gehört diesem Element — geprüft am Ziel des Klicks, weil fremde Komponenten
+     * @click.stop auf ihrem Wurzelelement setzen und ein Klick auf ein Kindelement
+     * darin die Zeile trotzdem erreicht.
+     */
+    zeilenKlick(vorstoss, event) {
+      if (event?.target?.closest('button, input, select, textarea, a, label, .pw-inline-select, .pw-inline-beschluss')) return
+      this.bearbeiten(vorstoss)
+    },
+    /**
+     * Ein in der Übersicht geändertes Feld wird sofort gespeichert — wie in der
+     * Geschäfteliste, ohne die Maske zu öffnen.
+     */
+    async feldDirektSpeichern(vorstoss, feld, wert) {
+      const geaendert = { ...vorstoss, [feld]: wert }
+      try {
+        const { data } = await axios.put(
+          generateUrl(`/apps/parlwin/vorstoesse/${vorstoss.id}`),
+          geaendert
+        )
+        const i = this.vorstoesse.findIndex(v => v.id === (data?.id ?? vorstoss.id))
+        if (i >= 0) this.vorstoesse.splice(i, 1, data || geaendert)
+      } catch (e) {
+        showError('Vorstoss konnte nicht gespeichert werden: ' + (e?.response?.data?.fehler || e?.message || ''))
+      }
+    },
+    async feldSpeichernJetzt() {
       if (!this.bearbeitung?.id) return
       if (!(this.bearbeitung.titel || '').trim()) return
       try {
@@ -631,11 +789,6 @@ export default {
 }
 </script>
 
-<style scoped>
-/* Übersicht (Karten), Modal, Inputs, Badges und Status kommen aus der globalen
-   style.scss – gleiche Elemente wie bei den Geschäften. Nur das
-   Nebeneinander-Layout im Dialog ist vorstoss-spezifisch. */
-.pw-data-card-aktionen { display: flex; justify-content: flex-end; margin-block-start: 0.5rem; }
-.pw-von-bis { display: flex; gap: 0.75rem; flex-wrap: wrap; }
-.pw-von-bis > * { flex: 1 1 14rem; }
-</style>
+<!-- Übersicht (Karten), Modal, Inputs, Badges, Status, das Nebeneinander im
+     Dialog und die Aktionen der Karte kommen aus der globalen style.scss —
+     dieselben Elemente wie bei den Geschäften und in der Fragestunde. -->

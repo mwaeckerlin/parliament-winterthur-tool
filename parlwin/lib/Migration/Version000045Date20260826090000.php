@@ -30,7 +30,7 @@ class Version000045Date20260826090000 extends SimpleMigrationStep
             return null;
         }
         $t->addColumn('kuenstlich', Types::SMALLINT, ['notnull' => true, 'default' => 0]);
-        $output->info('V45: Produktegruppe um Flag «kuenstlich» ergänzt');
+        $output->info('V45: Produktegruppe um das Kennzeichen «kuenstlich» ergänzt');
         return $schema;
     }
 }
