@@ -61,7 +61,7 @@ RUN npm run build:app \
     parlwin/phpunit.xml \
     parlwin/.phpunit.result.cache
 
-FROM mwaeckerlin/nextcloud:php-fpm
+FROM mwaeckerlin/nextcloud:php-fpm-33
 # GNU libiconv vorladen, damit PHPs iconv() alle PDF-Font-Kodierungen abdeckt
 # (MacRoman u.a.) — sonst extrahiert smalot aus manchen Budgetbüchern leeren Text
 # (siehe iconv-Stage oben). Die Bibliothek ist eigenständig LD_PRELOAD-tauglich.
