@@ -13,6 +13,7 @@ use OCA\ParliamentWinterthur\Service\SitzungService;
 use OCA\ParliamentWinterthur\Service\SyncLockService;
 use OCA\ParliamentWinterthur\Service\FraktionsarbeitService;
 use OCP\IConfig;
+use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -27,6 +28,7 @@ use Symfony\Component\Console\Output\OutputInterface;
  *   php occ parlwin:sync --nur-sitzungen
  *   php occ parlwin:sync --nur-mitglieder
  */
+#[AsCommand(name: 'parlwin:sync')]
 class SyncCommand extends Command
 {
     private const APP_ID = 'parlwin';

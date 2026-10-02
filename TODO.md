@@ -4,7 +4,9 @@ Ideen, die noch nicht umgesetzt sind. Umgesetzte Punkte wandern nach `FEATURES.m
 
 ## Aufträge von Marc
 
-Keine offenen Aufträge.
+
+
+- 2026-09-23 · offen · **Zusammenfassung je Geschäft** aus dem gelesenen Inhalt der amtlichen Dokumente (F121), mit einem lokalen Sprachmodell.
 
 ## Befunde aus dem Design-Test
 

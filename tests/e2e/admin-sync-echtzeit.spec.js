@@ -592,12 +592,24 @@ test.describe('Administration, Sync, Echtzeit, Änderungsverlauf (e2e)', () => {
       // Autoritativ: die Status-API meldet den Stopp (running=false oder Phase
       // «abgebrochen») — unabhängig von der UI-Textphase «abgebrochen», die in
       // Firefox unzuverlässig erscheint. Ein transienter null-Status zählt NICHT.
+      //
+      // Der Verlauf wird mitgeschrieben: Bleibt der Abbruch aus, sagt erst die
+      // Folge der Phasen, woran er hängt — ohne sie steht im Protokoll nur
+      // «nach 180 Sekunden nicht gestoppt» (29.09.2026).
+      const verlauf = []
       await expect
         .poll(async () => {
           const s = await syncStatus(page)
+          const marke = s
+            ? `${s.phase}/${s.current?.scope || '-'} läuft=${s.running} ${s.current?.processed ?? '-'}/${s.current?.total ?? '-'}`
+            : 'kein Status'
+          if (verlauf[verlauf.length - 1] !== marke) verlauf.push(marke)
           return !!s && (s.running === false || s.phase === 'abgebrochen')
         }, { timeout: 180_000, intervals: [1000] })
         .toBe(true)
+        .catch((e) => {
+          throw new Error(`${e.message}\nVerlauf des Abbruchs: ${verlauf.join(' → ')}`)
+        })
 
       await ensureSyncIdle(page)
       const final = await syncStatus(page)

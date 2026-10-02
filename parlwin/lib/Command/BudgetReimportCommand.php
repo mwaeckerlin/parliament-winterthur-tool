@@ -8,6 +8,7 @@ use OCA\ParliamentWinterthur\Db\BudgetAntragMapper;
 use OCA\ParliamentWinterthur\Db\BudgetVerteilungMapper;
 use OCA\ParliamentWinterthur\Service\BudgetImportService;
 use OCA\ParliamentWinterthur\Service\EreignisService;
+use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -27,6 +28,7 @@ use Symfony\Component\Console\Output\OutputInterface;
  *   php occ parlwin:budget-reimport 2026
  *   php occ parlwin:budget-reimport 2026 --purge   (auch Anträge/Pauschalanträge löschen)
  */
+#[AsCommand(name: 'parlwin:budget-reimport')]
 class BudgetReimportCommand extends Command
 {
     protected static $defaultName = 'parlwin:budget-reimport';

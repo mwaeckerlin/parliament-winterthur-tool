@@ -8,10 +8,12 @@ use OCA\ParliamentWinterthur\Service\RealtimePublisherService;
 use OCA\ParliamentWinterthur\Service\SyncLockService;
 use OCA\ParliamentWinterthur\Service\SyncProcessService;
 use OCP\IConfig;
+use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
+#[AsCommand(name: 'parlwin:sync:cancel')]
 class SyncCancelCommand extends Command {
     private const APP_ID = 'parlwin';
     protected static $defaultName = 'parlwin:sync:cancel';

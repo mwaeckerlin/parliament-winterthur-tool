@@ -6,6 +6,11 @@
       <NcSelect v-if="jahrOptionen.length" v-model="jahrOption" :options="jahrOptionen" :clearable="false" input-label="Budgetjahr" @update:model-value="jahrGewechselt" />
       <NcSelect v-if="kommissionOptionen.length" v-model="kommissionOption" :options="kommissionOptionen" input-label="Zuständige Kommission" placeholder="Alle" @update:model-value="kommissionGewechselt" />
       <NcSelect v-model="departementOption" :options="departementOptionen" input-label="Departement" placeholder="Alle" @update:model-value="ladeAnsicht(false)" />
+      <!-- Die Produktegruppe folgt dem Departement: Sie bietet nur an, was im
+           gewählten Departement vorkommt. Vor allem die Investitionsrechnung
+           führt so viele Vorhaben, dass sie ohne diese zweite Stufe
+           unübersichtlich ist (Rückmeldung der Fraktion, 23.09.2026). -->
+      <NcSelect v-model="produktegruppeOption" :options="produktegruppeOptionen" input-label="Produktegruppe" placeholder="Alle" />
       <NcTextField v-model="minProzent" type="number" label="Anstieg ab %" />
       <NcTextField v-model="minAbsolut" type="number" label="Anstieg ab CHF" />
       <NcSelect v-model="antragsartOption" :options="antragsartOptionen" :clearable="false" input-label="Anträge" />
@@ -599,6 +604,7 @@ export default {
       jahre: [],
       jahrOption: null,
       departementOption: null,
+      produktegruppeOption: null,
       kommissionOption: null,
       minProzent: '',
       minAbsolut: '',
@@ -707,8 +713,25 @@ export default {
       }
       return depts.map(d => ({ value: d, label: d }))
     },
+    // Zweite Stufe nach dem Departement: Angeboten wird, was im gewählten
+    // Departement wirklich vorkommt — als Produktegruppe des Globalbudgets oder
+    // als Zuordnung eines Investitionsprojekts. Ohne Departement stehen alle da.
+    produktegruppeOptionen() {
+      const dep = this.departementOption ? this.departementOption.value : ''
+      const namen = new Set()
+      for (const g of (this.ansicht ? this.ansicht.produktegruppen : [])) {
+        if (g && g.name && (!dep || g.departement === dep)) { namen.add(g.name) }
+      }
+      for (const i of (this.ansicht ? this.ansicht.investitionen : [])) {
+        if (i && i.cluster && (!dep || i.departement === dep)) { namen.add(i.cluster) }
+      }
+      return [...namen].sort((a, b) => a.localeCompare(b, 'de')).map(n => ({ value: n, label: n }))
+    },
+    gewaehlteProduktegruppe() {
+      return this.produktegruppeOption ? this.produktegruppeOption.value : ''
+    },
     produktegruppenCount() {
-      return this.ansicht ? this.ansicht.produktegruppen.length : 0
+      return this.gruppenNachDepartement.reduce((summe, dep) => summe + dep.gruppen.length, 0)
     },
     importierbareOptionen() {
       return this.importierbareJahre.map(j => ({ value: j, label: String(j) }))
@@ -726,7 +749,10 @@ export default {
       return this.ansicht ? this.ansicht.standardBetragProStelle : 200000
     },
     gruppenNachDepartement() {
-      return this.gruppieren(this.ansicht ? this.ansicht.produktegruppen : [], g => g.departement, 'gruppen')
+      const alle = this.ansicht ? this.ansicht.produktegruppen : []
+      const pg = this.gewaehlteProduktegruppe
+      const sichtbar = pg ? alle.filter(g => g.name === pg) : alle
+      return this.gruppieren(sichtbar, g => g.departement, 'gruppen')
     },
     investitionenTotal() {
       return (this.ansicht ? this.ansicht.investitionen : []).length
@@ -738,7 +764,9 @@ export default {
     // Über solche wird jetzt nicht entschieden, deshalb lassen sie sich ausblenden.
     investitionenNachDepartement() {
       const alle = this.ansicht ? this.ansicht.investitionen : []
-      const sichtbar = this.nurMitBetrag ? alle.filter(i => Number(i.bu) !== 0) : alle
+      const pg = this.gewaehlteProduktegruppe
+      const nachGruppe = pg ? alle.filter(i => i.cluster === pg) : alle
+      const sichtbar = this.nurMitBetrag ? nachGruppe.filter(i => Number(i.bu) !== 0) : nachGruppe
       return this.gruppieren(sichtbar, i => i.departement, 'projekte')
     },
     // Alle Anträge der aktiven Phase (für das Anträge-Tab und dessen Zähler).
@@ -847,6 +875,14 @@ export default {
   watch: {
     minProzent() { this.ladeVerzoegert() },
     minAbsolut() { this.ladeVerzoegert() },
+    // Wechselt das Departement, gilt eine Produktegruppe eines anderen nicht
+    // mehr; sie bliebe sonst als Filter stehen, den die Auswahl gar nicht mehr
+    // anbietet, und die Liste wäre ohne sichtbaren Grund leer.
+    departementOption() {
+      if (!this.produktegruppeOption) { return }
+      const erlaubt = this.produktegruppeOptionen.map(o => o.value)
+      if (!erlaubt.includes(this.produktegruppeOption.value)) { this.produktegruppeOption = null }
+    },
   },
   mounted() {
     this.ladeJahre()
@@ -1073,6 +1109,7 @@ export default {
     // Auswahl/Modus, keine Filter).
     filterZuruecksetzen() {
       this.departementOption = null
+      this.produktegruppeOption = null
       this.kommissionOption = null
       this.minProzent = ''
       this.minAbsolut = ''

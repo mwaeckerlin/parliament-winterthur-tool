@@ -7,6 +7,7 @@ namespace OCA\ParliamentWinterthur\Service;
 use OCA\ParliamentWinterthur\Db\Geschaeft;
 use OCA\ParliamentWinterthur\Db\GeschaeftAktion;
 use OCA\ParliamentWinterthur\Db\GeschaeftAktionMapper;
+use OCA\ParliamentWinterthur\Db\GeschaeftDokument;
 use OCA\ParliamentWinterthur\Db\GeschaeftEreignisMapper;
 use OCA\ParliamentWinterthur\Db\GeschaeftMapper;
 use OCA\ParliamentWinterthur\Db\Fraktionsrolle;
@@ -77,6 +78,9 @@ class FraktionsarbeitService
         private readonly IUserSession $userSession,
         private readonly IGroupManager $groupManager,
         private readonly NotizRevisionMapper $notizRevisionMapper,
+        // Die amtlichen Dokumente hängen am Geschäft, gehören aber nicht zur
+        // Fraktionsarbeit: Fehlt der Dienst, bleibt alles andere unverändert.
+        private readonly ?GeschaeftDokumentService $dokumentService = null,
     ) {
         $this->notizService = new NotizService($aktionMapper, $notizRevisionMapper, $userSession);
     }
@@ -93,9 +97,16 @@ class FraktionsarbeitService
         ?bool $filterEntscheidungsbedarf = null
     ): array {
         $result = [];
+        $dokumenteJeGeschaeft = $this->dokumentService?->zuGeschaeften(
+            array_map(static fn (Geschaeft $g): int => (int) $g->getId(), $geschaefte)
+        ) ?? [];
 
         foreach ($geschaefte as $geschaeft) {
             $eintrag = $geschaeft->jsonSerialize();
+            $eintrag['amtlicheDokumente'] = array_map(
+                fn (GeschaeftDokument $d): array => $this->dokumentKopf($d),
+                $dokumenteJeGeschaeft[(int) $geschaeft->getId()] ?? []
+            );
             $letzterBeschluss = $this->aktionMapper->findLetzterGueltigerBeschluss((int) $geschaeft->getId());
             $haupt = $this->zustaendigkeitMapper->findHauptByGeschaeft((int) $geschaeft->getId());
 
@@ -130,6 +141,21 @@ class FraktionsarbeitService
     }
 
     /**
+     * Ein amtliches Dokument für die Übersicht: nur der Kopf, ohne Inhalt. Der
+     * Inhalt eines einzigen Budgetantrags misst mehrere hundert Kilobyte, und
+     * die Liste zeigt über tausend Geschäfte.
+     *
+     * @return array<string, mixed>
+     */
+    private function dokumentKopf(GeschaeftDokument $dokument): array
+    {
+        $kopf = $dokument->jsonSerialize();
+        unset($kopf['markdown'], $kopf['abschnitte']);
+        $kopf['hatInhalt'] = ($dokument->getMarkdown() ?? '') !== '';
+        return $kopf;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function angereichertesGeschaeft(int $geschaeftId): array
@@ -149,6 +175,13 @@ class FraktionsarbeitService
         $daten['istNutzerZustaendig'] = $this->istNutzerZustaendig($geschaeftId, $zustaendigkeiten);
         $daten['erlaubteBeschluesse'] = $this->ermittleErlaubteBeschluesse($geschaeft);
         $daten['fraktionssitzung'] = $this->fraktionssitzungKontext();
+        // Im geöffneten Geschäft steht der gelesene Inhalt der amtlichen
+        // Dokumente: Wer das Geschäft liest, liest den Vorstoss und die Antwort
+        // des Stadtrats, ohne ein PDF herunterzuladen.
+        $daten['amtlicheDokumente'] = array_map(
+            static fn (GeschaeftDokument $d): array => $d->jsonSerialize(),
+            $this->dokumentService?->zuGeschaeft($geschaeftId) ?? []
+        );
         $this->fuelleFraktionsstatus($daten, $geschaeft, $letzterBeschluss);
 
         // Quell-Seite der Verknüpfung: zeigt das eigene Geschäft, mit welchem

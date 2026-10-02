@@ -100,17 +100,26 @@ class GeschaeftMapper extends QBMapper
      *
      * @return Geschaeft[]
      */
-    public function searchByText(string $text, int $limit = 20): array
+    public function searchByText(string $text, int $limit = 20, array $zusatzIds = []): array
     {
         $qb = $this->db->getQueryBuilder();
         $like = '%' . $this->db->escapeLikeParameter($text) . '%';
+        $bedingungen = [
+            $qb->expr()->iLike('titel', $qb->createNamedParameter($like)),
+            $qb->expr()->iLike('nummer', $qb->createNamedParameter($like)),
+        ];
+        // Geschäfte, die der Begriff nur in ihren amtlichen Dokumenten trifft.
+        $zusatzIds = array_values(array_unique(array_map('intval', $zusatzIds)));
+        if ($zusatzIds !== []) {
+            $bedingungen[] = $qb->expr()->in(
+                'id',
+                $qb->createNamedParameter($zusatzIds, IQueryBuilder::PARAM_INT_ARRAY)
+            );
+        }
         $qb->select('*')
             ->from($this->getTableName())
             ->where($qb->expr()->eq('geloescht', $qb->createNamedParameter(false, IQueryBuilder::PARAM_BOOL)))
-            ->andWhere($qb->expr()->orX(
-                $qb->expr()->iLike('titel', $qb->createNamedParameter($like)),
-                $qb->expr()->iLike('nummer', $qb->createNamedParameter($like))
-            ))
+            ->andWhere($qb->expr()->orX(...$bedingungen))
             ->orderBy('datum', 'DESC')
             ->setMaxResults($limit);
         return $this->findEntities($qb);

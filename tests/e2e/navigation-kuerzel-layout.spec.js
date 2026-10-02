@@ -153,7 +153,9 @@ async function oeffneFilterSelect(page, labelText) {
 // Reihenfolge wie in App.vue (ansichten). rows = Selektor für einen gerenderten
 // Eintrag; button = erwartete Primär-Aktion (null = kein Header-Knopf).
 const ANSICHTEN = [
-  { name: 'Geschäfte', rows: '.pw-geschaefte .pw-table-desktop tbody tr', button: '+ Eigenes Geschäft' },
+  // Gezählt werden die Geschäftszeilen: Unter jedem Geschäft steht seit F121
+  // eine zweite Zeile mit seinen amtlichen Dokumenten, und die ist kein Eintrag.
+  { name: 'Geschäfte', rows: '.pw-geschaefte .pw-table-desktop tbody tr.pw-table-row-clickable', button: '+ Eigenes Geschäft' },
   { name: 'Sitzungen', rows: '.pw-sitzungen .pw-sitzung-karte', button: '+ Neue Sitzung' },
   { name: 'Mitglieder', rows: '.pw-mitglieder .pw-mitglied-karte', button: null },
   { name: 'Kommissionen', rows: '.pw-kommissionen .pw-kommission-karte', button: null },

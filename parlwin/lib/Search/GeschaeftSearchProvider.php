@@ -6,6 +6,7 @@ namespace OCA\ParliamentWinterthur\Search;
 
 use OCA\ParliamentWinterthur\AppInfo\Application;
 use OCA\ParliamentWinterthur\Db\GeschaeftMapper;
+use OCA\ParliamentWinterthur\Service\GeschaeftDokumentService;
 use OCP\IL10N;
 use OCP\IURLGenerator;
 use OCP\IUser;
@@ -21,7 +22,9 @@ class GeschaeftSearchProvider implements IProvider
     private GeschaeftMapper $geschaeftMapper,
     private IURLGenerator $urlGenerator,
     private IL10N $l10n,
-    private LoggerInterface $logger
+    private LoggerInterface $logger,
+    // Ohne den Dienst sucht die Suche wie bisher in Nummer und Titel.
+    private ?GeschaeftDokumentService $dokumentService = null
   ) {
   }
 
@@ -51,7 +54,16 @@ class GeschaeftSearchProvider implements IProvider
     }
 
     try {
-      $treffer = $this->geschaeftMapper->searchByText($term, $query->getLimit());
+      // Der Begriff steht oft nur im PDF: im Vorstoss selbst, in der Antwort
+      // des Stadtrats, in einer Beilage. Diese Geschäfte kommen über ihre IDs
+      // dazu.
+      $ausDokumenten = [];
+      try {
+        $ausDokumenten = $this->dokumentService?->geschaeftIdsMitText($term) ?? [];
+      } catch (\Throwable $e) {
+        $this->logger->warning('parlwin document search failed: ' . $e->getMessage(), ['exception' => $e]);
+      }
+      $treffer = $this->geschaeftMapper->searchByText($term, $query->getLimit(), $ausDokumenten);
     } catch (\Throwable $e) {
       $this->logger->warning('parlwin search failed: ' . $e->getMessage(), ['exception' => $e]);
       return SearchResult::complete($this->getName(), []);

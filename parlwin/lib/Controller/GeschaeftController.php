@@ -6,6 +6,7 @@ namespace OCA\ParliamentWinterthur\Controller;
 
 use OCA\ParliamentWinterthur\AppInfo\Application;
 use OCA\ParliamentWinterthur\Service\FraktionsarbeitService;
+use OCA\ParliamentWinterthur\Service\GeschaeftDokumentService;
 use OCA\ParliamentWinterthur\Service\GeschaeftService;
 use OCA\ParliamentWinterthur\Service\RealtimePublisherService;
 use OCP\AppFramework\Controller;
@@ -36,6 +37,7 @@ class GeschaeftController extends Controller
         private readonly IUserSession $userSession,
         private readonly LoggerInterface $logger,
         private readonly GeschaeftMapper $geschaeftMapper,
+        private readonly GeschaeftDokumentService $dokumentService,
     ) {
         parent::__construct(Application::APP_ID, $request);
     }
@@ -464,6 +466,35 @@ class GeschaeftController extends Controller
         // weist sich über den Nonce aus (siehe votum_pdf.php), Inline-Skripte
         // bleiben verboten.
         return new TemplateResponse(Application::APP_ID, 'votum_pdf', $daten, 'blank');
+    }
+
+    /**
+     * Die amtlichen Dokumente eines Geschäfts mit ihrem gelesenen Inhalt —
+     * Vorstoss, Antwort des Stadtrats, Beilagen (F121). Die Übersicht lädt sie
+     * erst beim Aufklappen, weil der Inhalt eines Budgetantrags mehrere hundert
+     * Kilobyte misst.
+     */
+    /**
+     * Die IDs der Geschäfte, deren amtliche Dokumente den Begriff tragen. Die
+     * Übersicht nimmt sie zu ihren Treffern aus Nummer und Titel dazu (F121).
+     */
+    #[NoAdminRequired]
+    public function dokumentsuche(): DataResponse
+    {
+        $begriff = trim((string) $this->request->getParam('begriff', ''));
+        if ($begriff === '') {
+            return new DataResponse([]);
+        }
+        return new DataResponse($this->dokumentService->geschaeftIdsMitText($begriff));
+    }
+
+    #[NoAdminRequired]
+    public function amtlicheDokumente(int $id): DataResponse
+    {
+        return new DataResponse(array_map(
+            static fn ($dokument): array => $dokument->jsonSerialize(),
+            $this->dokumentService->zuGeschaeft($id)
+        ));
     }
 
     /**

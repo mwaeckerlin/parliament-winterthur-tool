@@ -19,6 +19,42 @@ use PHPUnit\Framework\TestCase;
  */
 class MigrationSchemaTest extends TestCase
 {
+    /**
+     * Die Prüfsumme eines amtlichen Dokuments trägt die Fassung des Lesers vorn
+     * («v2:» plus 64 Zeichen sha256). Passt sie nicht in die Spalte, endet jedes
+     * Lesen mit «Data too long for column 'quelle_hash'» — gemessen am
+     * 24.09.2026, als die Spalte 64 Zeichen lang war.
+     */
+    public function testDiePruefsummeMitFassungPasstInIhreSpalte(): void
+    {
+        $dienst = (string) file_get_contents(__DIR__ . '/../../lib/Service/GeschaeftDokumentService.php');
+        self::assertSame(
+            1,
+            preg_match("/LESER_FASSUNG = '([^']+)'/", $dienst, $treffer),
+            'die Fassung des Lesers steht im Dienst',
+        );
+        $gebraucht = \strlen($treffer[1]) + 1 + 64;
+
+        $laengen = [];
+        foreach (glob(__DIR__ . '/../../lib/Migration/*.php') ?: [] as $datei) {
+            $code = (string) file_get_contents($datei);
+            if (preg_match("/'quelle_hash'.*?'length'\s*=>\s*(\d+)/s", $code, $spalte) === 1) {
+                $laengen[] = (int) $spalte[1];
+            }
+            if (preg_match('/quelle_hash.*?setLength\((\d+)\)/s', $code, $spalte) === 1) {
+                $laengen[] = (int) $spalte[1];
+            }
+        }
+        self::assertNotSame([], $laengen, 'die Spalte quelle_hash steht in einer Migration');
+        foreach ($laengen as $laenge) {
+            self::assertGreaterThanOrEqual(
+                $gebraucht,
+                $laenge,
+                'quelle_hash braucht ' . $gebraucht . ' Zeichen: Fassung plus Prüfsumme',
+            );
+        }
+    }
+
     public function testKeineNotNullSpalteMitLeeremOderNullDefault(): void
     {
         $verzeichnis = __DIR__ . '/../../lib/Migration';

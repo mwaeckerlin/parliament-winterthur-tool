@@ -141,6 +141,15 @@ if (!interface_exists('OCP\Http\Client\IClientService')) {
     }');
 }
 
+if (!interface_exists('OCP\ITempManager')) {
+    // phpcs:ignore
+    eval ('namespace OCP; interface ITempManager {
+        public function getTemporaryFile(string $postFix = "");
+        public function getTemporaryFolder(string $postFix = "");
+        public function clean(): void;
+    }');
+}
+
 if (!interface_exists('OCP\IDBConnection')) {
     // phpcs:ignore
     eval ('namespace OCP; interface IDBConnection {

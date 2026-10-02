@@ -11,6 +11,7 @@ return [
         ['name' => 'geschaeft#index', 'url' => '/geschaefte', 'verb' => 'GET'],
         // Vor der {id}-Route: sonst schluckt sie den Pfad als Geschäfts-ID.
         ['name' => 'geschaeft#statuswerte', 'url' => '/geschaefte/statuswerte', 'verb' => 'GET'],
+        ['name' => 'geschaeft#dokumentsuche', 'url' => '/geschaefte/dokumentsuche', 'verb' => 'GET'],
         ['name' => 'geschaeft#show', 'url' => '/geschaefte/{id}', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
         ['name' => 'geschaeft#update', 'url' => '/geschaefte/{id}', 'verb' => 'PUT'],
         ['name' => 'geschaeft#setPrioritaet', 'url' => '/geschaefte/{id}/prioritaet', 'verb' => 'PUT'],
@@ -33,6 +34,7 @@ return [
         ['name' => 'geschaeft#archiviereVotum', 'url' => '/geschaefte/{id}/votum/archivieren', 'verb' => 'POST'],
         ['name' => 'geschaeft#votumPdf', 'url' => '/geschaefte/{id}/votum/pdf', 'verb' => 'GET'],
         ['name' => 'geschaeft#dokumente', 'url' => '/geschaefte/{id}/dokumente', 'verb' => 'GET'],
+        ['name' => 'geschaeft#amtlicheDokumente', 'url' => '/geschaefte/{id}/amtliche-dokumente', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
         ['name' => 'geschaeft#dokumentErstellen', 'url' => '/geschaefte/{id}/dokumente', 'verb' => 'POST'],
         ['name' => 'geschaeft#dokumentHochladen', 'url' => '/geschaefte/{id}/dokumente/upload', 'verb' => 'POST'],
         ['name' => 'geschaeft#create', 'url' => '/geschaefte', 'verb' => 'POST'],

@@ -8,6 +8,7 @@ use OCA\ParliamentWinterthur\Controller\GeschaeftController;
 use OCA\ParliamentWinterthur\Db\Geschaeft;
 use OCA\ParliamentWinterthur\Db\GeschaeftMapper;
 use OCA\ParliamentWinterthur\Service\FraktionsarbeitService;
+use OCA\ParliamentWinterthur\Service\GeschaeftDokumentService;
 use OCA\ParliamentWinterthur\Service\GeschaeftService;
 use OCA\ParliamentWinterthur\Service\RealtimePublisherService;
 use OCP\Files\IRootFolder;
@@ -51,6 +52,7 @@ class GeschaeftControllerTest extends TestCase
             $this->createStub(IUserSession::class),
             $this->createStub(LoggerInterface::class),
             $this->createStub(GeschaeftMapper::class),
+            $this->createStub(GeschaeftDokumentService::class),
         );
 
         $response = $controller->index();
@@ -90,6 +92,7 @@ class GeschaeftControllerTest extends TestCase
             $this->createStub(IUserSession::class),
             $this->createStub(LoggerInterface::class),
             $this->createStub(GeschaeftMapper::class),
+            $this->createStub(GeschaeftDokumentService::class),
         );
 
         $response = $controller->index();
@@ -138,6 +141,7 @@ class GeschaeftControllerTest extends TestCase
             $this->createStub(IUserSession::class),
             $this->createStub(LoggerInterface::class),
             $this->createStub(GeschaeftMapper::class),
+            $this->createStub(GeschaeftDokumentService::class),
         );
 
         $daten = $controller->index()->getData();
@@ -183,6 +187,7 @@ class GeschaeftControllerTest extends TestCase
             $this->createStub(IUserSession::class),
             $this->createStub(LoggerInterface::class),
             $mapper,
+            $this->createStub(GeschaeftDokumentService::class),
         );
 
         $response = $controller->create();
@@ -231,6 +236,7 @@ class GeschaeftControllerTest extends TestCase
             $this->createStub(IUserSession::class),
             $this->createStub(LoggerInterface::class),
             $mapper,
+            $this->createStub(GeschaeftDokumentService::class),
         );
 
         $controller->create();
@@ -317,6 +323,7 @@ class GeschaeftControllerTest extends TestCase
             $this->createStub(IUserSession::class),
             $this->createStub(LoggerInterface::class),
             $mapper,
+            $this->createStub(GeschaeftDokumentService::class),
         );
     }
 
@@ -429,6 +436,7 @@ class GeschaeftControllerTest extends TestCase
             $this->createStub(IUserSession::class),
             $this->createStub(LoggerInterface::class),
             $mapper,
+            $this->createStub(GeschaeftDokumentService::class),
         );
 
         $this->assertSame(200, $controller->updateStammdaten(7)->getStatus());
@@ -499,6 +507,7 @@ class GeschaeftControllerTest extends TestCase
             $this->createStub(IUserSession::class),
             $this->createStub(LoggerInterface::class),
             $this->createStub(GeschaeftMapper::class),
+            $this->createStub(GeschaeftDokumentService::class),
         );
 
         $daten = $controller->index()->getData();
@@ -541,6 +550,7 @@ class GeschaeftControllerTest extends TestCase
             $this->createStub(IUserSession::class),
             $this->createStub(LoggerInterface::class),
             $this->createStub(GeschaeftMapper::class),
+            $this->createStub(GeschaeftDokumentService::class),
         );
 
         $response = $controller->setPrioritaet(5);
@@ -573,6 +583,7 @@ class GeschaeftControllerTest extends TestCase
             $this->createStub(IUserSession::class),
             $this->createStub(LoggerInterface::class),
             $this->createStub(GeschaeftMapper::class),
+            $this->createStub(GeschaeftDokumentService::class),
         );
 
         $response = $controller->setPrioritaet(5);

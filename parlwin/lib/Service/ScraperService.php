@@ -1526,6 +1526,61 @@ class ScraperService
      * @return array<string, array<string, mixed>>
      */
     /**
+     * Liest die amtlichen Dokumente aus der Seite eines Geschäfts.
+     *
+     * Die Seite führt sie in einer Tabelle; jede Zeile trägt den Verweis auf das
+     * PDF («/_doc/<id>»), seine Bezeichnung, Grösse, Dokumentdatum und
+     * Kategorie («Vorstoss», «Antrag Stadtrat», «Antwort Stadtrat», «Beilage»,
+     * «Pressemitteilung»). Die zweite Zelle derselben Zeile wiederholt den
+     * Verweis als Download-Knopf und trägt keine Kategorie — daran werden die
+     * beiden unterschieden.
+     *
+     * @return array<int, array{externId: string, titel: string, url: string, kategorie: string, datum: string}>
+     */
+    public function extrahiereGeschaeftDokumenteAusHtml(string $html): array
+    {
+        $dokumente = [];
+        $gesehen = [];
+
+        if (preg_match_all('#<td[^>]*>(.*?)</td>#is', $html, $zellen) === false) {
+            return [];
+        }
+
+        foreach ($zellen[1] as $zelle) {
+            if (!str_contains($zelle, '/_doc/') || !str_contains($zelle, 'Kategorie:')) {
+                continue;
+            }
+            if (preg_match('#<a[^>]*href="([^"]*/_doc/(\d+))"[^>]*>(.*?)</a>#is', $zelle, $link) !== 1) {
+                continue;
+            }
+            $externId = $link[2];
+            if (isset($gesehen[$externId])) {
+                continue;
+            }
+            $gesehen[$externId] = true;
+
+            $kategorie = '';
+            if (preg_match('/Kategorie:\s*([^<]*)/u', $zelle, $k) === 1) {
+                $kategorie = self::bereinigeHtmlText($k[1]);
+            }
+            $datum = '';
+            if (preg_match('/Dokumentdatum:\s*(?:<br\s*\/?>)?\s*([^<]*)/iu', $zelle, $d) === 1) {
+                $datum = $this->normalisiereIsoDatumOderLeer(self::bereinigeHtmlText($d[1]));
+            }
+
+            $dokumente[] = [
+                'externId' => $externId,
+                'titel' => self::bereinigeHtmlText($link[3]),
+                'url' => self::absolutUrl($link[1]),
+                'kategorie' => $kategorie,
+                'datum' => $datum,
+            ];
+        }
+
+        return $dokumente;
+    }
+
+    /**
      * Parst das Feld «Verfasser/Beteiligte» aus dem rohen HTML einer Geschäfts-Detailseite.
      *
      * Rückgabe: Array von ['name' => string, 'rolle' => string, 'externId' => string]
@@ -1726,6 +1781,11 @@ class ScraperService
                     $ereignisse[] = $ereignis;
                 }
             }
+        }
+
+        $dokumente = $this->extrahiereGeschaeftDokumenteAusHtml($html);
+        if ($dokumente !== []) {
+            $details['dokumente'] = $dokumente;
         }
 
         if ($detailPaare !== []) {

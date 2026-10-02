@@ -122,22 +122,37 @@ test.describe('Budget: Import eines alten Jahrgangs (F89, F91)', () => {
    * Buchhaltungszeichen hinter den Beträgen) — bis zum 31.08.2026 kamen dabei ein
    * Gesamtaufwand von 33 Millionen und ein Steuerertrag von null heraus.
    */
-  test('Das Budget 2017 lässt sich importieren und zeigt seine Produktegruppen', async ({ page }) => {
+  test('Der älteste Jahrgang lässt sich importieren und zeigt seine Produktegruppen', async ({ page }) => {
+    // Der Import lädt zwei Budgetbücher herunter und liest sie Seite für Seite;
+    // das dauert Minuten und sprengt die 90 Sekunden, die ein Test hier sonst
+    // hat. Gemessen am 29.09.2026: der Jahrgang 2018 lief in dieses Limit.
+    test.setTimeout(600_000)
     const jsFehler = fehlerWaechter(page)
     await login(page, USERS.u1)
     await gotoBudget(page)
-    await sorgeFuerBudgetjahr(page, 2017)
+
+    // Welcher Jahrgang der älteste ist, sagt die Anwendung: Der Abgleich holt
+    // die jüngsten Geschäfte, und mit jedem neuen Budget fällt das älteste aus
+    // dem Fenster. Eine feste Jahreszahl im Test wird darum mit der Zeit falsch —
+    // am 28.09.2026 verlangte sie 2017, während 2018 der älteste war.
+    const quellen = await api(page, 'get', '/budget/verfuegbar')
+    expect(quellen.ok(), `Verfügbare Budgetjahre nicht abrufbar (${quellen.status()})`).toBeTruthy()
+    const jahre = ((await quellen.json()).verfuegbar || []).map(Number).filter(Boolean)
+    expect(jahre.length, 'Kein einziges Budgetjahr ist synchronisiert').toBeGreaterThan(0)
+    const jahr = Math.min(...jahre)
+
+    await sorgeFuerBudgetjahr(page, jahr)
 
     // Die Kopfzahlen kommen aus Teil A und müssen die Grössenordnung einer Stadt
     // mit 110'000 Einwohnern haben — nicht Millionen statt Milliarden.
-    const res = await api(page, 'get', '/budget/2017')
-    expect(res.ok(), `Budget 2017 nicht abrufbar (${res.status()})`).toBeTruthy()
+    const res = await api(page, 'get', `/budget/${jahr}`)
+    expect(res.ok(), `Budget ${jahr} nicht abrufbar (${res.status()})`).toBeTruthy()
     const ansicht = await res.json()
-    expect(ansicht.produktegruppen.length, 'Zu wenige Produktegruppen im Budget 2017').toBeGreaterThan(20)
-    expect(Number(ansicht.jahr.steuerfuss), 'Steuerfuss 2017').toBeGreaterThan(100)
-    expect(Number(ansicht.jahr.steuerertrag), 'Steuerertrag 2017').toBeGreaterThan(300_000_000)
-    expect(Number(ansicht.jahr.totalAufwand), 'Total Aufwand 2017').toBeGreaterThan(1_000_000_000)
-    expect(Number(ansicht.jahr.totalErtrag), 'Total Ertrag 2017').toBeGreaterThan(1_000_000_000)
+    expect(ansicht.produktegruppen.length, `Zu wenige Produktegruppen im Budget ${jahr}`).toBeGreaterThan(20)
+    expect(Number(ansicht.jahr.steuerfuss), `Steuerfuss ${jahr}`).toBeGreaterThan(100)
+    expect(Number(ansicht.jahr.steuerertrag), `Steuerertrag ${jahr}`).toBeGreaterThan(300_000_000)
+    expect(Number(ansicht.jahr.totalAufwand), `Total Aufwand ${jahr}`).toBeGreaterThan(1_000_000_000)
+    expect(Number(ansicht.jahr.totalErtrag), `Total Ertrag ${jahr}`).toBeGreaterThan(1_000_000_000)
 
     // Und die Ansicht zeigt es: Jahr wählbar, Produktegruppen sichtbar.
     await gotoBudget(page)
@@ -197,6 +212,40 @@ test.describe('Budget: Ansicht, Tabs, Filter, Summen (F74, F75, F76, F77, F79)',
     await expect
       .poll(async () => gruppen.count(), { timeout: 15_000 })
       .toBeLessThan(vorher)
+  })
+
+  // F120: Zweite Stufe nach dem Departement. Die Investitionsrechnung führt so
+  // viele Vorhaben, dass die Fraktion ohne diesen Filter den Überblick verliert.
+  test('Produktegruppen-Filter grenzt auf eine Produktegruppe ein (F120)', async ({ page }) => {
+    await login(page, USERS.u1)
+    await gotoBudget(page)
+    await sorgeFuerBudgetjahr(page, JAHR)
+    await gotoBudget(page)
+
+    const gruppen = page.locator('.pw-budget-tabpanel:visible .pw-data-card', { has: page.locator('.pw-data-card-kicker', { hasText: 'Produktegruppe' }) })
+    await gruppen.first().waitFor({ state: 'visible', timeout: 30_000 })
+    const vorher = await gruppen.count()
+    expect(vorher, 'Keine Produktegruppen sichtbar').toBeGreaterThan(1)
+
+    const filter = page.locator('#pw-filter-slot')
+    const auswahl = filter.getByLabel('Produktegruppe')
+    await expect(auswahl, 'Filter «Produktegruppe» fehlt').toBeVisible()
+
+    // Die erste angebotene Produktegruppe wählen: danach steht genau sie da.
+    await auswahl.click()
+    const erste = page.locator('.vs__dropdown-menu li').first()
+    // Die Auswahl ist schmal und bricht einen langen Namen mitten im Wort um.
+    // `innerText` trägt diesen Umbruch («Altersz\nentren»), `textContent` nicht:
+    // verglichen wird der Name, nicht seine Darstellung.
+    const name = ((await erste.textContent()) || '').replace(/\s+/g, ' ').trim()
+    await erste.click()
+    await page.waitForLoadState('networkidle')
+
+    await expect
+      .poll(async () => gruppen.count(), { timeout: 15_000 })
+      .toBeLessThan(vorher)
+    await expect(gruppen.first().locator('h3'), `Die gewählte Produktegruppe «${name}» steht nicht da`)
+      .toHaveText(name)
   })
 })
 
