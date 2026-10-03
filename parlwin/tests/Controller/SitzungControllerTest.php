@@ -93,7 +93,10 @@ class SitzungControllerTest extends TestCase
     {
         $service = $this->createMock(\OCA\ParliamentWinterthur\Service\SitzungVorstossService::class);
         $service->expects($this->once())->method('verlinke')->with(1, 7);
-        $service->method('vorstossIdsFuerSitzung')->with(1)->willReturn([7]);
+        // Die Antwort hängt am Argument über einen Rückruf: `with()` gehört zu
+        // einer Erwartung mit Aufrufzahl, und `any()` entfällt in PHPUnit 14.
+        $service->method('vorstossIdsFuerSitzung')
+            ->willReturnCallback(static fn(int $sitzungId): array => $sitzungId === 1 ? [7] : []);
 
         $request = $this->makeRequest(['vorstossId' => '7']);
         $response = $this->makeController($request, null, null, $service)->vorstossVerlinken(1);
@@ -105,7 +108,8 @@ class SitzungControllerTest extends TestCase
     {
         $service = $this->createMock(\OCA\ParliamentWinterthur\Service\SitzungVorstossService::class);
         $service->expects($this->once())->method('entlinke')->with(1, 7);
-        $service->method('vorstossIdsFuerSitzung')->with(1)->willReturn([]);
+        $service->method('vorstossIdsFuerSitzung')
+            ->willReturnCallback(static fn(int $sitzungId): array => $sitzungId === 1 ? [] : [7]);
 
         $response = $this->makeController($this->makeRequest([]), null, null, $service)->vorstossEntlinken(1, 7);
 

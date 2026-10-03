@@ -16,10 +16,23 @@ JUNIT_DIR="${ROOT}/tests/.junit"
 rm -rf "$JUNIT_DIR"
 mkdir -p "$JUNIT_DIR"
 
+# PHPUnit kommt immer aus `parlwin/vendor` — ein PHPUnit vom Wirt wäre eine
+# zweite, andere Fassung und gäbe über denselben Tests ein anderes Ergebnis.
+# `vendor/` ist git-ignoriert und entsteht im Bau: `npm run composer:update`
+# holt es heraus, und `npm run test:ci` macht genau das vor dem Lauf.
+PHPUNIT="${ROOT}/parlwin/vendor/bin/phpunit"
+if [[ ! -x "$PHPUNIT" ]]; then
+  echo "FEHLER: ${PHPUNIT} fehlt. Zuerst 'npm run composer:update' laufen lassen." >&2
+  exit 1
+fi
+
 PHPUNIT_FLAGS=(
   --bootstrap "${ROOT}/parlwin/tests/bootstrap.php"
   --fail-on-warning --fail-on-risky --fail-on-deprecation
   --fail-on-notice --fail-on-skipped --fail-on-incomplete
+  # Eine Verwerfung von PHPUnit selbst zählt ebenso: was PHPUnit 13 verwirft,
+  # fällt in PHPUnit 14 aus, und bis dahin bleibt sie sonst unbemerkt stehen.
+  --fail-on-phpunit-deprecation
 )
 
 section() { printf '\n========== %s ==========\n' "$1"; }
@@ -40,7 +53,7 @@ section "Unit-Tests (PHPUnit)"
 # Werkzeug der Prüfung von Hand, `npm run test:pruefung`) und «messung» (zeigt
 # eine Buchzeile mit ihren x-Positionen, `npm run test:messung`) — keines davon
 # ist ein Test. «live» läuft weiter unten gegen die echten Endpunkte.
-( cd "${ROOT}/parlwin" && phpunit "${PHPUNIT_FLAGS[@]}" --exclude-group live \
+( cd "${ROOT}/parlwin" && "$PHPUNIT" "${PHPUNIT_FLAGS[@]}" --exclude-group live \
     --exclude-group pdf --exclude-group generate --exclude-group pruefung \
     --exclude-group messung \
     --log-junit "${JUNIT_DIR}/php-unit.xml" tests )
@@ -51,8 +64,10 @@ section "Budget-Parser (PHPUnit, Gruppe pdf)"
 # Regressionslauf. Damit blieb der ganze Weg «Budget-Geschäft → Drehbuch →
 # Budgetbuch» ungeprüft: Ein Aufruf mit falscher Argumentzahl kam so bis in die
 # laufende Instanz und liess jede Budget-Ansicht mit Serverfehler enden
-# (2026-08-28). Der Lauf braucht rund acht Minuten und 300 MB.
-( cd "${ROOT}/parlwin" && phpunit "${PHPUNIT_FLAGS[@]}" --group pdf \
+# (2026-08-28). Früher gemessen: acht Minuten und 300 MB; am 2026-10-02 unter
+# PHP 8.5 und PHPUnit 13, bei gleichzeitigen Bauläufen anderer Projekte auf
+# demselben Rechner, 56 Minuten und 731 MB.
+( cd "${ROOT}/parlwin" && "$PHPUNIT" "${PHPUNIT_FLAGS[@]}" --group pdf \
     --log-junit "${JUNIT_DIR}/php-pdf.xml" tests )
 ensure_junit "php-pdf" "${JUNIT_DIR}/php-pdf.xml" "$?"
 
@@ -62,7 +77,7 @@ section "Komponenten-/JS-Tests (Vitest)"
 ensure_junit "js" "${JUNIT_DIR}/js.xml" "$?"
 
 section "Live-Tests (PHPUnit, externe Endpunkte)"
-( cd "${ROOT}/parlwin" && phpunit "${PHPUNIT_FLAGS[@]}" --group live \
+( cd "${ROOT}/parlwin" && "$PHPUNIT" "${PHPUNIT_FLAGS[@]}" --group live \
     --log-junit "${JUNIT_DIR}/php-live.xml" tests/Service/ScraperLiveEndpointTest.php )
 ensure_junit "php-live" "${JUNIT_DIR}/php-live.xml" "$?"
 

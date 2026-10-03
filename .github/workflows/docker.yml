@@ -32,4 +32,8 @@ jobs:
       contents: read
     with:
       branch-tags: '[{"branch": "nc([0-9]+)", "suffix": "-nc\\1"}]'
+      # The runner has no PHPUnit and no `parlwin/vendor` (git-ignored, built in
+      # the image), so the plain `npm test` cannot start the PHP suites.
+      # `test:ci` fetches both out of the build stage php-vendor first.
+      test: npm run test:ci
     secrets: inherit

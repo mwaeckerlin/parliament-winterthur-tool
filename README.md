@@ -146,7 +146,7 @@ Fraktion/
 ├── 30_Kommissionen/
 │   ├── Aufsichtskommission/
 │   ├── Sachkommission Bildung Sport Kultur/
-│   └── …
+│   └── …
 ├── 40_Vorstösse/
 │   ├── 10_Eigene/          ← Vorstösse werden von hier automatisch übernommen
 │   └── 20_Fremde/
@@ -433,13 +433,13 @@ Variablen für die Geschwindigkeit der Synchronisation:
 Wer nicht auf den stündlichen Auftrag warten will, liest die Dokumente von Hand nach:
 
 ```bash
-$ docker compose exec nextcloud-php-fpm php occ parlwin:dokumente-lesen --anzahl=200
+docker compose exec nextcloud-php-fpm php occ parlwin:dokumente-lesen --anzahl=200
 ```
 
 Ein Dokument, das an einer Grenze gescheitert ist, trägt seinen Grund und wird nicht immer wieder versucht. Nach einer angehobenen Grenze holt `--auch-gescheiterte` genau diese zurück:
 
 ```bash
-$ docker compose exec nextcloud-php-fpm php occ parlwin:dokumente-lesen --anzahl=200 --auch-gescheiterte
+docker compose exec nextcloud-php-fpm php occ parlwin:dokumente-lesen --anzahl=200 --auch-gescheiterte
 ```
 
 - `PARLWIN_DOKUMENT_PRO_LAUF` (Standard: `25`) So viele amtliche Dokumente liest ein Lauf höchstens. Der Abgleich verzeichnet jedes Dokument sofort mit Titel, Kategorie und Datum; den Inhalt liest er nur bis zu dieser Zahl, und ein stündlicher Hintergrundauftrag holt den Rest nach. Ohne diese Grenze liefe der erste Abgleich über tausend Geschäfte mit mehreren PDF je Geschäft stundenlang.
@@ -454,14 +454,14 @@ Variablen für den Speicher:
 Schnellstart:
 
 ```bash
-cd /home/marc/git/mwaeckerlin/parliament-winterthur-tool
+cd parliament-winterthur-tool
 cp .env.sample .env
 ```
 
 Starten:
 
 ```bash
-cd /home/marc/git/mwaeckerlin/parliament-winterthur-tool
+cd parliament-winterthur-tool
 npm run start:daemon
 ```
 
@@ -483,7 +483,7 @@ Hinweis:
 Stoppen:
 
 ```bash
-cd /home/marc/git/mwaeckerlin/parliament-winterthur-tool
+cd parliament-winterthur-tool
 npm stop
 ```
 
@@ -568,11 +568,13 @@ Der Hintergrundauftrag nutzt denselben Befehl wie die Verwaltung (`--source=back
 ## Entwicklung
 
 ```bash
-cd parlwin
-composer install
+cd parliament-winterthur-tool
 npm install
-npm run dev   # baut die Oberfläche bei jeder Änderung neu
+npm run composer:update   # holt parlwin/vendor samt PHPUnit aus dem Bau
+npm run dev               # baut die Oberfläche bei jeder Änderung neu
 ```
+
+`parlwin/vendor` ist git-ignoriert und entsteht im Bau: Die Stufe `php-deps` von `Dockerfile.php-fpm` installiert die Laufzeit-Abhängigkeiten für das ausgelieferte Abbild, die Stufe `php-deps-test` dieselben samt PHPUnit. `npm run composer:update` holt die zweite auf den Rechner, also braucht der Rechner weder Composer noch PHPUnit. Die Tests nehmen immer dieses PHPUnit — ein PHPUnit vom Wirt wäre eine zweite, andere Fassung und gäbe über denselben Tests ein anderes Ergebnis.
 
 ### Tests ausführen
 
@@ -581,25 +583,31 @@ Ein vollständiges Verzeichnis aller Tests, nach Testart gruppiert und je Test m
 Alle Tests (Klassen und Dienste, Abfragen gegen die echte Webseite, e2e) im Wurzelverzeichnis des Projekts:
 
 ```bash
-cd /home/marc/git/mwaeckerlin/parliament-winterthur-tool
+cd parliament-winterthur-tool
 npm run test
 ```
 
 Einzeln:
 
 ```bash
-cd /home/marc/git/mwaeckerlin/parliament-winterthur-tool/parlwin
-composer test
+cd parliament-winterthur-tool
+npm run test:unit
 ```
 
 Test des Parsers gegen die echten Adressen (ohne Datenbank):
 
 ```bash
-cd parlwin
-phpunit --bootstrap tests/bootstrap.php --group live tests/Service/ScraperLiveEndpointTest.php
+cd parliament-winterthur-tool
+npm run test:live
 ```
 
 Hinweis: Dieser Test ruft `parlament.winterthur.ch` wirklich auf und prüft nur, wie das HTML gelesen wird (`data-entities`), nicht den Abgleich mit der Datenbank.
+
+### Testlauf im Bau
+
+Der Bau auf GitHub ruft `npm run test:ci` auf (Eingabe `test` der gemeinsamen Vorlage `mwaeckerlin/scratch`): zuerst `npm run composer:update`, dann derselbe `npm run test` wie auf dem Rechner. Der Runner hat weder Composer noch PHPUnit noch `parlwin/vendor`, und `npm test` allein könnte die PHP-Suiten darum nicht starten.
+
+Die Gruppe `live` läuft dort mit. Sie fragt `parlament.winterthur.ch` lesend ab, und genau das ist ihr Zweck: Das Werkzeug hat diese Webseite als einzige Datenquelle, und eine geänderte Seitenstruktur fällt im wöchentlichen Bau auf, bevor eine Synchronisation damit scheitert.
 
 Strenger Testlauf:
 - `npm run test` ist absichtlich **streng** eingestellt.
@@ -610,7 +618,7 @@ Strenger Testlauf:
 Der E2E-Test nutzt dieselbe `docker-compose.yml` wie der lokale Betrieb:
 
 ```bash
-cd /home/marc/git/mwaeckerlin/parliament-winterthur-tool
+cd parliament-winterthur-tool
 ./tests/e2e/run-compose-e2e.sh
 ```
 
