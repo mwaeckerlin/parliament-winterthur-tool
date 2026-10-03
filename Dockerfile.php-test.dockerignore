@@ -1,0 +1,20 @@
+# Eigene Ausschlussliste für Dockerfile.php-test: Hier gehören `parlwin/tests`
+# und die Fixtures (rund 85 MB Budgetbücher) INS Abbild, denn genau sie laufen
+# darin. Die generelle `.dockerignore` schliesst sie aus, weil sie im
+# ausgelieferten Abbild nichts zu suchen haben.
+.git
+.agents
+.codex
+LICENSE
+.env
+.env.*
+node_modules
+**/node_modules
+**/.phpunit.result.cache
+# Ergebnisse früherer Läufe: Sie gehören keinem Abbild an und würden den
+# Kontext mit jedem Lauf wachsen lassen.
+tests/.junit
+tests/e2e/test-results
+tests/e2e/playwright-report
+test-results
+playwright-report

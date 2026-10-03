@@ -8,6 +8,10 @@ Ideen, die noch nicht umgesetzt sind. Umgesetzte Punkte wandern nach `FEATURES.m
 
 - 2026-09-23 · offen · **Zusammenfassung je Geschäft** aus dem gelesenen Inhalt der amtlichen Dokumente (F121), mit einem lokalen Sprachmodell.
 
+## Offen aus dem Testlauf
+
+- 2026-10-03 · offen · **Lokale Gegenstelle für den Abgleich im E2E-Lauf.** Der Stack synchronisiert heute die echte Webseite des Parlaments: 1236 Geschäfte mit je einer Detailseite, ohne Limit, weil jedes Limit die Weisung wegschneidet, aus der die Budget-Familie ihr Budgetbuch holt. Auf dem GitHub-Runner war der Abgleich nach 34 Minuten nicht fertig, darum läuft der E2E-Teil dort nicht mit (`PARLWIN_TESTS_OHNE_E2E=1`). Nötig sind zwei Stücke: die Adresse der Quelle als Einstellung (heute steht `https://parlament.winterthur.ch` als Konstante in `ScraperService` und `BudgetImportService`), und ein Dienst im Compose, der die gespeicherten Seiten und PDF ausliefert. Danach läuft der ganze Lauf im Bau, schnell und ohne Last für die Stadt.
+
 ## Befunde aus dem Design-Test
 
 Diese Befunde sind noch nicht beauftragt.

@@ -23,14 +23,17 @@ class ScraperHtmlSyncTest extends TestCase {
     private IClientService $clientService;
     private IClient $client;
     private LoggerInterface $logger;
-    private ScraperService $service;
+    private ScraperServiceMitFixtures $service;
 
     protected function setUp(): void {
         $this->clientService = $this->createStub(IClientService::class);
         $this->client = $this->createStub(IClient::class);
         $this->logger = $this->createStub(LoggerInterface::class);
 
-        $this->service = new ScraperService(
+        // Die Detailseiten holt der Dienst über curl_multi, nicht über
+        // IClient; darum antwortet hier auch der Parallel-Download aus den
+        // Fixtures (ScraperServiceMitFixtures).
+        $this->service = new ScraperServiceMitFixtures(
             $this->clientService,
             $this->logger,
         );
@@ -326,6 +329,7 @@ class ScraperHtmlSyncTest extends TestCase {
      * @param callable(string): string $resolver
      */
     private function erwarteHttpAntwortenMitResolver(callable $resolver): void {
+        $this->service->setzeResolver($resolver);
         $this->clientService->method('newClient')->willReturn($this->client);
 
         $this->client->method('get')->willReturnCallback(function (string $url, array $optionen) use ($resolver): IResponse {

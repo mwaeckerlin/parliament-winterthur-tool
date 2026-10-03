@@ -16,18 +16,21 @@ JUNIT_DIR="${ROOT}/tests/.junit"
 rm -rf "$JUNIT_DIR"
 mkdir -p "$JUNIT_DIR"
 
-# PHPUnit kommt immer aus `parlwin/vendor` — ein PHPUnit vom Wirt wäre eine
-# zweite, andere Fassung und gäbe über denselben Tests ein anderes Ergebnis.
-# `vendor/` ist git-ignoriert und entsteht im Bau: `npm run composer:update`
-# holt es heraus, und `npm run test:ci` macht genau das vor dem Lauf.
-PHPUNIT="${ROOT}/parlwin/vendor/bin/phpunit"
-if [[ ! -x "$PHPUNIT" ]]; then
-  echo "FEHLER: ${PHPUNIT} fehlt. Zuerst 'npm run composer:update' laufen lassen." >&2
+# Die PHP-Suiten laufen IM Abbild, also mit dem PHP der Anwendung
+# (tests/php-suite.sh). Ein PHP des Wirts ist eine andere Fassung und fehlt auf
+# dem GitHub-Runner ganz: Dort liegt PHP 8.3, PHPUnit 13 braucht mindestens
+# 8.4.1, und keine PHP-Suite startete (Lauf 37097532261 vom 2026-10-03).
+# PHPUnit selbst steckt in `parlwin/vendor`, git-ignoriert und aus dem Bau
+# geholt: `npm run composer:update`, das `npm run test:ci` vorher ausführt.
+if [[ ! -x "${ROOT}/parlwin/vendor/bin/phpunit" ]]; then
+  echo "FEHLER: parlwin/vendor/bin/phpunit fehlt. Zuerst 'npm run composer:update' laufen lassen." >&2
   exit 1
 fi
+PHP_SUITE="${ROOT}/tests/php-suite.sh"
 
+# Pfade relativ zu parlwin/, weil dieselben Argumente im Container gelten.
 PHPUNIT_FLAGS=(
-  --bootstrap "${ROOT}/parlwin/tests/bootstrap.php"
+  --bootstrap tests/bootstrap.php
   --fail-on-warning --fail-on-risky --fail-on-deprecation
   --fail-on-notice --fail-on-skipped --fail-on-incomplete
   # Eine Verwerfung von PHPUnit selbst zählt ebenso: was PHPUnit 13 verwirft,
@@ -53,10 +56,9 @@ section "Unit-Tests (PHPUnit)"
 # Werkzeug der Prüfung von Hand, `npm run test:pruefung`) und «messung» (zeigt
 # eine Buchzeile mit ihren x-Positionen, `npm run test:messung`) — keines davon
 # ist ein Test. «live» läuft weiter unten gegen die echten Endpunkte.
-( cd "${ROOT}/parlwin" && "$PHPUNIT" "${PHPUNIT_FLAGS[@]}" --exclude-group live \
-    --exclude-group pdf --exclude-group generate --exclude-group pruefung \
-    --exclude-group messung \
-    --log-junit "${JUNIT_DIR}/php-unit.xml" tests )
+bash "$PHP_SUITE" php-unit "${JUNIT_DIR}/php-unit.xml" -- "${PHPUNIT_FLAGS[@]}" \
+    --exclude-group live --exclude-group pdf --exclude-group generate \
+    --exclude-group pruefung --exclude-group messung tests
 ensure_junit "php-unit" "${JUNIT_DIR}/php-unit.xml" "$?"
 
 section "Budget-Parser (PHPUnit, Gruppe pdf)"
@@ -67,8 +69,8 @@ section "Budget-Parser (PHPUnit, Gruppe pdf)"
 # (2026-08-28). Früher gemessen: acht Minuten und 300 MB; am 2026-10-02 unter
 # PHP 8.5 und PHPUnit 13, bei gleichzeitigen Bauläufen anderer Projekte auf
 # demselben Rechner, 56 Minuten und 731 MB.
-( cd "${ROOT}/parlwin" && "$PHPUNIT" "${PHPUNIT_FLAGS[@]}" --group pdf \
-    --log-junit "${JUNIT_DIR}/php-pdf.xml" tests )
+bash "$PHP_SUITE" php-pdf "${JUNIT_DIR}/php-pdf.xml" -- "${PHPUNIT_FLAGS[@]}" \
+    --group pdf tests
 ensure_junit "php-pdf" "${JUNIT_DIR}/php-pdf.xml" "$?"
 
 section "Komponenten-/JS-Tests (Vitest)"
@@ -77,8 +79,8 @@ section "Komponenten-/JS-Tests (Vitest)"
 ensure_junit "js" "${JUNIT_DIR}/js.xml" "$?"
 
 section "Live-Tests (PHPUnit, externe Endpunkte)"
-( cd "${ROOT}/parlwin" && "$PHPUNIT" "${PHPUNIT_FLAGS[@]}" --group live \
-    --log-junit "${JUNIT_DIR}/php-live.xml" tests/Service/ScraperLiveEndpointTest.php )
+bash "$PHP_SUITE" php-live "${JUNIT_DIR}/php-live.xml" -- "${PHPUNIT_FLAGS[@]}" \
+    --group live tests/Service/ScraperLiveEndpointTest.php
 ensure_junit "php-live" "${JUNIT_DIR}/php-live.xml" "$?"
 
 section "Image-Contract (ausgelieferte Images ohne Shell)"
@@ -93,6 +95,22 @@ else
 fi
 
 section "End-to-End-Tests (Docker + Playwright)"
+# Auf dem GitHub-Runner bleiben sie aussen vor (PARLWIN_TESTS_OHNE_E2E=1 im
+# Befehl `test:ci`). Gemessen am 2026-10-03 im Lauf 37097532261: Der Stack
+# synchronisiert die echte Webseite des Parlaments, und zwar ohne Limit auf den
+# Geschäften — jedes Limit schneidet die Weisung weg, aus der die ganze
+# Budget-Familie ihr Budgetbuch holt. Das sind 1236 Geschäfte mit je einer
+# Detailseite; nach 34 Minuten war der Abgleich auf dem Runner nicht fertig,
+# und jeder Push würde diese Last an die Stadt schicken. Auf dem Rechner läuft
+# er vor dem Commit. Dauerhaft gehört dem Abgleich eine lokale Gegenstelle im
+# Compose (TODO.md).
+if [[ "${PARLWIN_TESTS_OHNE_E2E:-0}" == "1" ]]; then
+  echo "Nicht gelaufen: PARLWIN_TESTS_OHNE_E2E=1 — der Abgleich holt die echte"
+  echo "Webseite des Parlaments, siehe Kommentar oben und README."
+  node "${ROOT}/tests/junit-summary.mjs" "${JUNIT_DIR}"
+  exit $?
+fi
+
 # Der e2e-Lauf legt den Playwright-Report direkt hier ab. Er wird bewusst NICHT
 # aus dem Arbeitsverzeichnis gelesen: dort lag früher ein Report fester Ablage,
 # der als Ergebnis des aktuellen Laufs gezählt wurde, obwohl er Wochen alt war.

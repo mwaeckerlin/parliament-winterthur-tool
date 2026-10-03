@@ -1,0 +1,61 @@
+# syntax=docker/dockerfile:1.4
+#
+# Abbild für den PHPUnit-Lauf.
+#
+# Vorher liefen die PHP-Suiten mit dem PHP des Wirts. Auf dem GitHub-Runner
+# (ubuntu-24.04, PHP 8.3) brach PHPUnit 13 mit «requires PHP >= 8.4.1» ab, und
+# keine einzige PHP-Suite startete (Lauf 37097532261 vom 2026-10-03). Ein PHP
+# des Wirts ist ausserdem eine andere Fassung als die der Anwendung und prüft
+# damit die falsche Laufzeit.
+#
+# Die Basis ist dieselbe wie die der Anwendung: Alpine mit dem PHP aus dem
+# Paketmanager. Das ausgelieferte Abbild selbst taugt nicht als Basis — es hat
+# weder Shell noch Paketmanager (Abbild-Vertrag), und PHPUnit braucht die
+# Erweiterung «tokenizer», die dort fehlt.
+FROM mwaeckerlin/very-base AS iconv
+RUN ${PKG_INSTALL} gnu-libiconv gnu-libiconv-dev build-base
+COPY docker/iconv-shim.c /shim.c
+RUN gcc -shared -fPIC -O2 -o /preloadable_libiconv.so /shim.c -liconv
+
+FROM mwaeckerlin/very-base
+# Dieselben Erweiterungen wie im Abbild der Anwendung: Die Liste ist die
+# PHP_MODULES von mwaeckerlin/php-fpm, der Basis des Nextcloud-Abbilds. Ohne
+# `php-posix` nimmt die Abbruchprüfung einen anderen Weg (SyncProcessService
+# fällt auf `exec('kill -0')` zurück, und das Abbild hat keine Shell), ohne
+# `php-opcache` dauert der Lauf ein Vielfaches. Dazu, was PHPUnit zusätzlich
+# verlangt: tokenizer, phar und zlib.
+# Keine Versionsnummer: Die Pakete heissen «php-…», die Fassung kommt aus dem
+# Paketmanager der Basis.
+ARG PHP_MODULES="php-apcu php-bcmath php-ctype php-curl php-dom php-exif php-fileinfo php-gd php-gmp php-iconv php-intl php-json php-ldap php-mbstring php-mysqli php-openssl php-pdo_mysql php-posix php-session php-simplexml php-sodium php-xml php-xmlreader php-xmlwriter php-zip"
+RUN ${PKG_INSTALL} php ${PHP_MODULES} php-tokenizer php-phar php-zlib
+# Ohne opcache: Alpine führt das Paket nur für die vorige PHP-Fassung
+# («php-opcache» zieht php84 herein, neben dem installierten php85, ohne
+# Wirkung), und für die laufende Fassung gibt es keines. Ein Testlauf braucht
+# den Zwischenspeicher für Bytecode nicht.
+
+# GNU libiconv vorladen wie im ausgelieferten Abbild, sonst liest smalot aus
+# manchen Budgetbüchern leeren Text (docker/iconv-shim.c).
+COPY --from=iconv /preloadable_libiconv.so /usr/lib/preloadable_libiconv.so
+COPY --from=iconv /usr/lib/libiconv.so.2 /usr/lib/libiconv.so.2
+COPY --from=iconv /usr/lib/libcharset.so.1 /usr/lib/libcharset.so.1
+ENV LD_PRELOAD=/usr/lib/preloadable_libiconv.so
+
+# Die Budgetbücher brauchen mehr als die Vorgabe von 128M; gemessen am
+# 2026-10-02: 735 MB für die Gruppe «pdf». Über ein eigenes Verzeichnis wie im
+# Abbild der Anwendung, damit kein Pfad die PHP-Fassung festschreibt; der
+# führende Doppelpunkt hält den eingebauten Standard in der Liste.
+RUN mkdir -p /parlwin-php.d
+RUN printf 'memory_limit = 2048M\n' > /parlwin-php.d/99-parlwin-test.ini
+ENV PHP_INI_SCAN_DIR=":/parlwin-php.d"
+
+# Das ganze Projekt, weil Tests auch Projektdateien lesen (package.json,
+# .github/workflows/docker.yml, docker/, tests/run-all.sh). Was NICHT hinein
+# gehört, steht in Dockerfile.php-test.dockerignore — anders als im
+# ausgelieferten Abbild gehören `parlwin/tests` und die Fixtures dazu.
+# `parlwin/vendor` bringt PHPUnit mit und entsteht über `npm run
+# composer:update` aus der Stufe `php-vendor` von Dockerfile.php-fpm.
+COPY --chown=somebody:somebody . /test
+WORKDIR /test/parlwin
+USER somebody
+
+ENTRYPOINT ["/usr/bin/php", "vendor/bin/phpunit"]

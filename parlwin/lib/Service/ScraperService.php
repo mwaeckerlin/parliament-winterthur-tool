@@ -1387,7 +1387,7 @@ class ScraperService
      * @param callable|null $onComplete Wird nach jedem fertigen Download aufgerufen ($url, $erfolg, $erledigt, $gesamt)
      * @return array<string, string>
      */
-    private function ladeHtmlParallel(array $urls, int $parallel, bool $mitSequenziellemFallback = true, ?callable $onComplete = null): array
+    protected function ladeHtmlParallel(array $urls, int $parallel, bool $mitSequenziellemFallback = true, ?callable $onComplete = null): array
     {
         $urls = array_values(array_unique(array_filter($urls, static fn(string $u): bool => $u !== '')));
         if ($urls === []) {
@@ -1458,8 +1458,9 @@ class ScraperService
                     ]);
                 }
 
+                // Kein curl_close(): Seit PHP 8.0 wirkt es nicht mehr, und seit
+                // 8.5 ist es verworfen. Der Handle verschwindet mit $aktiv.
                 curl_multi_remove_handle($mh, $ch);
-                curl_close($ch);
                 unset($aktiv[$id]);
 
                 if ($onComplete !== null && $url !== '') {

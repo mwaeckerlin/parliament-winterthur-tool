@@ -1,8 +1,14 @@
 # Changelog
 
+- 2026-10-03 **1.9.4**
+    - Entwicklung: **die PHP-Tests laufen mit dem PHP der Anwendung** — in einem eigenen Abbild statt auf dem Rechner. Vorher nahmen sie das PHP des Wirts: auf dem Runner des Baus eine zu alte Fassung, mit der PHPUnit gar nicht erst anlief, und auf jedem Rechner eine andere Fassung als die der Anwendung
+    - Entwicklung: **eine Prüfung des Abgleichs ruft die Webseite des Parlaments nicht mehr auf** — sie holte deren Detailseiten wirklich ab, 1229 Stück je Lauf. Damit dauerte der Lauf 6,5 Minuten statt 8 Sekunden, hing an der Erreichbarkeit einer fremden Webseite, und das Lesen der Detailseiten war dabei gar nicht geprüft
+    - Betrieb: **der Abgleich meldet keine Verwerfung mehr** — ein Aufruf, der seit PHP 8.0 ohne Wirkung ist und seit 8.5 verworfen wird, ist entfernt
+    - Entwicklung: **der Bau prüft alles, was ohne die echte Webseite zu prüfen ist** — die Browsertests bleiben dort aussen vor, weil ihr Stack die Webseite des Parlaments vollständig synchronisiert: 1236 Geschäfte mit je einer Detailseite, auf dem Runner nach 34 Minuten nicht fertig. Sie laufen auf dem Rechner vor dem Commit
+
 - 2026-10-03 **1.9.3**
     - Entwicklung: **der Testlauf braucht kein PHPUnit auf dem Rechner** — `npm run composer:update` holt `parlwin/vendor` samt PHPUnit aus dem Bau, und jeder Testlauf nimmt dieses. Vorher lief er gegen ein PHPUnit des Wirts, das auf einem anderen Rechner fehlt oder eine andere Fassung ist und über denselben Tests ein anderes Ergebnis gibt
-    - Entwicklung: **der Bau auf GitHub führt alle Tests aus** — dort gibt es kein PHPUnit und kein `parlwin/vendor`, und darum konnten die PHP-Suiten gar nicht starten. Der Bau ruft jetzt `npm run test:ci`, das beides zuerst einrichtet
+    - Entwicklung: **der Bau auf GitHub richtet die PHP-Abhängigkeiten selbst ein** — dort gibt es kein PHPUnit und kein `parlwin/vendor`. Der Bau ruft jetzt `npm run test:ci`, das beides zuerst holt
     - Entwicklung: **eine Verwerfung von PHPUnit selbst gilt als Fehler** — was PHPUnit 13 verwirft, fällt in PHPUnit 14 aus; sieben solche Stellen in vier Tests sind korrigiert
 
 - 2026-10-02 **1.9.2**

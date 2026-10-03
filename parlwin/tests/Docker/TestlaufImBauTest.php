@@ -42,6 +42,10 @@ class TestlaufImBauTest extends TestCase
         $befehl = $skripte['test:ci'];
         self::assertStringContainsString('composer:update', $befehl);
         self::assertStringContainsString('npm test', $befehl);
+        // Der E2E-Teil bleibt im Bau aussen vor: Er synchronisiert die echte
+        // Webseite des Parlaments (1236 Geschäfte mit Detailseite, ohne Limit),
+        // und auf dem Runner war das nach 34 Minuten nicht fertig.
+        self::assertStringContainsString('PARLWIN_TESTS_OHNE_E2E=1', $befehl);
         self::assertLessThan(
             strpos($befehl, 'npm test'),
             strpos($befehl, 'composer:update'),
@@ -49,33 +53,65 @@ class TestlaufImBauTest extends TestCase
         );
     }
 
-    public function testJedesTestskriptNimmtDasPhpunitDesProjekts(): void
+    public function testJedeTestsuiteLaeuftImAbbild(): void
     {
+        // Mit dem PHP des Wirts lief PHPUnit 13 auf dem Runner (PHP 8.3) gar
+        // nicht an, und eine andere PHP-Fassung prüft die falsche Laufzeit.
         foreach ($this->skripte() as $name => $befehl) {
-            if (!str_starts_with($name, 'test')) {
+            if (!str_starts_with($name, 'test') || str_contains($name, 'e2e')) {
                 continue;
             }
-            if (!str_contains($befehl, 'phpunit')) {
+            if (!str_contains($befehl, 'bootstrap tests/bootstrap.php')) {
                 continue;
             }
             self::assertStringContainsString(
-                './vendor/bin/phpunit',
+                'tests/php-suite.sh',
                 $befehl,
-                "Das Skript {$name} muss das PHPUnit aus parlwin/vendor nehmen",
+                "Das Skript {$name} muss PHPUnit im Abbild starten (tests/php-suite.sh)",
             );
         }
     }
 
-    public function testDerGesamtlaufBrichtOhneDasPhpunitDesProjektsAb(): void
+    public function testDerGesamtlaufStartetJedePhpSuiteImAbbild(): void
     {
         $text = $this->datei('tests/run-all.sh');
-        self::assertStringContainsString('PHPUNIT="${ROOT}/parlwin/vendor/bin/phpunit"', $text);
+        self::assertSame(
+            3,
+            preg_match_all('/bash "\$PHP_SUITE"/', $text),
+            'Alle drei PHP-Suiten (unit, pdf, live) müssen im Abbild laufen',
+        );
         self::assertStringNotContainsString(
             'PHPUNIT="phpunit"',
             $text,
-            'Ein PHPUnit vom Wirt wäre eine zweite, andere Fassung',
+            'Ein PHPUnit vom Wirt wäre eine andere Fassung als die der Anwendung',
         );
         self::assertStringContainsString('--fail-on-phpunit-deprecation', $text);
+    }
+
+    public function testDasTestabbildBringtDieErweiterungenUndDenIconvVorlauf(): void
+    {
+        $text = $this->datei('Dockerfile.php-test');
+        foreach (['php-tokenizer', 'php-dom', 'php-mbstring', 'php-xmlwriter'] as $paket) {
+            self::assertStringContainsString($paket, $text, "PHPUnit braucht {$paket}");
+        }
+        self::assertStringContainsString('LD_PRELOAD=/usr/lib/preloadable_libiconv.so', $text);
+        self::assertStringContainsString('docker/iconv-shim.c', $text);
+        // Keine Versionsnummer in den Anweisungen: die Pakete heissen «php-…»,
+        // die Fassung kommt aus dem Paketmanager der Basis. Kommentare dürfen
+        // eine Fassung nennen, sie erklären ja gerade warum.
+        $anweisungen = array_filter(
+            explode("\n", $text),
+            static fn(string $zeile): bool => !str_starts_with(ltrim($zeile), '#'),
+        );
+        self::assertDoesNotMatchRegularExpression('/\bphp8\d\b/', implode("\n", $anweisungen));
+    }
+
+    public function testDerIconvVorlaufStehtEinmalUndWirdZweimalGebaut(): void
+    {
+        self::assertFileExists(__DIR__ . '/../../../docker/iconv-shim.c');
+        foreach (['Dockerfile.php-fpm', 'Dockerfile.php-test'] as $datei) {
+            self::assertStringContainsString('docker/iconv-shim.c', $this->datei($datei), $datei);
+        }
     }
 
     public function testDerBauKenntDieStufeMitDenTestwerkzeugen(): void

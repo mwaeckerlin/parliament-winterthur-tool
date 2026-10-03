@@ -607,7 +607,11 @@ Hinweis: Dieser Test ruft `parlament.winterthur.ch` wirklich auf und prüft nur,
 
 Der Bau auf GitHub ruft `npm run test:ci` auf (Eingabe `test` der gemeinsamen Vorlage `mwaeckerlin/scratch`): zuerst `npm run composer:update`, dann derselbe `npm run test` wie auf dem Rechner. Der Runner hat weder Composer noch PHPUnit noch `parlwin/vendor`, und `npm test` allein könnte die PHP-Suiten darum nicht starten.
 
-Die Gruppe `live` läuft dort mit. Sie fragt `parlament.winterthur.ch` lesend ab, und genau das ist ihr Zweck: Das Werkzeug hat diese Webseite als einzige Datenquelle, und eine geänderte Seitenstruktur fällt im wöchentlichen Bau auf, bevor eine Synchronisation damit scheitert.
+Die PHP-Suiten laufen in einem eigenen Abbild (`Dockerfile.php-test`, gestartet über `tests/php-suite.sh`), also mit dem PHP der Anwendung. Das PHP des Wirts ist eine andere Fassung und prüft damit die falsche Laufzeit; auf dem Runner liegt PHP 8.3, und PHPUnit 13 braucht mindestens 8.4.1.
+
+Die Gruppe `live` läuft im Bau mit. Sie fragt `parlament.winterthur.ch` lesend ab, mit sieben Anfragen, und genau das ist ihr Zweck: Das Werkzeug hat diese Webseite als einzige Datenquelle, und eine geänderte Seitenstruktur fällt im wöchentlichen Bau auf, bevor eine Synchronisation damit scheitert.
+
+Der E2E-Teil läuft im Bau **nicht** mit (`PARLWIN_TESTS_OHNE_E2E=1` im Befehl `test:ci`). Sein Stack synchronisiert die echte Webseite vollständig: 1236 Geschäfte mit je einer Detailseite, und zwar ohne Limit, weil jedes Limit die Weisung wegschneidet, aus der die Budget-Familie ihr Budgetbuch holt. Auf dem Runner war der Abgleich nach 34 Minuten nicht fertig, und jeder Push würde diese Last an die Stadt schicken. Auf dem Rechner läuft er vor dem Commit; dauerhaft gehört dem Abgleich eine lokale Gegenstelle im Compose ([TODO.md](TODO.md)).
 
 Strenger Testlauf:
 - `npm run test` ist absichtlich **streng** eingestellt.
