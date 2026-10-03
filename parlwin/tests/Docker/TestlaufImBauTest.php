@@ -53,7 +53,7 @@ class TestlaufImBauTest extends TestCase
         );
     }
 
-    public function testJedeTestsuiteLaeuftImAbbild(): void
+    public function testJedeTestsuiteLaeuftImImage(): void
     {
         // Mit dem PHP des Wirts lief PHPUnit 13 auf dem Runner (PHP 8.3) gar
         // nicht an, und eine andere PHP-Fassung prüft die falsche Laufzeit.
@@ -67,18 +67,18 @@ class TestlaufImBauTest extends TestCase
             self::assertStringContainsString(
                 'tests/php-suite.sh',
                 $befehl,
-                "Das Skript {$name} muss PHPUnit im Abbild starten (tests/php-suite.sh)",
+                "Das Skript {$name} muss PHPUnit im Image starten (tests/php-suite.sh)",
             );
         }
     }
 
-    public function testDerGesamtlaufStartetJedePhpSuiteImAbbild(): void
+    public function testDerGesamtlaufStartetJedePhpSuiteImImage(): void
     {
         $text = $this->datei('tests/run-all.sh');
         self::assertSame(
             3,
             preg_match_all('/bash "\$PHP_SUITE"/', $text),
-            'Alle drei PHP-Suiten (unit, pdf, live) müssen im Abbild laufen',
+            'Alle drei PHP-Suiten (unit, pdf, live) müssen im Image laufen',
         );
         self::assertStringNotContainsString(
             'PHPUNIT="phpunit"',
@@ -88,7 +88,7 @@ class TestlaufImBauTest extends TestCase
         self::assertStringContainsString('--fail-on-phpunit-deprecation', $text);
     }
 
-    public function testDasTestabbildBringtDieErweiterungenUndDenIconvVorlauf(): void
+    public function testDasTestImageBringtDieErweiterungenUndDenIconvVorlauf(): void
     {
         $text = $this->datei('Dockerfile.php-test');
         foreach (['php-tokenizer', 'php-dom', 'php-mbstring', 'php-xmlwriter'] as $paket) {
@@ -121,7 +121,7 @@ class TestlaufImBauTest extends TestCase
         self::assertStringContainsString('AS php-vendor', $text);
 
         // Die letzte Stufe einer Datei ist das Standardziel des Baus. Stünde
-        // «php-vendor» am Ende, baute `docker compose build` statt des Abbilds
+        // «php-vendor» am Ende, baute `docker compose build` statt des Images
         // ein Verzeichnis mit Bibliotheken.
         $stufen = [];
         preg_match_all('/^FROM\s+.*\s+AS\s+(\S+)/mi', $text, $stufen);

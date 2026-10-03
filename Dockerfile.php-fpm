@@ -22,7 +22,7 @@ RUN composer update --no-dev --no-interaction --no-progress --prefer-dist --igno
 # Testlauf auf dem Rechner und auf dem GitHub-Runner: beide haben kein PHPUnit
 # im Pfad, und `parlwin/vendor` ist git-ignoriert. `npm run php:deps` holt die
 # Stufe `php-vendor` heraus (tests/php-abhaengigkeiten.sh). Das ausgelieferte
-# Abbild bleibt ohne Testwerkzeug, es kopiert aus `php-deps`.
+# Image bleibt ohne Testwerkzeug, es kopiert aus `php-deps`.
 FROM php-deps AS php-deps-test
 RUN composer update --no-interaction --no-progress --prefer-dist --ignore-platform-reqs
 
@@ -31,7 +31,7 @@ COPY --from=php-deps-test /deps/vendor /vendor
 
 # GNU libiconv als LD_PRELOAD-fähige Bibliothek, weil musls iconv viele
 # PDF-Font-Kodierungen nicht kennt. Warum und wie: docker/iconv-shim.c, der
-# auch im Abbild des Testlaufs gebaut wird (Dockerfile.php-test).
+# auch im Image des Testlaufs gebaut wird (Dockerfile.php-test).
 FROM mwaeckerlin/very-base AS iconv
 RUN ${PKG_INSTALL} gnu-libiconv gnu-libiconv-dev build-base
 COPY docker/iconv-shim.c /shim.c

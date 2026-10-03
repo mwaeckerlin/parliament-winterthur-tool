@@ -12,7 +12,7 @@
  * braucht es die unpräfixierten Symbole iconv_open/iconv/iconv_close — genau
  * die liefert dieser Shim, indem er an GNU libiconv weiterreicht.
  *
- * Gebaut wird er im Abbild der Anwendung (Dockerfile.php-fpm) und im Abbild
+ * Gebaut wird er im Image der Anwendung (Dockerfile.php-fpm) und im Image
  * des Testlaufs (Dockerfile.php-test): Beide stehen auf musl, und die
  * Budgetbücher werden in beiden gelesen.
  */

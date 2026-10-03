@@ -318,7 +318,7 @@ docker compose up -d --build --remove-orphans --force-recreate --pull always
 
 Das genügt für den ersten Start und für alle künftigen Aktualisierungen: `git pull` holt die aktuellste Version, `--pull always` lädt die neuen Docker-Images automatisch nach, und `--build` erzeugt den vorgelagerten Proxy neu.
 
-Der vorgelagerte Proxy wird gebaut, weil seine Weiterleitungen (`example/traefik/dynamic.yml`) werden per `COPY` in sein Abbild aufgenommen, statt sie als Verzeichnis des Wirts in den Container einzublenden. Kein Container bekommt so ein Verzeichnis des Wirts zu sehen, und der Docker-Socket bleibt ebenfalls draussen — deshalb ist der Docker-Provider von Traefik abgeschaltet und die Weiterleitungen kommen aus dieser Datei. Wer sie ändert, baut den Proxy neu:
+Der vorgelagerte Proxy wird gebaut, weil seine Weiterleitungen (`example/traefik/dynamic.yml`) werden per `COPY` in sein Image aufgenommen, statt sie als Verzeichnis des Wirts in den Container einzublenden. Kein Container bekommt so ein Verzeichnis des Wirts zu sehen, und der Docker-Socket bleibt ebenfalls draussen — deshalb ist der Docker-Provider von Traefik abgeschaltet und die Weiterleitungen kommen aus dieser Datei. Wer sie ändert, baut den Proxy neu:
 
 ```bash
 docker compose up -d --build traefik
@@ -337,9 +337,9 @@ In der Verwaltung unter **«Fraktionsmitglieder ↔ Nextcloud-Benutzer»** werde
 Die automatische Synchronisation entfernt niemanden aus der Gruppe. Nur über «Ausgewählte abgleichen» mit ausdrücklicher Auswahl durch die Verwaltung werden Benutzer entfernt oder deaktiviert. Damit jemand als verwaist erscheint, muss er von Hand in die Nextcloud-Gruppe aufgenommen worden sein (Beispiel: ein ehemaliger Fraktionsmitarbeiter in der Gruppe — er erscheint als verwaister Eintrag, solange er kein aktives Parlamentsmandat hat).
 
 
-### Abbilder je Nextcloud-Linie
+### Images je Nextcloud-Linie
 
-Die drei Abbilder gibt es je Nextcloud-Hauptversion, weil ein Upgrade keine Hauptversion auslassen darf: Eine Installation auf Nextcloud 33 geht auf 34 und erst danach auf 35. Welche Marke eine Instanz braucht, sagt ihr eigener Stand.
+Die drei Images gibt es je Nextcloud-Hauptversion, weil ein Upgrade keine Hauptversion auslassen darf: Eine Installation auf Nextcloud 33 geht auf 34 und erst danach auf 35. Welche Marke eine Instanz braucht, sagt ihr eigener Stand.
 
 | Marke | Inhalt |
 | --- | --- |
@@ -347,7 +347,7 @@ Die drei Abbilder gibt es je Nextcloud-Hauptversion, weil ein Upgrade keine Haup
 | `…:php-fpm-nc34` | parlwin auf Nextcloud 34, rollend |
 | `…:php-fpm-nc34-v1.8.18` | parlwin 1.8.18 auf Nextcloud 34, eingefroren |
 
-Dasselbe gilt für `nginx` und `realtime`. Im Auslieferungs-Stack (`example/docker-compose.yml`) trägt jeder Dienst die Marke der Linie, auf der die Installation steht; erst nach dem Upgrade wird sie auf die nächste gesetzt. Läuft die Instanz auf einer älteren Linie als das Abbild, verweigert Nextcloud den Start («Downgrading Nextcloud … is not supported»), und der vorgelagerte Server antwortet mit 502.
+Dasselbe gilt für `nginx` und `realtime`. Im Auslieferungs-Stack (`example/docker-compose.yml`) trägt jeder Dienst die Marke der Linie, auf der die Installation steht; erst nach dem Upgrade wird sie auf die nächste gesetzt. Läuft die Instanz auf einer älteren Linie als das Image, verweigert Nextcloud den Start («Downgrading Nextcloud … is not supported»), und der vorgelagerte Server antwortet mit 502.
 
 Die Zweige und Marken der Linien erzeugt `./create-branches.sh` (auch `npm run branches`): Es baut je Version den Zweig `nc<version>` aus `master`, setzt darin die `FROM`-Zeilen auf `mwaeckerlin/nextcloud:php-fpm-<version>` und `:nginx-<version>` und schiebt ihn nach GitHub, worauf Docker Hub die Marken baut.
 
@@ -448,7 +448,7 @@ docker compose exec nextcloud-php-fpm php occ parlwin:dokumente-lesen --anzahl=2
 - `PARLWIN_DOKUMENT_LESER_SPEICHER` (Standard: `4096M`) So viel Speicher bekommt der Prozess, der ein einzelnes Dokument liest. Jedes Dokument wird in einem eigenen Prozess gelesen, weil das Entpacken der Ströme eines PDF beliebig viel Speicher braucht und ein überschrittenes Limit den Prozess ohne abfangbaren Fehler beendet. Stirbt der Leser, trägt das Dokument diesen Grund, und der Lauf liest weiter. Ein Lauf hört ausserdem auf, sobald die Hälfte von `PARLWIN_PHP_MEMORY_LIMIT` belegt ist.
 
 Variablen für den Speicher:
-- `PARLWIN_PHP_MEMORY_LIMIT` (Standard: `1024M`) Die Speichergrenze von PHP im Container, gültig für die Oberfläche, die Kommandozeile (`occ`) und den Hintergrundauftrag. Das Basis-Abbild liefert 512 MB; ein Budgetbuch braucht beim Einlesen mehr (gemessen am Buch 2027: 574,7 MB), und in der laufenden Instanz brach der automatische Import genau daran ab. Der Bootstrap schreibt den Wert beim Start in ein eigenes ini-Verzeichnis, das `PHP_INI_SCAN_DIR` zusätzlich zum Standard nennt.
+- `PARLWIN_PHP_MEMORY_LIMIT` (Standard: `1024M`) Die Speichergrenze von PHP im Container, gültig für die Oberfläche, die Kommandozeile (`occ`) und den Hintergrundauftrag. Das Basis-Image liefert 512 MB; ein Budgetbuch braucht beim Einlesen mehr (gemessen am Buch 2027: 574,7 MB), und in der laufenden Instanz brach der automatische Import genau daran ab. Der Bootstrap schreibt den Wert beim Start in ein eigenes ini-Verzeichnis, das `PHP_INI_SCAN_DIR` zusätzlich zum Standard nennt.
 - `PARLWIN_BUDGET_MEMORY_LIMIT` (Standard: `1024M`) Die Speichergrenze, die während des Lesens eines Budgetbuchs gilt; danach gilt wieder die der Installation. Sie greift dort, wo die Installation weniger gibt als das Buch braucht, etwa ausserhalb des mitgelieferten Containers. Ein Buch belegt beim Lesen mehrere hundert Megabyte — mehr, als Nextcloud einer Anfrage standardmässig zugesteht. Wächst das Buch weiter, gehört der Wert hier herauf; eine bereits höhere oder aufgehobene Grenze der Installation bleibt unangetastet.
 
 Schnellstart:
@@ -478,7 +478,7 @@ Hinweis:
 - Der NGINX-`fastcgi_read_timeout` steht in `docker/nginx/parlwin.conf` auf `36000s`, damit eine vollständige Synchronisation und der Import eines Budgetbuchs nicht nach 60s mit HTTP 504 abbrechen. Beide dauern Minuten.
 - Nach Änderungen am `Dockerfile` immer mit Neubau starten (`npm run start:daemon` oder `docker compose up -d --build`).
 - Die App wird beim Compose-Start automatisch aktiviert (`parlwin-app-init`).
-- Es gibt absichtlich **kein** dauerhaftes `custom_apps`-Volume; damit kommt bei jedem Neubau die aktuelle Version der App aus dem Abbild (keine veraltete Oberfläche aus alten Volumes).
+- Es gibt absichtlich **kein** dauerhaftes `custom_apps`-Volume; damit kommt bei jedem Neubau die aktuelle Version der App aus dem Image (keine veraltete Oberfläche aus alten Volumes).
 
 Stoppen:
 
@@ -574,7 +574,7 @@ npm run composer:update   # holt parlwin/vendor samt PHPUnit aus dem Bau
 npm run dev               # baut die Oberfläche bei jeder Änderung neu
 ```
 
-`parlwin/vendor` ist git-ignoriert und entsteht im Bau: Die Stufe `php-deps` von `Dockerfile.php-fpm` installiert die Laufzeit-Abhängigkeiten für das ausgelieferte Abbild, die Stufe `php-deps-test` dieselben samt PHPUnit. `npm run composer:update` holt die zweite auf den Rechner, also braucht der Rechner weder Composer noch PHPUnit. Die Tests nehmen immer dieses PHPUnit — ein PHPUnit vom Wirt wäre eine zweite, andere Fassung und gäbe über denselben Tests ein anderes Ergebnis.
+`parlwin/vendor` ist git-ignoriert und entsteht im Bau: Die Stufe `php-deps` von `Dockerfile.php-fpm` installiert die Laufzeit-Abhängigkeiten für das ausgelieferte Image, die Stufe `php-deps-test` dieselben samt PHPUnit. `npm run composer:update` holt die zweite auf den Rechner, also braucht der Rechner weder Composer noch PHPUnit. Die Tests nehmen immer dieses PHPUnit — ein PHPUnit vom Wirt wäre eine zweite, andere Fassung und gäbe über denselben Tests ein anderes Ergebnis.
 
 ### Tests ausführen
 
@@ -607,7 +607,7 @@ Hinweis: Dieser Test ruft `parlament.winterthur.ch` wirklich auf und prüft nur,
 
 Der Bau auf GitHub ruft `npm run test:ci` auf (Eingabe `test` der gemeinsamen Vorlage `mwaeckerlin/scratch`): zuerst `npm run composer:update`, dann derselbe `npm run test` wie auf dem Rechner. Der Runner hat weder Composer noch PHPUnit noch `parlwin/vendor`, und `npm test` allein könnte die PHP-Suiten darum nicht starten.
 
-Die PHP-Suiten laufen in einem eigenen Abbild (`Dockerfile.php-test`, gestartet über `tests/php-suite.sh`), also mit dem PHP der Anwendung. Das PHP des Wirts ist eine andere Fassung und prüft damit die falsche Laufzeit; auf dem Runner liegt PHP 8.3, und PHPUnit 13 braucht mindestens 8.4.1.
+Die PHP-Suiten laufen in einem eigenen Image (`Dockerfile.php-test`, gestartet über `tests/php-suite.sh`), also mit dem PHP der Anwendung. Das PHP des Wirts ist eine andere Fassung und prüft damit die falsche Laufzeit; auf dem Runner liegt PHP 8.3, und PHPUnit 13 braucht mindestens 8.4.1.
 
 Die Gruppe `live` läuft im Bau mit. Sie fragt `parlament.winterthur.ch` lesend ab, mit sieben Anfragen, und genau das ist ihr Zweck: Das Werkzeug hat diese Webseite als einzige Datenquelle, und eine geänderte Seitenstruktur fällt im wöchentlichen Bau auf, bevor eine Synchronisation damit scheitert.
 

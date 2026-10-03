@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Erzeugt je Nextcloud-Hauptversion einen Zweig «nc<version>» aus «master» und
-# setzt darin die FROM-Zeilen auf die Marken des Basis-Abbilds. Die Zweige
+# setzt darin die FROM-Zeilen auf die Marken des Basis-Images. Die Zweige
 # tragen keine eigene Geschichte: Jeder Lauf erzeugt sie aus dem aktuellen Stand
 # von master neu und schiebt sie mit «push -f» nach GitHub, worauf Docker Hub
 # die Marken «…-nc<version>» baut. Ein Release einer Linie entsteht über einen
@@ -45,7 +45,7 @@ for version in "${VERSIONS[@]}"; do
 
     # Geprüft wird, dass die Zeile wirklich steht: Ändert sich die Schreibweise
     # des FROM, ersetzt sed nichts, der Zweig wäre eine Kopie von master, und
-    # das Abbild trüge ein anderes Nextcloud, als seine Marke verspricht. Genau
+    # das Image trüge ein anderes Nextcloud, als seine Marke verspricht. Genau
     # daran stand die Instanz am 23.09.2026 still.
     grep -q "^FROM mwaeckerlin/nextcloud:php-fpm-${version}$" Dockerfile.php-fpm \
         || { echo "FROM-Zeile in Dockerfile.php-fpm nicht gesetzt" >&2; exit 1; }

@@ -10,7 +10,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * Ein Budgetbuch zu lesen braucht mehr Speicher, als eine Nextcloud-Installation
  * einer Anfrage standardmässig zugesteht. Gemessen am 22.09.2026 im ausgelieferten
- * Abbild: `occ parlwin:budget-reimport 2027` endete nach 503,8 MB mit «Allowed
+ * Symptom: `occ parlwin:budget-reimport 2027` endete nach 503,8 MB mit «Allowed
  * memory size of 536870912 bytes exhausted» — das Budget 2027 liess sich in der
  * laufenden Instanz nicht einlesen, während derselbe Parse auf dem Rechner (ohne
  * Grenze) durchlief.

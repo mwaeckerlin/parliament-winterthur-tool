@@ -1,6 +1,6 @@
 {
   "name": "@mwaeckerlin/parliament-winterthur-tool",
-  "version": "1.9.4",
+  "version": "1.9.5",
   "private": true,
   "license": "MIT",
   "description": "Nextcloud-Plugin für die Fraktionsarbeit im Winterthurer Parlament",

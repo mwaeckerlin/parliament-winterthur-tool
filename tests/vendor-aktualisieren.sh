@@ -3,15 +3,15 @@
 #
 # `vendor/` ist git-ignoriert und entsteht im Bau: Die Stufe «php-deps» von
 # Dockerfile.php-fpm installiert die Laufzeit-Abhängigkeiten für das
-# ausgelieferte Abbild, die Stufe «php-deps-test» dieselben samt PHPUnit. Die
-# Tests laufen auf dem Rechner, nicht im Abbild, und brauchen beides: ohne
+# ausgelieferte Image, die Stufe «php-deps-test» dieselben samt PHPUnit. Die
+# Tests laufen auf dem Rechner, nicht im Image, und brauchen beides: ohne
 # diesen Schritt kennt PHPUnit eine neu aufgenommene Bibliothek nicht, und auf
 # einem GitHub-Runner gibt es überhaupt kein PHPUnit im Pfad.
 #
 # Herausgeholt wird die Stufe «php-vendor» (FROM scratch, enthält nur das
 # Verzeichnis) direkt über die Ausgabe des Baus. Das braucht keinen laufenden
-# Container und keine Shell im Abbild — das ausgelieferte Abbild hat bewusst
-# keine (Abbild-Vertrag).
+# Container und keine Shell im Image — das ausgelieferte Image hat bewusst
+# keine (Image-Vertrag).
 set -euo pipefail
 
 cd "$(dirname "$0")/.."

@@ -16,7 +16,7 @@ JUNIT_DIR="${ROOT}/tests/.junit"
 rm -rf "$JUNIT_DIR"
 mkdir -p "$JUNIT_DIR"
 
-# Die PHP-Suiten laufen IM Abbild, also mit dem PHP der Anwendung
+# Die PHP-Suiten laufen IM Image, also mit dem PHP der Anwendung
 # (tests/php-suite.sh). Ein PHP des Wirts ist eine andere Fassung und fehlt auf
 # dem GitHub-Runner ganz: Dort liegt PHP 8.3, PHPUnit 13 braucht mindestens
 # 8.4.1, und keine PHP-Suite startete (Lauf 37097532261 vom 2026-10-03).
@@ -116,7 +116,7 @@ fi
 # der als Ergebnis des aktuellen Laufs gezählt wurde, obwohl er Wochen alt war.
 PW_JUNIT_OUT="${JUNIT_DIR}/e2e-browser.xml" "${ROOT}/tests/e2e/run-compose-e2e.sh"
 E2E_RC=$?
-# Die Bash-Integrationsprüfungen als einen Testfall abbilden (Exit-Code).
+# Die Bash-Integrationsprüfungen als einen Testfall imageen (Exit-Code).
 if [[ "$E2E_RC" -eq 0 ]]; then
   printf '<testsuite name="e2e-integration" tests="1" failures="0"><testcase classname="e2e" name="integrationspruefungen"/></testsuite>\n' \
     >"${JUNIT_DIR}/e2e-integration.xml"
