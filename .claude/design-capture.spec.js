@@ -171,6 +171,54 @@ for (const [format, breite, hoehe] of FORMATE) {
   })
 }
 
+test('Überlauf messen', async ({ browser }) => {
+  // Marcs Regel vom 20.10.2026: Nichts geht über den Bildschirm hinaus. Was
+  // breiter ist als sein Platz, wird hier genannt — Element, Ansicht, Format
+  // und die beiden Breiten, damit die Ursache ohne Raten zu finden ist.
+  // Die schmalen Formate entscheiden es; ein Element, das auf 1920 hinausläuft,
+  // läuft auf 360 erst recht hinaus. Der Lauf über alle 18 Formate brauchte
+  // länger als seine zehn Minuten und gab darum gar nichts aus (2026-10-20).
+  const ENG = new Set(['phone-small', 'phone-medium', 'phone-large', 'phone-landscape', 'tablet-portrait', 'tablet-landscape', 'desktop-4-3', 'full-hd-half', 'full-hd'])
+  test.setTimeout(1_800_000)
+  const befunde = []
+  for (const [format, breite, hoehe] of FORMATE.filter(f => ENG.has(f[0]))) {
+    const kontext = await browser.newContext({ storageState: SITZUNG, viewport: { width: breite, height: hoehe } })
+    const page = await kontext.newPage()
+    for (const [name, eintrag, warten, danach] of ANSICHTEN) {
+      await ansichtOeffnen(page, eintrag, warten, danach)
+      const treffer = await page.evaluate((sicht) => {
+        const raus = []
+        if (document.documentElement.scrollWidth > sicht + 1) {
+          raus.push(`DOKUMENT scrollWidth=${document.documentElement.scrollWidth} sichtbar=${sicht}`)
+        }
+        for (const el of document.querySelectorAll('body *')) {
+          const r = el.getBoundingClientRect()
+          if (r.width === 0 || r.height === 0) { continue }
+          // Was links neben dem Bild geparkt ist, läuft nicht hinaus: die
+          // unsichtbaren Beschriftungen von Nextcloud und die zugeklappte
+          // Navigation. Sie füllten die erste Messung (2026-10-20).
+          if (r.right <= 0) { continue }
+          // Ein seitwärts scrollender Behälter IST der Fehler, den Marc am
+          // 20.10.2026 verboten hat — gleich ob er `auto` oder `scroll` sagt.
+          const eigen = el.scrollWidth > el.clientWidth + 1
+          const breiter = r.right > sicht + 1
+          if (!eigen && !breiter) { continue }
+          const kenn = `${el.tagName.toLowerCase()}.${(el.className || '').toString().split(' ').slice(0, 2).join('.')}`
+          raus.push(`${kenn} [${Math.round(r.left)}..${Math.round(r.right)}] scroll=${el.scrollWidth}/${el.clientWidth}`)
+        }
+        return raus.slice(0, 20)
+      }, breite)
+      for (const t of treffer) { befunde.push(`${format} ${name}: ${t}`) }
+      // Je Ansicht ausgeben: Bricht der Lauf ab, steht das Gemessene trotzdem da.
+      // eslint-disable-next-line no-console
+      console.log(`[ueberlauf] ${format} ${name}: ${treffer.length ? '\n  ' + treffer.join('\n  ') : 'nichts'}`)
+    }
+    await kontext.close()
+  }
+  // eslint-disable-next-line no-console
+  console.log('[ueberlauf]\n' + (befunde.join('\n') || 'nichts läuft über'))
+})
+
 test('Druck messen', async ({ browser }) => {
   // Was im Druck wirklich gilt, steht hier: Ohne diese Messung kostet jede
   // Vermutung über eine Regel einen ganzen Lauf.
