@@ -24,7 +24,9 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: [hier('./parlwin/src/js/tests/setup.js')],
-    exclude: ['tests/e2e/**', 'node_modules'],
+    // `.claude` enthält die Aufnahme für den Design-Test: ein Playwright-Lauf
+    // in einem eigenen Image, der hier nur als Fehler auftaucht.
+    exclude: ['tests/e2e/**', '.claude/**', 'node_modules'],
   },
   resolve: {
     alias: {

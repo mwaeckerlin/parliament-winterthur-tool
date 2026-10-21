@@ -1,5 +1,8 @@
 # Changelog
 
+- 2026-10-21 **1.9.6**
+    - Sicherheit: **das Image baut wieder auf dem gehärteten PHP** von `mwaeckerlin/nextcloud:php-fpm`, mit den Gegenmassnahmen gegen die beiden PHP-Lücken CVE-2026-109618 und CVE-2026-109619 vom 21. Oktober. Der Bau war an einer Playwright-Aufnahme unter `.claude` gescheitert, die Vitest als Test lud; Vitest lässt `.claude` jetzt aus
+
 - 2026-10-03 **1.9.5**
     - Entwicklung: **ein Docker-Image heisst in den Dokumenten «Image»** — so sagen es die Praktiker, und so steht es in jedem Compose-File und in jedem Befehl. Die Dokumente, die Kommentare und drei Testnamen schrieben «Abbild»; alle diese Stellen sind umbenannt
 
