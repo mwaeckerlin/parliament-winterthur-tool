@@ -21,19 +21,33 @@ on:
     # mwaeckerlin/scratch at 03:17, this repository at level 4
     - cron: "17 7 * * 1"
   workflow_dispatch:
+    inputs:
+      ref:
+        description: git tag nc<version>-v<X.Y.Z> to build
+        type: string
+        default: ''
 
-concurrency: docker-${{ github.ref_name }}
+concurrency: docker-${{ inputs.ref || github.ref_name }}
 
 jobs:
   docker:
+    if: inputs.ref == ''
     uses: mwaeckerlin/scratch/.github/workflows/docker-image.yml@master
     permissions:
       actions: write
       contents: read
     with:
-      branch-tags: '[{"branch": "nc([0-9]+)", "suffix": "-nc\\1"}]'
+      branch-tags: '[{"branch": "nc([0-9]+)", "suffix": "-nc\\1", "version": "v"}, {"tag": "(nc[0-9]+-v[0-9.]+)", "suffix": "-\\1"}]'
       # The runner has no PHPUnit and no `parlwin/vendor` (git-ignored, built in
       # the image), so the plain `npm test` cannot start the PHP suites.
       # `test:ci` fetches both out of the build stage php-vendor first.
       test: npm run test:ci
+    secrets: inherit
+  release:
+    if: inputs.ref != ''
+    uses: mwaeckerlin/scratch/.github/workflows/docker-image.yml@master
+    with:
+      branch-tags: '[{"tag": "(nc[0-9]+-v[0-9.]+)", "suffix": "-\\1"}]'
+      ref: ${{ inputs.ref }}
+      test: npm run test:image
     secrets: inherit
