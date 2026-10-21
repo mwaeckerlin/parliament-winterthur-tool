@@ -573,11 +573,16 @@ class SettingsControllerTest extends TestCase {
         $localUser->method('getEMailAddress')->willReturn('max@example.org');
         $localUser->method('isEnabled')->willReturn(true);
 
+        // Die Attrappe bindet die Antwort an das Argument über einen Rückruf:
+        // `with()` gehört zur Erwartung eines Mocks und steht einer Attrappe
+        // (createStub) nicht zur Verfügung.
         $userManager = $this->createStub(IUserManager::class);
-        $userManager->method('get')->with('max-muster')->willReturn($localUser);
+        $userManager->method('get')
+            ->willReturnCallback(static fn(string $uid): ?IUser => $uid === 'max-muster' ? $localUser : null);
 
         $groupManager = $this->createStub(IGroupManager::class);
-        $groupManager->method('getUserGroupIds')->with($localUser)->willReturn(['Fraktion-SP-Gruene', 'users']);
+        $groupManager->method('getUserGroupIds')
+            ->willReturnCallback(static fn(IUser $user): array => $user === $localUser ? ['Fraktion-SP-Gruene', 'users'] : []);
 
         $publisher = $this->createStub(RealtimePublisherService::class);
 
@@ -638,9 +643,12 @@ class SettingsControllerTest extends TestCase {
         $mitglied->setEmail('max@example.org');
 
         $mitgliedService = $this->createStub(MitgliedService::class);
-        $mitgliedService->method('eins')->with(7)->willReturn($mitglied);
-        $mitgliedService->method('setzeNextcloudUid')->with(7, 'max-muster')->willReturn($mitglied);
-        $mitgliedService->method('aktiveDerFraktion')->with('SP/Grüne')->willReturn([$mitglied]);
+        $mitgliedService->method('eins')
+            ->willReturnCallback(static fn(int $id): ?Mitglied => $id === 7 ? $mitglied : null);
+        $mitgliedService->method('setzeNextcloudUid')
+            ->willReturnCallback(static fn(int $id, string $uid): ?Mitglied => $id === 7 && $uid === 'max-muster' ? $mitglied : null);
+        $mitgliedService->method('aktiveDerFraktion')
+            ->willReturnCallback(static fn(string $fraktion): array => $fraktion === 'SP/Grüne' ? [$mitglied] : []);
         $mitgliedService->method('gehoertZurFraktion')->willReturn(true);
 
         $localUser = $this->createStub(IUser::class);
@@ -660,14 +668,18 @@ class SettingsControllerTest extends TestCase {
             ->willReturn($localUser);
 
         $group = $this->createMock(IGroup::class);
-        $group->method('inGroup')->with($localUser)->willReturn(false);
+        $group->method('inGroup')
+            ->willReturnCallback(static fn(IUser $user): bool => $user === $localUser ? false : true);
         $group->expects(self::once())->method('addUser')->with($localUser);
 
         $groupManager = $this->createMock(IGroupManager::class);
-        $groupManager->method('groupExists')->with('Fraktion-SP-Gruene')->willReturn(false);
+        $groupManager->method('groupExists')
+            ->willReturnCallback(static fn(string $gid): bool => $gid === 'Fraktion-SP-Gruene' ? false : true);
         $groupManager->expects(self::once())->method('createGroup')->with('Fraktion-SP-Gruene')->willReturn($group);
-        $groupManager->method('get')->with('Fraktion-SP-Gruene')->willReturn($group);
-        $groupManager->method('getUserGroupIds')->with($localUser)->willReturn(['Fraktion-SP-Gruene']);
+        $groupManager->method('get')
+            ->willReturnCallback(static fn(string $gid): ?IGroup => $gid === 'Fraktion-SP-Gruene' ? $group : null);
+        $groupManager->method('getUserGroupIds')
+            ->willReturnCallback(static fn(IUser $user): array => $user === $localUser ? ['Fraktion-SP-Gruene'] : []);
 
         $publisher = $this->createMock(RealtimePublisherService::class);
         $publisher->expects(self::once())->method('publish')->with(

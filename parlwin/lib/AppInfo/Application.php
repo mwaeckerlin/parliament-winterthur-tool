@@ -24,6 +24,7 @@ use OCA\ParliamentWinterthur\Db\TraktandumMapper;
 use OCA\ParliamentWinterthur\Db\VorstossEntwurfMapper;
 use OCA\ParliamentWinterthur\Service\FraktionsarbeitService;
 use OCA\ParliamentWinterthur\Service\FraktionsraumService;
+use OCA\ParliamentWinterthur\Service\GeschaeftDokumentService;
 use OCA\ParliamentWinterthur\Service\GeschaeftService;
 use OCA\ParliamentWinterthur\Service\KalenderService;
 use OCA\ParliamentWinterthur\Service\MitgliedService;
@@ -116,7 +117,8 @@ class Application extends App implements IBootstrap
                 $c->get(VorstossEntwurfMapper::class),
                 $c->get(GeschaeftEreignisMapper::class),
                 $c->get(ScraperService::class),
-                $c->get(\Psr\Log\LoggerInterface::class)
+                $c->get(\Psr\Log\LoggerInterface::class),
+                $c->get(GeschaeftDokumentService::class)
             );
         });
         $context->registerService(FraktionsarbeitService::class, function ($c) {
@@ -132,6 +134,7 @@ class Application extends App implements IBootstrap
                 $c->get(\OCP\IUserSession::class),
                 $c->get(\OCP\IGroupManager::class),
                 $c->get(NotizRevisionMapper::class),
+                $c->get(GeschaeftDokumentService::class),
             );
         });
         $context->registerService(SitzungService::class, function ($c) {

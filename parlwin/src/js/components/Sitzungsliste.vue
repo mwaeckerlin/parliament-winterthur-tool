@@ -1096,9 +1096,11 @@ export default {
         this.geschaefteAlle = []
       }
     },
+    // Geschäfte heissen für den Leser immer bei ihrer Nummer des Parlaments und
+    // ihrem Titel; die Zeilennummer der Datenbank sagt ihm nichts.
     geschaeftTitel(geschaeftId) {
       const g = this.geschaefteAlle.find(x => x.id === geschaeftId)
-      return g ? `${g.nummer || ''} ${g.titel || ''}`.trim() : ('#' + geschaeftId)
+      return g ? `${g.nummer || ''} ${g.titel || ''}`.trim() : 'Unbekanntes Geschäft'
     },
     geschaefteOptionenFuer(sitzungId) {
       const verknuepft = new Set(this.verknuepfteGeschaeftIds[sitzungId] || [])
@@ -1158,7 +1160,9 @@ export default {
     },
     vorstossTitel(vorstossId) {
       const v = this.vorstoesseAlle.find(x => x.id === vorstossId)
-      if (!v) return '#' + vorstossId
+      // Ein Vorstoss heisst bei seinem Titel; die Zeilennummer der Datenbank
+      // sagt dem Leser nichts.
+      if (!v) return 'Unbekannter Vorstoss'
       const herkunft = v.herkunft === 'fremde' ? 'fremd' : 'eigen'
       return `${v.titel || ''} (${v.art || herkunft})`.trim()
     },

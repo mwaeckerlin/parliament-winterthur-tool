@@ -66,7 +66,10 @@ class FraktionsraumServiceTest extends TestCase {
         $folder->expects($this->exactly(14))->method('newFolder');
         $fraktionNode = $this->createStub(Folder::class);
         $fraktionNode->method('getId')->willReturn(1);
-        $folder->method('get')->with('Fraktion')->willReturn($fraktionNode);
+        // Die Antwort hängt am Argument über einen Rückruf: `with()` gehört zu
+        // einer Erwartung mit Aufrufzahl, und `any()` entfällt in PHPUnit 14.
+        $folder->method('get')
+            ->willReturnCallback(static fn(string $pfad): Folder => $pfad === 'Fraktion' ? $fraktionNode : throw new \LogicException('unerwarteter Pfad ' . $pfad));
 
         $rootFolder = $this->createStub(IRootFolder::class);
         $rootFolder->method('getUserFolder')->willReturn($folder);

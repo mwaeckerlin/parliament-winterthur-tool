@@ -5,7 +5,7 @@
  * Änderungen verfälschen einen laufenden Test, und der Container schreibt mit
  * seinen eigenen Rechten in die Arbeitskopie. Genau so hat ein Testlauf einmal die
  * lokalen Abhängigkeiten (node_modules) gelöscht. Alles, was ein Container braucht,
- * wird beim Bauen ins Abbild kopiert; Ergebnisse werden danach herauskopiert.
+ * wird beim Bauen ins Image kopiert; Ergebnisse werden danach herauskopiert.
  */
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
@@ -35,14 +35,14 @@ describe('Docker: keine Host-Verzeichnisse in Containern', () => {
     expect(gefunden).toEqual([])
   })
 
-  it('die Routing-Konfiguration des Edge-Proxy steckt im Abbild statt im Mount', () => {
+  it('die Routing-Konfiguration des Edge-Proxy steckt im Image statt im Mount', () => {
     const dockerfile = readFileSync(resolve(WURZEL, 'example/traefik/Dockerfile'), 'utf8')
     expect(dockerfile).toMatch(/^COPY\s+dynamic\.yml\s+\/etc\/traefik\/dynamic\.yml$/m)
     // ADD kann Archive entpacken und URLs laden — für eine Datei ist COPY der Standard.
     expect(dockerfile).not.toMatch(/^ADD\s/m)
   })
 
-  it('der Browser-Testlauf bringt seine Tests im Abbild mit und läuft ohne besondere Rechte', () => {
+  it('der Browser-Testlauf bringt seine Tests im Image mit und läuft ohne besondere Rechte', () => {
     const dockerfile = readFileSync(
       resolve(WURZEL, 'tests/e2e/Dockerfile.playwright'), 'utf8')
     expect(dockerfile).toMatch(/^COPY\s+--chown=pwuser:pwuser\s+\.\s+\/work\/$/m)
