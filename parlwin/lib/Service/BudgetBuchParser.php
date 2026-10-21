@@ -71,7 +71,7 @@ class BudgetBuchParser {
      *
      * Ein Budgetbuch belegt beim Parsen mehrere hundert Megabyte — mehr, als eine
      * Nextcloud-Installation einer Anfrage standardmässig zugesteht. Gemessen am
-     * 22.09.2026 im ausgelieferten Abbild: Das Budget 2027 brach nach 503,8 MB mit
+     * 22.09.2026 im ausgelieferten Image: Das Budget 2027 brach nach 503,8 MB mit
      * «Allowed memory size of 536870912 bytes exhausted» ab, und das Jahr blieb
      * ungelesen. Wie viel es sein darf, entscheidet der Betrieb über
      * `PARLWIN_BUDGET_MEMORY_LIMIT` (Standard 1024M); eine bereits höhere oder

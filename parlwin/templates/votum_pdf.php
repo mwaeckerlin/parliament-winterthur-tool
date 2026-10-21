@@ -4,7 +4,7 @@ declare(strict_types=1);
 /**
  * @var array{
  *     id: int,
- *     externId?: string,
+ *     nummer?: string,
  *     titel?: string,
  *     status?: string,
  *     aktuellesVotum?: array{text?: string, erstelltAm?: string, autorName?: string}|null,
@@ -22,7 +22,9 @@ declare(strict_types=1);
 $votum = is_array($_['aktuellesVotum'] ?? null) ? $_['aktuellesVotum'] : null;
 $votumText = (string) ($votum['text'] ?? '');
 $titel = (string) ($_['titel'] ?? '');
-$externId = (string) ($_['externId'] ?? '');
+// Die Geschäftsnummer des Parlaments, «2025.82». Die Kennung der
+// Parlamentswebseite («2504299») ist intern und steht auf keinem Ausdruck.
+$nummer = (string) ($_['nummer'] ?? '');
 $zustaendige = is_array($_['zustaendigkeiten'] ?? null) ? $_['zustaendigkeiten'] : [];
 $beschluss = is_array($_['letzterBeschluss'] ?? null) ? $_['letzterBeschluss'] : null;
 $datum = $votum['erstelltAm'] ?? (new \DateTimeImmutable())->format('Y-m-d H:i');
@@ -32,7 +34,7 @@ $autor = (string) ($votum['autorName'] ?? '');
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Votum – <?php p($externId !== '' ? $externId : (string) $_['id']); ?></title>
+    <title>Votum – <?php p($nummer !== '' ? $nummer : (string) ($titel !== '' ? $titel : $_['id'])); ?></title>
     <style>
         @page { size: A4; margin: 2.2cm 2cm 2.4cm 2cm; }
         * { box-sizing: border-box; }
@@ -137,14 +139,14 @@ $autor = (string) ($votum['autorName'] ?? '');
 
     <header class="kopf">
         <h1>Votum im Rat</h1>
-        <p class="geschaeft-titel"><?php p($titel !== '' ? $titel : 'Geschäft #' . (string) $_['id']); ?></p>
+        <p class="geschaeft-titel"><?php p($titel !== '' ? $titel : ($nummer !== '' ? 'Geschäft ' . $nummer : 'Geschäft ohne Titel')); ?></p>
     </header>
 
     <div class="meta">
-        <?php if ($externId !== ''): ?>
+        <?php if ($nummer !== ''): ?>
         <div class="meta-zeile">
             <div class="meta-label">Geschäftsnummer</div>
-            <div class="meta-wert"><?php p($externId); ?></div>
+            <div class="meta-wert"><?php p($nummer); ?></div>
         </div>
         <?php endif; ?>
         <?php if (!empty($zustaendige)): ?>
@@ -209,7 +211,7 @@ $autor = (string) ($votum['autorName'] ?? '');
     </div>
 
     <footer class="fuss">
-        Parliament Winterthur · Geschäft <?php p($externId !== '' ? $externId : (string) $_['id']); ?> · ausgedruckt am <?php p((new \DateTimeImmutable())->format('d.m.Y H:i')); ?>
+        Parlament Winterthur · Geschäft <?php p($nummer !== '' ? $nummer : (string) ($titel !== '' ? $titel : $_['id'])); ?> · ausgedruckt am <?php p((new \DateTimeImmutable())->format('d.m.Y H:i')); ?>
     </footer>
 
 <?php

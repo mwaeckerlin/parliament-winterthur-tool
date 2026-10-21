@@ -22,6 +22,10 @@ class GeschaeftService {
         private readonly GeschaeftEreignisMapper $geschaeftEreignisMapper,
         private readonly ScraperService $scraper,
         private readonly LoggerInterface $logger,
+        // Die Dokumente sind ein eigener Schritt des Abgleichs: Wo der Dienst
+        // fehlt — in einem Test des reinen Geschäftsabgleichs —, bleibt der
+        // Abgleich derselbe.
+        private readonly ?GeschaeftDokumentService $dokumentService = null,
     ) {
     }
 
@@ -146,7 +150,17 @@ class GeschaeftService {
             try {
                 $geschaeft = $this->mapper->findByExternId($externId);
                 $this->mapper->harmonisiereIdMitExternId($geschaeft, $dbId);
-                if (!$geschaeft->getGeloescht() && $this->istAbgeschlossenStatus($geschaeft->getStatus())) {
+                // Ein abgeschlossenes Geschäft wird übersprungen, solange die
+                // Quelle dasselbe hergibt wie beim letzten Mal. Ohne diesen
+                // Vergleich blieb es für immer stehen, wie es war: Am
+                // 23.09.2026 trugen 1197 von 1276 Geschäften keine Einreicher,
+                // weil sie schon erledigt waren, als die Anwendung anfing, die
+                // Einreicher zu lesen. Der Hash deckt alles ab, was aus der
+                // Quelle in die Datenbank geht, also fällt auch ein neu
+                // gelesenes Feld auf.
+                if (!$geschaeft->getGeloescht()
+                    && $this->istAbgeschlossenStatus($geschaeft->getStatus())
+                    && $this->berechneQuellversion($daten) === $geschaeft->getQuelleHash()) {
                     if ($fortschritt !== null) {
                         $fortschritt([
                             'scope' => 'geschaefte',
@@ -163,6 +177,7 @@ class GeschaeftService {
                 $this->mapper->update($geschaeft);
                 $this->synchronisiereEreignisse($geschaeft, $daten);
                 $this->verknuepfePassendenEntwurf($geschaeft, $daten);
+                $this->synchronisiereDokumente($geschaeft, $daten);
                 $statistik['aktualisiert']++;
             } catch (DoesNotExistException) {
                 // Neues Geschäft anlegen
@@ -170,6 +185,7 @@ class GeschaeftService {
                 $this->mapper->insert($geschaeft);
                 $this->synchronisiereEreignisse($geschaeft, $daten);
                 $this->verknuepfePassendenEntwurf($geschaeft, $daten);
+                $this->synchronisiereDokumente($geschaeft, $daten);
                 $statistik['neu']++;
             }
 
@@ -334,7 +350,19 @@ class GeschaeftService {
             'status' => (string) ScraperService::wert($daten, ['status', 'Status', 'state', 'State']),
             'date' => (string) ScraperService::wert($daten, ['date', 'Date', 'datum', 'Datum', 'eingangsdatum']),
             'url' => (string) ScraperService::wert($daten, ['url', 'Url', 'URL', 'link', 'Link', 'detailUrl']),
+            // Die Einreicher gehören in den Hash, weil sie aus der Quelle in die
+            // Datenbank gehen: Was hier fehlt, merkt der Abgleich nicht, wenn
+            // es sich ändert oder wenn die Anwendung es neu zu lesen beginnt.
+            'einreicher' => $this->normalisiereEinreicherFuerHash(
+                ScraperService::wert($daten, ['einreicher'], [])
+            ),
             'events' => $this->normalisiereEreignisseFuerHash($events),
+            // Auch die Dokumente gehen aus der Quelle in die Datenbank: Ein neu
+            // aufgeschaltetes PDF — die Antwort des Stadtrats — ändert damit die
+            // Prüfsumme, und ein erledigtes Geschäft holt seinen Inhalt nach.
+            'dokumente' => $this->normalisiereDokumenteFuerHash(
+                ScraperService::wert($daten, ['dokumente'], [])
+            ),
         ];
 
         $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
@@ -343,6 +371,77 @@ class GeschaeftService {
         }
 
         return hash('sha256', $json);
+    }
+
+    /**
+     * Die Dokumente eines Geschäfts lesen und ablegen. Ohne den Dienst und ohne
+     * Dokumente auf der Seite geschieht nichts.
+     *
+     * @param array<string, mixed> $daten
+     */
+    private function synchronisiereDokumente(Geschaeft $geschaeft, array $daten): void {
+        if ($this->dokumentService === null) {
+            return;
+        }
+        $dokumente = ScraperService::wert($daten, ['dokumente'], []);
+        if (!is_array($dokumente) || $dokumente === []) {
+            return;
+        }
+        try {
+            $this->dokumentService->aktualisiere((int) $geschaeft->getId(), array_values($dokumente));
+        } catch (\Throwable $e) {
+            // Ein unlesbares Dokument darf den Abgleich der Geschäfte nicht
+            // anhalten: Der Fehler steht im Protokoll und am Dokument.
+            $this->logger->warning(
+                'Parlament Winterthur: Dokumente eines Geschäfts nicht abgeglichen: ' . $e->getMessage(),
+                ['geschaeft' => $geschaeft->getNummer(), 'exception' => $e]
+            );
+        }
+    }
+
+    /**
+     * @return array<int, array<string, string>>
+     */
+    private function normalisiereDokumenteFuerHash(mixed $dokumente): array {
+        if (!is_array($dokumente)) {
+            return [];
+        }
+        $normalisiert = [];
+        foreach ($dokumente as $eintrag) {
+            if (!is_array($eintrag)) {
+                continue;
+            }
+            $normalisiert[] = [
+                'externId' => (string) ($eintrag['externId'] ?? ''),
+                'titel' => (string) ($eintrag['titel'] ?? ''),
+                'kategorie' => (string) ($eintrag['kategorie'] ?? ''),
+                'datum' => (string) ($eintrag['datum'] ?? ''),
+                'url' => (string) ($eintrag['url'] ?? ''),
+            ];
+        }
+        usort($normalisiert, static fn (array $a, array $b): int => strcmp($a['externId'], $b['externId']));
+        return $normalisiert;
+    }
+
+    /**
+     * @return array<int, array<string, string>>
+     */
+    private function normalisiereEinreicherFuerHash(mixed $einreicher): array {
+        if (!is_array($einreicher)) {
+            return [];
+        }
+        $normalisiert = [];
+        foreach ($einreicher as $eintrag) {
+            if (!is_array($eintrag)) {
+                continue;
+            }
+            $normalisiert[] = [
+                'name' => (string) ($eintrag['name'] ?? ''),
+                'rolle' => (string) ($eintrag['rolle'] ?? ''),
+                'externId' => (string) ($eintrag['externId'] ?? ''),
+            ];
+        }
+        return $normalisiert;
     }
 
     /**

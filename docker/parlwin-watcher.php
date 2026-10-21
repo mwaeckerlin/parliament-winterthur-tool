@@ -95,6 +95,96 @@ function pwAbortContainer(string $reason): never
 }
 
 /**
+ * Räumt die Einrichtungswarnungen von Nextcloud ab, soweit sie aus dem
+ * Container heraus zu beheben sind.
+ *
+ * Die Prüfungen «Datenverzeichnis geschützt», «JavaScript-Module», «OCS
+ * Anbieter-Auflösung», «.well-known URLs», «Laden der Schriftartdatei» und
+ * «WebDAV-Endpunkt» fragen den eigenen Server über HTTP. Erreicht wird er über
+ * eine der vertrauten Domänen oder über `overwrite.cli.url`; die vertraute
+ * Domäne der Installation zeigt auf den Host (localhost:29824), und der ist aus
+ * dem Container heraus nichts. Darum steht der interne Name hier zusätzlich in
+ * den vertrauten Domänen.
+ *
+ * Dazu die beiden Aufräumkommandos, die Nextcloud bei einem Upgrade bewusst
+ * nicht selbst ausführt (sie können lange dauern), und der Protokolltyp, den
+ * die Protokoll-App braucht.
+ */
+function pwVertrauteDomain(string $internal): string
+{
+  $host = (string) parse_url($internal, PHP_URL_HOST);
+  if ($host === '') {
+    return '';
+  }
+  $port = parse_url($internal, PHP_URL_PORT);
+  // Der Port gehört dazu: Die Installation vertraut «nextcloud-nginx» ohne
+  // Port, und eine Anfrage an diesen Namen landet auf Port 80, wo nichts
+  // antwortet — genau daran scheiterten alle Selbstprüfungen.
+  return $host . (is_int($port) ? ':' . $port : '');
+}
+
+function pwRichteEinrichtungEin(string $internal): void
+{
+  $domain = pwVertrauteDomain($internal);
+  if ($domain !== '') {
+    [, $vorhanden] = pwOcc(['config:system:get', 'trusted_domains', '--no-ansi']);
+    $zeilen = array_values(array_filter(array_map('trim', explode("\n", $vorhanden))));
+    if (!in_array($domain, $zeilen, true)) {
+      pwOcc([
+        'config:system:set',
+        'trusted_domains',
+        (string) count($zeilen),
+        '--value=' . $domain,
+        '--no-ansi',
+      ]);
+      pwLog("trusted_domains += {$domain}");
+    }
+  }
+
+  // Der Protokolltyp bleibt, wie ihn das Basis-Image setzt: Ein Container
+  // schreibt sein Protokoll nach stderr, wo Docker es einsammelt. Die
+  // Protokoll-App von Nextcloud liest nur aus einer Datei und meldet darum
+  // einen Hinweis — eine Datei im Container wäre der schlechtere Tausch.
+
+  // Die Dateisperre über die Datenbank ist die langsamste Variante. Der
+  // Container bringt APCu mit, und er ist genau EIN php-fpm — damit teilen sich
+  // alle Arbeitsprozesse denselben Speicher, was die Sperre braucht. Wer den
+  // Stack auf mehrere php-fpm verteilt, setzt hier eine verteilte Ablage ein.
+  pwOcc(['config:system:set', 'memcache.locking', '--value=\\OC\\Memcache\\APCu', '--no-ansi']);
+
+  // Die Serverkennung: ohne sie meldet die Übersicht einen Hinweis; mehrere
+  // PHP-Server hat dieser Stack nicht, also trägt er die 0.
+  pwOcc(['config:system:set', 'serverid', '--type=integer', '--value=0', '--no-ansi']);
+
+  if (getenv('PARLWIN_SETUP_REPAIR') === '0') {
+    return;
+  }
+  // Fehlende Indizes und Mimetype-Migrationen: Nextcloud führt beides beim
+  // Upgrade nicht aus, weil es auf grossen Installationen lange dauert, und
+  // meldet es stattdessen als Warnung. Hier ist die Installation klein.
+  // Die Einrichtungsübersicht prüft die Datenbank auf Indizes, Primärschlüssel
+  // und Spalten getrennt; ab Nextcloud 35 meldete sie «4 database checks are
+  // failing», solange nur die Indizes nachgezogen wurden.
+  foreach ([
+    'db:add-missing-indices',
+    'db:add-missing-primary-keys',
+    'db:add-missing-columns',
+    'db:convert-filecache-bigint',
+  ] as $befehl) {
+    pwLog("Running {$befehl}...");
+    [$code, $ausgabe] = pwOcc([$befehl, '--no-interaction', '--no-ansi']);
+    if ($code !== 0) {
+      pwLog("{$befehl} failed (exit={$code}): {$ausgabe}");
+    }
+  }
+  pwLog('Running expensive repair steps (mimetype migrations)...');
+  [$code, $ausgabe] = pwOcc(['maintenance:repair', '--include-expensive', '--no-interaction', '--no-ansi']);
+  if ($code !== 0) {
+    pwLog("maintenance:repair failed (exit={$code}): {$ausgabe}");
+  }
+}
+
+/**
  * Haupt-Schleife: wartet auf die Installation, aktiviert die App, führt das
  * Upgrade aus und übernimmt danach den Cron-Tick.
  */
@@ -144,6 +234,7 @@ function pwMain(): void
         '--value=' . $internal,
         '--no-ansi',
       ]);
+      pwRichteEinrichtungEin($internal);
 
       // App aktivieren. Ein erneutes app:enable triggert parlwins eigene
       // Migrationen, die beim occ upgrade oben bereits gelaufen sein sollten.
@@ -169,6 +260,20 @@ function pwMain(): void
         pwLog('Maintenance mode still active after upgrade — disabling.');
         pwOcc(['maintenance:mode', '--off', '--no-ansi']);
       }
+      // Nextcloud führt die Migrationen einer App nur aus, wenn die Version in
+      // info.xml höher ist als die installierte. Bleibt die Version gleich,
+      // läuft eine neu hinzugekommene Migration nie, und die Instanz arbeitet
+      // still mit dem alten Schema weiter — am 24.09.2026 blieb so die Spalte
+      // quelle_hash zu kurz, und jedes Lesen eines Dokuments endete mit «Data
+      // too long». Darum hier die Gegenprobe gegen die Tabelle migrations.
+      [$code, $output] = pwOcc(['parlwin:migrationen-pruefen', '--no-ansi']);
+      if ($code !== 0) {
+        pwAbortContainer(
+          "parlwin migrations are missing in this instance:\n{$output}\n" .
+          'Raise <version> in parlwin/appinfo/info.xml and deploy again.'
+        );
+      }
+
       pwLog('parlwin ready');
 
       // Cron: Ohne externen Tick führt Nextcloud keine Background-Jobs aus — die

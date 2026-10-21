@@ -235,6 +235,16 @@
           </details>
         </div>
 
+        <div v-if="(geschaeft.amtlicheDokumente || []).length" class="pw-form-zeile">
+          <label>Amtliche Dokumente</label>
+          <!-- Vorstoss, Antwort des Stadtrats, Beilagen: eingeklappt der Titel,
+               ein Klick zeigt den gelesenen Inhalt (F121). -->
+          <PwAmtlicheDokumente
+            :geschaeft-id="geschaeftId"
+            :dokumente="geschaeft.amtlicheDokumente"
+          />
+        </div>
+
         <div class="pw-form-zeile">
           <label>Dokumente zum Geschäft</label>
           <GeschaeftDokumente
@@ -324,6 +334,7 @@ import PwDatumInput from './PwDatumInput.vue'
 import PwWysiwyg from './PwWysiwyg.vue'
 import PwMultiSelect from './PwMultiSelect.vue'
 import GeschaeftDokumente from './GeschaeftDokumente.vue'
+import PwAmtlicheDokumente from './PwAmtlicheDokumente.vue'
 import BeschlussWidget from './BeschlussWidget.vue'
 import NotizenListe from './NotizenListe.vue'
 import Aktionszeitleiste from './Aktionszeitleiste.vue'
@@ -332,7 +343,7 @@ import { subscribeRealtime } from '../realtime'
 
 export default {
   name: 'GeschaeftDetail',
-  components: { NcButton, PwWysiwyg, PwMultiSelect, PwPrioritaetSelect, PwKommissionSelect, PwTypSelect, PwDatumInput, GeschaeftDokumente, BeschlussWidget, NotizenListe, Aktionszeitleiste, GeschaeftVerknuepfenDialog },
+  components: { NcButton, PwWysiwyg, PwMultiSelect, PwPrioritaetSelect, PwKommissionSelect, PwTypSelect, PwDatumInput, GeschaeftDokumente, PwAmtlicheDokumente, BeschlussWidget, NotizenListe, Aktionszeitleiste, GeschaeftVerknuepfenDialog },
   props: {
     geschaeftId: { type: Number, required: true },
     mitglieder: { type: Array, default: () => [] },

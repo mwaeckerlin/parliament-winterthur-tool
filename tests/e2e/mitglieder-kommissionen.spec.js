@@ -54,6 +54,41 @@ async function apiGet(page, pfad) {
   return res.json()
 }
 
+/**
+ * Die aktiven Mitglieder, die Fraktions- bzw. Kommissionspräsident sind, aus
+ * `/mitglieder`, `/fraktionen` und `/kommissionen` — derselbe Weg, den die
+ * Ansicht nimmt (Mitgliederliste.vue: `fraktionsrolleNachExternId`,
+ * `kommissionenNachExternId`). Vize und Stellvertretung zählen nicht.
+ */
+async function praesidiumAusDaten(page) {
+  const [mitglieder, fraktionen, kommissionen] = await Promise.all([
+    apiGet(page, '/mitglieder'), apiGet(page, '/fraktionen'), apiGet(page, '/kommissionen'),
+  ])
+  const aktiveIds = new Set(mitglieder.filter((m) => m.aktiv).map((m) => String(m.externId ?? m.extern_id ?? '')))
+  const istPraesident = (funktion) => {
+    const v = String(funktion || '').toLowerCase()
+    if (!v.includes('präsiden') && !v.includes('praesiden')) return false
+    return !v.includes('vize') && !v.includes('stellvert')
+  }
+  const sammle = (behoerden) => {
+    const ids = new Set()
+    for (const b of behoerden || []) {
+      if (b?.aktiv === false) continue
+      let eintraege = b?.mitglieder
+      if (typeof eintraege === 'string') {
+        try { eintraege = JSON.parse(eintraege) } catch { eintraege = [] }
+      }
+      for (const e of Array.isArray(eintraege) ? eintraege : []) {
+        if (!e || typeof e !== 'object' || e.aktiv === false) continue
+        const id = String(e.externId ?? e.extern_id ?? e.id ?? '')
+        if (id && aktiveIds.has(id) && istPraesident(e.funktion)) ids.add(id)
+      }
+    }
+    return ids
+  }
+  return { fraktion: sammle(fraktionen), kommission: sammle(kommissionen) }
+}
+
 /** Reads the numeric count badge of the current view. */
 async function zaehler(page) {
   return Number(norm(await page.locator('.pw-view-count').first().innerText()))
@@ -363,21 +398,37 @@ test.describe('Mitglieder: Ansicht end-to-end', () => {
     expect(kTreffer.every(Boolean), 'Nicht alle Karten enthalten die gewählte Kommission').toBeTruthy()
     await ncWaehlenIndex(page, 'Kommission', 0)
 
-    await ncWaehlenExakt(page, 'Funktion', 'Fraktionspräsident')
-    const fpCount = await page.locator('.pw-mitglied-karte').count()
-    expect(fpCount, 'Kein Fraktionspräsident gefiltert').toBeGreaterThan(0)
-    const fpRollen = await page.$$eval('.pw-mitglied-karte .pw-mitglied-fraktionsrolle', (els) => els.map((e) => e.textContent.trim()))
-    expect(fpRollen.length, 'Nicht jede Karte trägt eine Fraktionsrolle').toBe(fpCount)
-    expect(fpRollen.every((r) => r === 'Fraktionspräsident'), 'Vize wird nicht ausgeschlossen').toBeTruthy()
-    await ncWaehlenExakt(page, 'Funktion', 'Alle Funktionen')
+    // Die Auswahl «Funktion» bietet nur an, was unter den aktiven Mitgliedern
+    // wirklich vorkommt. Welche Funktionen das sind, hängt an den
+    // synchronisierten Daten des Parlaments, nicht am Test — darum wird die
+    // Erwartung aus denselben Daten abgeleitet, die die Ansicht benutzt, und
+    // in beide Richtungen geprüft: vorhanden mit Wirkung, oder nicht angeboten.
+    const praesidenten = await praesidiumAusDaten(page)
+    const funktionOptionen = await optTitel(await ncOeffnen(page, 'Funktion'))
+    await page.keyboard.press('Escape')
 
-    await ncWaehlenExakt(page, 'Funktion', 'Kommissionspräsident')
-    const kpCount = await page.locator('.pw-mitglied-karte').count()
-    expect(kpCount, 'Kein Kommissionspräsident gefiltert').toBeGreaterThan(0)
-    const alleSindPraes = await page.$$eval('.pw-mitglied-karte', (cards) => cards.every((c) =>
-      [...c.querySelectorAll('.pw-mitglied-kommission-rolle')].some((r) => r.textContent.trim() === 'Präsident'),
-    ))
-    expect(alleSindPraes, 'Nicht alle gefilterten Karten sind Kommissionspräsident').toBeTruthy()
+    for (const [label, ids] of [['Fraktionspräsident', praesidenten.fraktion], ['Kommissionspräsident', praesidenten.kommission]]) {
+      if (ids.size === 0) {
+        expect(funktionOptionen, `«${label}» wird angeboten, obwohl kein aktives Mitglied diese Funktion hat`).not.toContain(label)
+        continue
+      }
+      expect(funktionOptionen, `«${label}» fehlt, obwohl ${ids.size} aktive Mitglieder diese Funktion haben`).toContain(label)
+      await ncWaehlenExakt(page, 'Funktion', label)
+      await expect.poll(async () => await page.locator('.pw-mitglied-karte').count(), {
+        message: `Die Zahl der Karten mit «${label}» stimmt nicht mit den Daten überein`,
+      }).toBe(ids.size)
+      if (label === 'Fraktionspräsident') {
+        const fpRollen = await page.$$eval('.pw-mitglied-karte .pw-mitglied-fraktionsrolle', (els) => els.map((e) => e.textContent.trim()))
+        expect(fpRollen.length, 'Nicht jede Karte trägt eine Fraktionsrolle').toBe(ids.size)
+        expect(fpRollen.every((r) => r === 'Fraktionspräsident'), 'Vize wird nicht ausgeschlossen').toBeTruthy()
+      } else {
+        const alleSindPraes = await page.$$eval('.pw-mitglied-karte', (cards) => cards.every((c) =>
+          [...c.querySelectorAll('.pw-mitglied-kommission-rolle')].some((r) => r.textContent.trim() === 'Präsident'),
+        ))
+        expect(alleSindPraes, 'Nicht alle gefilterten Karten sind Kommissionspräsident').toBeTruthy()
+      }
+      await ncWaehlenExakt(page, 'Funktion', 'Alle Funktionen')
+    }
     expect(jsFehler, jsFehler.join(' | ')).toEqual([])
   })
 

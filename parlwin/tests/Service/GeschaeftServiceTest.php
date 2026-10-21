@@ -16,6 +16,32 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
 class GeschaeftServiceTest extends TestCase {
+    /**
+     * Lässt einen Abgleich über die Daten laufen, damit das Geschäft den Hash
+     * des aktuellen Quellstands trägt. Ein abgeschlossenes Geschäft wird nur
+     * übersprungen, solange dieser Hash dem gespeicherten entspricht; ohne
+     * diesen Vorlauf stünde im Bestand der Hash einer früheren Lesart, und der
+     * Abgleich schriebe das Geschäft zu Recht nach (F1, Fehler 2026-09-23).
+     *
+     * @param array<string, mixed> $daten
+     */
+    private function quellstandUebernehmen(Geschaeft $bestand, array $daten): void {
+        $mapper = $this->createStub(GeschaeftMapper::class);
+        $mapper->method('findByExternId')->willReturn($bestand);
+        $mapper->method('update')->willReturnArgument(0);
+
+        $scraper = $this->createStub(ScraperService::class);
+        $scraper->method('ladeGeschaefte')->willReturn([$daten]);
+
+        (new GeschaeftService(
+            $mapper,
+            $this->createStub(VorstossEntwurfMapper::class),
+            $this->createStub(GeschaeftEreignisMapper::class),
+            $scraper,
+            $this->createStub(LoggerInterface::class),
+        ))->synchronisieren();
+    }
+
     public function testSynchronisierenMeldetFortschrittBereitsBeimLadenDerDetailseiten(): void {
         $mapper = $this->createMock(GeschaeftMapper::class);
         $entwurfMapper = $this->createStub(VorstossEntwurfMapper::class);
@@ -227,22 +253,26 @@ class GeschaeftServiceTest extends TestCase {
 
         $service = new GeschaeftService($mapper, $entwurfMapper, $ereignisMapper, $scraper, $logger);
 
+        $quelldaten = [
+            'id' => '1388420',
+            'title' => 'Wahl von zwei Mitgliedern',
+            'number' => '2021.82',
+            'type' => 'Wahlen',
+            'status' => 'Pendent',
+            'date' => '2021-10-04',
+            'url' => 'https://parlament.winterthur.ch/_rte/information/1388420',
+        ];
+
         $bestehend = new Geschaeft();
         $bestehend->setId(42);
         $bestehend->setExternId('1388420');
         $bestehend->setStatus('Erledigt');
+        $this->quellstandUebernehmen($bestehend, $quelldaten);
+        $bestehend->setStatus('Erledigt');
 
         $scraper->expects($this->once())
             ->method('ladeGeschaefte')
-            ->willReturn([[
-                'id' => '1388420',
-                'title' => 'Wahl von zwei Mitgliedern',
-                'number' => '2021.82',
-                'type' => 'Wahlen',
-                'status' => 'Pendent',
-                'date' => '2021-10-04',
-                'url' => 'https://parlament.winterthur.ch/_rte/information/1388420',
-            ]]);
+            ->willReturn([$quelldaten]);
 
         $mapper->expects($this->once())
             ->method('findByExternId')
@@ -330,23 +360,26 @@ class GeschaeftServiceTest extends TestCase {
 
         $service = new GeschaeftService($mapper, $entwurfMapper, $ereignisMapper, $scraper, $logger);
 
+        $quelldaten = [
+            'id' => '8888',
+            'title' => 'Erledigtes Geschäft',
+            'number' => '2019.5',
+            'type' => 'Motion',
+            'status' => 'Erledigt',
+            'date' => '2019-01-01',
+            'url' => 'https://parlament.winterthur.ch/_rte/information/8888',
+        ];
+
         $bestehend = new Geschaeft();
         $bestehend->setId(8);
         $bestehend->setExternId('8888');
         $bestehend->setStatus('Erledigt');
         $bestehend->setGeloescht(false);
+        $this->quellstandUebernehmen($bestehend, $quelldaten);
 
         $scraper->expects($this->once())
             ->method('ladeGeschaefte')
-            ->willReturn([[
-                'id' => '8888',
-                'title' => 'Erledigtes Geschäft',
-                'number' => '2019.5',
-                'type' => 'Motion',
-                'status' => 'Erledigt',
-                'date' => '2019-01-01',
-                'url' => 'https://parlament.winterthur.ch/_rte/information/8888',
-            ]]);
+            ->willReturn([$quelldaten]);
 
         $mapper->expects($this->once())
             ->method('findByExternId')

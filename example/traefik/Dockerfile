@@ -1,12 +1,12 @@
 # Edge-Proxy mit eingebackener Routing-Konfiguration.
 #
-# Die Konfiguration wird ins Abbild KOPIERT und nicht vom Host eingeblendet: ein
+# Die Konfiguration wird ins Image KOPIERT und nicht vom Host eingeblendet: ein
 # Bind-Mount koppelt den Container an ein Verzeichnis des Wirts und macht die
 # Auslieferung von dessen Zustand abhängig. Der Docker-Socket wird ebenfalls
 # nicht eingeblendet — deshalb bleibt der Docker-Provider abgeschaltet
 # (--providers.docker=false) und das Routing kommt aus dieser Datei.
 #
-# Wird das Routing geändert, muss das Abbild neu gebaut werden:
+# Wird das Routing geändert, muss das Image neu gebaut werden:
 #   $ docker compose up -d --build traefik
 FROM traefik
 
