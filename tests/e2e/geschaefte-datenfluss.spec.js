@@ -512,6 +512,38 @@ test.describe('Geschäfteliste: Filter und Suche', () => {
     await expect(page.locator('.pw-tabelle-geschaefte tbody tr', { hasText: ersteNr }).first()).toBeVisible()
   })
 
+  test('Amtliche Dokumente stehen eingeklappt in der Übersicht und klappen auf (F121)', async ({ page }) => {
+    await login(page, USERS.u1)
+    await gotoGeschaefte(page)
+    await page.locator('#pw-filter-slot').getByText('Erledigte anzeigen').click()
+    await page.waitForLoadState('networkidle')
+
+    // Erste Stufe: Am Geschäft steht nur ein Dreieck, keine Dokumentliste.
+    const dreieck = page.locator('.pw-tabelle-geschaefte .pw-dokumente-schalter').first()
+    await dreieck.waitFor({ state: 'visible', timeout: 30_000 })
+    await expect(page.locator('.pw-tabelle-geschaefte .pw-dokument-kopf')).toHaveCount(0)
+    await dreieck.click()
+
+    // Zweite Stufe: Eingeklappt steht nur der Kopf des Dokuments da, kein Inhalt.
+    const kopf = page.locator('.pw-tabelle-geschaefte .pw-dokument-kopf').first()
+    await kopf.waitFor({ state: 'visible', timeout: 30_000 })
+    await expect(page.locator('.pw-tabelle-geschaefte .pw-dokument-inhalt')).toHaveCount(0)
+    expect((await kopf.innerText()).trim().length, 'Der Dokumenttitel fehlt').toBeGreaterThan(0)
+
+    // Der Klick öffnet das Dokument und NICHT das Geschäft.
+    await kopf.click()
+    await expect(page.locator('.pw-dokument-inhalt').first()).toBeVisible({ timeout: 30_000 })
+    await expect(page.locator('.pw-geschaeft-detail'), 'Der Klick auf das Dokument hat das Geschäft geöffnet').toHaveCount(0)
+    expect(
+      (await page.locator('.pw-dokument-inhalt').first().innerText()).trim().length,
+      'Das aufgeklappte Dokument ist leer',
+    ).toBeGreaterThan(0)
+
+    // Der zweite Klick klappt wieder zu.
+    await kopf.click()
+    await expect(page.locator('.pw-dokument-inhalt')).toHaveCount(0)
+  })
+
   test('«Erledigte anzeigen» ist standardmässig aus und blendet erledigte Geschäfte ein', async ({ page }) => {
     await login(page, USERS.u1)
     await gotoGeschaefte(page)

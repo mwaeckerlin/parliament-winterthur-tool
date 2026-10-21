@@ -146,7 +146,7 @@ Fraktion/
 ├── 30_Kommissionen/
 │   ├── Aufsichtskommission/
 │   ├── Sachkommission Bildung Sport Kultur/
-│   └── …
+│   └── …
 ├── 40_Vorstösse/
 │   ├── 10_Eigene/          ← Vorstösse werden von hier automatisch übernommen
 │   └── 20_Fremde/
@@ -318,7 +318,7 @@ docker compose up -d --build --remove-orphans --force-recreate --pull always
 
 Das genügt für den ersten Start und für alle künftigen Aktualisierungen: `git pull` holt die aktuellste Version, `--pull always` lädt die neuen Docker-Images automatisch nach, und `--build` erzeugt den vorgelagerten Proxy neu.
 
-Der vorgelagerte Proxy wird gebaut, weil seine Weiterleitungen (`example/traefik/dynamic.yml`) werden per `COPY` in sein Abbild aufgenommen, statt sie als Verzeichnis des Wirts in den Container einzublenden. Kein Container bekommt so ein Verzeichnis des Wirts zu sehen, und der Docker-Socket bleibt ebenfalls draussen — deshalb ist der Docker-Provider von Traefik abgeschaltet und die Weiterleitungen kommen aus dieser Datei. Wer sie ändert, baut den Proxy neu:
+Der vorgelagerte Proxy wird gebaut, weil seine Weiterleitungen (`example/traefik/dynamic.yml`) werden per `COPY` in sein Image aufgenommen, statt sie als Verzeichnis des Wirts in den Container einzublenden. Kein Container bekommt so ein Verzeichnis des Wirts zu sehen, und der Docker-Socket bleibt ebenfalls draussen — deshalb ist der Docker-Provider von Traefik abgeschaltet und die Weiterleitungen kommen aus dieser Datei. Wer sie ändert, baut den Proxy neu:
 
 ```bash
 docker compose up -d --build traefik
@@ -336,6 +336,20 @@ In der Verwaltung unter **«Fraktionsmitglieder ↔ Nextcloud-Benutzer»** werde
 
 Die automatische Synchronisation entfernt niemanden aus der Gruppe. Nur über «Ausgewählte abgleichen» mit ausdrücklicher Auswahl durch die Verwaltung werden Benutzer entfernt oder deaktiviert. Damit jemand als verwaist erscheint, muss er von Hand in die Nextcloud-Gruppe aufgenommen worden sein (Beispiel: ein ehemaliger Fraktionsmitarbeiter in der Gruppe — er erscheint als verwaister Eintrag, solange er kein aktives Parlamentsmandat hat).
 
+
+### Images je Nextcloud-Linie
+
+Die drei Images gibt es je Nextcloud-Hauptversion, weil ein Upgrade keine Hauptversion auslassen darf: Eine Installation auf Nextcloud 33 geht auf 34 und erst danach auf 35. Welche Marke eine Instanz braucht, sagt ihr eigener Stand.
+
+| Marke | Inhalt |
+| --- | --- |
+| `mwaeckerlin/parliament-winterthur-tool:php-fpm` | parlwin auf der neuesten Nextcloud-Linie, rollend |
+| `…:php-fpm-nc34` | parlwin auf Nextcloud 34, rollend |
+| `…:php-fpm-nc34-v1.8.18` | parlwin 1.8.18 auf Nextcloud 34, eingefroren |
+
+Dasselbe gilt für `nginx` und `realtime`. Im Auslieferungs-Stack (`example/docker-compose.yml`) trägt jeder Dienst die Marke der Linie, auf der die Installation steht; erst nach dem Upgrade wird sie auf die nächste gesetzt. Läuft die Instanz auf einer älteren Linie als das Image, verweigert Nextcloud den Start («Downgrading Nextcloud … is not supported»), und der vorgelagerte Server antwortet mit 502.
+
+Die Zweige und Marken der Linien erzeugt `./create-branches.sh` (auch `npm run branches`): Es baut je Version den Zweig `nc<version>` aus `master`, setzt darin die `FROM`-Zeilen auf `mwaeckerlin/nextcloud:php-fpm-<version>` und `:nginx-<version>` und schiebt ihn nach GitHub, worauf Docker Hub die Marken baut.
 
 ### Voraussetzungen
 
@@ -415,43 +429,61 @@ Variablen des Dienstes `parlwin-realtime` (werden automatisch vorbelegt):
 Variablen für die Geschwindigkeit der Synchronisation:
 - `PARLWIN_SYNC_SECTION_PARALLEL` (Standard: `6`) Wie viele Hauptlisten gleichzeitig vorgeladen werden (`geschäfte`, `sitzungen`, `mitglieder`, `kommissionen`, `fraktionen`).
 - `PARLWIN_SYNC_GESCHAEFTE_PARALLEL` (Standard: `10`) Anzahl gleichzeitiger Abfragen auf die Detailseiten der Geschäfte (`/_rte/information/{id}`).
+- `PARLWIN_SETUP_REPAIR` (Standard: `1`) Beim Start legt der Container die fehlenden Datenbank-Indizes an und führt die Mimetype-Migrationen aus. Nextcloud lässt beides beim Upgrade bewusst aus, weil es auf grossen Installationen lange dauert, und meldet es stattdessen in der Übersicht. Mit `0` unterbleiben beide Schritte; sie gehören dann von Hand in ein Wartungsfenster (`occ db:add-missing-indices`, `occ maintenance:repair --include-expensive`).
+Wer nicht auf den stündlichen Auftrag warten will, liest die Dokumente von Hand nach:
+
+```bash
+docker compose exec nextcloud-php-fpm php occ parlwin:dokumente-lesen --anzahl=200
+```
+
+Ein Dokument, das an einer Grenze gescheitert ist, trägt seinen Grund und wird nicht immer wieder versucht. Nach einer angehobenen Grenze holt `--auch-gescheiterte` genau diese zurück:
+
+```bash
+docker compose exec nextcloud-php-fpm php occ parlwin:dokumente-lesen --anzahl=200 --auch-gescheiterte
+```
+
+- `PARLWIN_DOKUMENT_PRO_LAUF` (Standard: `25`) So viele amtliche Dokumente liest ein Lauf höchstens. Der Abgleich verzeichnet jedes Dokument sofort mit Titel, Kategorie und Datum; den Inhalt liest er nur bis zu dieser Zahl, und ein stündlicher Hintergrundauftrag holt den Rest nach. Ohne diese Grenze liefe der erste Abgleich über tausend Geschäfte mit mehreren PDF je Geschäft stundenlang.
+- `PARLWIN_DOKUMENT_ZEIT_PRO_LAUF` (Standard: `120`) So lange liest ein Abgleich höchstens Dokumente, in Sekunden. Der Abgleich meldet dem Status regelmässig, dass er lebt; bleibt das länger als 15 Minuten aus, gilt er als abgestürzt und wird abgebrochen. Ein einzelnes grosses Dokument kann Minuten dauern, darum hört der Abgleich nach dieser Zeit auf zu lesen; verzeichnet werden die Dokumente weiterhin, und der stündliche Auftrag liest sie nach.
+- `PARLWIN_DOKUMENT_MAX_MB` (Standard: `150`) Bis zu dieser Grösse wird ein amtliches Dokument gelesen und sein Inhalt abgelegt. Ein grösseres bleibt am Geschäft verzeichnet und trägt seine Grösse als Grund; der Verweis auf das PDF beim Parlament steht weiterhin da. Die Beilagen zum Budget sind die grössten Dokumente, die vorkommen.
+- `PARLWIN_DOKUMENT_LESER_SPEICHER` (Standard: `4096M`) So viel Speicher bekommt der Prozess, der ein einzelnes Dokument liest. Jedes Dokument wird in einem eigenen Prozess gelesen, weil das Entpacken der Ströme eines PDF beliebig viel Speicher braucht und ein überschrittenes Limit den Prozess ohne abfangbaren Fehler beendet. Stirbt der Leser, trägt das Dokument diesen Grund, und der Lauf liest weiter. Ein Lauf hört ausserdem auf, sobald die Hälfte von `PARLWIN_PHP_MEMORY_LIMIT` belegt ist.
 
 Variablen für den Speicher:
-- `PARLWIN_PHP_MEMORY_LIMIT` (Standard: `1024M`) Die Speichergrenze von PHP im Container, gültig für die Oberfläche, die Kommandozeile (`occ`) und den Hintergrundauftrag. Das Basis-Abbild liefert 512 MB; ein Budgetbuch braucht beim Einlesen mehr (gemessen am Buch 2027: 574,7 MB), und in der laufenden Instanz brach der automatische Import genau daran ab. Der Bootstrap schreibt den Wert beim Start in ein eigenes ini-Verzeichnis, das `PHP_INI_SCAN_DIR` zusätzlich zum Standard nennt.
+- `PARLWIN_PHP_MEMORY_LIMIT` (Standard: `1024M`) Die Speichergrenze von PHP im Container, gültig für die Oberfläche, die Kommandozeile (`occ`) und den Hintergrundauftrag. Das Basis-Image liefert 512 MB; ein Budgetbuch braucht beim Einlesen mehr (gemessen am Buch 2027: 574,7 MB), und in der laufenden Instanz brach der automatische Import genau daran ab. Der Bootstrap schreibt den Wert beim Start in ein eigenes ini-Verzeichnis, das `PHP_INI_SCAN_DIR` zusätzlich zum Standard nennt.
 - `PARLWIN_BUDGET_MEMORY_LIMIT` (Standard: `1024M`) Die Speichergrenze, die während des Lesens eines Budgetbuchs gilt; danach gilt wieder die der Installation. Sie greift dort, wo die Installation weniger gibt als das Buch braucht, etwa ausserhalb des mitgelieferten Containers. Ein Buch belegt beim Lesen mehrere hundert Megabyte — mehr, als Nextcloud einer Anfrage standardmässig zugesteht. Wächst das Buch weiter, gehört der Wert hier herauf; eine bereits höhere oder aufgehobene Grenze der Installation bleibt unangetastet.
 
 Schnellstart:
 
 ```bash
-cd /home/marc/git/mwaeckerlin/parliament-winterthur-tool
+cd parliament-winterthur-tool
 cp .env.sample .env
 ```
 
 Starten:
 
 ```bash
-cd /home/marc/git/mwaeckerlin/parliament-winterthur-tool
-npm start
+cd parliament-winterthur-tool
+npm run start:daemon
 ```
 
-Skript-Konvention:
+Skript-Konvention, dieselbe wie in den übrigen Projekten der Familie:
 - `npm run build`: `docker compose build`
-- `npm start`: `docker compose up -d --build --force-recreate --remove-orphans`
-- `npm run start:dev`: derselbe Compose-Start unter zweitem Namen
+- `npm start`: `docker compose up --build --force-recreate --remove-orphans`, im Vordergrund mit den Protokollen aller Container
+- `npm run start:daemon`: dasselbe im Hintergrund
+- `npm run start:dev`: dasselbe wie `npm start`
 - `npm stop`: hält die Container an, ohne die Volumes zu löschen
 
 `npm start` macht absichtlich nur den normalen Compose-Start und sonst nichts.
 
 Hinweis:
-- Der NGINX-`fastcgi_read_timeout` im Projekt-Image ist auf `36000s` gesetzt, damit manuelle Vollsynchronisationen nicht nach 60s mit HTTP 504 abbrechen.
-- Nach Änderungen am `Dockerfile` immer mit Neubau starten (`npm start` oder `docker compose up -d --build`).
+- Der NGINX-`fastcgi_read_timeout` steht in `docker/nginx/parlwin.conf` auf `36000s`, damit eine vollständige Synchronisation und der Import eines Budgetbuchs nicht nach 60s mit HTTP 504 abbrechen. Beide dauern Minuten.
+- Nach Änderungen am `Dockerfile` immer mit Neubau starten (`npm run start:daemon` oder `docker compose up -d --build`).
 - Die App wird beim Compose-Start automatisch aktiviert (`parlwin-app-init`).
-- Es gibt absichtlich **kein** dauerhaftes `custom_apps`-Volume; damit kommt bei jedem Neubau die aktuelle Version der App aus dem Abbild (keine veraltete Oberfläche aus alten Volumes).
+- Es gibt absichtlich **kein** dauerhaftes `custom_apps`-Volume; damit kommt bei jedem Neubau die aktuelle Version der App aus dem Image (keine veraltete Oberfläche aus alten Volumes).
 
 Stoppen:
 
 ```bash
-cd /home/marc/git/mwaeckerlin/parliament-winterthur-tool
+cd parliament-winterthur-tool
 npm stop
 ```
 
@@ -536,11 +568,13 @@ Der Hintergrundauftrag nutzt denselben Befehl wie die Verwaltung (`--source=back
 ## Entwicklung
 
 ```bash
-cd parlwin
-composer install
+cd parliament-winterthur-tool
 npm install
-npm run dev   # baut die Oberfläche bei jeder Änderung neu
+npm run composer:update   # holt parlwin/vendor samt PHPUnit aus dem Bau
+npm run dev               # baut die Oberfläche bei jeder Änderung neu
 ```
+
+`parlwin/vendor` ist git-ignoriert und entsteht im Bau: Die Stufe `php-deps` von `Dockerfile.php-fpm` installiert die Laufzeit-Abhängigkeiten für das ausgelieferte Image, die Stufe `php-deps-test` dieselben samt PHPUnit. `npm run composer:update` holt die zweite auf den Rechner, also braucht der Rechner weder Composer noch PHPUnit. Die Tests nehmen immer dieses PHPUnit — ein PHPUnit vom Wirt wäre eine zweite, andere Fassung und gäbe über denselben Tests ein anderes Ergebnis.
 
 ### Tests ausführen
 
@@ -549,25 +583,35 @@ Ein vollständiges Verzeichnis aller Tests, nach Testart gruppiert und je Test m
 Alle Tests (Klassen und Dienste, Abfragen gegen die echte Webseite, e2e) im Wurzelverzeichnis des Projekts:
 
 ```bash
-cd /home/marc/git/mwaeckerlin/parliament-winterthur-tool
+cd parliament-winterthur-tool
 npm run test
 ```
 
 Einzeln:
 
 ```bash
-cd /home/marc/git/mwaeckerlin/parliament-winterthur-tool/parlwin
-composer test
+cd parliament-winterthur-tool
+npm run test:unit
 ```
 
 Test des Parsers gegen die echten Adressen (ohne Datenbank):
 
 ```bash
-cd parlwin
-phpunit --bootstrap tests/bootstrap.php --group live tests/Service/ScraperLiveEndpointTest.php
+cd parliament-winterthur-tool
+npm run test:live
 ```
 
 Hinweis: Dieser Test ruft `parlament.winterthur.ch` wirklich auf und prüft nur, wie das HTML gelesen wird (`data-entities`), nicht den Abgleich mit der Datenbank.
+
+### Testlauf im Bau
+
+Der Bau auf GitHub ruft `npm run test:ci` auf (Eingabe `test` der gemeinsamen Vorlage `mwaeckerlin/scratch`): zuerst `npm run composer:update`, dann derselbe `npm run test` wie auf dem Rechner. Der Runner hat weder Composer noch PHPUnit noch `parlwin/vendor`, und `npm test` allein könnte die PHP-Suiten darum nicht starten.
+
+Die PHP-Suiten laufen in einem eigenen Image (`Dockerfile.php-test`, gestartet über `tests/php-suite.sh`), also mit dem PHP der Anwendung. Das PHP des Wirts ist eine andere Fassung und prüft damit die falsche Laufzeit; auf dem Runner liegt PHP 8.3, und PHPUnit 13 braucht mindestens 8.4.1.
+
+Die Gruppe `live` läuft im Bau mit. Sie fragt `parlament.winterthur.ch` lesend ab, mit sieben Anfragen, und genau das ist ihr Zweck: Das Werkzeug hat diese Webseite als einzige Datenquelle, und eine geänderte Seitenstruktur fällt im wöchentlichen Bau auf, bevor eine Synchronisation damit scheitert.
+
+Der E2E-Teil läuft im Bau **nicht** mit (`PARLWIN_TESTS_OHNE_E2E=1` im Befehl `test:ci`). Sein Stack synchronisiert die echte Webseite vollständig: 1236 Geschäfte mit je einer Detailseite, und zwar ohne Limit, weil jedes Limit die Weisung wegschneidet, aus der die Budget-Familie ihr Budgetbuch holt. Auf dem Runner war der Abgleich nach 34 Minuten nicht fertig, und jeder Push würde diese Last an die Stadt schicken. Auf dem Rechner läuft er vor dem Commit; dauerhaft gehört dem Abgleich eine lokale Gegenstelle im Compose ([TODO.md](TODO.md)).
 
 Strenger Testlauf:
 - `npm run test` ist absichtlich **streng** eingestellt.
@@ -578,7 +622,7 @@ Strenger Testlauf:
 Der E2E-Test nutzt dieselbe `docker-compose.yml` wie der lokale Betrieb:
 
 ```bash
-cd /home/marc/git/mwaeckerlin/parliament-winterthur-tool
+cd parliament-winterthur-tool
 ./tests/e2e/run-compose-e2e.sh
 ```
 

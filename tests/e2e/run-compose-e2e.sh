@@ -387,8 +387,13 @@ assert_compose_project_isolation() {
 }
 
 assert_package_scripts_use_direct_compose() {
-  grep -q '"start": "docker compose up -d --build --force-recreate --remove-orphans"' package.json \
+  # Die Skriptnamen sind die der übrigen Projekte der Familie: «start» im
+  # Vordergrund mit den Protokollen, «start:daemon» im Hintergrund. Beide
+  # starten direkt compose, mit Neubau und ohne übrig gebliebene Container.
+  grep -q '"start": "docker compose up --build --force-recreate --remove-orphans"' package.json \
     || fail "npm start muss direkt docker compose up mit --force-recreate --remove-orphans ausführen"
+  grep -q '"start:daemon": "docker compose up -d --build --force-recreate --remove-orphans"' package.json \
+    || fail "npm run start:daemon muss dasselbe im Hintergrund ausführen"
   grep -q '"stop": "docker compose down --remove-orphans"' package.json \
     || fail "npm stop muss direkt docker compose down --remove-orphans ausführen"
 }
@@ -694,7 +699,14 @@ RICH_ENABLED="$(docker compose exec -T nextcloud-php-fpm php occ --no-ansi --no-
 if [[ "$RICH_ENABLED" != "yes" ]]; then
   echo "[E2E] Diagnose: installierte Apps (occ app:list)" >&2
   docker compose exec -T nextcloud-php-fpm php occ --no-ansi app:list >&2 || true
-  echo "[E2E] Diagnose: php-fpm-Log (letzte 200 Zeilen, Bootstrap/Office)" >&2
+  # Die Zeilen des Office-Bootstraps stehen im Protokoll des Containers zwischen
+  # tausenden Zugriffszeilen; nach 200 Zeilen sind sie längst hinausgeschoben.
+  # Darum gezielt seine eigenen Meldungen, die den Grund nennen («app:install
+  # returned 1 output: …»).
+  echo "[E2E] Diagnose: Meldungen des Office-Bootstraps" >&2
+  docker compose logs --no-color nextcloud-php-fpm 2>/dev/null \
+    | grep -E 'office-bootstrap|app:install|app:enable|appstore' >&2 || true
+  echo "[E2E] Diagnose: php-fpm-Log (letzte 200 Zeilen)" >&2
   docker compose logs --tail 200 nextcloud-php-fpm >&2 || true
   fail "richdocuments-App ist nicht aktiviert (Status='${RICH_ENABLED}')"
 fi
@@ -1047,6 +1059,78 @@ jq -e 'all(.[]; .id and .titel and .status)' <<<"$LAST_BODY" >/dev/null || fail 
 FIRST_ID="$(jq -r '.[0].id' <<<"$LAST_BODY")"
 api_expect_status GET "admin" "$ADMIN_TOKEN" "/geschaefte/${FIRST_ID}" "200"
 jq -e '.id and .titel' <<<"$LAST_BODY" >/dev/null || fail "Geschäft-Detail fehlen Felder"
+
+echo "[E2E] Einrichtungsübersicht von Nextcloud ohne Warnungen (F122)"
+# Gemessen wird, was in «Administration → Übersicht» steht. Offen bleiben nur
+# die Prüfungen, die ohne HTTPS und ohne echten Client nicht grün werden
+# können: HSTS und die erzeugten URLs brauchen TLS, «Ihre entfernte Adresse
+# konnte nicht bestimmt werden» entsteht auf der Kommandozeile mangels Client,
+# die Datenbankversion folgt dem Image von MariaDB, und der Deploy-Daemon sowie
+# der zweite Faktor sind bewusst nicht eingerichtet. Das Protokoll geht nach
+# stderr, wo Docker es einsammelt; die Protokoll-App von Nextcloud liest nur
+# aus einer Datei und meldet darum einen Hinweis.
+# «DatabaseChecks» kommt von der App «serverinfo» und trägt Ratschläge zur
+# Einstellung des Datenbankservers, übernommen aus phpMyAdmin. Gemessen am
+# 25.09.2026 sind es vier: das ausgeschaltete Protokoll langsamer Abfragen, die
+# hohe Schwelle dafür, die Grösse der InnoDB-Logdatei und eine gemeldete
+# Replikation, die es auf einem einzelnen Server nicht gibt. Alle vier gehören
+# dem Image von MariaDB, wie schon dessen Version.
+SETUP_ERLAUBT='HttpsUrlGeneration|SecurityHeaders|BruteForceThrottler|ForwardedForHeaders|SupportedDatabase|DaemonCheck|TwoFactorConfiguration|LogErrors|DatabaseChecks'
+docker compose exec -T nextcloud-php-fpm php -r '
+  $proc = proc_open(["/usr/bin/php", "/app/occ", "setupchecks", "--output=json", "--no-ansi"],
+    [1 => ["pipe", "w"], 2 => ["file", "/dev/null", "w"]], $pipes);
+  $roh = stream_get_contents($pipes[1]);
+  fclose($pipes[1]);
+  proc_close($proc);
+  file_put_contents("/tmp/setupchecks.json", substr($roh, strpos($roh, "{")));
+' >/dev/null
+SETUP_JSON="$(docker compose exec -T nextcloud-php-fpm php -r 'echo file_get_contents("/tmp/setupchecks.json");')"
+SETUP_OFFEN="$(jq -r --arg erlaubt "$SETUP_ERLAUBT" '
+  to_entries[] | .key as $bereich | .value | to_entries[]
+  | select(.value.severity != "success")
+  | select((.key | test($erlaubt)) | not)
+  | "\($bereich) · \(.value.name): \(.value.description // "")"' <<<"$SETUP_JSON")"
+if [[ -n "${SETUP_OFFEN}" ]]; then
+  echo "${SETUP_OFFEN}" >&2
+  # Die Datenbankprüfung fasst mehrere Einzelprüfungen zu einem Satz zusammen
+  # («4 database checks are failing»). Welche es sind, sagt erst der Nachlauf
+  # der drei Ergänzungsbefehle; ohne ihn steht im Protokoll nur die Zahl.
+  echo "[E2E] Diagnose: was die Datenbank noch braucht" >&2
+  occ db:add-missing-indices --dry-run --no-ansi >&2 || true
+  occ db:add-missing-primary-keys --dry-run --no-ansi >&2 || true
+  occ db:add-missing-columns --dry-run --no-ansi >&2 || true
+  occ db:convert-filecache-bigint --dry-run --no-ansi >&2 || true
+  echo "[E2E] Diagnose: die Prüfungen im Wortlaut" >&2
+  jq -r 'to_entries[] | .key as $bereich | .value | to_entries[]
+    | select(.value.severity != "success")
+    | "\($bereich) · \(.key) · \(.value.severity) · \(.value.name): \(.value.description // "")"' <<<"$SETUP_JSON" >&2
+  fail "Die Einrichtungsübersicht meldet Punkte, die der Container beheben müsste"
+fi
+
+echo "[E2E] Amtliche Dokumente: verzeichnet, gelesen und durchsuchbar (F121)"
+DOK_GESAMT="$(sql "SELECT COUNT(*) FROM ${TABLE_PREFIX}pw_geschaeft_dokumente;")"
+[[ "${DOK_GESAMT:-0}" -gt 0 ]] || fail "Der Abgleich hat kein einziges amtliches Dokument verzeichnet"
+# Der Abgleich liest je Lauf nur ein Kontingent; wie weit er dabei kam, hängt an
+# der Grösse der Dokumente und darf den Test nicht bestimmen. Darum liest der
+# Befehl hier gezielt nach, den auch ein Betreiber aufruft.
+occ parlwin:dokumente-lesen --anzahl=5 --no-ansi
+DOK_GELESEN="$(sql "SELECT COUNT(*) FROM ${TABLE_PREFIX}pw_geschaeft_dokumente WHERE markdown IS NOT NULL AND markdown <> '';")"
+[[ "${DOK_GELESEN:-0}" -gt 0 ]] || fail "Kein einziges Dokument wurde gelesen (Markdown leer)"
+DOK_GID="$(sql "SELECT geschaeft_id FROM ${TABLE_PREFIX}pw_geschaeft_dokumente WHERE markdown IS NOT NULL AND markdown <> '' LIMIT 1;")"
+api_expect_status GET "parlwin_mitglied" "$MITGLIED_TOKEN" "/geschaefte/${DOK_GID}/amtliche-dokumente" "200"
+jq -e 'length > 0 and (.[0].titel | length > 0)' <<<"$LAST_BODY" >/dev/null \
+  || fail "Die amtlichen Dokumente des Geschäfts ${DOK_GID} fehlen oder tragen keinen Titel"
+# Ein Wort aus dem Inhalt eines gelesenen Dokuments muss sein Geschäft finden.
+# Gewählt wird ein einzelnes langes Wort aus Buchstaben: Der Volltext trägt
+# Zeilenumbrüche, Zahlen und Satzzeichen, und ein über einen Umbruch hinweg
+# geschnittenes Stück («2021\nGGR-Nr.») steht so in keinem Dokument.
+DOK_TEXT="$(sql "SELECT LEFT(volltext, 2000) FROM ${TABLE_PREFIX}pw_geschaeft_dokumente WHERE CHAR_LENGTH(volltext) > 200 LIMIT 1;")"
+DOK_WORT="$(printf '%s' "${DOK_TEXT}" | grep -oE '[A-Za-zÄÖÜäöü]{8,}' | head -n 1)"
+if [[ -n "${DOK_WORT}" ]]; then
+  api_expect_status GET "parlwin_mitglied" "$MITGLIED_TOKEN" "/geschaefte/dokumentsuche?begriff=$(printf '%s' "${DOK_WORT}" | jq -sRr @uri)" "200"
+  jq -e 'length > 0' <<<"$LAST_BODY" >/dev/null \
+    || fail "Die Dokumentsuche findet «${DOK_WORT}» nicht, obwohl das Wort im Volltext steht"
+fi
 
 echo "[E2E] Prüfung 4/4: Alle Mitglieder sehen dieselbe Geschäftsliste"
 api_expect_status GET "admin" "$ADMIN_TOKEN" "/geschaefte?limit=200" "200"

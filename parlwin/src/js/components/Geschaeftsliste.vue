@@ -44,9 +44,8 @@
           </tr>
         </thead>
           <tbody>
+            <template v-for="g in gefilterteGeschaefte" :key="g.id">
             <tr
-              v-for="g in gefilterteGeschaefte"
-              :key="g.id"
               :class="['pw-table-row-clickable', { 'pw-geloescht': g.geloescht, 'pw-prio-hoch': prioritaetEffektiv(g) === 'hoch', 'pw-prio-tief': prioritaetEffektiv(g) === 'tief' }]"
               tabindex="0"
               role="button"
@@ -63,6 +62,18 @@
                 <a v-if="g.url" :href="g.url" target="_blank" @click.stop class="pw-inline-link" title="Extern öffnen">↗</a>
                 {{ g.titel }}
                 <span v-if="erstunterzeichner(g)" class="pw-col-einreicher">{{ erstunterzeichner(g) }}</span>
+                <!-- Erste Stufe (F121): Das Dreieck zeigt, dass das Geschäft
+                     amtliche Dokumente hat; erst ein Klick darauf bringt ihre
+                     Liste hervor, und erst ein Klick auf einen Titel das
+                     Dokument selbst. -->
+                <button
+                  v-if="(g.amtlicheDokumente || []).length"
+                  type="button"
+                  class="pw-dokumente-schalter"
+                  :aria-expanded="String(dokumenteOffen.includes(g.id))"
+                  :title="`Amtliche Dokumente (${g.amtlicheDokumente.length})`"
+                  @click.stop="dokumenteUmschalten(g.id)"
+                >{{ dokumenteOffen.includes(g.id) ? '▲' : '▼' }}</button>
               </td>
               <td data-label="Prio" class="pw-col-inline-edit pw-col-prio" @click.stop>
                 <PwPrioritaetSelect
@@ -95,6 +106,15 @@
                 />
               </td>
             </tr>
+            <!-- Die amtlichen Dokumente des Geschäfts stehen direkt unter ihm,
+                 eingeklappt mit ihrem Titel (F121). Der Klick darauf öffnet das
+                 Dokument und nicht das Geschäft. -->
+            <tr v-if="(g.amtlicheDokumente || []).length && dokumenteOffen.includes(g.id)" class="pw-dokumente-zeile">
+              <td :colspan="spaltenzahl" @click.stop>
+                <PwAmtlicheDokumente :geschaeft-id="g.id" :dokumente="g.amtlicheDokumente" />
+              </td>
+            </tr>
+            </template>
           </tbody>
           </table>
         </div>
@@ -153,6 +173,20 @@
                 @update:model-value="aenderungBeschluss(g, $event)"
               />
             </div>
+
+            <div v-if="(g.amtlicheDokumente || []).length" class="pw-card-dokumente" @click.stop>
+              <button
+                type="button"
+                class="pw-dokumente-schalter"
+                :aria-expanded="String(dokumenteOffen.includes(g.id))"
+                @click.stop="dokumenteUmschalten(g.id)"
+              >{{ dokumenteOffen.includes(g.id) ? '▲' : '▼' }} Amtliche Dokumente ({{ g.amtlicheDokumente.length }})</button>
+              <PwAmtlicheDokumente
+                v-if="dokumenteOffen.includes(g.id)"
+                :geschaeft-id="g.id"
+                :dokumente="g.amtlicheDokumente"
+              />
+            </div>
           </article>
         </div>
 
@@ -201,10 +235,11 @@ import NcButton from '@nextcloud/vue/components/NcButton'
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 import NcEmptyContent from '@nextcloud/vue/components/NcEmptyContent'
 import FilterPanel from './FilterPanel.vue'
+import PwAmtlicheDokumente from './PwAmtlicheDokumente.vue'
 
 export default {
   name: 'Geschaeftsliste',
-  components: { GeschaeftDetail, NcTextField, NcSelect, PwMultiSelect, PwPrioritaetSelect, NcCheckboxRadioSwitch, NcButton, NcLoadingIcon, NcEmptyContent, BeschlussWidget, FilterPanel },
+  components: { GeschaeftDetail, NcTextField, NcSelect, PwMultiSelect, PwPrioritaetSelect, NcCheckboxRadioSwitch, NcButton, NcLoadingIcon, NcEmptyContent, BeschlussWidget, FilterPanel, PwAmtlicheDokumente },
   props: {
     mitglieder: { type: Array, default: () => [] },
   },
@@ -216,6 +251,10 @@ export default {
       laden: true,
       statusKuerzelListe: window.PARLWIN_CONFIG?.statusKuerzel || [],
       suche: '',
+      // Geschäfte, deren amtliche Dokumente den Suchbegriff tragen.
+      dokumentTreffer: [],
+      // Geschäfte, deren Dokumentliste aufgeklappt ist (erste Stufe).
+      dokumenteOffen: [],
       filterStatus: [],
       filterPrioritaet: [],
       // Die Maske ist im Anlege-Modus: es existiert noch kein Geschäft.
@@ -254,6 +293,10 @@ export default {
     statusSpalteAnzeigen() {
       // Wenn genau ein Status gefiltert ist, wäre die Spalte redundant.
       return !(Array.isArray(this.filterStatus) && this.filterStatus.length === 1)
+    },
+    spaltenzahl() {
+      // Nr., Titel, Prio, Zuständig, Beschluss — und der Status, wo er steht.
+      return this.statusSpalteAnzeigen ? 6 : 5
     },
     alleTypen() {
       return [...new Set(this.geschaefte.map(g => g.typ).filter(Boolean))].sort()
@@ -391,9 +434,14 @@ export default {
 
       if (this.suche) {
         const s = this.suche.toLowerCase()
+        // Der Begriff steht oft nur im PDF — im Vorstoss selbst, in der Antwort
+        // des Stadtrats, in einer Beilage. Diese Geschäfte liefert der Server
+        // als Liste von IDs (F121).
         liste = liste.filter(g =>
           (g.titel || '').toLowerCase().includes(s) ||
-          (g.nummer || '').toLowerCase().includes(s)
+          (g.nummer || '').toLowerCase().includes(s) ||
+          (g.amtlicheDokumente || []).some(d => (d.titel || '').toLowerCase().includes(s)) ||
+          this.dokumentTreffer.includes(g.id)
         )
       }
       if (this.filterStatus.length > 0) {
@@ -442,6 +490,25 @@ export default {
     zeigeErledigte() {
       this.ladeGeschaefte()
     },
+    async suche(begriff) {
+      const gesucht = String(begriff || '').trim()
+      // Unter drei Zeichen träfe der Begriff halb den Bestand; die Suche in den
+      // Titeln greift ohnehin ab dem ersten Zeichen.
+      if (gesucht.length < 3) {
+        this.dokumentTreffer = []
+        return
+      }
+      try {
+        const antwort = await axios.get(
+          generateUrl('/apps/parlwin/geschaefte/dokumentsuche'),
+          { params: { begriff: gesucht } },
+        )
+        this.dokumentTreffer = Array.isArray(antwort.data) ? antwort.data.map(Number) : []
+      } catch (e) {
+        // Ohne Antwort sucht die Liste weiter in Nummer und Titel.
+        this.dokumentTreffer = []
+      }
+    },
   },
   mounted() {
     this.$nextTick(() => { this.filterReady = true })
@@ -459,6 +526,11 @@ export default {
     }
   },
   methods: {
+    dokumenteUmschalten(id) {
+      this.dokumenteOffen = this.dokumenteOffen.includes(id)
+        ? this.dokumenteOffen.filter(offen => offen !== id)
+        : [...this.dokumenteOffen, id]
+    },
     toggleMehrfachFilter(feld, wert, checked) {
       const liste = Array.isArray(this[feld]) ? [...this[feld]] : []
       const index = liste.indexOf(wert)
