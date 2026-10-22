@@ -1,5 +1,8 @@
 # Changelog
 
+- 2026-10-22 **1.9.7**
+    - Sicherheit: **der Bau prüft im fertigen Image, dass die Gegenmassnahmen gegen CVE-2026-109618 und CVE-2026-109619 wirken** — der Fortschritt eines Uploads bleibt abgeschaltet und gesperrt, und ein schwerer Fehler gibt keinen Backtrace aus. Schaltet eine Einstellung der App eines davon wieder ein, schlägt der Bau fehl
+
 - 2026-10-21 **1.9.6**
     - Sicherheit: **das Image baut wieder auf dem gehärteten PHP** von `mwaeckerlin/nextcloud:php-fpm`, mit den Gegenmassnahmen gegen die beiden PHP-Lücken CVE-2026-109618 und CVE-2026-109619 vom 21. Oktober. Der Bau war an einer Playwright-Aufnahme unter `.claude` gescheitert, die Vitest als Test lud; Vitest lässt `.claude` jetzt aus
 
