@@ -61,6 +61,28 @@ _php_iconv() {
     fi
 }
 
+# CVE-2026-109618, CVE-2026-109619: the base image locks both flags off, and nothing of this image turns them on.
+_php_fpm_locked() {
+    local image="$1" pool info flag
+    if ! docker run --rm --pull=never --entrypoint /usr/bin/php "${image}" -v > /dev/null 2>&1; then
+        return 0  # no PHP in the image — not applicable
+    fi
+    pool=$(docker run --rm --pull=never --entrypoint /usr/sbin/php-fpm "${image}" -tt 2>&1)
+    for flag in session.upload_progress.enabled fatal_error_backtraces; do
+        if grep -Eq "${flag//./\\.}\] = (off|no|0)" <<< "${pool}"; then
+            _pass "${image}_${flag}_locked"
+        else
+            _fail "${image}_${flag}_locked" "the pool does not lock ${flag} off"
+        fi
+    done
+    info=$(docker run --rm --pull=never --entrypoint /usr/sbin/php-fpm "${image}" -i 2>&1)
+    if grep -Eiq 'session\.upload_progress\.enabled( => |</td><td class="v">)(Off|0)' <<< "${info}"; then
+        _pass "${image}_session_upload_progress_off"
+    else
+        _fail "${image}_session_upload_progress_off" "$(grep -i 'session.upload_progress.enabled' <<< "${info}" || echo 'setting not reported')"
+    fi
+}
+
 echo "==> Image contract: headless images"
 
 for image in "$@"; do
@@ -70,6 +92,7 @@ for image in "$@"; do
     _no_interpreter "${image}" /bin/busybox busybox ls /
     _no_interpreter "${image}" /usr/bin/perl perl   -e 1
     _php_iconv "${image}"
+    _php_fpm_locked "${image}"
 done
 
 echo ""
