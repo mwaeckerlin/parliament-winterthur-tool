@@ -1,14 +1,14 @@
 # Builds the images of this repository for amd64 and arm64 and publishes them on
-# Docker Hub: on every push to master and to the version branches, and once a
-# week for the security fixes of the base images. The build itself is the
-# reusable workflow docker-image.yml of mwaeckerlin/scratch; its README explains
-# the setup.
+# Docker Hub: on every push to master and to the version branches, and in the
+# hourly check when a parent image or a download changed or the image is a week
+# old. The build itself is the reusable workflow docker-image.yml of
+# mwaeckerlin/scratch; its README explains the setup.
 #
 # One branch per Nextcloud major version, because Nextcloud upgrades one major
 # version at a time: branch nc34 publishes php-fpm-nc34, nginx-nc34 and
 # realtime-nc34 with their date and version tags, master publishes the plain
-# tags. GitHub starts scheduled runs on the default branch only, so the weekly
-# run of master starts this workflow on every nc branch as well; that needs
+# tags. GitHub starts scheduled runs on the default branch only, so the
+# scheduled run of master starts this workflow on every nc branch as well; that needs
 # «actions: write».
 
 name: docker
@@ -17,9 +17,7 @@ on:
   push:
     branches: [master, "nc*"]
   schedule:
-    # weekly rebuild, one hour per level after the images it is built on:
-    # mwaeckerlin/scratch at 03:17, this repository at level 4
-    - cron: "17 7 * * 1"
+    - cron: "17 * * * *"
   workflow_dispatch:
     inputs:
       ref:
