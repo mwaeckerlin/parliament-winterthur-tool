@@ -61,9 +61,15 @@ export PARLWIN_SYNC_LIMIT_GESCHAEFTE="${PARLWIN_SYNC_LIMIT_GESCHAEFTE:-}"
 # Mitte 2023 als Dokument, also schneidet jedes Limit den Fall weg, den F115
 # prüft. Der volle Abgleich der Sitzungen dauert rund eine Minute.
 export PARLWIN_SYNC_LIMIT_SITZUNGEN="${PARLWIN_SYNC_LIMIT_SITZUNGEN:-}"
-export PARLWIN_SYNC_LIMIT_MITGLIEDER="${PARLWIN_SYNC_LIMIT_MITGLIEDER:-80}"
-export PARLWIN_SYNC_LIMIT_KOMMISSIONEN="${PARLWIN_SYNC_LIMIT_KOMMISSIONEN:-30}"
-export PARLWIN_SYNC_LIMIT_FRAKTIONEN="${PARLWIN_SYNC_LIMIT_FRAKTIONEN:-20}"
+# Mitglieder, Kommissionen und Fraktionen OHNE Limit: Die Limits hielten den
+# Abgleich gegen die echte Webseite kurz. Die Quelle ist jetzt die lokale
+# Gegenstelle, die aus Dateien antwortet — und ein Limit schnitt genau die
+# Mitglieder weg, die eine Funktion tragen: Gemessen am 2026-10-15 blieben von
+# der Mitgliederliste 19 aktive übrig, und der Präsident mit der Kennung 281201
+# war nicht darunter, weshalb die Mitgliederansicht keine Fraktionsrolle zeigte.
+export PARLWIN_SYNC_LIMIT_MITGLIEDER="${PARLWIN_SYNC_LIMIT_MITGLIEDER:-}"
+export PARLWIN_SYNC_LIMIT_KOMMISSIONEN="${PARLWIN_SYNC_LIMIT_KOMMISSIONEN:-}"
+export PARLWIN_SYNC_LIMIT_FRAKTIONEN="${PARLWIN_SYNC_LIMIT_FRAKTIONEN:-}"
 
 BASE_URL="http://nextcloud-nginx:8080/index.php/apps/parlwin"
 STATUS_URL="http://nextcloud-nginx:8080/status.php"
@@ -80,6 +86,23 @@ trap cleanup EXIT
 
 fail() {
   echo "E2E FEHLER: $1" >&2
+  # Die Antwort selbst nennt bei den Endpunkten von parlwin den Grund: sie
+  # trägt das Feld «fehler» mit der Meldung der Ausnahme. Ohne diese Zeile
+  # stand im Protokoll nur der Status 500, und die Ursache war nicht zu sehen
+  # (gemessen am 24.10.2026 bei PUT /geschaefte/1/stammdaten).
+  if [[ -n "${LAST_BODY:-}" ]]; then
+    echo "[E2E] Diagnose: Antwort des Servers:" >&2
+    printf '%s\n' "${LAST_BODY:0:2000}" >&2
+  fi
+  echo "[E2E] Diagnose: parlwin-Zeilen aus nextcloud.log (letzte 40)" >&2
+  docker compose exec -T nextcloud-php-fpm php -r '
+    foreach (["/app/data/nextcloud.log", "/var/www/html/data/nextcloud.log", "/data/nextcloud.log"] as $pfad) {
+      if (!is_readable($pfad)) { continue; }
+      $zeilen = array_filter(explode("\n", (string) file_get_contents($pfad)), static fn ($z) => stripos($z, "parlwin") !== false);
+      echo implode("\n", array_slice($zeilen, -40)), "\n";
+      break;
+    }
+  ' >&2 || true
   # Server-Log zur Ursache mitliefern (z.B. die Exception hinter einem 500).
   echo "[E2E] Diagnose: php-fpm-Log (letzte 60 Zeilen)" >&2
   docker compose logs --tail 60 nextcloud-php-fpm >&2 || true
@@ -515,6 +538,16 @@ assert_non_empty "$MITGLIED_TOKEN" "Mitglied-App-Passwort konnte nicht erzeugt w
 SAFE_SYNC_HOUR=$(printf '%02d' "$(( ($(TZ=Europe/Zurich date +%-H) + 6) % 24 ))")
 occ config:app:set parlwin sync_zeitplan --value="[{\"tage\":[1,2,3,4,5,6,7],\"zeit\":\"${SAFE_SYNC_HOUR}:00\"}]" >/dev/null 2>&1 || true
 
+# Die lokale Gegenstelle liegt im Compose-Netz, also auf einer privaten
+# Adresse. Der HTTP-Client von Nextcloud lehnt solche Adressen ab
+# (LocalServerException), und davon betroffen ist genau der Download der
+# amtlichen Dokumente: Die Listen und Detailseiten holt der Abgleich über
+# curl_multi, die Dokumente über den Client von Nextcloud. Gemessen am
+# 2026-10-15: Liste und 1236 Detailseiten kamen von der Gegenstelle, kein
+# einziges Dokument. Im Betrieb bleibt die Regel, wie sie ist — dort steht die
+# Quelle im Internet.
+occ config:system:set allow_local_remote_servers --value=true --type=boolean >/dev/null 2>&1 || true
+
 # Admin-Sprache auf Deutsch: Nextcloud lädt die App-Übersetzung l10n/de.js
 # (OC.L10N.register) nur bei deutscher Sprache. Genau diese Datei löst
 # «OC is not defined» aus, wenn sie vor dem Core lädt. Ohne deutsche Sprache
@@ -559,6 +592,36 @@ for _ in $(seq 1 1800); do
 done
 [[ "$SAW_RUNNING" -eq 1 ]] || fail "Während des Syncs wurde kein laufender Fortschritt beobachtet"
 [[ "$SAW_FINISHED" -eq 1 ]] || fail "Sync wurde nicht rechtzeitig abgeschlossen"
+
+# Der Abgleich holt seine Seiten bei der lokalen Gegenstelle, nicht bei der
+# Stadt. Gemessen am Zugriffsprotokoll der Gegenstelle: Die Liste der Geschäfte
+# und ihre Detailseiten müssen dort angefragt worden sein. Ohne diese Prüfung
+# bliebe unbemerkt, dass der Lauf wieder parlament.winterthur.ch befragt —
+# 1236 Detailseiten je Lauf, auf dem Runner nach 34 Minuten nicht fertig.
+echo "[E2E] Prüfe, dass der Abgleich die lokale Gegenstelle befragt hat"
+QUELLE_LOG="$(docker compose logs parlwin-quelle 2>/dev/null)"
+# Die Antworten der Gegenstelle nach Status und Weg: Eine Anfrage, die mit 404
+# endet, liefert dem Abgleich nichts, und ohne diese Zahlen sieht das genauso
+# aus wie eine Anfrage, die nie kam.
+echo "[E2E] Antworten der Gegenstelle (Status × Weg, die zehn häufigsten):"
+grep -oE '"(GET|HEAD) [^ ]+ [^"]*" [0-9]{3}' <<<"$QUELLE_LOG" \
+  | sed -E 's#/[0-9]+$#/<id>#' \
+  | sort | uniq -c | sort -rn | head -10 || true
+grep -q "GET /politbusiness" <<<"$QUELLE_LOG" \
+  || fail "Die Gegenstelle hat keine Anfrage nach /politbusiness gesehen: Der Abgleich ging woanders hin"
+QUELLE_DETAILS="$(grep -c "GET /_rte/information/" <<<"$QUELLE_LOG" || true)"
+[[ "$QUELLE_DETAILS" -ge 100 ]] \
+  || fail "Die Gegenstelle hat nur ${QUELLE_DETAILS} Detailseiten ausgeliefert, erwartet sind mindestens 100"
+if ! grep -q "GET /_doc/" <<<"$QUELLE_LOG"; then
+  echo "[E2E] Diagnose: was parlwin über die Dokumente sagt"
+  docker compose exec -T nextcloud-php-fpm php -r '
+    $log = "/app/data/nextcloud.log";
+    if (!is_readable($log)) { echo "kein Protokoll unter $log\n"; exit; }
+    foreach (array_slice(file($log), -400) as $zeile) {
+      if (stripos($zeile, "dokument") !== false || stripos($zeile, "local") !== false) { echo $zeile; }
+    }' 2>/dev/null | tail -20 || true
+  fail "Die Gegenstelle hat kein Dokument ausgeliefert: Die amtlichen Dokumente kamen woanders her"
+fi
 
 assert_json '.running == false' "Sync-Status ist nach Abschluss noch running=true"
 assert_json '.phase == "abgeschlossen"' "Sync-Status endet nicht im Erfolgs-Status"
@@ -1061,6 +1124,38 @@ api_expect_status GET "admin" "$ADMIN_TOKEN" "/geschaefte/${FIRST_ID}" "200"
 jq -e '.id and .titel' <<<"$LAST_BODY" >/dev/null || fail "Geschäft-Detail fehlen Felder"
 
 echo "[E2E] Einrichtungsübersicht von Nextcloud ohne Warnungen (F122)"
+# Zuerst warten, bis der Container seinen Cron einmal getickt hat: Die
+# Übersicht prüft, wann der Hintergrundauftrag zuletzt lief, und ohne einen
+# einzigen Lauf meldet sie «Last background job execution ran 56 years ago»
+# (Zeitpunkt 0). Der Watcher tickt alle PARLWIN_CRON_INTERVAL Sekunden (im Test
+# 5). Vorher fiel das nicht auf, weil der Abgleich gegen die echte Webseite
+# Minuten dauerte und der erste Tick längst vorbei war; mit der lokalen
+# Gegenstelle ist der Abgleich in Sekunden fertig.
+# `occ config:app:get` endet mit einem Fehler, solange der Schlüssel fehlt —
+# und genau das ist der Zustand vor dem ersten Lauf. Ohne `|| true` beendet
+# `set -e` den ganzen Lauf an dieser Stelle, ohne eine Zeile zu schreiben.
+# Gewartet wird auf eine ZAHL: Fehlt der Schlüssel, endet `occ config:app:get`
+# mit einem Fehler UND schreibt einen Satz nach stdout («not set or is
+# empty»). Eine Prüfung auf «nicht leer» hält diesen Satz für den Zeitpunkt und
+# wartet gar nicht; ohne `|| true` bricht `set -e` den Lauf stumm ab.
+# Gelesen wird die Zahl am Ende der Ausgabe: `occ` stellt ihr einen Hinweis zu
+# den PCNTL-Erweiterungen voran, und ein Zeitpunkt in Unix-Sekunden hat zehn
+# Stellen. Ein `grep` auf die letzte lange Zahlenfolge nimmt genau sie.
+# Gewartet wird fünf Minuten, nicht eine: Der Watcher tickt zwar alle fünf
+# Sekunden (PARLWIN_CRON_INTERVAL im E2E-Compose), er erreicht seine Schleife
+# aber erst nach Installation, Migrationsprüfung und Erstlauf. Unter Last
+# dauert das länger als eine Minute — am 16.10.2026 scheiterte der Lauf hier
+# mit «lastcron: leer», während derselbe Code zwei Stunden vorher grün war.
+LETZTER_CRON=""
+for _ in $(seq 1 300); do
+  LETZTER_CRON="$(occ config:app:get core lastcron 2>/dev/null | grep -oE '[0-9]{10,}' | tail -n 1 || true)"
+  if [[ "$LETZTER_CRON" =~ ^[0-9]+$ ]] && [[ "$LETZTER_CRON" -gt 0 ]]; then
+    break
+  fi
+  sleep 1
+done
+{ [[ "$LETZTER_CRON" =~ ^[0-9]+$ ]] && [[ "$LETZTER_CRON" -gt 0 ]]; } \
+  || fail "Der Hintergrundauftrag des Containers lief nicht ein einziges Mal (core lastcron: «${LETZTER_CRON:-leer}»)"
 # Gemessen wird, was in «Administration → Übersicht» steht. Offen bleiben nur
 # die Prüfungen, die ohne HTTPS und ohne echten Client nicht grün werden
 # können: HSTS und die erzeugten URLs brauchen TLS, «Ihre entfernte Adresse
@@ -1107,6 +1202,33 @@ if [[ -n "${SETUP_OFFEN}" ]]; then
   fail "Die Einrichtungsübersicht meldet Punkte, die der Container beheben müsste"
 fi
 
+# Woher die Mitgliederansicht eine Fraktionsrolle nimmt: aus den Mitgliedern
+# einer AKTIVEN Fraktion, die selbst als aktiv geführt sind und eine Funktion
+# tragen (Mitgliederliste.vue, `fraktionsrolleNachExternId`). Fehlt die Rolle
+# in der Ansicht, sagt diese Zeile, ob sie in den Daten fehlt. Die Abfrage
+# steht NACH den Prüfungen des Sync-Status, weil sie `LAST_BODY` überschreibt.
+echo "[E2E] Diagnose: Fraktionsrollen in den Daten"
+api_request GET "admin" "$ADMIN_TOKEN" "/fraktionen" >/dev/null 2>&1 || true
+jq -r '[.[] | select(.aktiv != false)] as $aktive
+  | [$aktive[] | (.mitglieder // "[]") | fromjson? // [] | .[] | select(.aktiv != false)] as $mitglieder
+  | "aktive Fraktionen: \($aktive | length)",
+    "aktive Mitglieder darin: \($mitglieder | length)",
+    "mit Präsidium: \([$mitglieder[] | select((.funktion // "") | test("räsiden"))] | length)",
+    "Funktionen der aktiven: \([$mitglieder[] | .funktion // ""] | unique | join(" | "))",
+    "Kennungen mit Präsidium: \([$mitglieder[] | select((.funktion // "") | test("räsiden")) | .externId] | unique | join(", "))"' \
+  <<<"$LAST_BODY" 2>/dev/null || echo "(Fraktionen nicht lesbar)"
+# Die Ansicht findet eine Rolle nur, wenn die Kennung des Mitglieds in BEIDEN
+# Listen steht: in der Fraktion und in der Mitgliederliste.
+FRAKTION_IDS="$(jq -r '[.[] | select(.aktiv != false) | (.mitglieder // "[]") | fromjson? // [] | .[] | select(.aktiv != false) | .externId] | unique | join(",")' <<<"$LAST_BODY" 2>/dev/null || true)"
+api_request GET "admin" "$ADMIN_TOKEN" "/mitglieder" >/dev/null 2>&1 || true
+jq -r --arg ids "$FRAKTION_IDS" '
+  ($ids | split(",")) as $fraktion
+  | [.[] | select(.aktiv != false) | .externId] as $liste
+  | "aktive Mitglieder in der Mitgliederliste: \($liste | length)",
+    "davon auch in einer Fraktion: \([$liste[] | select(. as $i | $fraktion | index($i))] | length)",
+    "erste Kennungen der Liste: \($liste[0:5] | join(", "))"' \
+  <<<"$LAST_BODY" 2>/dev/null || echo "(Mitglieder nicht lesbar)"
+
 echo "[E2E] Amtliche Dokumente: verzeichnet, gelesen und durchsuchbar (F121)"
 DOK_GESAMT="$(sql "SELECT COUNT(*) FROM ${TABLE_PREFIX}pw_geschaeft_dokumente;")"
 [[ "${DOK_GESAMT:-0}" -gt 0 ]] || fail "Der Abgleich hat kein einziges amtliches Dokument verzeichnet"
@@ -1125,7 +1247,14 @@ jq -e 'length > 0 and (.[0].titel | length > 0)' <<<"$LAST_BODY" >/dev/null \
 # Zeilenumbrüche, Zahlen und Satzzeichen, und ein über einen Umbruch hinweg
 # geschnittenes Stück («2021\nGGR-Nr.») steht so in keinem Dokument.
 DOK_TEXT="$(sql "SELECT LEFT(volltext, 2000) FROM ${TABLE_PREFIX}pw_geschaeft_dokumente WHERE CHAR_LENGTH(volltext) > 200 LIMIT 1;")"
-DOK_WORT="$(printf '%s' "${DOK_TEXT}" | grep -oE '[A-Za-zÄÖÜäöü]{8,}' | head -n 1)"
+# Gewählt wird ein Wort, das im Volltext ZWISCHEN Leerzeichen steht. Eine
+# blosse Buchstabenfolge genügt nicht: In einem Dokument mit Tabellen stehen
+# Zellen ohne Trennzeichen beieinander, und dann ist «nbetreffend» eine
+# Buchstabenfolge, aber kein Wort — die Suche zerlegt den Text in Wörter und
+# findet es zu Recht nicht (gemessen am 2026-10-15; die Vorstösse, die Antwort
+# des Stadtrats, die Medienmitteilung und das Drehbuch liefern alle saubere
+# Wörter, das Budgetbuch nicht).
+DOK_WORT="$(printf '%s' "${DOK_TEXT}" | grep -oE '(^| )[A-Za-zÄÖÜäöü]{8,}( |$)' | head -n 1 | tr -d ' ')"
 if [[ -n "${DOK_WORT}" ]]; then
   api_expect_status GET "parlwin_mitglied" "$MITGLIED_TOKEN" "/geschaefte/dokumentsuche?begriff=$(printf '%s' "${DOK_WORT}" | jq -sRr @uri)" "200"
   jq -e 'length > 0' <<<"$LAST_BODY" >/dev/null \
@@ -1365,6 +1494,13 @@ export PW_ADMIN_PASS="${NEXTCLOUD_ADMIN_PASSWORD}"
 # Arbeitskopie: dort kann kein Alt-Report den aktuellen Lauf vortäuschen, und
 # keine Altlast (z.B. ein root-owned tests/e2e/.junit früherer Läufe vor der
 # docker-cp-Umstellung) kann den Lauf vor dem ersten Browser-Test abbrechen.
+# Was der Verknüpfen-Dialog zu bieten hat: Er lädt `/geschaefte?limit=500` ohne
+# `show_erledigt`, bekommt also die pendenten. Steht hier 0, fehlt dem Dialog
+# die Grundlage, und sein Browsertest meldet «keine Geschäfte zur Verknüpfung
+# angeboten» — das sieht in der Anzeige gleich aus wie ein kaputter Dialog.
+api_request GET "parlwin_mitglied" "$MITGLIED_TOKEN" "/geschaefte?limit=500" >/dev/null 2>&1 || true
+echo "[E2E] Diagnose: pendente Geschäfte für den Verknüpfen-Dialog: $(jq -r 'length' <<<"$LAST_BODY" 2>/dev/null || echo '?')"
+
 PW_REPORT="${TEMP_DIR}/e2e-junit/e2e.xml"
 PW_CONTAINER="parlwin-e2e-playwright"
 mkdir -p "$(dirname "$PW_REPORT")"

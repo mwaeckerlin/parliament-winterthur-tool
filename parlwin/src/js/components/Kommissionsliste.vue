@@ -88,7 +88,7 @@
           </div>
           <p v-else class="pw-hinweis">Keine Mitglieder synchronisiert.</p>
           <p v-if="!geschaefteFuer(k).length" class="pw-hinweis">
-            Keine Geschäfte mit Status „Bei Kommission {{ kuerze(k.name) }} pendent“
+            Keine Geschäfte mit Status «Bei Kommission {{ kuerze(k.name) }} pendent»
             und keines, das dieser Kommission zugewiesen ist.
           </p>
           <div v-if="!istAktiv(k)" class="pw-inline-note">
@@ -146,6 +146,8 @@ export default {
       nurAktive: true,
       nurAktiveMitglieder: true,
       offeneMitglieder: [],
+      // Der Zustand des Anwenders, während der Druck alle Karten offen hat.
+      offeneVorDemDruck: null,
       unsubRealtime: null,
       ausgewaehlteGeschaeftId: null,
     }
@@ -229,8 +231,16 @@ export default {
     this.ladeKommissionen()
     this.ladeGeschaefte()
     this.unsubRealtime = subscribeRealtime(this.handleRealtimeEvent)
+    // Eine eingeklappte Mitgliederliste steht gar nicht im Dokument, also
+    // kann kein Stylesheet sie auf das Papier holen: Auf dem Ausdruck stand
+    // «Mitglieder (12):» und darunter nichts. Vor dem Druck klappen alle auf,
+    // danach steht wieder der Zustand des Anwenders da.
+    window.addEventListener('beforeprint', this.vorDemDruck)
+    window.addEventListener('afterprint', this.nachDemDruck)
   },
   beforeUnmount() {
+    window.removeEventListener('beforeprint', this.vorDemDruck)
+    window.removeEventListener('afterprint', this.nachDemDruck)
     if (this.unsubRealtime) {
       this.unsubRealtime()
       this.unsubRealtime = null
@@ -238,6 +248,16 @@ export default {
   },
   methods: {
     kuerze,
+    vorDemDruck() {
+      this.offeneVorDemDruck = [...this.offeneMitglieder]
+      this.offeneMitglieder = this.kommissionen.map(k => k.id)
+    },
+    nachDemDruck() {
+      if (this.offeneVorDemDruck) {
+        this.offeneMitglieder = this.offeneVorDemDruck
+        this.offeneVorDemDruck = null
+      }
+    },
     filterZuruecksetzen() {
       this.suche = ''
       this.nurAktive = true

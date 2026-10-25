@@ -249,7 +249,7 @@
 
         <!-- Aufklappbarer Bereich mit Traktanden -->
         <div v-if="offeneSitzungen.includes(sitzung.id)" class="pw-sitzung-details">
-          <!-- Notizen zur Sitzung (ersetzt frühere „Bemerkungen zur Sitzung“). -->
+          <!-- Notizen zur Sitzung (ersetzt frühere «Bemerkungen zur Sitzung»). -->
           <div class="pw-sitzung-notizen">
             <h4>Notizen zur Sitzung</h4>
             <NotizenListe

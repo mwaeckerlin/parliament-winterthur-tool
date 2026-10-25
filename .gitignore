@@ -17,6 +17,10 @@ Thumbs.db
 # Lokal abgelegte E-Mails des Fake-SMTP-Servers
 mails/
 
+# Im Wurzelverzeichnis abgelegte Tabellenausgaben: Daten einer Installation,
+# erzeugt vom Excel-Export, nie Teil des Quellcodes.
+/*.xlsx
+
 # Playwright-Testausgaben (Screenshots, Traces, Reports)
 test-results/
 playwright-report/

@@ -15,14 +15,29 @@ services:
       retries: 40
       start_period: 10s
 
+  # Die lokale Gegenstelle des Abgleichs: liefert die gespeicherten Seiten und
+  # PDF des Parlaments aus (Dockerfile.quelle). Ohne sie holte der Lauf 1236
+  # Detailseiten von der echten Webseite der Stadt — auf dem GitHub-Runner nach
+  # 34 Minuten nicht fertig, und jeder Push schickte diese Last an die Stadt.
+  parlwin-quelle:
+    build:
+      context: .
+      dockerfile: Dockerfile.quelle
+    image: mwaeckerlin/parliament-winterthur-tool:quelle
+    networks:
+      - nginx-php
+
   nextcloud-php-fpm:
     environment:
       # Kurzer Cron-Tick für den E2E-Test (Produktion: 300s Default im Watcher),
       # damit der automatische Background-Job-Lauf im Test zügig greift.
       PARLWIN_CRON_INTERVAL: "5"
+      PARLWIN_QUELLE_BASE_URL: "http://parlwin-quelle:8080"
     depends_on:
       nextcloud-db:
         condition: service_healthy
+      parlwin-quelle:
+        condition: service_started
 
   parlwin-realtime:
     ports: !reset []

@@ -6,14 +6,14 @@
     <FilterPanel @reset="filterZuruecksetzen">
       <section class="pw-filter-panel pw-filter-gruppe">
         <div class="pw-filter-header"><h3>Sortieren</h3></div>
-        <NcSelect v-model="sortierModusOption" :options="sortierOptions" :clearable="false" input-label="Sortieren nach" />
+        <NcSelect v-model="sortierModusOption" :options="sortierOptions" :clearable="false" input-label="Sortieren nach" :calculate-position="filterDropdownPosition" />
       </section>
       <section class="pw-filter-panel pw-filter-gruppe">
         <div class="pw-filter-header"><h3>Filter</h3></div>
-        <NcSelect v-model="filterFraktionOption" :options="fraktionOptions" :clearable="false" input-label="Fraktion" />
-        <NcSelect v-model="filterParteiOption" :options="parteiOptions" :clearable="false" input-label="Partei" />
-        <NcSelect v-model="filterKommissionOption" :options="kommissionOptions" :clearable="false" input-label="Kommission" />
-        <NcSelect v-model="funktionFilterOption" :options="funktionFilterOptions" :clearable="false" input-label="Funktion" />
+        <NcSelect v-model="filterFraktionOption" :options="fraktionOptions" :clearable="false" input-label="Fraktion" :calculate-position="filterDropdownPosition" />
+        <NcSelect v-model="filterParteiOption" :options="parteiOptions" :clearable="false" input-label="Partei" :calculate-position="filterDropdownPosition" />
+        <NcSelect v-model="filterKommissionOption" :options="kommissionOptions" :clearable="false" input-label="Kommission" :calculate-position="filterDropdownPosition" />
+        <NcSelect v-model="funktionFilterOption" :options="funktionFilterOptions" :clearable="false" input-label="Funktion" :calculate-position="filterDropdownPosition" />
         <NcCheckboxRadioSwitch v-model="nurAktive" type="switch">
           Nur aktive Mitglieder
         </NcCheckboxRadioSwitch>
@@ -74,6 +74,7 @@ import NcSelect from '@nextcloud/vue/components/NcSelect'
 import NcCheckboxRadioSwitch from '@nextcloud/vue/components/NcCheckboxRadioSwitch'
 import NcEmptyContent from '@nextcloud/vue/components/NcEmptyContent'
 import FilterPanel from './FilterPanel.vue'
+import { filterDropdownPosition } from '../filter-dropdown'
 import { kuerze } from '../utils'
 
 export default {
@@ -253,6 +254,9 @@ export default {
     },
   },
   methods: {
+    // Die Liste eines Filterfeldes bleibt im sichtbaren Bereich, auch wenn
+    // die Bildschirmtastatur ihn halbiert (filter-dropdown.js).
+    filterDropdownPosition,
     kuerze,
     filterZuruecksetzen() {
       this.suche = ''

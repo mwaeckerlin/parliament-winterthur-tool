@@ -26,6 +26,8 @@ use JsonSerializable;
  * @method void   setZielTyp(?string $v)
  * @method string getZielRef()
  * @method void   setZielRef(?string $v)
+ * @method string getNeuerWert()
+ * @method void   setNeuerWert(?string $v)
  * @method int    getBetragDelta()
  * @method void   setBetragDelta(int $v)
  * @method float  getProzentDelta()
@@ -70,6 +72,11 @@ class BudgetAntrag extends Entity implements JsonSerializable {
     protected ?string $bereich = null;
     protected ?string $zielTyp = null;
     protected ?string $zielRef = null;
+    /**
+     * F137: Der neue Wert eines Antrags ohne Betrag — das Bewilligungsorgan
+     * eines Verpflichtungskredits. Leer bei jedem anderen Antrag.
+     */
+    protected ?string $neuerWert = null;
     protected int $betragDelta = 0;
     protected float $prozentDelta = 0.0;
     protected float $stellenDelta = 0.0;
@@ -194,6 +201,7 @@ class BudgetAntrag extends Entity implements JsonSerializable {
             'jahr' => $this->jahr,
             'bereich' => $this->bereich,
             'zielTyp' => $this->zielTyp,
+            'neuerWert' => $this->neuerWert ?? '',
             'zielRef' => $this->zielRef,
             'betragDelta' => $this->betragDelta,
             'prozentDelta' => $this->prozentDelta,

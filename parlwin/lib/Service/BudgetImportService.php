@@ -29,8 +29,6 @@ use OCP\Http\Client\IClientService;
  * nicht im Image.
  */
 class BudgetImportService {
-    private const BASE_URL = 'https://parlament.winterthur.ch';
-
     /**
      * Untergrenze für einen plausiblen Teil-B-Parse. Der schmalste Jahrgang (2017)
      * führt 46 Produktegruppen; die Grenze liegt bewusst weit darunter, damit ein
@@ -147,6 +145,45 @@ class BudgetImportService {
         if ($mitNovemberbrief) {
             $this->importiereNovemberbrief($jahr);
         }
+    }
+
+    /**
+     * Die Jahre, die mit einem älteren Stand des Einlesers gelesen wurden
+     * (F130).
+     *
+     * @return int[]
+     */
+    public function jahreMitAltemEinleser(): array {
+        $alt = [];
+        foreach ($this->jahre->alle() as $j) {
+            if ((int) $j->getParserVersion() < BudgetBuchParser::VERSION) {
+                $alt[] = (int) $j->getJahr();
+            }
+        }
+        return $alt;
+    }
+
+    /**
+     * Liest ein Jahr mit dem heutigen Einleser neu ein, ohne die Einträge der
+     * Fraktion anzutasten (F130).
+     *
+     * Marc am 24.10.2026: «Stelle sicher, dass bei Verbesserungen im Parser auch
+     * bereits eingelesene Dokumente nach dem Update neu eingelesen werden, und
+     * bestehende Einträge der Fraktion nicht verloren gehen und auch am
+     * richtigen Ort bleiben. Es darf sich an unseren Einträgen nichts ändern,
+     * nichts kaputt gehen kann.»
+     *
+     * Was dabei ersetzt wird, sind die Zahlen des Buchs: Produktegruppen,
+     * Investitionen, Zielvorgaben, Kostenzeilen. Anträge, Notizen, Dokumente,
+     * Entscheide und Pauschalverteilungen bleiben unberührt — sie hängen an der
+     * Nummer der Produktegruppe und am Vorhaben, und beide stehen im Buch
+     * unverändert.
+     *
+     * Der Unterschied zum Knopf «Budget neu einlesen» (F91): Jener leert
+     * vorher bewusst alles, dieser rührt nichts an.
+     */
+    public function erneuereEinlesen(int $jahr): void {
+        $this->importiereJahr($jahr);
     }
 
     /**
@@ -320,7 +357,18 @@ class BudgetImportService {
         if ($url === '' || preg_match('#^https?://#i', $url) === 1) {
             return $url;
         }
-        return self::BASE_URL . '/' . ltrim($url, '/');
+        return self::absoluteQuellUrl($url);
+    }
+
+    /**
+     * Eine Adresse der Datenquelle, aus einem Pfad des Buchs oder der Seite.
+     *
+     * Die Basis ist eine Einstellung (`ScraperService::basisUrl()`): im Betrieb
+     * die Webseite des Parlaments, im Testlauf die lokale Gegenstelle. Sonst
+     * holte der Abgleich des Testlaufs die Bücher und Drehbücher bei der Stadt.
+     */
+    public static function absoluteQuellUrl(string $url): string {
+        return ScraperService::basisUrl() . '/' . ltrim($url, '/');
     }
 
     /** Lädt eine HTML-Seite der Parlamentswebseite. */
@@ -388,6 +436,12 @@ class BudgetImportService {
         // Novemberbriefs stehen nicht mehr darin, also gilt er wieder als offen und
         // die Oberfläche bietet ihn erneut zum Einlesen an.
         $jahrRow->setNovemberbriefImportiert(0);
+        // F136: die Departementssekretariate aus Teil A.
+        $jahrRow->setSekretariate((string) json_encode(array_values($struktur['sekretariate'] ?? [])));
+        // F130: Stand des Einlesers festhalten, mit dem dieses Jahr gelesen
+        // wurde. Daran erkennt der Hintergrundauftrag nach einem Update, welche
+        // Jahre neu zu lesen sind.
+        $jahrRow->setParserVersion(BudgetBuchParser::VERSION);
         $this->jahre->update($jahrRow);
 
         // Produktegruppen und Investitionen ersetzen (Anträge bleiben).
@@ -471,6 +525,8 @@ class BudgetImportService {
         $e->setName((string) ($g['name'] ?? ''));
         $e->setDepartement((string) ($g['departement'] ?? ''));
         $e->setReihenfolge((int) ($g['reihenfolge'] ?? $reihenfolge));
+        // F129: die Seite, auf der die Produktegruppe im Budgetbuch steht.
+        $e->setBuchseite((int) ($g['buchseite'] ?? 0));
         $gk = $g['globalkredit'] ?? [];
         $e->setGlobalkreditIst((int) ($gk['ist'] ?? 0));
         $e->setGlobalkreditSollVorjahr((int) ($gk['sollVorjahr'] ?? 0));
@@ -538,9 +594,20 @@ class BudgetImportService {
         foreach ($this->investitionen->findByJahr($jahr) as $i) {
             $invNachId[(string) $i->getId()] = $i;
         }
-        // Innerhalb eines Departements zuerst das Budget (Globalbudget, Personal),
-        // dann die Investitionen (F92); der Steuerfuss steht in einem eigenen Abschnitt.
-        $bereichOrder = ['globalbudget' => 0, 'personal' => 1, 'investition' => 2, 'steuerfuss' => 3];
+        // Innerhalb eines Departements zuerst das Sekretariat (F136, es steht
+        // auch am Bildschirm über den Produktegruppen), dann das Budget
+        // (Globalbudget, Personal), dann die Investitionen mit ihren
+        // Verpflichtungskrediten (F92, F135, F137); der Steuerfuss steht in
+        // einem eigenen Abschnitt.
+        $bereichOrder = [
+            'departementssekretariat' => 0,
+            'globalbudget' => 1,
+            'personal' => 2,
+            'investition' => 3,
+            'verpflichtungskredit' => 4,
+            'bewilligungsorgan' => 5,
+            'steuerfuss' => 6,
+        ];
         $eintraege = [];
         $depReihenfolge = [];
         foreach ($this->antraege->findByJahr($jahr) as $a) {
@@ -553,10 +620,30 @@ class BudgetImportService {
             }
             $bereich = (string) $a->getBereich();
             $steuerfuss = $bereich === 'steuerfuss';
+            $seite = 0;
             if ($bereich === 'investition') {
                 $inv = $invNachId[(string) $a->getZielRef()] ?? null;
                 $dep = $inv !== null ? (string) $inv->getDepartement() : '';
                 $bezeichnung = $inv !== null ? (string) $inv->getProjekt() : (string) $a->getZielRef();
+            } elseif ($bereich === 'verpflichtungskredit' || $bereich === 'bewilligungsorgan') {
+                // F135/F137: Die Kennung ist das Vorhaben mit seinem Konto.
+                [$invId, $konto] = array_pad(explode('|', (string) $a->getZielRef(), 2), 2, '');
+                $inv = $invNachId[$invId] ?? null;
+                $dep = $inv !== null ? (string) $inv->getDepartement() : '';
+                $kreditName = '';
+                foreach ($inv !== null ? $inv->getKontenArray() : [] as $k) {
+                    if ((string) ($k['konto'] ?? '') === $konto) {
+                        $kreditName = trim((string) ($k['name'] ?? ''));
+                        break;
+                    }
+                }
+                $bezeichnung = ($inv !== null ? (string) $inv->getProjekt() : $invId)
+                    . ' · Kredit ' . $konto . ($kreditName !== '' ? ' ' . $kreditName : '');
+            } elseif ($bereich === 'departementssekretariat') {
+                // F136: Der Antrag zielt auf das Sekretariat des Departements;
+                // das Departement selbst ist die Kennung.
+                $dep = (string) $a->getZielRef();
+                $bezeichnung = 'Departementssekretariat';
             } elseif ($steuerfuss) {
                 $dep = 'Steuerfuss';
                 $bezeichnung = 'Steuerfuss';
@@ -564,6 +651,9 @@ class BudgetImportService {
                 $g = $gruppenNachCode[(string) $a->getZielRef()] ?? null;
                 $dep = $g !== null ? (string) $g->getDepartement() : '';
                 $bezeichnung = $g !== null ? (string) $g->getName() : (string) $a->getZielRef();
+                // F129: die Seite im Budgetbuch, damit man die Produktegruppe
+                // auch auf dem Papier findet.
+                $seite = $g !== null ? (int) $g->getBuchseite() : 0;
             }
             if ($kommission !== null && $kommission !== '' && !$steuerfuss && $dep !== $kommission) {
                 continue;
@@ -579,9 +669,20 @@ class BudgetImportService {
             if (((string) $a->getHerkunft()) === 'eigene' && $eigeneFraktion !== '') {
                 $antrag['antragsteller'] = $eigeneFraktion;
             }
+            // Zielvorgaben-Änderungen so drucken, wie sie am Bildschirm stehen:
+            // mit dem Unterabschnitt im Namen und dem heutigen Soll vor dem
+            // beantragten. Beides steht nicht am Antrag, sondern an der
+            // Zielvorgabe der Produktegruppe.
+            $antrag['zielAenderungen'] = $this->zielAenderungenMitSoll(
+                is_array($antrag['zielAenderungen'] ?? null) ? $antrag['zielAenderungen'] : [],
+                !$steuerfuss && $bereich !== 'investition'
+                    ? ($gruppenNachCode[(string) $a->getZielRef()] ?? null)
+                    : null
+            );
             $eintraege[] = [
                 'departement' => $dep,
                 'produktegruppe' => $bezeichnung,
+                'buchseite' => $seite,
                 'bereichOrder' => $bereichOrder[$bereich] ?? 9,
                 'antrag' => $antrag,
             ];
@@ -602,6 +703,44 @@ class BudgetImportService {
             return $x['bereichOrder'] <=> $y['bereichOrder'];
         });
         return ['jahr' => $jahr, 'kommission' => $kommission, 'fraktion' => $eigeneFraktion, 'eintraege' => $eintraege];
+    }
+
+    /**
+     * Ergänzt die Zielvorgaben-Änderungen eines Antrags um den Unterabschnitt
+     * und den heutigen Soll aus der Zielvorgabe der Produktegruppe (F109).
+     *
+     * @param list<array<string, mixed>> $aenderungen
+     * @return list<array<string, mixed>>
+     */
+    private function zielAenderungenMitSoll(array $aenderungen, ?BudgetProduktegruppe $gruppe): array {
+        if ($aenderungen === []) {
+            return [];
+        }
+        $vorgaben = [];
+        if ($gruppe !== null) {
+            $roh = $gruppe->jsonSerialize()['zielvorgaben'] ?? [];
+            $vorgaben = is_array($roh) ? $roh : [];
+        }
+        $out = [];
+        foreach ($aenderungen as $z) {
+            $ut = trim((string) ($z['unterTitel'] ?? ''));
+            foreach ($vorgaben as $v) {
+                if ((string) ($v['zielNummer'] ?? '') !== (string) ($z['zielNummer'] ?? '')
+                    || (string) ($v['messgroesse'] ?? '') !== (string) ($z['messgroesse'] ?? '')) {
+                    continue;
+                }
+                // Ein Antrag ohne Unterabschnitt (eingelesen, bevor das Buch ihn
+                // mitführte) passt auf die erste Vorgabe dieses Namens.
+                if ($ut !== '' && $ut !== trim((string) ($v['unterTitel'] ?? ''))) {
+                    continue;
+                }
+                $z['unterTitel'] = $ut !== '' ? $ut : trim((string) ($v['unterTitel'] ?? ''));
+                $z['soll'] = (string) ($v['soll'] ?? '');
+                break;
+            }
+            $out[] = $z;
+        }
+        return $out;
     }
 
     /**

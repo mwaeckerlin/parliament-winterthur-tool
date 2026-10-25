@@ -23,7 +23,7 @@ describe('BudgetAntragForm', () => {
     const w = form()
     const zv = { zielNummer: 2, messgroesse: 'Prozentsatz zufrieden', soll: '85' }
     w.vm.zielWertGesetzt(zv, '100')
-    expect(w.vm.form.zielAenderungen).toEqual([{ zielNummer: 2, messgroesse: 'Prozentsatz zufrieden', neuerWert: '100' }])
+    expect(w.vm.form.zielAenderungen).toEqual([{ zielNummer: 2, unterTitel: '', messgroesse: 'Prozentsatz zufrieden', neuerWert: '100' }])
     expect(w.vm.zielWert(zv)).toBe('100')
     w.vm.zielWertGesetzt(zv, '')
     expect(w.vm.form.zielAenderungen).toEqual([])

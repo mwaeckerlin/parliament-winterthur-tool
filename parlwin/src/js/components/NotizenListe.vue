@@ -22,6 +22,7 @@
         <PwWysiwyg
           :model-value="aktiveNotizText"
           :revisionen="aktiveNotizRevisionen"
+          aria-label="Notiz"
           placeholder="Notiz bearbeiten…"
           @update:model-value="notizEingabe"
           @version-angezeigt="v => angezeigteVersion = v"
@@ -50,6 +51,7 @@
     <div v-if="editorOffen && editorModus === 'neu'" class="pw-notiz-bearbeiten-zeile">
       <PwWysiwyg
         :model-value="aktiveNotizText"
+        aria-label="Notiz"
         placeholder="Kommentar, Beobachtung, Hinweis"
         @update:model-value="notizEingabe"
       />
@@ -111,6 +113,12 @@ export default {
      */
     kategorie: { type: String, default: 'notiz' },
     /**
+     * Zweite Kennung für ein Objekt, das keine Zahl hat: der Name eines
+     * Departements oder eines Tabs der Budgetansicht. Alle übrigen Objekte
+     * lassen ihn leer.
+     */
+    schluessel: { type: String, default: '' },
+    /**
      * Nur-Lese-Modus: zeigt die Notizen an, blendet aber «+ Neue Notiz»,
      * Löschen und das Bearbeiten aus (z.B. Notizen verknüpfter Sitzungen).
      */
@@ -161,7 +169,10 @@ export default {
     },
     /** Query-Suffix, der die Kategorie an URL-basierte Anfragen (GET/DELETE/POST-Undo) anhängt. */
     _katParam() {
-      return `?kategorie=${encodeURIComponent(this.kategorie)}`
+      const schluessel = this.schluessel
+        ? `&schluessel=${encodeURIComponent(this.schluessel)}`
+        : ''
+      return `?kategorie=${encodeURIComponent(this.kategorie)}${schluessel}`
     },
     /**
      * Notizen für die statische Liste. Eine gerade neu erfasste Notiz (Editor unten,
@@ -335,7 +346,7 @@ export default {
         try {
           const { data } = await axios.post(
             generateUrl(`/apps/parlwin/${this.basisUrl}/notizen`),
-            { text, kategorie: this.kategorie }
+            { text, kategorie: this.kategorie, schluessel: this.schluessel }
           )
           this.aktiveNotizId = data.id
           this._lokalHinzufuegen(data)
@@ -351,7 +362,7 @@ export default {
       try {
         const { data } = await axios.put(
           generateUrl(`/apps/parlwin/${this.basisUrl}/notizen/${this.aktiveNotizId}`),
-          { text, kategorie: this.kategorie }
+          { text, kategorie: this.kategorie, schluessel: this.schluessel }
         )
         this._lokalAktualisieren(data)
         showSuccess('Notiz gespeichert')

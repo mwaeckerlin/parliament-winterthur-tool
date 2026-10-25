@@ -1,0 +1,94 @@
+# Anmelden und die Übersicht der Geschäfte von parlwin zeigen.
+#
+# Der Ablauf läuft je Format einmal; ab dem zweiten Lauf ist die Sitzung schon
+# angemeldet, darum trägt jeder Anmeldeschritt seine Bedingung. Das Kennwort
+# steht nicht hier, es kommt aus der Umgebung.
+#
+# Gemessen am 2026-10-16: Die Anmeldeseite steht in Englisch (sie gehört noch
+# keinem Benutzer), ihre Felder sind über Beschriftung und Platzhalter nicht zu
+# treffen, und ein `fill` reichte nicht — die Seite ist eine Vue-Maske, die auf
+# jeden Tastendruck reagiert. Darum: dieselben Wähler wie in den Browsertests
+# des Projekts, `type` statt `fill`, und abgeschickt wird mit der Eingabetaste.
+
+version: 1
+name: parlwin-geschaefte
+description: Anmelden und die Übersicht der Geschäfte zeigen
+
+defaults:
+  timeout: 20000
+
+steps:
+
+  # Die Anmeldeseite wird selbst aufgerufen, nicht über die Umleitung der
+  # App erreicht: So steht im Formular ein frischer Request-Token, und der
+  # Weg ist derselbe, den die Browsertests des Projekts gehen. Über die
+  # Umleitung meldete die Seite «Wrong login or password», obwohl das Konto
+  # und das getippte Kennwort nachweislich stimmten (gemessen 2026-10-16).
+  - action: goto
+    label: die Anmeldeseite direkt öffnen
+    when:
+      visible:
+        css: 'input[name="user"]'
+    url: /index.php/login
+    waitUntil: domcontentloaded
+
+  - action: waitForSelector
+    label: die Anmeldeseite steht
+    optional: true
+    timeout: 8000
+    target:
+      css: 'input[name="user"]'
+    state: visible
+
+  - action: type
+    label: Benutzername
+    when:
+      visible:
+        css: 'input[name="user"]'
+    target:
+      css: 'input[name="user"]'
+    delay: 20
+    value:
+      env: SCAN_USER
+
+  - action: type
+    label: Kennwort
+    when:
+      visible:
+        css: 'input[name="password"]'
+    target:
+      css: 'input[name="password"]'
+    delay: 20
+    value:
+      env: SCAN_PASSWORD
+
+  - action: press
+    label: abschicken
+    when:
+      visible:
+        css: 'input[name="password"]'
+    target:
+      css: 'input[name="password"]'
+    key: Enter
+
+  - action: waitForUrl
+    label: die Anmeldung ist durch
+    optional: true
+    timeout: 30000
+    url: "**/apps/parlwin/**"
+
+  - action: waitForLoadState
+    state: networkidle
+
+  # Die Übersicht der Geschäfte: die Tabelle mit der Spalte «Zuständig». Auf
+  # schmalen Formaten steht statt der Tabelle die Kartenansicht.
+  - action: waitForSelector
+    label: die Geschäftsliste steht
+    target:
+      css: '.pw-tabelle-geschaefte, .pw-card-mobile, .pw-view'
+    state: visible
+
+  - action: waitForLoadState
+    state: networkidle
+
+  - action: ready

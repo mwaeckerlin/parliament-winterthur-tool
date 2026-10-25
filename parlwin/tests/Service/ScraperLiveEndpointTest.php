@@ -172,7 +172,10 @@ class ScraperLiveEndpointTest extends TestCase {
             $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
             $curlErrNo = curl_errno($ch);
             $error = curl_error($ch);
-            curl_close($ch);
+            // Kein curl_close(): Seit PHP 8.0 hat der Aufruf keine Wirkung
+            // mehr, seit 8.5 wird er verworfen, und der Testlauf meldete die
+            // Verwerfung sieben Mal (16.10.2026). Das Handle gibt der
+            // Speicherbereiniger frei.
 
             if (!is_string($body) || $body === '') {
                 $detail = trim($error !== '' ? $error : "curl errno {$curlErrNo}");

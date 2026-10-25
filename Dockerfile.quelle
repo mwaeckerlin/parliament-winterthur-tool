@@ -1,0 +1,95 @@
+# syntax=docker/dockerfile:1.4
+#
+# Die lokale Gegenstelle des Abgleichs für den E2E-Lauf: ein Webserver, der die
+# gespeicherten Seiten und PDF des Parlaments ausliefert.
+#
+# Warum: Der E2E-Stack synchronisierte die echte Webseite der Stadt, 1236
+# Geschäfte mit je einer Detailseite. Auf dem GitHub-Runner war der Abgleich
+# nach 34 Minuten nicht fertig (Lauf 37097532261, 2026-10-03), darum lief der
+# Browserteil im Bau nicht mit; und jeder Push schickte diese Last an die
+# Stadt. Mit `PARLWIN_QUELLE_BASE_URL` zeigt der Abgleich hierher.
+#
+# Die Seiten sind echte Aufnahmen (parlwin/tests/Fixtures/html), die PDF die
+# echten Bücher und Dokumente (parlwin/tests/Fixtures/budget, drehbuch,
+# dokumente). Nur dieses Abbild trägt sie; das ausgelieferte Abbild nicht.
+# Die Detailseiten der Behörden: Von den Fraktionen liegt eine Aufnahme vor
+# (28072), von den Kommissionen eine (27446), und beide Arten gehen über
+# denselben Weg `/_rte/behoerde/<id>`. Ohne Zuordnung bekäme jede andere
+# Behörde eine leere Seite — dann trägt kein Mitglied eine Fraktionsrolle, und
+# die Mitgliederansicht zeigt keine (gemessen am 2026-10-15 im Browsertest).
+# Darum legt diese Stufe für JEDE Kennung aus der Fraktionsliste eine Kopie der
+# Fraktions-Aufnahme und für jede aus der Kommissionsliste eine Kopie der
+# Kommissions-Aufnahme an. Die Kennungen kommen aus den Listen selbst, also
+# wandern sie mit, wenn die Aufnahmen erneuert werden.
+FROM mwaeckerlin/very-base AS behoerden
+WORKDIR /behoerden
+COPY parlwin/tests/Fixtures/html/fraktionen-list.html ./fraktionen-list.html
+COPY parlwin/tests/Fixtures/html/kommissionen-list.html ./kommissionen-list.html
+COPY parlwin/tests/Fixtures/html/kommission-detail-27446.html ./kommission.html
+RUN mkdir -p out
+# Für die Fraktionen steht die Aufnahme einer heutigen Behörde ein. Die einzige
+# Fraktions-Aufnahme (28072) gehört der 2012 aufgelösten CVP, und ihre
+# Mitglieder stehen in der heutigen Mitgliederliste nicht — dann trägt kein
+# Mitglied eine Fraktionsrolle, und die Ansicht zeigt keine. Die Aufnahme der
+# Aufsichtskommission führt heutige Mitglieder mit ihrer Funktion, also
+# bekommt die Ansicht die Gestalt, die sie prüft.
+RUN for id in $(grep -o '_rte.\{0,2\}behoerde.\{0,2\}[0-9]*' fraktionen-list.html | grep -o '[0-9]*$' | sort -u); do \
+      cp kommission.html "out/behoerde-${id}.html"; \
+    done
+RUN for id in $(grep -o '_rte.\{0,2\}behoerde.\{0,2\}[0-9]*' kommissionen-list.html | grep -o '[0-9]*$' | sort -u); do \
+      cp kommission.html "out/behoerde-${id}.html"; \
+    done
+RUN ls out | wc -l
+
+
+# Eine Weisung je Budgetjahr: Vorlage ist die Aufnahme der Weisung zum Budget
+# 2027 (Geschäft 2990959), die Kennung des Jahres kommt aus der Liste der
+# Geschäfte, und die Dokumentkennungen werden je Jahr eindeutig gesetzt
+# (<jahr>604 für Teil A, <jahr>610 für Teil B). Ohne das antwortete für jedes
+# andere Jahr die Ersatzseite, und der Import endete mit 500.
+FROM mwaeckerlin/very-base AS weisungen
+WORKDIR /weisungen
+COPY parlwin/tests/Fixtures/html/politbusiness-list.html ./liste.html
+COPY parlwin/tests/Fixtures/html/geschaeft-detail-2990959.html ./vorlage.html
+COPY parlwin/tests/Fixtures/budget/ ./budget/
+RUN mkdir -p out/html out/doc
+RUN for jahr in $(ls budget); do \
+      id="$(grep -o "information.\{0,20\}Budget ${jahr} und Festsetzung" liste.html \
+            | grep -o '[0-9]\{6,\}' | head -n 1)"; \
+      [ -n "$id" ] || continue; \
+      sed -e "s/7242604/${jahr}604/g" -e "s/7242610/${jahr}610/g" \
+          -e "s/Budget 2027/Budget ${jahr}/g" vorlage.html > "out/html/geschaeft-detail-${id}.html"; \
+      cp "budget/${jahr}/teil-a.pdf" "out/doc/${jahr}604.pdf"; \
+      cp "budget/${jahr}/teil-b.pdf" "out/doc/${jahr}610.pdf"; \
+      echo "Weisung ${jahr}: Geschäft ${id}, Dokumente ${jahr}604 und ${jahr}610"; \
+    done
+RUN ls out/html | wc -l
+
+FROM mwaeckerlin/nginx
+
+# Ein unbekannter Pfad antwortet 404 und nicht mit einer Startseite: Ein
+# Abgleich, der eine Adresse falsch zusammensetzt, soll daran scheitern und
+# nicht stillschweigend HTML einer anderen Seite lesen.
+ENV SPA_FALLBACK="no"
+
+COPY docker/quelle/locations.conf /etc/nginx.template/locations.d/default.conf
+
+# Die Listen und Detailseiten unter den Namen, die die Regeln erwarten, dazu
+# die Antwort für eine Seite, von der keine Aufnahme vorliegt.
+COPY parlwin/tests/Fixtures/html/ /app/html/
+COPY docker/quelle/leer.html /app/html/leer.html
+COPY --from=behoerden /behoerden/out/ /app/html/
+COPY --from=weisungen /weisungen/out/html/ /app/html/
+COPY --from=weisungen /weisungen/out/doc/ /app/doc/
+
+# Die Dokumente unter ihrer Kennung aus den Seiten: Die Weisung zum Budget 2027
+# (Geschäft 2990959) nennt Teil A, Teil B und die Medienmitteilung, die
+# Budgetsitzung das Drehbuch. Alles andere beantwortet die Ersatzdatei, damit
+# jedes der rund 90 Dokumente der Aufnahmen lesbar ist.
+COPY parlwin/tests/Fixtures/budget/2027/teil-a.pdf /app/doc/7242604.pdf
+COPY parlwin/tests/Fixtures/budget/2027/teil-b.pdf /app/doc/7242610.pdf
+COPY parlwin/tests/Fixtures/dokumente/medienmitteilung-budget-2027.pdf /app/doc/7242631.pdf
+COPY parlwin/tests/Fixtures/drehbuch/2026/drehbuch.pdf /app/doc/6378680.pdf
+COPY parlwin/tests/Fixtures/dokumente/vorstoss-2026-15.pdf /app/doc/5867974.pdf
+COPY parlwin/tests/Fixtures/dokumente/antwort-stadtrat-2026-15.pdf /app/doc/6133036.pdf
+COPY parlwin/tests/Fixtures/dokumente/vorstoss-2026-86.pdf /app/doc/ersatz.pdf

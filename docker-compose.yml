@@ -46,6 +46,9 @@ services:
       PARLWIN_REALTIME_PUBLISH_URL: ${PARLWIN_REALTIME_PUBLISH_URL:-http://parlwin-realtime:3001/publish}
       PARLWIN_REALTIME_SECRET: ${PARLWIN_REALTIME_SECRET:-}
       PARLWIN_PHP_MEMORY_LIMIT: ${PARLWIN_PHP_MEMORY_LIMIT:-1024M}
+      # Die Adresse der Datenquelle. Leer heisst die Webseite des Parlaments,
+      # also der Betrieb; der E2E-Lauf zeigt auf seine lokale Gegenstelle.
+      PARLWIN_QUELLE_BASE_URL: ${PARLWIN_QUELLE_BASE_URL:-}
       PARLWIN_SYNC_LIMIT_ALL: ${PARLWIN_SYNC_LIMIT_ALL:-}
       PARLWIN_SYNC_LIMIT_GESCHAEFTE: ${PARLWIN_SYNC_LIMIT_GESCHAEFTE:-}
       PARLWIN_SYNC_LIMIT_SITZUNGEN: ${PARLWIN_SYNC_LIMIT_SITZUNGEN:-}

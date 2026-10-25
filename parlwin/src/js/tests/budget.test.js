@@ -362,11 +362,12 @@ describe('Budgetliste', () => {
     expect(call[1].betragDelta).toBe(-1000000)
   })
 
-  // F87: Die Gesamtkosten eines Projekts sind die Summe seiner Jahre — bereits
-  // getätigt, Budgetjahr und die drei Planjahre. Der bewilligte Kredit aus dem
-  // Anhang «Kontrolle der Investitionskredite» ist eine andere Aussage (was das
-  // Parlament freigegeben hat) und steht als eigener Wert daneben.
-  it('zeigt als Gesamtkosten die Summe aller Jahre und den bewilligten Kredit daneben', async () => {
+  // F87: Die Summe der Jahre eines Projekts ist bereits getätigt, Budgetjahr
+  // und die drei Planjahre. Der bewilligte Kredit aus dem Anhang «Kontrolle der
+  // Investitionskredite» ist eine andere Aussage (was das Parlament freigegeben
+  // hat) und steht als eigener Wert daneben. Beide hiessen «Gesamtkosten», hier
+  // und im Detail, mit verschiedenen Zahlen (Befund vom 19.10.2026).
+  it('zeigt die Summe aller Jahre und den bewilligten Kredit je bei ihrem Namen', async () => {
     const w = await mitAnsicht()
     await w.vm.$nextTick()
     const karte = w.findAll('.pw-data-card').find(c => c.text().includes('Tösstalstrasse'))
@@ -376,8 +377,10 @@ describe('Budgetliste', () => {
       paare[p.find('span').text()] = p.find('strong').text()
     }
     // 500'000 + 2'000'000 + 1'000'000 = 3'500'000
-    expect(paare['Gesamtkosten']).toMatch(/3['’]500['’]000/)
-    expect(paare['bewilligter Kredit']).toMatch(/5['’]000['’]000/)
+    expect(paare['Summe der Jahre']).toMatch(/3['’]500['’]000/)
+    expect(paare['Bewilligter Kredit']).toMatch(/5['’]000['’]000/)
+    expect(Object.keys(paare), 'der Name «Gesamtkosten» steht noch auf der Karte')
+      .not.toContain('Gesamtkosten')
   })
 
   // F87: Über den Betrag des Budgetjahres wird entschieden — er ist der grösste
@@ -839,6 +842,14 @@ describe('Budgetliste', () => {
     expect(ansichtRufe()).toBe(vorher)
   })
 
+  // F125: jeder Antrag trägt neben seinen Notizen auch Dokumente — dieselbe
+  // Dokumentenverwaltung wie am Geschäft, am Vorstoss und an der Sitzung.
+  it('bietet unter jedem Antrag einen Bereich «Dokumente»', async () => {
+    const w = await mitAnsicht()
+    expect(w.find('.pw-antrag-dokumente').exists(), 'kein Bereich für Dokumente am Antrag').toBe(true)
+    expect(w.find('.pw-antrag-dokumente summary').text()).toBe('Dokumente')
+  })
+
   // F100: alle Pauschalanträge stehen einheitlich in EINEM Kasten «Pauschalanträge»;
   // den früheren Automatik-Block (Switch «Defizit automatisch verteilen», Knopf
   // «Defizit verteilen») gibt es nicht mehr, die Liste startet leer.
@@ -846,7 +857,9 @@ describe('Budgetliste', () => {
     const w = await mitAnsicht()
     const kasten = w.find('.pw-pauschalantraege')
     expect(kasten.exists(), 'Pauschalanträge-Kasten fehlt').toBe(true)
-    expect(kasten.find('h3').text()).toBe('Pauschalanträge')
+    // Der Kasten klappt auf flachem Schirm zu; seine Überschrift ist darum der
+    // Griff des aufklappbaren Bereichs (Auftrag von Marc am 24.10.2026).
+    expect(kasten.find('summary').text()).toContain('Pauschalanträge')
     expect(kasten.find('.pw-pauschal-automatik').exists(), 'alter Automatik-Block noch da').toBe(false)
     const html = w.html()
     expect(html).not.toContain('Defizit automatisch als Pauschalkürzung verteilen')

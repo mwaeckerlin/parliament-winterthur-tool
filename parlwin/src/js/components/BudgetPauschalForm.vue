@@ -31,7 +31,17 @@
         input-label="Ausnahmen (Produktegruppen)"
         @update:model-value="l => { ausnahmenSetzen(l); autoSpeichern() }"
       />
-      <NcTextField v-model="begruendung" label="Begründung" @update:model-value="autoSpeichern" />
+    </div>
+    <!-- Dieselbe mehrzeilige, formatierbare Begründung wie beim Einzelantrag
+         (Auftrag von Marc am 24.10.2026). -->
+    <div class="pw-pauschal-begruendung">
+      <label class="pw-pauschal-begruendung-label">Begründung</label>
+      <PwWysiwyg
+        :model-value="begruendung"
+        aria-label="Begründung"
+        placeholder="Warum dieser Pauschalantrag?"
+        @update:model-value="w => { begruendung = w; autoSpeichern() }"
+      />
     </div>
   </div>
 </template>
@@ -41,6 +51,7 @@ import NcSelect from '@nextcloud/vue/components/NcSelect'
 import NcTextField from '@nextcloud/vue/components/NcTextField'
 import NcCheckboxRadioSwitch from '@nextcloud/vue/components/NcCheckboxRadioSwitch'
 import PwMultiSelect from './PwMultiSelect.vue'
+import PwWysiwyg from './PwWysiwyg.vue'
 import PwLoeschen from './PwLoeschen.vue'
 
 // Ziel-Typ eines Pauschalantrags (F84/F85/F100): «Einsparungen» ist relativ
@@ -79,7 +90,7 @@ function felderAus(pauschal, eigeneFraktion) {
  */
 export default {
   name: 'BudgetPauschalForm',
-  components: { NcSelect, NcTextField, NcCheckboxRadioSwitch, PwMultiSelect, PwLoeschen },
+  components: { NcSelect, NcTextField, NcCheckboxRadioSwitch, PwMultiSelect, PwWysiwyg, PwLoeschen },
   props: {
     pauschal: { type: Object, required: true },
     produktegruppen: { type: Array, default: () => [] },

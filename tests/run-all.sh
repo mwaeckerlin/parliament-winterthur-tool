@@ -31,6 +31,11 @@ PHP_SUITE="${ROOT}/tests/php-suite.sh"
 # Pfade relativ zu parlwin/, weil dieselben Argumente im Container gelten.
 PHPUNIT_FLAGS=(
   --bootstrap tests/bootstrap.php
+  # Jede Meldung zählt. PHPUnit 13 teilt Verwerfungen in eigene, direkte und
+  # indirekte, und `--fail-on-deprecation` erfasst nicht alle: Am 16.10.2026
+  # meldete der Lauf sieben Mal «curl_close() is deprecated since 8.5» und
+  # endete trotzdem mit «OK, but there were issues» und Rückgabewert 0.
+  --fail-on-all-issues
   --fail-on-warning --fail-on-risky --fail-on-deprecation
   --fail-on-notice --fail-on-skipped --fail-on-incomplete
   # Eine Verwerfung von PHPUnit selbst zählt ebenso: was PHPUnit 13 verwirft,

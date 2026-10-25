@@ -8,6 +8,7 @@ use OCA\ParliamentWinterthur\Controller\BudgetController;
 use OCA\ParliamentWinterthur\Db\BudgetAntrag;
 use OCA\ParliamentWinterthur\Service\BudgetImportService;
 use OCA\ParliamentWinterthur\Service\BudgetService;
+use OCA\ParliamentWinterthur\Service\DokumentAblageService;
 use OCA\ParliamentWinterthur\Service\EreignisService;
 use OCA\ParliamentWinterthur\Service\RealtimePublisherService;
 use OCP\IRequest;
@@ -40,6 +41,7 @@ class BudgetControllerTest extends TestCase {
             $this->createStub(LoggerInterface::class),
             $this->createStub(RealtimePublisherService::class),
             $this->createStub(EreignisService::class),
+            $this->createStub(DokumentAblageService::class),
         );
     }
 

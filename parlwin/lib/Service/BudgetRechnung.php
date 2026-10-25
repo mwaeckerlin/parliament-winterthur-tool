@@ -20,7 +20,8 @@ class BudgetRechnung {
      * @param array<int, array<string, float|int|string>> $gruppen  je Gruppe:
      *        aufwandSoll, ertragSoll, stellenSoll und *Vorjahr-Pendants.
      * @param array<int, array<string, float|int|string>> $antraege je Antrag:
-     *        bereich (globalbudget|personal|pauschal|steuerfuss|investition),
+     *        bereich (globalbudget|personal|pauschal|steuerfuss|investition|
+     *        departementssekretariat|verpflichtungskredit|bewilligungsorgan),
      *        betragDelta (neg = Kürzung der Ausgaben bzw. Einnahmen), stellenDelta.
      *
      * Die künstliche Produktegruppe (F89) schliesst die Differenz zwischen den
@@ -50,10 +51,20 @@ class BudgetRechnung {
             $betrag = (int) ($a['betragDelta'] ?? 0);
             if ($bereich === 'steuerfuss') {
                 $einnahmen += $betrag;
-            } elseif ($bereich === 'investition') {
-                // Investitionen fliessen nicht in die Erfolgsrechnung-Summe ein.
+            } elseif ($bereich === 'investition' || $bereich === 'verpflichtungskredit') {
+                // Investitionen und Verpflichtungskredite (F135) stehen in der
+                // Investitionsrechnung und fliessen nicht in die Summe der
+                // Erfolgsrechnung ein.
+                continue;
+            } elseif ($bereich === 'bewilligungsorgan') {
+                // F137: Ein Antrag auf das Bewilligungsorgan ändert die
+                // Zuständigkeit für einen Kredit, keinen Betrag.
                 continue;
             } else {
+                // F136: Ein Antrag auf ein Departementssekretariat zählt wie ein
+                // Antrag auf den Aufwand: Die Kosten des Sekretariats werden
+                // über Umlagen auf die Globalkredite der Produktegruppen
+                // verteilt und stecken damit in der Erfolgsrechnung.
                 $ausgaben += $betrag;
                 $stellen += (float) ($a['stellenDelta'] ?? 0);
             }
@@ -87,9 +98,30 @@ class BudgetRechnung {
     }
 
     /**
-     * Verteilt einen Gesamtbetrag anteilig zum Aufwand auf die Gruppen. Der
-     * Rundungsrest geht an die Gruppe mit dem grössten Aufwand, damit die Summe
-     * exakt bleibt.
+     * Der Aufwand einer Gruppe, der die Bezugsgrösse der Verteilung bildet: der
+     * beeinflussbare Anteil, wo das Buch die Kosten gliedert, sonst der ganze
+     * Aufwand (F128).
+     *
+     * Marc am 24.10.2026: «Vor allem sollte sich der kürzbare Anteil,
+     * insbesondere bei der automatischen Verteilung prozentual, auf den
+     * flexiblen Teil beschränken. […] Ausser bei der automatischen Verteilung,
+     * da soll nur auf den flexiblen Anteil verteilt werden.»
+     *
+     * @param array<string, mixed> $gruppe
+     */
+    public static function verteilbarerAufwand(array $gruppe): int {
+        $aufwand = max(0, (int) ($gruppe['aufwandSoll'] ?? 0));
+        $zeilen = $gruppe['kostenzeilen'] ?? [];
+        if (!\is_array($zeilen) || $zeilen === []) {
+            return $aufwand;
+        }
+        return BudgetSteuerbarkeit::beeinflussbarerAufwand($zeilen, $aufwand);
+    }
+
+    /**
+     * Verteilt einen Gesamtbetrag anteilig zum beeinflussbaren Aufwand auf die
+     * Gruppen (F128). Der Rundungsrest geht an die Gruppe mit dem grössten
+     * beeinflussbaren Aufwand, damit die Summe exakt bleibt.
      *
      * @param array<int, array<string, float|int|string>> $gruppen
      * @return array<string, int> code => Delta
@@ -97,7 +129,7 @@ class BudgetRechnung {
     public static function verteileAnteiligAufwand(int $totalDelta, array $gruppen): array {
         $summeAufwand = 0;
         foreach ($gruppen as $g) {
-            $summeAufwand += max(0, (int) ($g['aufwandSoll'] ?? 0));
+            $summeAufwand += self::verteilbarerAufwand($g);
         }
         $verteilung = [];
         if ($summeAufwand <= 0) {
@@ -111,7 +143,7 @@ class BudgetRechnung {
         $groessterAufwand = -1;
         foreach ($gruppen as $g) {
             $code = (string) $g['code'];
-            $aufwand = max(0, (int) ($g['aufwandSoll'] ?? 0));
+            $aufwand = self::verteilbarerAufwand($g);
             $delta = (int) round($totalDelta * $aufwand / $summeAufwand);
             $verteilung[$code] = $delta;
             $zugeteilt += $delta;
@@ -139,9 +171,11 @@ class BudgetRechnung {
      * @return array<string, int>
      */
     private static function hoechstensAufNull(array $verteilung, array $gruppen): array {
+        // Die Grenze ist der beeinflussbare Aufwand (F128): mehr als das lässt
+        // eine automatische Verteilung an einer Position nicht kürzen.
         $grenze = [];
         foreach ($gruppen as $g) {
-            $grenze[(string) $g['code']] = max(0, (int) ($g['aufwandSoll'] ?? 0));
+            $grenze[(string) $g['code']] = self::verteilbarerAufwand($g);
         }
         // Immer wieder kappen und den Überhang auf die Positionen mit Platz
         // verteilen, bis nichts mehr umzulegen ist.

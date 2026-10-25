@@ -1,0 +1,28 @@
+# Eigene Ausschlussliste für Dockerfile.quelle: Die Gegenstelle liefert genau
+# die Aufnahmen aus `parlwin/tests/Fixtures` aus, also gehören sie IN ihren
+# Bau-Kontext. Die generelle `.dockerignore` schliesst `**/tests` aus, weil im
+# ausgelieferten Image nichts davon etwas zu suchen hat.
+.git
+.agents
+.codex
+LICENSE
+.env
+.env.*
+node_modules
+**/node_modules
+**/.phpunit.result.cache
+tests/.junit
+tests/e2e/test-results
+tests/e2e/playwright-report
+test-results
+playwright-report
+# Was die Gegenstelle nicht ausliefert: der Quellcode der Anwendung, ihre
+# Abhängigkeiten und ihre erzeugten Dateien.
+parlwin/lib
+parlwin/src
+parlwin/js
+parlwin/css
+parlwin/vendor
+parlwin/l10n
+parlwin/reference
+parlwin/templates

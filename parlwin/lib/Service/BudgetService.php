@@ -48,6 +48,14 @@ class BudgetService {
     // ── Notizen an Anträgen (F103): geteilter NotizService wie beim Vorstoss ────
 
     /** Alle Notizen eines Antrags (aktiv und gelöscht) — für die shared Komponente. */
+    /**
+     * Ein einzelner Antrag als Datensatz — für die Ablage seiner Dokumente, die
+     * den Jahresordner aus dem Budgetjahr des Antrags ableitet (F125).
+     */
+    public function antrag(int $antragId): array {
+        return $this->antraege->findeAntrag($antragId)->jsonSerialize();
+    }
+
     public function notizen(int $antragId): array {
         $this->antraege->findeAntrag($antragId);
         return $this->notizService->liste(self::NOTIZ_OBJEKT_TYP, $antragId);
@@ -72,6 +80,62 @@ class BudgetService {
 
     public function notizRevisionen(int $antragId, int $aktionId): array {
         return $this->notizService->revisionen(self::NOTIZ_OBJEKT_TYP, $antragId, $aktionId);
+    }
+
+    /**
+     * Notizen am übergeordneten Zusammenhang des Budgets: am ganzen Budgetjahr,
+     * an einem Departement und an einem Tab der Ansicht. Die Ebene trägt das
+     * Jahr als Kennung und den Namen des Departements oder des Tabs als
+     * Schlüssel; das ganze Budget führt den leeren Schlüssel.
+     *
+     * Marc am 24.10.2026: «Notizen sollte man überall anlegen, auch in einem
+     * übergeordneten Zusammenhang. Beim Budget zum Beispiel sollte man Notizen
+     * machen zum Departement und man sollte Notizen machen insgesamt zum ganzen
+     * Budget. Global. Und natürlich auf jedem Tab.»
+     */
+    public const EBENE_BUDGET = 'budget_jahr';
+    public const EBENE_DEPARTEMENT = 'budget_departement';
+    public const EBENE_TAB = 'budget_tab';
+
+    /** @return string[] */
+    public static function ebenen(): array {
+        return [self::EBENE_BUDGET, self::EBENE_DEPARTEMENT, self::EBENE_TAB];
+    }
+
+    private function ebenePruefen(string $ebene): void {
+        if (!\in_array($ebene, self::ebenen(), true)) {
+            throw new \InvalidArgumentException('Unbekannte Notiz-Ebene: ' . $ebene);
+        }
+    }
+
+    public function ebenenNotizen(string $ebene, int $jahr, string $schluessel = ''): array {
+        $this->ebenePruefen($ebene);
+        return $this->notizService->liste($ebene, $jahr, 'notiz', $schluessel);
+    }
+
+    public function ebeneNotizHinzufuegen(string $ebene, int $jahr, string $text, string $schluessel = ''): array {
+        $this->ebenePruefen($ebene);
+        return $this->notizService->hinzufuegen($ebene, $jahr, $text, 'notiz', $schluessel);
+    }
+
+    public function ebeneNotizAktualisieren(string $ebene, int $jahr, int $aktionId, string $text): array {
+        $this->ebenePruefen($ebene);
+        return $this->notizService->aktualisieren($ebene, $jahr, $aktionId, $text);
+    }
+
+    public function ebeneNotizLoeschen(string $ebene, int $jahr, int $aktionId): void {
+        $this->ebenePruefen($ebene);
+        $this->notizService->loeschen($ebene, $jahr, $aktionId);
+    }
+
+    public function ebeneNotizWiederherstellen(string $ebene, int $jahr, int $aktionId): array {
+        $this->ebenePruefen($ebene);
+        return $this->notizService->wiederherstellen($ebene, $jahr, $aktionId);
+    }
+
+    public function ebeneNotizRevisionen(string $ebene, int $jahr, int $aktionId): array {
+        $this->ebenePruefen($ebene);
+        return $this->notizService->revisionen($ebene, $jahr, $aktionId);
     }
 
     /** Konfigurierter Standardbetrag pro Stelle (F86), initial 200'000 CHF. */
@@ -238,6 +302,12 @@ class BudgetService {
             'ertragVorjahr' => (int) $g->getErtragSollVorjahr(),
             'stellenSoll' => (float) $g->getStellenSoll(),
             'stellenVorjahr' => (float) $g->getStellenSollVorjahr(),
+            // F128: Die automatische Verteilung bezieht sich auf den
+            // beeinflussbaren Aufwand; dafür braucht sie die Gliederung der
+            // Kosten aus dem Buch.
+            'kostenzeilen' => $g->jsonSerialize()['kostenzeilen'] ?? [],
+            // F134: ein Pauschalantrag kann sich auf ein Departement beschränken.
+            'departement' => (string) $g->getDepartement(),
         ], $gruppen);
     }
 
@@ -361,6 +431,9 @@ class BudgetService {
         $a->setBereich((string) ($daten['bereich'] ?? 'globalbudget'));
         $a->setZielTyp((string) ($daten['zielTyp'] ?? 'produktegruppe'));
         $a->setZielRef((string) ($daten['zielRef'] ?? ''));
+        // F137: Ein Antrag auf das Bewilligungsorgan trägt den neuen Wert statt
+        // eines Betrags.
+        $a->setNeuerWert(trim((string) ($daten['neuerWert'] ?? '')));
         $a->setStellenDelta((float) ($daten['stellenDelta'] ?? 0));
         $proStelle = (int) ($daten['betragProStelle'] ?? 0);
         if ($a->getBereich() === 'personal' && $proStelle <= 0) {
@@ -566,7 +639,46 @@ class BudgetService {
      * Budgetwert einer Antragsposition als Basis für die Prozentrechnung (F95):
      * Globalkredit-Soll der Produktegruppe bzw. Budgetwert des Investitionsprojekts.
      */
+    /**
+     * Der Aufwand eines Departementssekretariats im Budgetjahr (F136), 0 wo das
+     * Buch ihn nicht liefert.
+     */
+    private function sekretariatAufwand(int $jahr, string $departement): int {
+        try {
+            $row = $this->jahre->findByJahr($jahr);
+        } catch (DoesNotExistException) {
+            return 0;
+        }
+        foreach ($row->getSekretariateArray() as $s) {
+            if ((string) ($s['departement'] ?? '') === $departement) {
+                return (int) ($s['aufwand'] ?? 0);
+            }
+        }
+        return 0;
+    }
+
     private function basisFuerPosition(?string $bereich, string $zielRef, int $jahr): int {
+        // F135: Ein Verpflichtungskredit trägt seinen Betrag im Konto des
+        // Vorhabens; die Kennung ist «<Vorhaben>|<Konto>».
+        if ($bereich === 'verpflichtungskredit') {
+            [$vorhaben, $konto] = array_pad(explode('|', $zielRef, 2), 2, '');
+            foreach ($this->investitionen->findByJahr($jahr) as $i) {
+                if ((string) $i->getId() !== $vorhaben) {
+                    continue;
+                }
+                foreach ($i->getKontenArray() as $k) {
+                    if ((string) ($k['konto'] ?? '') === $konto) {
+                        return (int) ($k['betrag'] ?? 0);
+                    }
+                }
+            }
+            return 0;
+        }
+        // F136: Das Departementssekretariat trägt seinen Aufwand im Kapitel von
+        // Teil A; ohne eingelesene Zahl gibt es keine Grenze zu prüfen.
+        if ($bereich === 'departementssekretariat') {
+            return $this->sekretariatAufwand($jahr, $zielRef);
+        }
         if ($bereich === 'investition') {
             foreach ($this->investitionen->findByJahr($jahr) as $i) {
                 if ((string) $i->getId() === $zielRef) {
@@ -678,11 +790,17 @@ class BudgetService {
 
     /**
      * Normalisiert die Zielvorgaben-Änderungen eines Antrags (F109) zu
-     * [{zielNummer, messgroesse, neuerWert}]. Verworfen wird alles ohne Ziel-Nummer,
-     * Messgrösse oder Wert.
+     * [{zielNummer, unterTitel, messgroesse, neuerWert}]. Verworfen wird alles ohne
+     * Ziel-Nummer, Messgrösse oder Wert.
+     *
+     * Der Unterabschnitt gehört zur Identität einer Vorgabe: Ziel 1 der
+     * Produktegruppe Immobilien führt «Wohnliegenschaften (in %)» unter 1.1
+     * (minimale Nettorendite) und unter 1.2 (durchschnittliche). Ein Antrag aus
+     * einem Buch ohne diesen Teil trägt ihn leer und zeigt auf die erste
+     * Vorgabe dieses Namens, wie bisher.
      *
      * @param mixed $roh
-     * @return list<array{zielNummer:int,messgroesse:string,neuerWert:string}>
+     * @return list<array{zielNummer:int,unterTitel:string,messgroesse:string,neuerWert:string}>
      */
     private function zielAenderungenBereinigt($roh): array {
         if (!is_array($roh)) {
@@ -694,10 +812,11 @@ class BudgetService {
                 continue;
             }
             $nr = (int) ($e['zielNummer'] ?? 0);
+            $ut = trim((string) ($e['unterTitel'] ?? ''));
             $mg = trim((string) ($e['messgroesse'] ?? ''));
             $wert = trim((string) ($e['neuerWert'] ?? ''));
             if ($nr > 0 && $mg !== '' && $wert !== '') {
-                $out[] = ['zielNummer' => $nr, 'messgroesse' => $mg, 'neuerWert' => $wert];
+                $out[] = ['zielNummer' => $nr, 'unterTitel' => $ut, 'messgroesse' => $mg, 'neuerWert' => $wert];
             }
         }
         return $out;

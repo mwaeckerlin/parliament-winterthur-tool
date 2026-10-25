@@ -76,7 +76,11 @@
   /* Chip-spezifische em-Werte */
   --pw-chip-pad-start: 0.4em;
   --pw-chip-pad-end: 0.2em;
+  /* Derselbe Wert zweimal: einmal als Schriftgrösse, einmal als Faktor für
+     Breiten, die in Zeichen der Chip-Schrift gerechnet werden (`ch` lässt
+     sich nicht mit einer em-Grösse multiplizieren). */
   --pw-chip-font: 0.75em;
+  --pw-chip-font-faktor: 0.75;
 
   /* Pill-Radius */
   --pw-radius-pill: 999rem;
@@ -84,9 +88,12 @@
   /* Tabellen-Spalten – Mindestbreiten in em (skalieren mit Schrift) */
   --pw-col-nr: 4em;
   --pw-col-typ: 10em;
-  --pw-col-status: 6em;
+  /* Das längste Status-Wort «Aufsichtskommission» hat 19 Zeichen und steht in
+     der Chip-Schrift; dazu die beiden Innenabstände des Chips. */
+  --pw-col-status: calc(19ch * var(--pw-chip-font-faktor) + var(--pw-chip-pad-start) + var(--pw-chip-pad-end));
   --pw-col-datum: 5em;
-  --pw-col-zustaendig: 4em;
+  /* Der längste Nachname im Bestand hat 13 Zeichen («Kramer-Schwob»). */
+  --pw-col-zustaendig: 9em;
   --pw-col-beschluss: 14em;
   --pw-col-titel: 15em;
   --pw-col-prio: 6em;
@@ -157,6 +164,42 @@
   list-style: none;
   padding: var(--pw-gap-1);
   /* keine Trennlinie – passt zu Standard-Nextcloud-Apps */
+}
+
+/* F131: Der Vollbild-Knopf hat KEINE eigene Gestalt und keine eigene Lage. Er
+   ist das Geschwister des Griffs, der die Seitenleiste einklappt: dieselbe
+   Komponente (NcButton, «tertiary»), derselbe Behälter
+   («app-navigation-toggle-wrapper»), dieselbe Ebene, dasselbe CSS. Marc am
+   24.10.2026: «Gleiche Definition, keine Kopie!», «Sie teilen dasselbe CSS»,
+   «Und sind Geschwister im selben Element in derselben Ebene», «Es wird nie
+   etwas nachgebaut!»
+
+   Die eine Zeile hier gilt beiden: Der Behälter ist ein Block, und zwei Knöpfe
+   darin stünden untereinander. Nebeneinander stehen sie als Reihe. */
+.app-navigation-toggle-wrapper {
+  display: flex;
+}
+
+/* Die Navigationsleiste scrollt, sobald ihr Inhalt nicht mehr auf den Schirm
+   passt. Die Menüeinträge und die Filter darunter sind auf einem flachen Schirm
+   zusammen höher als die Leiste; ohne diese Regel standen die Filter ab
+   «Budgetjahr» unerreichbar unter dem unteren Rand (Bild von Marc vom
+   24.10.2026, Tablet quer). Eine Flex-Kette gibt eine Höhe nur frei, wenn jedes
+   Glied darin schrumpfen darf — darum die Mindesthöhe null bis hinauf zur
+   Leiste selbst. */
+#app-navigation,
+.app-navigation,
+#app-navigation .app-navigation__content,
+.app-navigation .app-navigation__content,
+#app-navigation .app-navigation__body,
+.app-navigation .app-navigation__body {
+  min-block-size: 0;
+}
+
+#app-navigation .app-navigation__list,
+.app-navigation .app-navigation__list {
+  overflow-y: auto;
+  min-block-size: 0;
 }
 
 .pw-nav-filter-item {
@@ -543,6 +586,21 @@
   gap: var(--pw-gap-1);
   align-items: flex-start;
   justify-content: space-between;
+  /* Titel und Betrag stehen nebeneinander, solange beide Platz haben, und
+     untereinander, sobald nicht. Ohne das war der Kopf einer Investitionskarte
+     406 Pixel breit in einer Karte von 380, und der Titel lief unter den
+     Betrag (gemessen am 20.10.2026). */
+  flex-wrap: wrap;
+}
+
+/* Jeder Teil des Kopfes darf schmaler werden als sein Inhalt — die Vorgabe von
+   Flex ist `min-width: auto`, und damit hält ein langer Titel die ganze Zeile
+   auseinander. */
+.pw-data-card-header > *,
+.pw-timeline-kopf > *,
+.pw-mitglied-kopf > *,
+.pw-kommission-kopf > * {
+  min-inline-size: 0;
 }
 
 .pw-app-main-header,
@@ -611,6 +669,25 @@
 .pw-card-grid {
   display: grid;
   gap: var(--pw-gap-2);
+  /* Jede Karte bleibt bei ihrer eigenen Höhe. Die Vorgabe von grid streckt
+     jedes Element auf die Höhe seiner Zeile, und dann läuft eine kurze Karte
+     bis zur Höhe der längsten leer (Befund vom 11.09.2026, Kommissionen). Bei
+     einer Spalte fiel es nicht auf, weil dort jede Karte ihre eigene Zeile
+     ist. */
+  align-items: start;
+}
+
+/* Eine Karte bleibt in ihrer Spalte. Ein Rasterelement ist von sich aus so
+   breit wie sein Inhalt mindestens braucht und ragt sonst nach rechts darüber
+   hinaus: In der linken Spalte bleibt das im Bild, in der rechten steht es
+   ausserhalb. Marcs Bild vom 24.10.2026 zeigt es am offenen Antragsformular der
+   letzten Spalte, wo «Betrag CHF», «Betrag %» und jedes Feld «neuer Soll» am
+   Fensterrand abgeschnitten sind. */
+.pw-admin-grid > *,
+.pw-data-card-grid > *,
+.pw-mitglieder-grid > *,
+.pw-card-grid > * {
+  min-inline-size: 0;
 }
 
 .pw-admin-grid {
@@ -721,7 +798,27 @@
   flex: 1 1 14rem;
 }
 
-.pw-data-pair span {
+/* Nur die Beschriftung selbst, nicht jede Zeile im Inhalt daneben: Mit dem
+   Nachfahren-Selektor standen die sechs Kommissionen einer Mitgliederkarte in
+   Grossbuchstaben und Beschriftungsgrösse (beschriftung.test.js). */
+.pw-data-pair > span {
+  color: var(--pw-muted);
+  font-size: var(--pw-space-md);
+  text-transform: uppercase;
+  letter-spacing: var(--pw-track-wide);
+}
+
+/* Die beiden Felder einer Geschäftskarte sind Felder derselben Karte: gleiche
+   Breite und dieselbe Beschriftungsschrift wie die Paare darüber. Auf dem
+   Telefon stand «Priorität» auf drei Vierteln der Breite und «Beschluss» auf
+   voller (kartenfelder.test.js). */
+.pw-card-prio .v-select,
+.pw-card-beschluss .v-select {
+  inline-size: 100%;
+}
+
+.pw-card-prio label,
+.pw-card-beschluss label {
   color: var(--pw-muted);
   font-size: var(--pw-space-md);
   text-transform: uppercase;
@@ -730,7 +827,9 @@
 
 .pw-choice-list {
   max-block-size: 15rem;
-  overflow: auto;
+  /* Nach unten, nie zur Seite (Marc, 20.10.2026). */
+  overflow-y: auto;
+  overflow-x: hidden;
   padding: var(--pw-space-xs);
   border: var(--pw-border-thin) solid var(--pw-border);
   border-radius: var(--pw-radius-small);
@@ -932,7 +1031,7 @@
 /* Jede Zelle der Info-Tabelle bricht um statt überzulaufen. */
 .pw-info-tabelle th,
 .pw-info-tabelle td {
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   word-break: normal;
   white-space: normal;
   hyphens: auto;
@@ -948,7 +1047,7 @@
 .pw-tabelle td,
 .pw-members-table th,
 .pw-members-table td {
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   word-break: normal;
   white-space: normal;
   hyphens: auto;
@@ -1144,7 +1243,10 @@
 .pw-modal {
   inline-size: min(72rem, 100%);
   max-block-size: calc(100dvb - var(--pw-space-2xl));
-  overflow: auto;
+  /* Ein Popup wird höher als der Bildschirm und scrollt dann nach unten; zur
+     Seite geht es nie (Marc, 20.10.2026). */
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .pw-modal-kopf {
@@ -1170,10 +1272,13 @@
   background: var(--pw-surface);
 }
 
-/* Vollbild-Popup einer Produktegruppe (F110): nutzt fast den ganzen Bildschirm. */
+/* Vollbild-Popup einer Produktegruppe (F110): nutzt bis zum ganzen Bildschirm,
+   so viel wie sein Inhalt braucht. Bei fester Höhe stand das Detail eines
+   Investitionsvorhabens mit vier Zeilen Inhalt in einem leeren Blatt über die
+   ganze Höhe (Bild vom 20.10.2026). */
 .pw-modal-vollbild {
   inline-size: min(96rem, 100%);
-  block-size: calc(100dvb - var(--pw-space-xl));
+  max-block-size: calc(100dvb - var(--pw-space-xl));
 }
 
 .pw-pg-detail {
@@ -1214,12 +1319,15 @@
 
 /* Eigener Scrollcontainer für die breite Zielvorgaben-Tabelle (Design-Regel:
    breite Inhalte scrollen in sich, nie die Seite). */
-.pw-zv-scroll { overflow-x: auto; }
+/* Nichts geht über den Bildschirm hinaus (Marc, 20.10.2026): Was nicht
+   nebeneinander passt, bricht um und macht die Seite höher. Ein Balken unter
+   der Tabelle ist keine Lösung — der Inhalt steht dann weiterhin ausserhalb
+   des Bildes, und am Telefon war die Jahresreihe nach «Plan 2027»
+   abgeschnitten. */
+.pw-zv-scroll { overflow-x: hidden; }
 
 .pw-zielvorgabe-tabelle {
   inline-size: 100%;
-  /* Auf schmalen Screens nicht quetschen, sondern im Container scrollen. */
-  min-inline-size: 34rem;
   border-collapse: collapse;
   font-size: var(--pw-font-sm);
   /* Feste Breiten, damit eine lange Messgrösse die Wertspalten nicht aus dem Bild
@@ -1241,7 +1349,9 @@
   /* Der lange Messgrössen-Text bricht um (überschreibt ein vom Framework geerbtes
      nowrap), damit er nicht über die Wertspalten läuft. */
   white-space: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  hyphens: auto;
+  -webkit-hyphens: auto;
 }
 
 .pw-zielvorgabe-tabelle th {
@@ -1285,9 +1395,14 @@
 
 .pw-produkt-kosten th,
 .pw-produkt-kosten td {
+  /* Nextcloud legt den Zeilen einer Tabelle eine eigene Fläche unter. Die war
+     dunkler als die Hervorhebung des Budgetjahres, und damit stand die Spalte,
+     über die entschieden wird, als einzige HELL in einem grauen Band (Bild vom
+     20.10.2026). Die Fläche der Zeile kommt von hier, die Hervorhebung bleibt
+     die einzige Abweichung davon. */
+  background: var(--color-main-background);
   padding: var(--pw-space-xs);
   text-align: end;
-  white-space: nowrap;
   border-block-end: var(--pw-border-thin) solid var(--pw-border);
 }
 
@@ -1296,10 +1411,36 @@
   text-align: start;
   white-space: normal;
   overflow-wrap: break-word;
+  hyphens: auto;
+  -webkit-hyphens: auto;
   inline-size: 40%;
 }
 
-.pw-produkt-kosten th { color: var(--pw-muted); font-weight: normal; }
+/* Die Jahresreihe eines Investitionsvorhabens führt in jeder Spalte eine Zahl,
+   auch in der ersten. Die 40% der Label-Spalte rissen dort eine leere Fläche
+   zwischen «bis 2025» und dem Budgetjahr auf (Bild vom 20.10.2026). */
+.pw-inv-jahre th:first-child,
+.pw-inv-jahre td:first-child {
+  text-align: end;
+  white-space: nowrap;
+  inline-size: auto;
+}
+
+/* Der Spaltentitel bricht an seinen Leerzeichen um, damit die Tabelle auf das
+   Telefon passt; die Silbentrennung erlaubt den Bruch im Wort nur dort, wo er
+   hingehört. Mit `overflow-wrap: break-word` stand «Summ e der Jahre» da (Bild
+   vom 20.10.2026). */
+.pw-produkt-kosten th {
+  color: var(--pw-muted);
+  font-weight: normal;
+  white-space: normal;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+
+/* Eine Zahl bleibt zusammen: Ohne das brach «400'000» als «400'00 0» um (Bild
+   vom 20.10.2026). */
+.pw-produkt-kosten td { white-space: nowrap; }
 
 .pw-produkt-kosten .pw-kosten-soll { background: var(--pw-surface-strong); font-weight: 600; }
 
@@ -1432,6 +1573,19 @@
   .pw-grid-2 {
     grid-template-columns: 1fr;
   }
+
+  /* Der Kompromiss fürs Telefon (Marc, 20.10.2026): Sechs Zahlenspalten auf
+     360 Pixeln gehen nur kleiner. Gemessen am 20.10.2026 war «Budget 2026» als
+     Spaltentitel 52 Pixel breit in einer Spalte von 47; ein einzelnes Wort
+     bricht nicht, also wird die Schrift kleiner. */
+  .pw-produkt-kosten {
+    font-size: var(--pw-font-xs);
+  }
+
+  .pw-produkt-kosten th,
+  .pw-produkt-kosten td {
+    padding: var(--pw-space-2xs);
+  }
 }
 
 .pw-modal-neu {
@@ -1536,7 +1690,9 @@
 
 .pw-zustaendigkeiten-liste {
   max-block-size: 18rem;
-  overflow: auto;
+  /* Nach unten, nie zur Seite (Marc, 20.10.2026). */
+  overflow-y: auto;
+  overflow-x: hidden;
   padding: var(--pw-space-md);
   border: var(--pw-border-thin) solid var(--pw-border);
   border-radius: var(--pw-radius-small);
@@ -2258,7 +2414,7 @@ tr.pw-prio-hoch > td {
   }
 
   .pw-titel {
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
     hyphens: auto;
     -webkit-hyphens: auto;
   }
@@ -2453,9 +2609,12 @@ tr.pw-prio-hoch > td {
 }
 
 .pw-tabelle-geschaefte .pw-col-titel {
-  /* Titel-Spalte bekommt den restlichen Platz, mit komfortabler Mindestbreite. */
+  /* Der Titel hört bei der Lesebreite auf: 90 Zeichen je Zeile liest niemand
+     mehr bequem, und darüber hinaus nahm die Spalte auf 3440 die halbe
+     Tabelle, ohne sie zu füllen (spaltenbreite.test.js). */
   inline-size: auto;
   min-inline-size: var(--pw-col-titel);
+  max-inline-size: 90ch;
 }
 
 .pw-tabelle-geschaefte .pw-col-typ {
@@ -2470,8 +2629,17 @@ tr.pw-prio-hoch > td {
 }
 
 .pw-tabelle-geschaefte .pw-col-status {
+  /* Ohne Silbentrennung ist die kleinste mögliche Breite das längste Wort,
+     also muss die Tabelle sie geben. Mit Trennung schrumpfte die Spalte auf
+     eine Silbe, und «Bei der Aufsichtskommission pendent» stand als sieben
+     Zeilen darin (spaltenbreite.test.js). */
   inline-size: 1%;
   min-inline-size: var(--pw-col-status);
+  white-space: normal;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+  -webkit-hyphens: none;
 }
 
 .pw-tabelle-geschaefte .pw-col-datum {
@@ -2481,24 +2649,28 @@ tr.pw-prio-hoch > td {
 }
 
 .pw-tabelle-geschaefte .pw-col-zustaendig {
-  /* Wrap mit Silbentrennung erlaubt. */
+  /* Hier stehen Namen und Gremien: Der Umbruch nimmt das Leerzeichen und den
+     Bindestrich, und nur ein Wort, das allein nicht in die Spalte passt,
+     bricht noch. Einen errechneten Trennstrich bekommt ein Name nie
+     (spaltenbreite.test.js). */
   inline-size: 1%;
   min-inline-size: var(--pw-col-zustaendig);
   max-inline-size: 12em;
   white-space: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   word-break: normal;
-  hyphens: auto;
-  -webkit-hyphens: auto;
+  hyphens: none;
+  -webkit-hyphens: none;
 }
 
 .pw-tabelle-geschaefte .pw-col-beschluss {
-  /* Wrap mit Silbentrennung erlaubt. */
-  inline-size: 1%;
+  /* Hier schreibt der Anwender selbst, darum bekommt diese Spalte den Platz,
+     den der Titel nicht braucht, statt ihn als leere Fläche stehen zu lassen
+     (spaltenbreite.test.js). Fliesstext, also mit Silbentrennung. */
+  inline-size: auto;
   min-inline-size: var(--pw-col-beschluss);
-  max-inline-size: 18em;
   white-space: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   word-break: normal;
   hyphens: auto;
   -webkit-hyphens: auto;
@@ -2568,9 +2740,11 @@ tr.pw-prio-hoch > td {
   row-gap: var(--pw-space-xs);
 }
 
-/* 5) Chip-Breite richtet sich am Inhalt aus, max = Zellbreite, Wrap mit
-      Silbentrennung. Spezifitaet (0,4,1) schlaegt `.v-select.select .vs__selected`
-      (0,3,0). */
+/* 5) Chip-Breite richtet sich am Inhalt aus, max = Zellbreite. Im Chip steht
+      ein Name oder ein Gremium, darum bricht er an Leerzeichen und
+      Bindestrich und bekommt keinen errechneten Trennstrich
+      (spaltenbreite.test.js). Spezifitaet (0,4,1) schlaegt
+      `.v-select.select .vs__selected` (0,3,0). */
 .pw-tabelle-geschaefte .pw-inline-select.v-select .vs__selected {
   display: inline-flex;
   align-items: center;
@@ -2584,20 +2758,20 @@ tr.pw-prio-hoch > td {
   line-height: 1.2;
   padding-inline: var(--pw-chip-pad-start) var(--pw-chip-pad-end);
   white-space: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   word-break: normal;
-  hyphens: auto;
-  -webkit-hyphens: auto;
+  hyphens: none;
+  -webkit-hyphens: none;
 }
 
 .pw-tabelle-geschaefte .pw-inline-select.v-select .vs__selected>* {
   min-inline-size: 0;
   max-inline-size: 100%;
   white-space: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   word-break: normal;
-  hyphens: auto;
-  -webkit-hyphens: auto;
+  hyphens: none;
+  -webkit-hyphens: none;
 }
 
 .pw-tabelle-geschaefte .pw-inline-select.v-select .vs__selected .vs__deselect {
@@ -2621,20 +2795,35 @@ tr.pw-prio-hoch > td {
 }
 
 .pw-status-text {
+  /* Ein Status ist ein fester Satz des Parlaments: Er bricht an seinen
+     Leerzeichen, nie innerhalb eines Wortes (spaltenbreite.test.js). */
   display: inline-block;
   max-inline-size: 100%;
   white-space: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
   word-break: normal;
+  hyphens: none;
+  -webkit-hyphens: none;
 }
 
 .pw-view-header {
   display: flex;
   align-items: baseline;
+  /* Die Zeile bricht um, statt ihre Knöpfe zu quetschen: Am Telefon standen
+     «Budget neu einlesen» und «+ Neu» als «B·» und «-» da (Befund vom
+     19.10.2026, kopfzeile-telefon.test.js). */
+  flex-wrap: wrap;
   gap: var(--pw-space-sm);
   /* Platz für Nextcloud Nav-Toggle ("Hamburger") oben links */
   padding-inline-start: var(--pw-click-lg);
   padding-block-end: var(--pw-gap-1);
+}
+
+/* Ein Knopf trägt seine Beschriftung ganz; schrumpfen tut die Zeile um ihn
+   herum, nie er selbst. */
+.pw-view-header button {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 // Primär-Aktionsknopf in Listen-Headern (z.B. „+ Neue Sitzung“) — nach
@@ -2839,5 +3028,398 @@ tr.pw-prio-hoch > td {
   .pw-info-tabelle th,
   .pw-info-tabelle td {
     padding-inline: 0;
+  }
+}
+
+/* ==========================================================================
+   Drucken.
+
+   Befund aus dem Design-Test vom 11.09.2026: Die Anwendung hatte kein
+   Drucklayout. Auf A4 druckte die Kopfleiste von Nextcloud übereinander, ein
+   Titel wie «Weisung 2025.110» wurde abgeschnitten, der blaue Hintergrund kam
+   als Vollton, und nach dem ersten Pauschalantrag brach die Seite ab.
+
+   Grundsatz: Auf Papier steht der Inhalt. Was man am Papier nicht bedienen
+   kann, steht nicht darauf; was man lesen soll, wird nicht abgeschnitten und
+   nicht mitten im Eintrag umgebrochen. Die Werte kommen aus denselben Tokens
+   wie am Schirm.
+   ========================================================================== */
+
+/* Flacher Schirm (Tablet quer, Telefon quer): Nextcloud legt um den Inhalt
+   einen Rand auf dem Hintergrund der Theme. Oben nimmt die Adressleiste des
+   Browsers Platz, unten die Navigationsleiste des Geräts, und was vom
+   scrollbaren Bereich übrig bleibt, trägt bei 800 Pixel Bildhöhe noch zwei
+   Zeilen (Bild von Marc vom 24.10.2026, Tablet quer). Der Inhalt läuft darum
+   bis an den unteren Bildrand. */
+@media (max-height: 56rem) {
+  body {
+    /* Mit EINHEIT. Nextcloud rechnet mit diesem Wert die Breite und die Höhe
+       seiner Behälter aus («calc(100% - var(--body-container-margin) * 2)»),
+       und eine einheitenlose Null ist in einer solchen Rechnung keine Länge:
+       Die ganze Rechnung wird ungültig, die Angabe fällt weg, und der Behälter
+       schrumpft auf seinen Inhalt. Gemessen am 24.10.2026: Bei 1024×768 war
+       der Inhaltsbereich 24 Pixel breit, die Navigationsleiste lag darüber,
+       und von der Anwendung war nichts zu sehen. */
+    --body-container-margin: 0px;
+  }
+
+  /* Eine Stufe dichter, aus derselben Quelle wie sonst: jede Abstufung bleibt
+     erhalten, der ganze Satz rückt zusammen. */
+  :root {
+    --pw-gap-1: var(--pw-space-xs);
+    --pw-gap-2: var(--pw-space-md);
+    --pw-gap-3: var(--pw-space-lg);
+    --pw-gap-4: var(--pw-space-xl);
+  }
+
+  /* Der Kopf des Budgets zeigt nur die Differenz — die Zeile, wegen der man
+     hinsieht. Der Griff darüber klappt Stadtrat und Fraktion dazu. */
+  .pw-budget-summen:not(.pw-budget-summen-offen) .pw-budget-vergleich thead,
+  .pw-budget-summen:not(.pw-budget-summen-offen) .pw-budget-vergleich tbody tr:not(.pw-vergleich-differenz) {
+    display: none;
+  }
+
+  .pw-budget-summen-griff {
+    display: inline-flex;
+  }
+
+  /* Die Kopfleiste von Nextcloud weicht beim Blättern nach unten und kommt
+     beim Blättern nach oben zurück. */
+  body.pw-kopf-weg #header {
+    transform: translateY(-100%);
+  }
+
+  #header {
+    transition: transform 0.2s ease;
+  }
+
+  #content,
+  #content-vue {
+    padding-block-end: 0;
+  }
+
+  #app-content,
+  #app-content-vue,
+  .app-content {
+    border-end-start-radius: 0;
+    border-end-end-radius: 0;
+  }
+}
+
+/* Der Griff am Budgetkopf erscheint nur auf flachem Schirm; sonst stehen alle
+   drei Zeilen ohnehin da. */
+.pw-budget-summen-griff {
+  display: none;
+  align-items: center;
+  gap: var(--pw-space-xs);
+  align-self: flex-start;
+  padding: var(--pw-space-2xs) var(--pw-space-sm);
+  border: none;
+  background: transparent;
+  color: var(--color-main-text);
+  cursor: pointer;
+  font-size: var(--pw-font-sm);
+}
+
+/* Rand des Papiers: ein ruhiger Rahmen, in der Einheit der Schrift, damit er
+   mit einer grösseren Grundschrift mitwächst. Ohne Angabe druckt jeder
+   Browser seinen eigenen Standard. */
+@page {
+  margin: 1.5rem;
+}
+
+@media print {
+  /* Die Oberfläche von Nextcloud: Kopfleiste, Navigation und Seitenleiste
+     gehören nicht auf das Papier. Sie lagen vorher über dem Inhalt. */
+  #header,
+  #app-navigation,
+  #app-sidebar,
+  .app-navigation,
+  .pw-app-nav {
+    display: none !important;
+  }
+
+  /* Die Bedienelemente der Anwendung: Filter, Werkzeugleisten, Knöpfe und
+     Schalter. Sie kosten auf Papier den Platz des Inhalts. */
+  .pw-filter-panel,
+  .pw-filter-stack,
+  .pw-filter-fix,
+  .pw-filter-clear,
+  .pw-toolbar,
+  .pw-toolbar-inline,
+  .pw-toolbar-hint,
+  .pw-aktionen,
+  .pw-dokumente-schalter,
+  /* Der Pfeil zum Auf- und Zuklappen: Auf Papier steht alles offen, also
+     zeigt er nichts an (Befund vom 16.10.2026 am A3 der Kommissionen). */
+  .pw-toggle,
+  button,
+  .button {
+    display: none !important;
+  }
+
+  /* Der Inhalt nimmt die ganze Breite des Papiers: Am Schirm teilt er sie mit
+     der Navigation, die hier weg ist. */
+  #content,
+  #app-content,
+  #app-content-vue,
+  .pw-app-main,
+  .pw-view {
+    /* Mit Nachdruck, weil die Regeln von Nextcloud für dieselben Behälter
+       nach unseren geladen werden und selbst `!important` tragen: Ohne das
+       blieb der Behälter ein Flex-Element, und die dritte Karte brach beim
+       Seitenumbruch mitten durch (Befund vom 16.10.2026). */
+    display: block !important;
+    inline-size: 100%;
+    max-inline-size: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: visible !important;
+  }
+
+  /* Zurück in den Fluss der Seite: Gemessen am 16.10.2026 standen über den
+     Karten `div.content` als `position: fixed` mit `overflow: hidden` und
+     `body` ebenso fest. Was fest positioniert ist, nimmt am Seitenumbruch
+     nicht teil — keine Karte konnte auf die nächste Seite rücken, und jede
+     Umbruchregel blieb wirkungslos. */
+  body,
+  .app-parlwin,
+  .content,
+  .content > div {
+    /* Ohne `display`: Die Navigation ist ein direktes Kind von `.content`,
+       und eine Anzeigeangabe hier hob ihr `display: none` von weiter oben
+       auf — die Seitenleiste druckte als erste Seite mit (gemessen am
+       16.10.2026). */
+    position: static !important;
+    overflow: visible !important;
+    block-size: auto !important;
+    max-block-size: none !important;
+  }
+
+  .content,
+  .app-parlwin {
+    display: block !important;
+  }
+
+  /* Blockfluss von oben bis zur Karte: In einem Flex- oder Rasterbehälter
+     übergeht der Browser beim Seitenumbruch `break-inside: avoid`, und die
+     Karte «Budget 2018» brach mitten durch (Befund vom 16.10.2026,
+     drucklayout.test.js). */
+  .pw-view-content,
+  .pw-card-grid,
+  .pw-mitglieder-grid {
+    display: block !important;
+    gap: 0;
+  }
+
+  /* Eine Karte, die ihren Inhalt abschneidet, lässt sich nicht zusammenhalten:
+     «Budget 2018» brach trotz `break-inside: avoid` mitten durch (Befund vom
+     16.10.2026). */
+  .pw-data-card,
+  .pw-card,
+  .pw-mitglied-karte,
+  .pw-kommission-karte {
+    overflow: visible !important;
+    margin-block-end: var(--pw-space-md);
+  }
+
+  /* Ein Eingabefeld ist Bedienung; auf Papier zählt nur sein Wert. Unter
+     «Priorität» stand ein leerer Kasten (Befund vom 16.10.2026). */
+  input,
+  select,
+  textarea {
+    border: 0 !important;
+    background: transparent !important;
+    padding: 0 !important;
+    min-block-size: 0 !important;
+    appearance: none;
+  }
+
+  /* Das Blatt ist weiss. Nextcloud legt seine Farbe auf die eigenen Behälter,
+     und sie lief rechts und unten über die Seite; auf durchsichtig gesetzt
+     wurde das ganze Blatt blau, weil die weisse Fläche des Inhalts sie vorher
+     verdeckt hatte (Befund vom 16.10.2026, drucklayout.test.js). */
+  html,
+  body,
+  #body-user,
+  #content,
+  #content-vue,
+  #app-content,
+  #app-content-vue,
+  .app-content {
+    /* Das Blau sitzt auf `html`: gemessen am 16.10.2026 als
+       `rgb(0, 103, 158)`. Dort, wo der Körper das Blatt nicht ausfüllt, kam
+       es als Strich am rechten Blattrand durch. */
+    background: var(--color-main-background, #fff) !important;
+    background-image: none !important;
+    /* Vom Rahmen des Behälters blieb sonst ein blauer Strich am rechten
+       Blattrand stehen (Befund vom 16.10.2026). */
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /* Keine Flächen in Vollton: Der Drucker gibt sie als Farbe aus, und der
+     Text darauf wird schlecht lesbar. Linien bleiben, sie gliedern. */
+  .pw-view,
+  .pw-data-card,
+  .pw-table-wrap,
+  .pw-members-table-wrap,
+  .pw-modal-kopf,
+  .pw-sitzung-kopf,
+  .pw-kommission-kopf,
+  .pw-budget-kopf,
+  .pw-tabelle thead th,
+  .pw-members-table thead th,
+  .pw-tabelle tbody tr:nth-child(even),
+  .pw-members-table tbody tr:nth-child(even) {
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  /* Nichts wird abgeschnitten: Ein Titel, der am Schirm in seine Spalte
+     passen muss, hat auf Papier den Platz zu brechen. */
+  .pw-cell-ellipsis,
+  .pw-titel,
+  .pw-status-text {
+    display: block;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    max-inline-size: none;
+  }
+
+  /* Ein Eintrag bleibt zusammen: eine Tabellenzeile, eine Karte, ein Antrag.
+     Vorher brach die Seite nach dem ersten Pauschalantrag mitten hinein. */
+  tr,
+  .pw-data-card,
+  .pw-card,
+  .pw-antrag,
+  .pw-pg-karte,
+  .pw-mitglied-karte,
+  .pw-kommission-karte {
+    /* `avoid-page` nennt die Seite als das, was nicht durchbrochen werden
+       darf; mit dem allgemeinen `avoid` brach die dritte Karte weiter, obwohl
+       die ganze Kette von body bis Karte im Blockfluss steht und überläuft
+       (gemessen am 16.10.2026). */
+    break-inside: avoid-page;
+    page-break-inside: avoid;
+  }
+
+  /* Ein offenes Popup ist auf Papier der Inhalt: Seine Abdeckung deckt nichts
+     ab, das Fenster nimmt die Breite des Blattes. Fest positioniert stand die
+     Abdeckung als dunkelgraues Blatt auf jeder Seite, dreimal dasselbe Bild,
+     mit dem Fenster in der Mitte (Bild vom 20.10.2026, A4 des Detail eines
+     Investitionsvorhabens). */
+  .pw-modal-overlay {
+    position: static !important;
+    display: block !important;
+    background: none !important;
+    padding: 0 !important;
+    z-index: auto !important;
+  }
+
+  /* Steht ein Popup offen, ist es das Dokument: Die Seite dahinter bleibt auf
+     dem Papier weg. Das A4 des geöffneten Details trug 190 Seiten, die ganze
+     Liste der Investitionsvorhaben, und das Detail darin (Bild vom
+     20.10.2026). */
+  body:has(.pw-modal-overlay) #content,
+  body:has(.pw-modal-overlay) #content-vue,
+  body:has(.pw-modal-overlay) .app-parlwin {
+    display: none !important;
+  }
+
+  /* Das Blatt ist der Rahmen: Mit einer festen Breite von 100% stand der Kasten
+     des Fensters über den rechten Blattrand hinaus (Bild vom 20.10.2026). Im
+     Blockfluss nimmt er die Breite des Satzspiegels von selbst. */
+  .pw-modal,
+  .pw-modal-vollbild {
+    inline-size: auto !important;
+    max-inline-size: 100% !important;
+    max-block-size: none !important;
+    overflow: visible !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /* Am Schirm scrollt eine breite Tabelle in ihrem Behälter, und die
+     Mindestbreite hält die Spalten auseinander. Auf Papier scrollt nichts: Auf
+     A5 lief die Jahresreihe eines Investitionsvorhabens rechts aus dem Blatt
+     und «Summe der Jahre» war abgeschnitten (Bild vom 20.10.2026). */
+  .pw-zv-scroll {
+    overflow: visible !important;
+  }
+
+  .pw-zv-scroll table {
+    min-inline-size: 0 !important;
+  }
+
+  /* Eine Tabelle, die über die Seite geht, wiederholt ihren Kopf. */
+  thead {
+    display: table-header-group;
+  }
+
+  /* Der Kopf einer Tabelle klebt am Schirm oben an; auf Papier hat er zu
+     stehen, wo er steht. */
+  .pw-tabelle thead th,
+  .pw-members-table thead th {
+    position: static;
+  }
+
+  /* Eine Auswahl im Feld zeigt auf Papier ihren Wert als Text: Das Chevron
+     und das Kreuz zum Löschen sind Bedienung, der Name ist der Inhalt. */
+  .pw-inline-select .vs__actions,
+  .pw-inline-select .vs__deselect,
+  .pw-inline-select .vs__search {
+    display: none !important;
+  }
+
+  /* Auch das Auswahlfeld selbst: Am Schirm ist der Rahmen die Einladung zum
+     Klicken, auf Papier blieb davon ein leerer weisser Kasten unter
+     «Priorität» stehen (Befund vom 16.10.2026). Die eigene Regel von
+     vue-select ist genauer, darum `!important`. */
+  /* Mit einer Kennung davor, weil NcSelect seinen Rahmen aus dem Stylesheet
+     von Nextcloud holt und ihn selbst mit `!important` setzt: Ohne das blieb
+     unter «Priorität» ein leerer Kasten auf dem Blatt stehen. */
+  #content .pw-inline-select .vs__dropdown-toggle,
+  #content .pw-card-prio .vs__dropdown-toggle,
+  #content .pw-card-beschluss .vs__dropdown-toggle,
+  #content .pw-card-prio .v-select,
+  #content .pw-card-beschluss .v-select,
+  .pw-inline-select .vs__dropdown-toggle,
+  .pw-card-prio .vs__dropdown-toggle,
+  .pw-card-beschluss .vs__dropdown-toggle,
+  .pw-card-prio .v-select,
+  .pw-card-beschluss .v-select {
+    /* Den Kasten zeichnet NcSelect als Schatten, nicht als Rahmen: gemessen
+       am 16.10.2026 im Druck, `box-shadow: 0 -1px 0 #7d7d7d, 0 0 0 1px
+       rgba(125,125,125,.35)`, während Rahmen und Hintergrund schon weg
+       waren. */
+    border: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    min-block-size: 0 !important;
+  }
+
+  .pw-inline-select .vs__selected {
+    background: transparent !important;
+    padding: 0;
+  }
+
+  /* Ein leeres Auswahlfeld nimmt auf Papier keinen Platz: Die Zeile hielt
+     sich über `min-height: 32px` offen, und unter «PRIORITÄT» blieb eine
+     Lücke von 51 Punkten (gemessen am 16.10.2026). */
+  .vs__selected-options,
+  .vs__dropdown-toggle {
+    min-block-size: 0 !important;
+  }
+
+  /* Was am Schirm einklappt, steht auf Papier offen: Der Druck ist das ganze
+     Dokument, nicht die halbe Ansicht. */
+  .pw-dokumente-zeile,
+  details[open] > *,
+  details > * {
+    display: revert;
   }
 }

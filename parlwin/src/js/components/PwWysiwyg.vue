@@ -62,6 +62,13 @@ export default {
     modelValue: { type: String, default: '' },
     editable: { type: Boolean, default: true },
     placeholder: { type: String, default: '' },
+    /**
+     * Die Beschriftung des Schreibbereichs. Der Editor ist ein
+     * `contenteditable`, also kein Feld, das ein `<label for="…">` benennen
+     * kann; dieser Name steht am Bereich selbst und ist das, was ein
+     * Vorleseprogramm sagt und was eine Prüfung über die Beschriftung findet.
+     */
+    ariaLabel: { type: String, default: '' },
     status: { type: String, default: '' },
     pdfHref: { type: String, default: '' },
     pdfTitle: { type: String, default: '' },
@@ -103,6 +110,7 @@ export default {
     this.editor = new Editor({
       content: this.modelValue || '',
       editable: this.editable,
+      editorProps: this.ariaLabel ? { attributes: { 'aria-label': this.ariaLabel } } : {},
       extensions: [
         StarterKit,
         Underline,

@@ -566,8 +566,14 @@ test.describe('F27 Dokumente am Geschäft', () => {
       const bereich = await oeffneDokumente(page, geschaeft)
 
       // «+ Neues Dokument» öffnet das Vorlagen-Menü (Nextcloud-Standardmuster).
-      await bereich.getByText('+ Neues Dokument', { exact: true }).first().click()
+      // Unter Last blieb das Menü in Firefox einmal aus, obwohl der Klick ankam
+      // (25.10.2026); darum bis zu dreimal klicken, bis es steht.
       const menu = page.locator('.v-popper__popper:visible').first()
+      for (let versuch = 0; versuch < 3; versuch++) {
+        if (await menu.isVisible().catch(() => false)) { break }
+        await bereich.getByText('+ Neues Dokument', { exact: true }).first().click()
+        await menu.waitFor({ state: 'visible', timeout: 5_000 }).catch(() => {})
+      }
       await menu.waitFor({ state: 'visible', timeout: 15_000 })
       await expect(menu.getByRole('menuitem', { name: 'Word-Dokument (docx)' })).toBeVisible()
       await expect(menu.getByRole('menuitem', { name: 'OpenDocument-Text (odt)' })).toBeVisible()

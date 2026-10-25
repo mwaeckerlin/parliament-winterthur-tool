@@ -6,6 +6,7 @@ namespace OCA\ParliamentWinterthur\Tests\Service;
 
 use OCA\ParliamentWinterthur\Db\BudgetAntrag;
 use OCA\ParliamentWinterthur\Db\BudgetAntragMapper;
+use OCA\ParliamentWinterthur\Db\BudgetInvestition;
 use OCA\ParliamentWinterthur\Db\BudgetInvestitionMapper;
 use OCA\ParliamentWinterthur\Db\BudgetProduktegruppe;
 use OCA\ParliamentWinterthur\Db\BudgetJahr;
@@ -172,6 +173,146 @@ class BudgetImportServiceTest extends TestCase {
         // Der Fraktionsname wird zurückgegeben — die Druckseite setzt ihn in den Titel
         // «Budgetanträge der <Fraktion>» (F92).
         self::assertSame('Unsere Fraktion', $svc->antraegePdf(2026, null, false, 'Unsere Fraktion')['fraktion']);
+    }
+
+    /**
+     * Die Druckdaten tragen zu jeder Zielvorgaben-Änderung den Unterabschnitt
+     * und den heutigen Soll — dasselbe, was am Bildschirm steht.
+     *
+     * Befund von Marc am 24.10.2026: «Auch in der Liste der Anträge fehlen
+     * angepasste Zielwerte (ebenso wie dann folglich im PDF)!» Gedruckt wurde
+     * nur die Messgrösse und der neue Wert; welche der beiden gleich benannten
+     * Vorgaben gemeint ist und was heute gilt, stand nicht da.
+     */
+    public function testAntraegePdfTraegtUnterabschnittUndHeutigenSoll(): void {
+        $g = new BudgetProduktegruppe();
+        $g->setCode('240');
+        $g->setName('Immobilien');
+        $g->setDepartement('Finanzen');
+        $g->setZielvorgaben((string) json_encode([
+            ['zielNummer' => 1, 'zielTitel' => '1 Wirtschaftlichkeit', 'unterTitel' => 'Minimale Nettorendite', 'messgroesse' => 'Wohnliegenschaften (in %)', 'soll' => '1.00', 'werte' => []],
+            ['zielNummer' => 1, 'zielTitel' => '1 Wirtschaftlichkeit', 'unterTitel' => 'Durchschnittliche Nettorendite', 'messgroesse' => 'Wohnliegenschaften (in %)', 'soll' => '2.31', 'werte' => []],
+        ]));
+        $gruppen = $this->createStub(BudgetProduktegruppeMapper::class);
+        $gruppen->method('findByJahr')->willReturn([$g]);
+        $investitionen = $this->createStub(BudgetInvestitionMapper::class);
+        $investitionen->method('findByJahr')->willReturn([]);
+
+        $a = new BudgetAntrag();
+        $a->setId(7);
+        $a->setJahr(2027);
+        $a->setBereich('globalbudget');
+        $a->setZielRef('240');
+        $a->setHerkunft('eigene');
+        $a->setHaltung('einreichen');
+        $a->setAntragsteller('Marc Wäckerlin');
+        $a->setZielAenderungen((string) json_encode([
+            ['zielNummer' => 1, 'unterTitel' => 'Durchschnittliche Nettorendite', 'messgroesse' => 'Wohnliegenschaften (in %)', 'neuerWert' => '4'],
+        ]));
+        $antraege = $this->createStub(BudgetAntragMapper::class);
+        $antraege->method('findByJahr')->willReturn([$a]);
+
+        $time = new class implements ITimeFactory {
+            public function getTime(): int {
+                return 100;
+            }
+        };
+        $svc = new BudgetImportService(
+            $this->createStub(BudgetJahrMapper::class), $gruppen, $investitionen, $antraege,
+            $this->createStub(BudgetBuchParser::class), $time, $this->createStub(GeschaeftMapper::class),
+            $this->createStub(IClientService::class), $this->createStub(TraktandumMapper::class),
+            $this->createStub(SitzungMapper::class), $this->createStub(BudgetDrehbuchParser::class),
+        );
+        $eintraege = $svc->antraegePdf(2027, null, false, 'Unsere Fraktion')['eintraege'];
+        self::assertCount(1, $eintraege);
+        $zae = $eintraege[0]['antrag']['zielAenderungen'];
+        self::assertSame('Durchschnittliche Nettorendite', $zae[0]['unterTitel']);
+        self::assertSame('2.31', $zae[0]['soll'], 'der heutige Soll kommt von der gemeinten Vorgabe');
+        self::assertSame('4', $zae[0]['neuerWert']);
+    }
+
+    /**
+     * Die Druckdaten tragen die Seite im Budgetbuch (F129) und ordnen auch die
+     * drei Antragsarten zu, die seit dem 24.10.2026 möglich sind: der Antrag
+     * auf ein Departementssekretariat (F136) und der auf einen
+     * Verpflichtungskredit mit seinem Betrag oder seinem Bewilligungsorgan
+     * (F135, F137). Ohne die Zuordnung stand im Ausdruck und im Excel-Export
+     * die interne Kennung «12|3000.1» als Produktegruppe, ohne Departement.
+     */
+    public function testAntraegePdfTraegtSeiteUndDieNeuenAntragsarten(): void {
+        $g = new BudgetProduktegruppe();
+        $g->setCode('240');
+        $g->setName('Immobilien');
+        $g->setDepartement('Finanzen');
+        $g->setBuchseite(243);
+        $gruppen = $this->createStub(BudgetProduktegruppeMapper::class);
+        $gruppen->method('findByJahr')->willReturn([$g]);
+
+        $inv = new BudgetInvestition();
+        $inv->setId(12);
+        $inv->setJahr(2027);
+        $inv->setDepartement('Bau');
+        $inv->setProjekt('Schulhaus Neuwiesen');
+        $inv->setKonten((string) json_encode([
+            ['konto' => '3000.1', 'name' => 'Ausführungskredit', 'betrag' => 263000, 'kredit' => 1200000],
+        ]));
+        $investitionen = $this->createStub(BudgetInvestitionMapper::class);
+        $investitionen->method('findByJahr')->willReturn([$inv]);
+
+        $antraege = [];
+        foreach ([
+            ['globalbudget', '240', ''],
+            ['departementssekretariat', 'Finanzen', ''],
+            ['verpflichtungskredit', '12|3000.1', ''],
+            ['bewilligungsorgan', '12|3000.1', '#'],
+        ] as $i => [$bereich, $ref, $neuerWert]) {
+            $a = new BudgetAntrag();
+            $a->setId($i + 1);
+            $a->setJahr(2027);
+            $a->setBereich($bereich);
+            $a->setZielRef($ref);
+            $a->setHerkunft('eigene');
+            $a->setHaltung('einreichen');
+            $a->setAntragsteller('Marc Wäckerlin');
+            $a->setBetragDelta($neuerWert === '' ? -1000 : 0);
+            $a->setNeuerWert($neuerWert);
+            $antraege[] = $a;
+        }
+        $antragMapper = $this->createStub(BudgetAntragMapper::class);
+        $antragMapper->method('findByJahr')->willReturn($antraege);
+
+        $time = new class implements ITimeFactory {
+            public function getTime(): int {
+                return 100;
+            }
+        };
+        $svc = new BudgetImportService(
+            $this->createStub(BudgetJahrMapper::class), $gruppen, $investitionen, $antragMapper,
+            $this->createStub(BudgetBuchParser::class), $time, $this->createStub(GeschaeftMapper::class),
+            $this->createStub(IClientService::class), $this->createStub(TraktandumMapper::class),
+            $this->createStub(SitzungMapper::class), $this->createStub(BudgetDrehbuchParser::class),
+        );
+        $eintraege = $svc->antraegePdf(2027, null, false, 'Unsere Fraktion')['eintraege'];
+        $nach = [];
+        foreach ($eintraege as $e) {
+            $nach[(string) $e['antrag']['bereich']] = $e;
+        }
+
+        self::assertSame(243, $nach['globalbudget']['buchseite'], 'die Seite im Budgetbuch fehlt in den Druckdaten');
+        self::assertSame('Immobilien', $nach['globalbudget']['produktegruppe']);
+
+        self::assertSame('Finanzen', $nach['departementssekretariat']['departement'], 'der Sekretariatsantrag hat kein Departement');
+        self::assertSame('Departementssekretariat', $nach['departementssekretariat']['produktegruppe']);
+
+        foreach (['verpflichtungskredit', 'bewilligungsorgan'] as $bereich) {
+            self::assertSame('Bau', $nach[$bereich]['departement'], 'der Kreditantrag steht unter keinem Departement');
+            self::assertSame(
+                'Schulhaus Neuwiesen · Kredit 3000.1 Ausführungskredit',
+                $nach[$bereich]['produktegruppe'],
+                'der Kreditantrag nennt Vorhaben und Kredit nicht',
+            );
+        }
+        self::assertSame('#', $nach['bewilligungsorgan']['antrag']['neuerWert']);
     }
 
     public function testImportiertNeuestesJahrAutomatischWennNochNichtVorhanden(): void {

@@ -836,9 +836,14 @@ test.describe('Kommissionen: Ansicht end-to-end', () => {
     let ohneGeschaefte = 0
     for (let i = 0; i < dn; i++) {
       const d = details.nth(i)
-      if (await d.locator('.pw-kommission-mitglied-karte').count() === 0) {
-        await expect(d.getByText('Keine Mitglieder synchronisiert.')).toBeVisible()
-      }
+      // Entweder eine Mitgliederkarte ODER der Hinweis, in EINEM Warten: Die
+      // Karten kommen nachgeladen, und wer erst zählt und dann den Hinweis
+      // verlangt, prüft den Zustand von vorhin (Firefox, 25.10.2026).
+      await expect(
+        d.locator('.pw-kommission-mitglied-karte').first()
+          .or(d.getByText('Keine Mitglieder synchronisiert.')),
+        'Eine Kommission ohne Mitglieder sagt es nicht',
+      ).toBeVisible({ timeout: 20_000 })
       // Entweder pendente Geschäfte ODER der Hinweis — in EINEM Zugriff gelesen:
       // Die Ansicht lädt die Geschäfte seitenweise nach, und zwischen Zählen und
       // Prüfen wechselt die Karte sonst von «kein Geschäft» zu «Geschäfte da».

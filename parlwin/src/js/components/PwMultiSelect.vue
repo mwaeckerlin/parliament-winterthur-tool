@@ -5,12 +5,14 @@
     :options="verfuegbareOptionen"
     multiple
     :close-on-select="false"
+    :calculate-position="filterDropdownPosition"
     @update:model-value="$emit('update:model-value', $event)"
   />
 </template>
 
 <script>
 import NcSelect from '@nextcloud/vue/components/NcSelect'
+import { filterDropdownPosition } from '../filter-dropdown'
 
 /**
  * Generisches Multi-Select-Widget.
@@ -39,6 +41,11 @@ export default {
     },
   },
   emits: ['update:model-value'],
+  methods: {
+    // Die Liste bleibt im sichtbaren Bereich, auch wenn die Bildschirmtastatur
+    // ihn halbiert (filter-dropdown.js).
+    filterDropdownPosition,
+  },
   computed: {
     verfuegbareOptionen() {
       const gewaehlt = Array.isArray(this.modelValue) ? this.modelValue : []

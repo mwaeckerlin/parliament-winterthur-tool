@@ -44,13 +44,20 @@ function ohneFunktionsfallbacks(css) {
   return s
 }
 
+// Ein Farbcode in einem Kommentar ist kein Wert, sondern die Messung, die
+// erklärt, warum eine Regel dasteht: Am 16.10.2026 schlug diese Prüfung auf
+// dem notierten Schatten von NcSelect an, den der Druckteil wegnimmt.
+function ohneKommentare(css) {
+  return css.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|\s)\/\/[^\n]*/g, '$1')
+}
+
 describe('CSS-Farben: nur Variablen, keine harten Farbcodes', () => {
   it('kein Hex-Farbcode als direkter Wert (nur als var()/color-mix()-Fallback erlaubt)', () => {
     const verstoesse = []
     for (const wurzel of WURZELN) {
       for (const datei of dateien(wurzel, ['.vue', '.scss'])) {
         const css = ohneFunktionsfallbacks(styleInhalt(datei))
-        const zeilen = css.split('\n')
+        const zeilen = ohneKommentare(css).split('\n')
         zeilen.forEach((zeile, i) => {
           if (/#[0-9a-fA-F]{3,8}\b/.test(zeile)) {
             verstoesse.push(`${datei}: ${zeile.trim()}`)

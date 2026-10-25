@@ -3,17 +3,17 @@
        Filterband auf der Seite). -->
   <Teleport v-if="filterReady" to="#pw-filter-slot">
     <FilterPanel @reset="filterZuruecksetzen">
-      <NcSelect v-if="jahrOptionen.length" v-model="jahrOption" :options="jahrOptionen" :clearable="false" input-label="Budgetjahr" @update:model-value="jahrGewechselt" />
-      <NcSelect v-if="kommissionOptionen.length" v-model="kommissionOption" :options="kommissionOptionen" input-label="Zuständige Kommission" placeholder="Alle" @update:model-value="kommissionGewechselt" />
-      <NcSelect v-model="departementOption" :options="departementOptionen" input-label="Departement" placeholder="Alle" @update:model-value="ladeAnsicht(false)" />
+      <NcSelect v-if="jahrOptionen.length" v-model="jahrOption" :options="jahrOptionen" :clearable="false" input-label="Budgetjahr" :calculate-position="filterDropdownPosition" @update:model-value="jahrGewechselt" />
+      <NcSelect v-if="kommissionOptionen.length" v-model="kommissionOption" :options="kommissionOptionen" input-label="Zuständige Kommission" placeholder="Alle" :calculate-position="filterDropdownPosition" @update:model-value="kommissionGewechselt" />
+      <NcSelect v-model="departementOption" :options="departementOptionen" input-label="Departement" placeholder="Alle" :calculate-position="filterDropdownPosition" @update:model-value="ladeAnsicht(false)" />
       <!-- Die Produktegruppe folgt dem Departement: Sie bietet nur an, was im
            gewählten Departement vorkommt. Vor allem die Investitionsrechnung
            führt so viele Vorhaben, dass sie ohne diese zweite Stufe
            unübersichtlich ist (Rückmeldung der Fraktion, 23.09.2026). -->
-      <NcSelect v-model="produktegruppeOption" :options="produktegruppeOptionen" input-label="Produktegruppe" placeholder="Alle" />
+      <NcSelect v-model="produktegruppeOption" :options="produktegruppeOptionen" input-label="Produktegruppe" placeholder="Alle" :calculate-position="filterDropdownPosition" />
       <NcTextField v-model="minProzent" type="number" label="Anstieg ab %" />
       <NcTextField v-model="minAbsolut" type="number" label="Anstieg ab CHF" />
-      <NcSelect v-model="antragsartOption" :options="antragsartOptionen" :clearable="false" input-label="Anträge" />
+      <NcSelect v-model="antragsartOption" :options="antragsartOptionen" :clearable="false" input-label="Anträge" :calculate-position="filterDropdownPosition" />
       <!-- Nur bei den Investitionen: viele Vorhaben beginnen erst in einem
            Planjahr und führen im Budgetjahr eine Null. Auf den anderen Tabs
            wirkt der Filter nicht und steht deshalb auch nicht da. -->
@@ -71,7 +71,17 @@
            so überlagern sich die beiden nicht, und die Tabs hängen unten an den
            Übersichtszahlen (statt zwei konkurrierende Stickies auf top: 0). -->
       <div class="pw-budget-sticky">
-      <div class="pw-budget-summen">
+      <!-- Auf flachem Schirm steht nur die Differenz; der Griff holt
+           Stadtratsbudget und Fraktionsbudget dazu (Bild von Marc vom
+           24.10.2026, Tablet quer). Auf hohem Schirm ist der Griff unsichtbar
+           und alle drei Zeilen stehen da. -->
+      <button
+        type="button"
+        class="pw-budget-summen-griff"
+        :aria-expanded="summenOffen"
+        @click="summenOffen = !summenOffen"
+      >{{ summenOffen ? '▾' : '▸' }} Stadtrat und Fraktion</button>
+      <div class="pw-budget-summen" :class="{ 'pw-budget-summen-offen': summenOffen }">
         <table class="pw-budget-vergleich">
           <thead>
             <tr>
@@ -112,6 +122,11 @@
         </table>
       </div>
 
+      <!-- F128: Wie viel des Aufwands über alle gezeigten Produktegruppen
+           überhaupt beeinflussbar ist. Dieselbe Orientierung wie je Karte, über
+           das ganze Budget und den gesetzten Filter. -->
+      <p v-if="steuerbarGesamt" class="pw-steuerbar pw-steuerbar-gesamt">{{ steuerbarGesamt }}</p>
+
       <div class="pw-budget-tabs" role="tablist">
         <button
           v-for="t in tabs"
@@ -126,13 +141,34 @@
       </div>
       </div>
 
+      <!-- F124: Notizen zum ganzen Budgetjahr und zum gerade offenen Tab. Die
+           Notizen zum Budget gelten über alle Tabs, die des Tabs nur für ihn. -->
+      <div v-if="ansicht" class="pw-budget-ebenen-notizen">
+        <BudgetEbeneNotizen
+          ebene="budget_jahr"
+          :jahr="jahrOption ? jahrOption.value : ansicht.jahr.jahr"
+          titel="Notizen zum Budget"
+          :aktuelle-uid="aktuelleUid"
+        />
+        <BudgetEbeneNotizen
+          :key="'tab-' + aktiverTab"
+          ebene="budget_tab"
+          :jahr="jahrOption ? jahrOption.value : ansicht.jahr.jahr"
+          :schluessel="aktiverTab"
+          :titel="'Notizen zu ' + aktiverTabLabel"
+          :aktuelle-uid="aktuelleUid"
+        />
+      </div>
+
       <!-- Tab: Globalbudgets -->
       <div v-show="aktiverTab === 'globalbudget'" class="pw-budget-tabpanel">
         <!-- Pauschalanträge (F100): alle gleich behandelt, jeder mit eigenem Ziel-Typ
              (Einsparungen, schwarze Null, fester Ertrag, festes Defizit). Die Liste
              startet leer; «+ Pauschalantrag» legt einen neuen an. -->
-        <div v-if="!sitzungsmodus" class="pw-data-card pw-pauschalantraege">
-          <h3 class="pw-pauschal-titel">Pauschalanträge</h3>
+        <!-- Auf flachem Schirm startet der Block zugeklappt: er steht immer
+             oben, auch wenn gerade niemand einen Pauschalantrag stellt. -->
+        <details v-if="!sitzungsmodus" class="pw-data-card pw-pauschalantraege" :open="pauschalOffen">
+          <summary class="pw-pauschal-titel">Pauschalanträge<span v-if="pauschalantraege.length"> ({{ pauschalantraege.length }})</span></summary>
           <BudgetPauschalForm
             v-for="p in pauschalantraege"
             :key="p.id"
@@ -144,15 +180,66 @@
             @delete="pauschalLoeschen(p.id)"
           />
           <NcButton type="secondary" @click="pauschalErstellen">+ Pauschalantrag</NcButton>
-        </div>
+        </details>
 
         <div v-for="dep in gruppenNachDepartement" :key="dep.name" class="pw-budget-departement">
           <h3 class="pw-budget-dep-titel">{{ dep.name }}</h3>
+          <!-- F124: Notizen zum Departement, über alle seine Produktegruppen. -->
+          <BudgetEbeneNotizen
+            ebene="budget_departement"
+            :jahr="jahrOption ? jahrOption.value : ansicht.jahr.jahr"
+            :schluessel="dep.name"
+            :titel="'Notizen zu ' + dep.name"
+            :aktuelle-uid="aktuelleUid"
+          />
+          <!-- F136: Das Departementssekretariat. Seine Kosten stehen in Teil A
+               «vor Umlagen auf die Produktegruppen» und werden danach auf die
+               Globalkredite des Departements umgelegt; Kommissionen und
+               Fraktionen stellen Anträge darauf. -->
+          <article v-if="sekretariat(dep.name)" class="pw-data-card pw-sekretariat">
+            <div class="pw-data-card-header pw-budget-kopf">
+              <div class="pw-budget-kopf-titel">
+                <p class="pw-data-card-kicker">Departementssekretariat</p>
+                <h3>{{ dep.name }}</h3>
+              </div>
+              <span class="pw-budget-betrag">
+                <span class="pw-budget-wert">
+                  <span class="pw-budget-wert-zahl">{{ fr(sekretariat(dep.name).aufwand) }}</span>
+                </span>
+              </span>
+            </div>
+            <p class="pw-sekretariat-hinweis">Aufwand vor Umlagen auf die Produktegruppen; ein Antrag darauf verteilt sich über die Umlage auf die Globalkredite des Departements.</p>
+            <ul v-if="antraegeBereich('departementssekretariat', dep.name).length" class="pw-budget-antraege">
+              <li v-for="a in antraegeBereich('departementssekretariat', dep.name)" :key="a.id">
+                <span class="pw-antrag-betrag" :class="diffKlasse(a.betragDelta)">{{ fr(a.betragDelta) }}</span>
+                <span class="pw-antrag-steller">{{ a.antragsteller }}</span>
+                <span class="pw-antrag-begruendung" v-html="markdownZuHtml(a.begruendung)"></span>
+                <PwLoeschen class="pw-antrag-loeschen" label="Antrag löschen" @click.stop="antragLoeschen(a.id)" />
+              </li>
+            </ul>
+            <BudgetAntragForm
+              v-if="formOffen['s' + dep.name]"
+              :form="neuSekretariat[dep.name]"
+              :antragsteller-optionen="antragstellerOptionen(neuSekretariat[dep.name].herkunft)"
+              :fraktion-optionen="fraktionOptionen"
+              :basis="sekretariat(dep.name).aufwand"
+              @herkunft="herkunftGewechselt(neuSekretariat[dep.name], $event)"
+              @save="antragSekretariat(dep.name)"
+              @abbrechen="formSchliessen('s' + dep.name)"
+            />
+            <NcButton v-else type="secondary" @click="formOeffnen('s' + dep.name)">+ Antrag</NcButton>
+          </article>
           <div class="pw-card-grid">
             <article v-for="g in dep.gruppen" :key="g.id" class="pw-data-card" :class="{ 'pw-budget-kuenstlich': g.kuenstlich }">
               <div class="pw-data-card-header pw-budget-kopf">
                 <div class="pw-budget-kopf-titel">
-                  <p class="pw-data-card-kicker">{{ g.kuenstlich ? 'Rechnerische Position' : 'Produktegruppe ' + g.code }}</p>
+                  <!-- F129: Die Seite im Budgetbuch steht an der Produktegruppe,
+                       damit sie sich in der Fraktion, in der Kommission und in
+                       der Debatte sofort im Buch aufschlagen lässt. -->
+                  <p class="pw-data-card-kicker">
+                    {{ g.kuenstlich ? 'Rechnerische Position' : 'Produktegruppe ' + g.code }}
+                    <span v-if="g.buchseite" class="pw-buchseite">Buch S.&nbsp;{{ g.buchseite }}</span>
+                  </p>
                   <h3>{{ g.name }}</h3>
                 </div>
                 <!-- F116: Wirken unsere Anträge auf die Produktegruppe, steht oben
@@ -166,6 +253,11 @@
                   </span>
                 </span>
               </div>
+              <!-- F128: Wie viel des Aufwands überhaupt beeinflussbar ist. Eine
+                   Orientierung, wo Suchen lohnt — keine Sperre: ein Antrag auf
+                   eine gebundene Position bleibt möglich und fordert dann eine
+                   Rechtsänderung. -->
+              <p v-if="steuerbarText(g)" class="pw-steuerbar">{{ steuerbarText(g) }}</p>
               <ul v-if="antraegeFuer(g.code).length" class="pw-budget-antraege">
                 <!-- F117: Ein Klick in den freien Bereich der Zeile macht den Antrag
                      bearbeitbar; die Bedienelemente darin behalten ihre eigene
@@ -194,7 +286,14 @@
                   <template v-else>
                     <span class="pw-antrag-betrag" :class="diffKlasse(a.betragDelta)">{{ fr(a.betragDelta) }}</span>
                     <span class="pw-antrag-steller">{{ a.antragsteller || (a.automatisch ? 'automatisch' : '') }}</span>
-                    <span class="pw-antrag-begruendung">{{ a.begruendung }}</span>
+                    <!-- Die Begründung ist formatierter Text; sie wird gerendert
+                         wie eine Notiz, mit derselben Säuberung vor der Anzeige. -->
+                    <span class="pw-antrag-begruendung" v-html="markdownZuHtml(a.begruendung)"></span>
+                    <!-- Was der Antrag an den Zielwerten ändert, steht auf der Karte:
+                         ohne das stand dort nur die Begründung (Befund vom 24.10.2026). -->
+                    <ul v-if="zielAenderungZeilen(a).length" class="pw-antrag-zielwerte">
+                      <li v-for="(zeile, zi) in zielAenderungZeilen(a)" :key="zi">{{ zeile }}</li>
+                    </ul>
                     <NcCheckboxRadioSwitch v-if="!a.automatisch" :model-value="haltungAn(a)" type="switch" class="pw-antrag-toggle" @click.stop @update:model-value="haltungUmschalten(a, $event)">{{ haltungLabel(a) }}</NcCheckboxRadioSwitch>
                     <!-- Entscheid (Parlamentsbeschluss) nur in der Sitzung. -->
                     <template v-if="sitzungsmodus">
@@ -209,6 +308,19 @@
                     <details class="pw-antrag-notizen" @click.stop @toggle="notizenToggle(a.id, $event)">
                       <summary>Notizen</summary>
                       <NotizenListe v-if="offeneNotizen[a.id]" :basis-url="'budget/antraege/' + a.id" :notizen="a.aktionen || []" :aktuelle-uid="aktuelleUid" @geaendert="ladeAnsicht(false)" />
+                    </details>
+                    <!-- F125: Dokumente am Antrag, dieselbe Komponente wie am
+                         Geschäft, am Vorstoss und an der Sitzung. -->
+                    <details class="pw-antrag-dokumente" @click.stop @toggle="dokumenteToggle(a.id, $event)">
+                      <summary>Dokumente</summary>
+                      <GeschaeftDokumente
+                        v-if="offeneDokumente[a.id]"
+                        :api-basis="'/apps/parlwin/budget/antraege/' + a.id"
+                        :titel="a.begruendung || ('Antrag ' + a.id)"
+                        objekt-typ="budget_antrag"
+                        :objekt-id="a.id"
+                        ordner-hinweis="Ablage im Fraktionsordner unter «50_Budget», im Ordner des Budgetjahres"
+                      />
                     </details>
                   </template>
                 </li>
@@ -255,6 +367,18 @@
       <div v-show="aktiverTab === 'personal'" class="pw-budget-tabpanel">
         <div v-for="dep in gruppenNachDepartement" :key="dep.name" class="pw-budget-departement">
           <h3 class="pw-budget-dep-titel">{{ dep.name }}</h3>
+          <!-- F124: Notizen zum Departement, über alle seine Produktegruppen. -->
+          <BudgetEbeneNotizen
+            ebene="budget_departement"
+            :jahr="jahrOption ? jahrOption.value : ansicht.jahr.jahr"
+            :schluessel="dep.name"
+            :titel="'Notizen zu ' + dep.name"
+            :aktuelle-uid="aktuelleUid"
+          />
+          <!-- F136: Die Karte des Departementssekretariats steht im Tab
+               «Globalbudgets». Sie trägt einen Aufwand in Franken; auf diesem
+               Tab stehen Stellen, und zwei verschiedene Grössen nebeneinander
+               sind keine Übersicht. -->
           <div class="pw-card-grid">
             <article v-for="g in dep.gruppen" v-show="!g.kuenstlich" :key="g.id" class="pw-data-card">
               <div class="pw-data-card-header pw-budget-kopf">
@@ -294,7 +418,9 @@
                     <span class="pw-antrag-betrag" :class="diffKlasse(a.stellenDelta)">{{ zahl(a.stellenDelta) }} Stellen</span>
                     <span class="pw-antrag-betrag" :class="diffKlasse(a.betragDelta)">{{ fr(a.betragDelta) }}</span>
                     <span class="pw-antrag-steller">{{ a.antragsteller }}</span>
-                    <span class="pw-antrag-begruendung">{{ a.begruendung }}</span>
+                    <!-- Die Begründung ist formatierter Text; sie wird gerendert
+                         wie eine Notiz, mit derselben Säuberung vor der Anzeige. -->
+                    <span class="pw-antrag-begruendung" v-html="markdownZuHtml(a.begruendung)"></span>
                     <NcCheckboxRadioSwitch v-if="!a.automatisch" :model-value="haltungAn(a)" type="switch" class="pw-antrag-toggle" @click.stop @update:model-value="haltungUmschalten(a, $event)">{{ haltungLabel(a) }}</NcCheckboxRadioSwitch>
                     <template v-if="sitzungsmodus">
                       <span class="pw-antrag-entscheid" :class="'pw-entscheid-' + a.entscheid">{{ entscheidLabel(a.entscheid) }}</span>
@@ -309,6 +435,19 @@
                       <summary>Notizen</summary>
                       <NotizenListe v-if="offeneNotizen[a.id]" :basis-url="'budget/antraege/' + a.id" :notizen="a.aktionen || []" :aktuelle-uid="aktuelleUid" @geaendert="ladeAnsicht(false)" />
                     </details>
+                    <!-- F125: Dokumente am Antrag, dieselbe Komponente wie am
+                         Geschäft, am Vorstoss und an der Sitzung. -->
+                    <details class="pw-antrag-dokumente" @click.stop @toggle="dokumenteToggle(a.id, $event)">
+                      <summary>Dokumente</summary>
+                      <GeschaeftDokumente
+                        v-if="offeneDokumente[a.id]"
+                        :api-basis="'/apps/parlwin/budget/antraege/' + a.id"
+                        :titel="a.begruendung || ('Antrag ' + a.id)"
+                        objekt-typ="budget_antrag"
+                        :objekt-id="a.id"
+                        ordner-hinweis="Ablage im Fraktionsordner unter «50_Budget», im Ordner des Budgetjahres"
+                      />
+                    </details>
                   </template>
                 </li>
               </ul>
@@ -322,14 +461,22 @@
                 @save="antragPersonal(g.code)"
                 @abbrechen="formSchliessen('p' + g.code)"
               />
-              <NcButton v-else type="secondary" @click="formOeffnen('p' + g.code)">+ Antrag</NcButton>
+              <!-- Dieselbe Aktionszeile wie bei den Globalbudgets: «+ Antrag»
+                   als Hauptaktion, «Details» öffnet dasselbe Vollbild-Popup der
+                   Produktegruppe (Auftrag von Marc am 24.10.2026). -->
+              <div v-if="!g.kuenstlich" class="pw-budget-card-aktionen">
+                <NcButton v-if="!formOffen['p' + g.code]" type="secondary" @click="formOeffnen('p' + g.code)">+ Antrag</NcButton>
+                <NcButton type="tertiary" class="pw-pg-detail-knopf" @click="pgDetailOeffnen(g.code)">
+                  Details<span v-if="g.zielvorgaben && g.zielvorgaben.length"> · {{ g.zielvorgaben.length }} Zielvorgaben</span>
+                </NcButton>
+              </div>
             </article>
           </div>
         </div>
       </div>
 
       <!-- Tab: Investitionsrechnung -->
-      <div v-show="aktiverTab === 'investition'" class="pw-budget-tabpanel">
+      <div v-show="aktiverTab === 'investition'" class="pw-budget-tabpanel pw-budget-investitionen">
         <div v-for="dep in investitionenNachDepartement" :key="dep.name" class="pw-budget-departement">
           <h3 class="pw-budget-dep-titel">{{ dep.name }}</h3>
           <div class="pw-card-grid">
@@ -341,16 +488,57 @@
                 </div>
                 <span class="pw-budget-betrag">{{ fr(i.bu) }}</span>
               </div>
-              <!-- Gesamtkosten sind die Summe aller Jahre; der bewilligte Kredit
-                   aus dem Anhang «Kontrolle der Investitionskredite» sagt etwas
-                   anderes — was das Parlament freigegeben hat — und steht daneben. -->
+              <!-- Zwei verschiedene Zahlen, zwei verschiedene Namen: Die Summe
+                   der Jahre sagt, was das Vorhaben bis zum letzten Planjahr
+                   kostet; der bewilligte Kredit aus dem Anhang «Kontrolle der
+                   Investitionskredite» sagt, was das Parlament freigegeben hat.
+                   Beide hiessen «Gesamtkosten», hier und im Detail, und standen
+                   mit verschiedenen Zahlen da (Befund eines Fraktionsmitglieds
+                   vom 19.10.2026). -->
               <div class="pw-data-card-grid">
-                <div class="pw-data-pair"><span>Gesamtkosten</span><strong>{{ fr(gesamtkosten(i)) }}</strong></div>
+                <div class="pw-data-pair"><span>Summe der Jahre</span><strong>{{ fr(summeDerJahre(i)) }}</strong></div>
                 <div class="pw-data-pair"><span>bereits getätigt</span><strong>{{ fr(i.bereitsGetaetigt) }}</strong></div>
                 <div class="pw-data-pair"><span>künftig</span><strong>{{ fr(i.fap1 + i.fap2 + i.fap3) }}</strong></div>
-                <div v-if="i.gesamtkosten" class="pw-data-pair"><span>bewilligter Kredit</span><strong>{{ fr(i.gesamtkosten) }}</strong></div>
+                <div v-if="i.gesamtkosten" class="pw-data-pair"><span>Bewilligter Kredit</span><strong>{{ fr(i.gesamtkosten) }}</strong></div>
                 <div v-if="i.planungskosten" class="pw-data-pair"><span>Planung</span><strong>{{ fr(i.planungskosten) }}</strong></div>
               </div>
+              <!-- F135/F137: Die Verpflichtungskredite des Vorhabens. Das
+                   Parlament beschliesst je Kredit über das Jahresprogramm und
+                   über das Bewilligungsorgan; beides steht im Drehbuch der
+                   Budgetberatung als eigene Antragsspalte. -->
+              <details v-if="i.konten && i.konten.length" class="pw-kredite">
+                <summary>Verpflichtungskredite ({{ i.konten.length }})</summary>
+                <div v-for="k in i.konten" :key="k.konto" class="pw-kredit">
+                  <p class="pw-kredit-kopf">
+                    <span class="pw-kredit-konto">{{ k.konto }}</span>
+                    <span class="pw-kredit-name">{{ k.name }}</span>
+                    <span class="pw-kredit-betrag pw-num">{{ fr(k.betrag) }}</span>
+                    <span v-if="k.kredit" class="pw-kredit-kredit pw-num">von {{ fr(k.kredit) }}</span>
+                  </p>
+                  <ul v-if="antraegeKredit(i.id, k.konto).length" class="pw-budget-antraege">
+                    <li v-for="a in antraegeKredit(i.id, k.konto)" :key="a.id">
+                      <span v-if="a.neuerWert" class="pw-antrag-betrag">Bewilligungsorgan → {{ a.neuerWert }}</span>
+                      <span v-else class="pw-antrag-betrag" :class="diffKlasse(a.betragDelta)">{{ fr(a.betragDelta) }}</span>
+                      <span class="pw-antrag-steller">{{ a.antragsteller }}</span>
+                      <span class="pw-antrag-begruendung" v-html="markdownZuHtml(a.begruendung)"></span>
+                      <PwLoeschen class="pw-antrag-loeschen" label="Antrag löschen" @click.stop="antragLoeschen(a.id)" />
+                    </li>
+                  </ul>
+                  <BudgetAntragForm
+                    v-if="formOffen['k' + i.id + '|' + k.konto]"
+                    :form="neuKredit[i.id + '|' + k.konto]"
+                    :antragsteller-optionen="antragstellerOptionen(neuKredit[i.id + '|' + k.konto].herkunft)"
+                    :fraktion-optionen="fraktionOptionen"
+                    :basis="k.betrag"
+                    mit-neuem-wert
+                    neuer-wert-label="Neues Bewilligungsorgan (statt Betrag)"
+                    @herkunft="herkunftGewechselt(neuKredit[i.id + '|' + k.konto], $event)"
+                    @save="antragKredit(i, k.konto)"
+                    @abbrechen="formSchliessen('k' + i.id + '|' + k.konto)"
+                  />
+                  <NcButton v-else type="secondary" @click="formOeffnen('k' + i.id + '|' + k.konto)">+ Antrag</NcButton>
+                </div>
+              </details>
               <!-- «Details» öffnet dasselbe Vollbild-Popup wie bei einer Produkte-
                    gruppe, hier mit der Jahresreihe und den bewilligten Krediten. -->
               <div class="pw-budget-card-aktionen">
@@ -380,7 +568,9 @@
                   <template v-else>
                   <span class="pw-antrag-betrag" :class="diffKlasse(a.betragDelta)">{{ fr(a.betragDelta) }}</span>
                   <span class="pw-antrag-steller">{{ a.antragsteller }}</span>
-                  <span class="pw-antrag-begruendung">{{ a.begruendung }}</span>
+                  <!-- Die Begründung ist formatierter Text; sie wird gerendert
+                       wie eine Notiz, mit derselben Säuberung vor der Anzeige. -->
+                  <span class="pw-antrag-begruendung" v-html="markdownZuHtml(a.begruendung)"></span>
                   <NcCheckboxRadioSwitch v-if="!a.automatisch" :model-value="haltungAn(a)" type="switch" class="pw-antrag-toggle" @click.stop @update:model-value="haltungUmschalten(a, $event)">{{ haltungLabel(a) }}</NcCheckboxRadioSwitch>
                   <template v-if="sitzungsmodus">
                     <span class="pw-antrag-entscheid" :class="'pw-entscheid-' + a.entscheid">{{ entscheidLabel(a.entscheid) }}</span>
@@ -394,6 +584,19 @@
                   <details class="pw-antrag-notizen" @click.stop @toggle="notizenToggle(a.id, $event)">
                     <summary>Notizen</summary>
                     <NotizenListe v-if="offeneNotizen[a.id]" :basis-url="'budget/antraege/' + a.id" :notizen="a.aktionen || []" :aktuelle-uid="aktuelleUid" @geaendert="ladeAnsicht(false)" />
+                  </details>
+                  <!-- F125: Dokumente am Antrag, dieselbe Komponente wie am
+                       Geschäft, am Vorstoss und an der Sitzung. -->
+                  <details class="pw-antrag-dokumente" @click.stop @toggle="dokumenteToggle(a.id, $event)">
+                    <summary>Dokumente</summary>
+                    <GeschaeftDokumente
+                      v-if="offeneDokumente[a.id]"
+                      :api-basis="'/apps/parlwin/budget/antraege/' + a.id"
+                      :titel="a.begruendung || ('Antrag ' + a.id)"
+                      objekt-typ="budget_antrag"
+                      :objekt-id="a.id"
+                      ordner-hinweis="Ablage im Fraktionsordner unter «50_Budget», im Ordner des Budgetjahres"
+                    />
                   </details>
                   </template>
                 </li>
@@ -451,7 +654,30 @@
         <div class="pw-antraege-kopf">
           <NcCheckboxRadioSwitch :model-value="pdfMitFremden" type="switch" @update:model-value="pdfMitFremden = $event">Mit unterstützten fremden Anträgen</NcCheckboxRadioSwitch>
           <NcButton type="secondary" @click="pdfOeffnen">Anträge als PDF</NcButton>
+          <!-- F138: dieselbe Liste als Tabelle, zum Rechnen und Sortieren. Sie
+               geht in den Fraktionsordner des Budgetjahrs, wo auch die
+               Dokumente der Anträge liegen; wer sie nur für sich braucht,
+               lädt sie herunter. -->
+          <NcButton class="pw-excel-ablegen" type="secondary" :disabled="excelLaeuft" @click="excelSpeichern">Excel in die Dateien</NcButton>
+          <NcButton class="pw-excel-download" type="tertiary" @click="excelHerunterladen">Excel herunterladen</NcButton>
         </div>
+
+        <!-- F126: viele Anträge hintereinander erfassen, eine Zeile je Antrag.
+             F127: dieselben Spalten aus einer Tabellendatei übernehmen. -->
+        <details v-if="!sitzungsmodus" class="pw-data-card pw-erfassen-karte">
+          <summary>Anträge erfassen</summary>
+          <BudgetAntraegeErfassen
+            :position-optionen="positionOptionen"
+            :antragsteller-optionen="antragstellerOptionen('eigene')"
+            :fraktion-optionen="fraktionOptionen"
+            :letzter-antragsteller="letzterAntragsteller"
+            @anlegen="antraegeAnlegen"
+          />
+          <BudgetAntraegeUebernahme
+            :position-optionen="positionOptionen"
+            @anlegen="antraegeAnlegen"
+          />
+        </details>
         <div v-if="!alleAntraege.length" class="pw-budget-info">Keine Anträge.</div>
         <!-- Ein Grid über ALLE Departemente (Subgrid je Zeile), damit die Spalten
              gruppenübergreifend fluchten: Position links, Betrag/Zusatz-Zahl rechts,
@@ -465,18 +691,37 @@
               <span class="pw-antrag-znum pw-num" :class="diffKlasse(antragZusatzWert(a))">{{ antragZusatzNum(a) }}</span>
               <span class="pw-antrag-zeinheit">{{ antragZusatzEinheit(a) }}</span>
               <span class="pw-antrag-steller">{{ a.antragsteller || (a.automatisch ? 'automatisch' : '') }}</span>
-              <span class="pw-antrag-begruendung">{{ a.begruendung }}</span>
+              <span class="pw-antrag-begruendung">
+                <span v-html="markdownZuHtml(a.begruendung)"></span>
+                <!-- Dieselben Zielwerte wie auf der Karte; das PDF liest dieselben
+                     Daten aus `zielAenderungen` (Befund vom 24.10.2026). -->
+                <ul v-if="zielAenderungZeilen(a).length" class="pw-antrag-zielwerte">
+                  <li v-for="(zeile, zi) in zielAenderungZeilen(a)" :key="zi">{{ zeile }}</li>
+                </ul>
+              </span>
               <span class="pw-antrag-entscheid" :class="'pw-entscheid-' + a.entscheid">{{ entscheidLabel(a.entscheid) }}</span>
             </div>
           </template>
         </div>
       </div>
 
-      <!-- F111: das ganze Budget als geschachtelte Kreise, Fläche = Betrag. -->
+      <!-- F111: das ganze Budget als geschachtelte Kreise, Fläche = Betrag.
+           F123: dieselben Kreise messen auf Wunsch den Stellenplan. -->
       <div v-show="aktiverTab === 'grafik'" class="pw-budget-tabpanel">
+        <div class="pw-grafik-mass" role="group" aria-label="Was die Kreise messen">
+          <button
+            v-for="mass in grafikMasse"
+            :key="mass.key"
+            type="button"
+            :class="{ 'pw-grafik-mass-gewaehlt': grafikMasseinheit === mass.key }"
+            :aria-pressed="String(grafikMasseinheit === mass.key)"
+            @click="grafikMasseinheit = mass.key"
+          >{{ mass.label }}</button>
+        </div>
         <BudgetGrafik
           :produktegruppen="ansicht.produktegruppen"
           :jahr="ansicht.jahr ? ansicht.jahr.jahr : 0"
+          :masseinheit="grafikMasseinheit"
         />
       </div>
     </template>
@@ -575,15 +820,20 @@ import BudgetPauschalForm from './BudgetPauschalForm.vue'
 import BudgetPgDetail from './BudgetPgDetail.vue'
 import BudgetInvDetail from './BudgetInvDetail.vue'
 import FilterPanel from './FilterPanel.vue'
+import { filterDropdownPosition } from '../filter-dropdown'
 import NotizenListe from './NotizenListe.vue'
+import BudgetEbeneNotizen from './BudgetEbeneNotizen.vue'
+import GeschaeftDokumente from './GeschaeftDokumente.vue'
+import BudgetAntraegeErfassen from './BudgetAntraegeErfassen.vue'
+import BudgetAntraegeUebernahme from './BudgetAntraegeUebernahme.vue'
 import PwLoeschen from './PwLoeschen.vue'
 import BudgetGrafik from './BudgetGrafik.vue'
 import { subscribeRealtime } from '../realtime'
-import { frankenFormat } from '../utils'
+import { frankenFormat, vollerName, gleicheZielvorgabe, markdownZuHtml } from '../utils'
 
 export default {
   name: 'Budgetliste',
-  components: { NcButton, NcSelect, NcTextField, NcCheckboxRadioSwitch, NcLoadingIcon, NcEmptyContent, PwMultiSelect, BudgetAntragForm, BudgetPauschalForm, BudgetPgDetail, BudgetInvDetail, BudgetGrafik, FilterPanel, NotizenListe, PwLoeschen },
+  components: { NcButton, NcSelect, NcTextField, NcCheckboxRadioSwitch, NcLoadingIcon, NcEmptyContent, PwMultiSelect, BudgetAntragForm, BudgetPauschalForm, BudgetPgDetail, BudgetInvDetail, BudgetGrafik, FilterPanel, NotizenListe, BudgetEbeneNotizen, GeschaeftDokumente, BudgetAntraegeErfassen, BudgetAntraegeUebernahme, PwLoeschen },
   props: {
     kommissionen: { type: Array, default: () => [] },
     mitglieder: { type: Array, default: () => [] },
@@ -597,10 +847,28 @@ export default {
       // leicht bleibt (sonst Dutzende NcSelects/NotizenListen auf einmal).
       formOffen: {},
       offeneNotizen: {},
+      offeneDokumente: {},
       // F117: der Antrag, der gerade bearbeitet wird (Antrags-ID), und sein
       // Formularstand. Es ist immer höchstens einer offen.
       bearbeiteterAntrag: null,
       bearbeitung: {},
+      // F123: Was die Kreise der Grafik messen — Franken oder Stellen.
+      grafikMasseinheit: 'franken',
+      // Alle Benutzer dieser Nextcloud, für die Antragsteller-Auswahl.
+      benutzer: [],
+      // F136: Formularstand je Departementssekretariat.
+      neuSekretariat: {},
+      // F135/F137: Formularstand je Verpflichtungskredit («<Vorhaben>|<Konto>»).
+      neuKredit: {},
+      // Auf flachem Schirm (Tablet quer, Telefon quer) zählt jede Zeile: der
+      // Budgetkopf zeigt dort nur die Differenz, und die Pauschalanträge
+      // stehen zugeklappt. Auf hohem Schirm steht beides offen wie bisher.
+      summenOffen: true,
+      pauschalOffen: true,
+      // F126: der zuletzt gewählte Antragsteller bleibt für den nächsten Antrag
+      // gesetzt — bei fünfzig Anträgen ist er fünfzig Mal derselbe.
+      letzterAntragsteller: '',
+      letzteScrollPosition: 0,
       jahre: [],
       jahrOption: null,
       departementOption: null,
@@ -618,8 +886,11 @@ export default {
       ansicht: null,
       laden: false,
       aktiverTab: 'globalbudget',
-      // Anträge-PDF: unterstützte fremde Anträge mit aufnehmen? (Option, F92).
+      // Anträge-PDF und Excel-Export: unterstützte fremde Anträge mit
+      // aufnehmen? (Option, F92).
       pdfMitFremden: false,
+      // Läuft das Ablegen der Tabelle in den Dateien? (F138)
+      excelLaeuft: false,
       basisTabs: [
         { key: 'globalbudget', label: 'Globalbudgets' },
         { key: 'personal', label: 'Personalbestand' },
@@ -773,6 +1044,13 @@ export default {
     alleAntraege() {
       return (this.ansicht ? this.ansicht.antraege : []).filter(a => (a.phase || 'fraktion') === this.aktivePhase)
     },
+    // F123: Die beiden Masse der Grafik, in der Reihenfolge der Umschalter.
+    grafikMasse() {
+      return [
+        { key: 'franken', label: 'Franken' },
+        { key: 'stellen', label: 'Stellen' },
+      ]
+    },
     // Tabs inkl. dynamischem «X Anträge»-Tab (X = Anzahl der Anträge).
     tabs() {
       return [
@@ -781,6 +1059,68 @@ export default {
         // F111: die grafische Übersicht steht zuhinterst.
         { key: 'grafik', label: 'Grafik' },
       ]
+    },
+    /**
+     * F128: der beeinflussbare Anteil über alle gezeigten Produktegruppen.
+     * Dieselbe Rechnung wie je Karte, nur summiert.
+     */
+    steuerbarGesamt() {
+      if (!this.ansicht) { return '' }
+      let beeinflussbar = 0
+      let gebunden = 0
+      let neutral = 0
+      for (const dep of this.gruppenNachDepartement) {
+        for (const g of dep.gruppen) {
+          const s = g.steuerbarkeit
+          if (!s) { continue }
+          beeinflussbar += s.beeinflussbar || 0
+          gebunden += s.gebunden || 0
+          neutral += s.neutral || 0
+        }
+      }
+      const gesamt = beeinflussbar + gebunden
+      if (gesamt <= 0) { return '' }
+      const anteil = Math.round(beeinflussbar / gesamt * 100)
+      const intern = neutral ? `, ${this.fr(neutral)} intern verrechnet` : ''
+      return `Beeinflussbar ${this.fr(beeinflussbar)} von ${this.fr(gesamt)} (${anteil}%)${intern}`
+    },
+    /**
+     * Alle Positionen, auf die ein Antrag zielen kann (F126/F127): jede
+     * Produktegruppe der Globalbudgets und jedes Investitionsvorhaben. Jede
+     * Option trägt ihren Bereich und ihr Ziel, sodass die Erfassungstabelle und
+     * die Dateiübernahme nur noch den Betrag beisteuern.
+     */
+    positionOptionen() {
+      if (!this.ansicht) { return [] }
+      const gruppen = this.ansicht.produktegruppen.map(g => ({
+        value: 'pg:' + g.code,
+        nummer: String(g.code),
+        label: g.code + ' ' + g.name,
+        basis: g.globalkredit ? g.globalkredit.soll : 0,
+        bereich: 'globalbudget',
+        zielTyp: 'produktegruppe',
+        zielRef: String(g.code),
+      }))
+      const investitionen = this.ansicht.investitionen.map(i => ({
+        value: 'inv:' + i.id,
+        nummer: String(i.id),
+        label: 'Investition: ' + (i.name || i.bezeichnung || i.id),
+        basis: i.bu || 0,
+        bereich: 'investition',
+        zielTyp: 'investition',
+        zielRef: String(i.id),
+      }))
+      return [...gruppen, ...investitionen]
+    },
+    // Die Beschriftung des offenen Tabs, für die Überschrift seiner Notizen
+    // (F124). Beim Tab der Anträge steht die Zahl davor; die Notizen heissen
+    // darum nach der Sache, nicht nach der Beschriftung mit ihrer Zahl.
+    aktivesTabLabelRein() {
+      const gefunden = this.tabs.find(t => t.key === this.aktiverTab)
+      return gefunden ? gefunden.label : ''
+    },
+    aktiverTabLabel() {
+      return this.aktiverTab === 'antraege' ? 'den Anträgen' : this.aktivesTabLabelRein
     },
     // Alle Anträge nach Departement gruppiert, mit lesbarer Positionsbezeichnung —
     // die Zusammenfassung im Anträge-Tab (dieselbe Gliederung wie das Anträge-PDF).
@@ -798,7 +1138,12 @@ export default {
         } else if (a.bereich === 'investition') {
           const i = invNach[String(a.zielRef)]; dept = i ? i.departement : 'Investitionen'; pos = i ? i.projekt : a.zielRef
         } else {
-          const g = pgNach[a.zielRef]; dept = g ? g.departement : 'Weiteres'; pos = g ? (g.name + ' (' + g.code + ')') : a.zielRef
+          // F129: auch in der Antragsliste steht die Seite des Budgetbuchs.
+          const g = pgNach[a.zielRef]
+          dept = g ? g.departement : 'Weiteres'
+          pos = g
+            ? (g.name + ' (' + g.code + ')' + (g.buchseite ? ', Buch S. ' + g.buchseite : ''))
+            : a.zielRef
         }
         if (!gruppen.has(dept)) { gruppen.set(dept, []) }
         gruppen.get(dept).push({ ...a, posName: pos })
@@ -886,15 +1231,26 @@ export default {
   },
   mounted() {
     this.ladeJahre()
+    this.ladeBenutzer()
     this.unsubRealtime = subscribeRealtime(this.handleRealtime)
     this.$nextTick(() => { this.filterReady = true })
+    this.flacherSchirmBeobachten()
   },
   beforeUnmount() {
     if (this.unsubRealtime) { this.unsubRealtime() }
     if (this.steuerfussTimer) { clearTimeout(this.steuerfussTimer) }
+    if (this.flachListe) { this.flachListe.removeEventListener('change', this.flacherSchirmGewechselt) }
+    if (typeof window !== 'undefined') { window.removeEventListener('scroll', this.scrollBeobachten, true) }
+    if (typeof document !== 'undefined') { document.body.classList.remove('pw-kopf-weg') }
   },
   methods: {
     fr: frankenFormat,
+    // Die Begründung eines Antrags ist formatierter Text (wie eine Notiz) und
+    // wird vor der Anzeige gesäubert.
+    markdownZuHtml,
+    // Die Liste eines Filterfeldes bleibt im sichtbaren Bereich, auch wenn die
+    // Bildschirmtastatur ihn halbiert (filter-dropdown.js).
+    filterDropdownPosition,
     zahl(n) {
       return (Number(n) || 0).toLocaleString('de-CH', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
     },
@@ -935,6 +1291,32 @@ export default {
     // Zusatzgrösse eines Antrags fürs Anträge-Tab (neben dem CHF-Betrag): Stellen
     // oder Steuerprozentpunkte. Zahl und Einheit getrennt, damit sie im Grid je auf
     // ihrer eigenen Kante fluchten (Zahl rechts, Einheit links). Wert für die Farbe.
+    /**
+     * Die geänderten Zielwerte eines Antrags als lesbare Zeilen: je Änderung die
+     * Messgrösse, der heutige Soll und der beantragte. Der heutige Soll steht
+     * nicht am Antrag, sondern an der Zielvorgabe der Produktegruppe.
+     *
+     * Befund von Marc am 24.10.2026: Ein Antrag, der nur Zielwerte ändert, zeigte
+     * auf der Karte und in der Antragsliste nur die Begründung — wer ihn stellt,
+     * sah nicht, worüber er abstimmen lässt.
+     */
+    zielAenderungZeilen(a) {
+      const aenderungen = (a && a.zielAenderungen) || []
+      if (!aenderungen.length) { return [] }
+      const gruppe = (this.ansicht ? this.ansicht.produktegruppen : [])
+        .find(g => String(g.code) === String(a.zielRef))
+      const vorgaben = (gruppe && gruppe.zielvorgaben) || []
+      return aenderungen.map((z) => {
+        const zv = vorgaben.find(v => gleicheZielvorgabe(z, v))
+        const heute = zv ? zv.soll : ''
+        // Der Unterabschnitt gehört zum Namen: «Wohnliegenschaften (in %)»
+        // steht im Buch zweimal, unter der minimalen und unter der
+        // durchschnittlichen Nettorendite.
+        const name = [z.unterTitel || (zv && zv.unterTitel) || '', z.messgroesse]
+          .filter(t => t).join(' — ')
+        return `${name}: ${heute !== '' ? heute + ' → ' : ''}${z.neuerWert}`
+      })
+    },
     antragZusatzWert(a) {
       if (a.stellenDelta) { return a.stellenDelta }
       if (a.prozentDelta && a.bereich === 'steuerfuss') { return a.prozentDelta }
@@ -970,6 +1352,17 @@ export default {
     antraegeBereich(bereich, ref) {
       return (this.ansicht ? this.ansicht.antraege : []).filter(a =>
         a.bereich === bereich && a.zielRef === String(ref)
+        && (a.phase || 'fraktion') === this.aktivePhase)
+    },
+    /**
+     * F135/F137: die Anträge auf einen Verpflichtungskredit — beide Arten, der
+     * Antrag auf das Jahresprogramm und der auf das Bewilligungsorgan.
+     */
+    antraegeKredit(vorhaben, konto) {
+      const schluessel = String(vorhaben) + '|' + String(konto)
+      return (this.ansicht ? this.ansicht.antraege : []).filter(a =>
+        (a.bereich === 'verpflichtungskredit' || a.bereich === 'bewilligungsorgan')
+        && a.zielRef === schluessel
         && (a.phase || 'fraktion') === this.aktivePhase)
     },
     async ladeJahre() {
@@ -1041,33 +1434,103 @@ export default {
         if (!neuPersonal[g.code]) { neuPersonal[g.code] = this.leererAntrag({ stellen: '' }) }
       }
       const neuInv = { ...this.neuInv }
+      const neuKredit = { ...this.neuKredit }
       for (const i of this.ansicht.investitionen) {
         if (!neuInv[i.id]) { neuInv[i.id] = this.leererAntrag() }
+        // F135/F137: je Verpflichtungskredit ein eigener Formularstand, mit dem
+        // Feld für das neue Bewilligungsorgan.
+        for (const k of (i.konten || [])) {
+          const schluessel = i.id + '|' + k.konto
+          if (!neuKredit[schluessel]) { neuKredit[schluessel] = this.leererAntrag({ neuerWert: '' }) }
+        }
+      }
+      // F136: je Departement ein Formularstand für sein Sekretariat.
+      const neuSekretariat = { ...this.neuSekretariat }
+      for (const s of ((this.ansicht.jahr && this.ansicht.jahr.sekretariate) || [])) {
+        if (!neuSekretariat[s.departement]) { neuSekretariat[s.departement] = this.leererAntrag() }
       }
       this.neu = neu
       this.neuPersonal = neuPersonal
       this.neuInv = neuInv
+      this.neuKredit = neuKredit
+      this.neuSekretariat = neuSekretariat
       this.steuerfussManuellSync()
+    },
+    // Flacher Schirm: dieselbe Grenze wie im Stylesheet (56rem Bildhöhe). Was
+    // dort die Darstellung ändert, steht im Stylesheet; was einen Zustand
+    // braucht — zugeklappter Kopf, zugeklappte Pauschalanträge —, steht hier.
+    flacherSchirmBeobachten() {
+      if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') { return }
+      this.flachListe = window.matchMedia('(max-height: 56rem)')
+      this.flacherSchirmGewechselt()
+      this.flachListe.addEventListener('change', this.flacherSchirmGewechselt)
+      window.addEventListener('scroll', this.scrollBeobachten, true)
+    },
+    flacherSchirmGewechselt() {
+      const flach = !!(this.flachListe && this.flachListe.matches)
+      this.summenOffen = !flach
+      this.pauschalOffen = !flach
+      if (!flach && typeof document !== 'undefined') { document.body.classList.remove('pw-kopf-weg') }
+    },
+    // Die Kopfleiste von Nextcloud weicht beim Blättern nach unten und kommt
+    // beim Blättern nach oben zurück — auf flachem Schirm sind ihre 56 Pixel
+    // ein Zehntel der Bildhöhe.
+    scrollBeobachten(ereignis) {
+      if (typeof document === 'undefined') { return }
+      if (!(this.flachListe && this.flachListe.matches)) { return }
+      const ziel = ereignis && ereignis.target
+      const oben = ziel && typeof ziel.scrollTop === 'number' ? ziel.scrollTop : (window.scrollY || 0)
+      const runter = oben > this.letzteScrollPosition && oben > 48
+      document.body.classList.toggle('pw-kopf-weg', runter)
+      this.letzteScrollPosition = oben
+    },
+    // Alle Benutzer dieser Nextcloud, für die Antragsteller-Auswahl. Wer der
+    // Fraktion angehört, ohne im Parlament zu sitzen, steht in keiner
+    // Mitgliederliste und konnte sich nicht als Antragsteller wählen (Befund
+    // von Marc am 24.10.2026, Manuel Zanoni).
+    async ladeBenutzer() {
+      try {
+        const { data } = await axios.get(generateUrl('/apps/parlwin/sitzungstypen/nc/users'), { params: { limit: 100 } })
+        this.benutzer = Array.isArray(data) ? data : []
+      } catch (e) {
+        this.benutzer = []
+      }
+    },
+    // Die Benutzer, die nicht schon als Mitglied in der Auswahl stehen.
+    benutzerOptionen(vorhanden) {
+      const schon = new Set(vorhanden.map(o => o.label))
+      return (this.benutzer || [])
+        .map(b => String(b.displayName || b.uid || '').trim())
+        .filter(n => n !== '' && !schon.has(n))
+        .map(n => ({ value: n, label: n }))
     },
     // Antragsteller-Auswahl (F94): bei fremden die aktiven Fraktionen zuoberst, dann
     // alle Mitglieder; bei eigenen die eigene Fraktion zuoberst (Standard) und darunter
     // ausschliesslich ihre eigenen Mitglieder — ein eigener Antrag kommt nie von einem
     // Mitglied einer anderen Fraktion. Ist keine eigene Fraktion konfiguriert, kann
-    // nicht gefiltert werden; dann stehen alle Mitglieder zur Wahl.
+    // nicht gefiltert werden; dann stehen alle Mitglieder zur Wahl. Dazu kommen
+    // die Benutzer dieser Nextcloud, die in keiner Mitgliederliste stehen.
     antragstellerOptionen(herkunft) {
       const aktive = (this.mitglieder || []).filter(m => m && m.aktiv !== false && m.name)
-      const alsOption = m => ({ value: m.name, label: m.name })
+      // `name` ist im Datenmodell der Nachname, der Vorname steht daneben
+      // (ScraperService). Ohne `vollerName` stand auf jedem Antrag «Wäckerlin»
+      // (Befund von Marc am 24.10.2026).
+      const alsOption = m => ({ value: vollerName(m), label: vollerName(m) })
       const fraktionen = (this.fraktionen || [])
         .filter(f => f && f.aktiv !== false && f.name)
         .map(f => ({ value: f.name, label: f.name }))
-      if (herkunft === 'fremde') { return [...fraktionen, ...aktive.map(alsOption)] }
+      if (herkunft === 'fremde') {
+        const liste = [...fraktionen, ...aktive.map(alsOption)]
+        return [...liste, ...this.benutzerOptionen(liste)]
+      }
       const eigen = this.eigeneFraktionName
       const eigenKlein = eigen.trim().toLowerCase()
       const eigenOpt = eigen ? [{ value: eigen, label: eigen }] : []
       const personen = eigenKlein
         ? aktive.filter(m => (m.fraktion || '').trim().toLowerCase() === eigenKlein)
         : aktive
-      return [...eigenOpt, ...personen.map(alsOption).filter(p => p.value !== eigen)]
+      const liste = [...eigenOpt, ...personen.map(alsOption).filter(p => p.value !== eigen)]
+      return [...liste, ...this.benutzerOptionen(liste)]
     },
     // Wechsel der Herkunft setzt die Haltung auf den passenden Standard zurück.
     herkunftGewechselt(form, wert) {
@@ -1086,6 +1549,34 @@ export default {
     // Notizen erst mounten, wenn der Nutzer sie aufklappt (Performance).
     notizenToggle(id, event) {
       this.offeneNotizen = { ...this.offeneNotizen, [id]: !!(event && event.target && event.target.open) }
+    },
+    /**
+     * F136: Das Departementssekretariat eines Departements, aus Teil A des
+     * Buchs. Gibt es keines — ein Buch ohne dieses Kapitel —, steht die Karte
+     * nicht da.
+     */
+    sekretariat(departement) {
+      const liste = (this.ansicht && this.ansicht.jahr && this.ansicht.jahr.sekretariate) || []
+      return liste.find(s => s.departement === departement) || null
+    },
+    /**
+     * F128: Der beeinflussbare Anteil des Aufwands einer Produktegruppe, als
+     * Satz unter dem Betrag. Wo das Buch die Kosten nicht gliedert, steht
+     * nichts — eine Zahl ohne Grundlage wäre schlechter als keine.
+     */
+    steuerbarText(g) {
+      const s = g && g.steuerbarkeit
+      if (!s) { return '' }
+      const gesamt = (s.beeinflussbar || 0) + (s.gebunden || 0)
+      if (gesamt <= 0) { return '' }
+      const anteil = Math.round((s.beeinflussbar || 0) / gesamt * 100)
+      const neutral = s.neutral ? `, ${this.fr(s.neutral)} intern verrechnet` : ''
+      return `Beeinflussbar ${this.fr(s.beeinflussbar || 0)} von ${this.fr(gesamt)} (${anteil}%)${neutral}`
+    },
+    // F125: die Dokumente eines Antrags werden erst beim Aufklappen geladen,
+    // wie seine Notizen.
+    dokumenteToggle(id, event) {
+      this.offeneDokumente = { ...this.offeneDokumente, [id]: !!(event && event.target && event.target.open) }
     },
     ladeVerzoegert() {
       if (this.ladeTimer) { clearTimeout(this.ladeTimer) }
@@ -1169,6 +1660,46 @@ export default {
       if (betrag.betragDelta !== undefined) { daten.betragDelta = betrag.betragDelta }
       await this.antragSenden(daten)
     },
+    /**
+     * F136: Antrag auf ein Departementssekretariat. Er zählt wie jeder Antrag
+     * auf den Aufwand: Die Kosten des Sekretariats stecken über die Umlage in
+     * den Globalkrediten der Produktegruppen.
+     */
+    async antragSekretariat(departement) {
+      const e = this.neuSekretariat[departement]
+      const betrag = this.signierterBetrag(e)
+      if (betrag.betragDelta === undefined && betrag.prozentDelta === undefined) { return }
+      await this.antragSenden({
+        bereich: 'departementssekretariat',
+        zielTyp: 'departementssekretariat',
+        zielRef: departement,
+        ...betrag,
+        ...this.gemeinsameFelder(e),
+      })
+    },
+    /**
+     * F135: Antrag auf einen Verpflichtungskredit. Die Kennung ist das
+     * Vorhaben mit seinem Konto; der Betrag ändert das Jahresprogramm.
+     */
+    async antragKredit(inv, konto) {
+      const schluessel = inv.id + '|' + konto
+      const e = this.neuKredit[schluessel]
+      if (!e) { return }
+      const betrag = this.signierterBetrag(e)
+      const neuerWert = (e.neuerWert || '').trim()
+      if (betrag.betragDelta === undefined && betrag.prozentDelta === undefined && neuerWert === '') { return }
+      // F137: Trägt der Antrag einen neuen Wert statt eines Betrags, zielt er
+      // auf das Bewilligungsorgan und zählt in keiner Summe mit.
+      const bereich = neuerWert !== '' ? 'bewilligungsorgan' : 'verpflichtungskredit'
+      await this.antragSenden({
+        bereich,
+        zielTyp: bereich,
+        zielRef: schluessel,
+        neuerWert,
+        ...betrag,
+        ...this.gemeinsameFelder(e),
+      })
+    },
     async antragInvestition(inv) {
       const e = this.neuInv[inv.id]
       const betrag = this.signierterBetrag(e)
@@ -1183,6 +1714,39 @@ export default {
       const daten = (f && f.response && f.response.data) || {}
       const grund = daten.fehler || daten.message || (f && f.message) || ''
       showError(was + (grund ? ': ' + grund : ''))
+    },
+    /**
+     * F126/F127: mehrere Anträge nacheinander anlegen — aus der
+     * Erfassungstabelle oder aus einer übernommenen Datei. Jede Position trägt
+     * ihren Bereich und ihr Ziel schon in der Auswahl, sodass hier nur noch
+     * Betrag, Begründung und die gemeinsamen Felder dazukommen. Die Ansicht
+     * wird einmal am Ende neu geladen, nicht nach jedem Antrag.
+     */
+    async antraegeAnlegen(antraege) {
+      if (!Array.isArray(antraege) || antraege.length === 0) { return }
+      for (const a of antraege) {
+        const pos = this.positionOptionen.find(o => o.value === a.position)
+        if (!pos) { continue }
+        const daten = {
+          bereich: pos.bereich,
+          zielTyp: pos.zielTyp,
+          zielRef: pos.zielRef,
+          betragDelta: a.betragDelta,
+          herkunft: a.herkunft || 'eigene',
+          antragsteller: a.antragsteller || this.letzterAntragsteller,
+          unterstuetzer: a.unterstuetzer || [],
+          haltung: (a.herkunft === 'fremde') ? 'offen' : 'einreichen',
+          begruendung: a.begruendung || '',
+          phase: this.aktivePhase,
+        }
+        try {
+          await axios.post(generateUrl('/apps/parlwin/budget/' + this.jahrOption.value + '/antraege'), daten)
+          if (daten.antragsteller) { this.letzterAntragsteller = daten.antragsteller }
+        } catch (f) {
+          this.meldeFehler('Antrag anlegen fehlgeschlagen (' + (pos.label || a.position) + ')', f)
+        }
+      }
+      await this.ladeAnsicht(false)
     },
     async antragSenden(daten) {
       try {
@@ -1466,8 +2030,13 @@ export default {
     // Vollbild-Detail einer Produktegruppe öffnen/schliessen (F110).
     pgDetailOeffnen(code) { this.pgDetailCode = code },
     pgDetailSchliessen() { this.pgDetailCode = null },
-    /** Was ein Projekt über alle Jahre kostet: bereits getätigt, Budgetjahr, Planjahre. */
-    gesamtkosten(i) {
+    /**
+     * Was ein Projekt über alle Jahre kostet: bereits getätigt, Budgetjahr,
+     * Planjahre. Der bewilligte Kredit ist eine andere Zahl und heisst auch
+     * so — beide trugen den Namen «Gesamtkosten» und standen mit
+     * verschiedenen Werten nebeneinander.
+     */
+    summeDerJahre(i) {
       return Number(i.bereitsGetaetigt || 0) + Number(i.bu || 0)
         + Number(i.fap1 || 0) + Number(i.fap2 || 0) + Number(i.fap3 || 0)
     },
@@ -1480,6 +2049,36 @@ export default {
       if (this.pdfMitFremden) { params.set('mitFremden', '1') }
       const q = params.toString()
       window.open(generateUrl('/apps/parlwin/budget/' + this.jahrOption.value + '/antraege-pdf') + (q ? '?' + q : ''), '_blank')
+    },
+    /** Die Auswahl, die für den Export gilt — dieselbe wie beim PDF (F138). */
+    exportParameter() {
+      const params = new URLSearchParams()
+      if (this.departementOption) { params.set('kommission', this.departementOption.value) }
+      if (this.pdfMitFremden) { params.set('mitFremden', '1') }
+      return params
+    },
+    excelUrl(params) {
+      const q = params.toString()
+      return generateUrl('/apps/parlwin/budget/' + this.jahrOption.value + '/antraege-excel') + (q ? '?' + q : '')
+    },
+    /** F138: Die Tabelle in den Fraktionsordner des Budgetjahrs legen. */
+    async excelSpeichern() {
+      this.excelLaeuft = true
+      try {
+        const { data } = await axios.post(this.excelUrl(this.exportParameter()), {})
+        showSuccess('Gespeichert: ' + (data?.pfad || 'Fraktion/50_Budget/' + this.jahrOption.value))
+      } catch (f) {
+        this.meldeFehler('Excel speichern fehlgeschlagen', f)
+      } finally {
+        this.excelLaeuft = false
+      }
+    },
+    /**
+     * F138: Dieselbe Tabelle herunterladen, statt sie abzulegen — auf
+     * demselben Weg wie das PDF, damit die Anwendung geöffnet bleibt.
+     */
+    excelHerunterladen() {
+      window.open(this.excelUrl(this.exportParameter()), '_blank')
     },
     async neuOeffnen() {
       this.neuJahrOption = null
@@ -1618,6 +2217,19 @@ export default {
   .pw-budget-vergleich .pw-vergleich-zeile { text-align: start; font-size: 0.95rem; padding-block-end: 0.2rem; border-block-end: 1px solid var(--color-border); }
   .pw-budget-vergleich td { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; padding-block: 0.1rem; }
   .pw-budget-vergleich td::before { content: attr(data-label); font-weight: 400; text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.03em; color: var(--color-text-maxcontrast); }
+  /* Am Telefon wird die Übersicht so hoch wie der ganze Bildschirm, weil sie in
+     je einen Block pro Budget umbricht. Als haftender Block lag sie dann über
+     allem darunter und fing dessen Klicks ab — gemessen am 19.10.2026, als der
+     Klick auf den Umschalter der Grafik bei «Stadtratsbudget» landete. Sie
+     scrollt deshalb mit; haften bleibt, was man beim Scrollen braucht: die
+     Tab-Leiste. */
+  .pw-budget-sticky { position: static; }
+  .pw-budget-tabs { position: sticky; top: 0; z-index: 5; }
+  /* Wo keine Differenz steht, steht auch keine Beschriftung: Unter «Differenz»
+     standen am Telefon vier Beschriftungen ohne Wert, weil die Beschriftung
+     aus `td::before` kommt und die Zelle bei einer Differenz von null leer ist
+     (Befund vom 19.10.2026, budget-telefon.test.js). */
+  .pw-budget-vergleich td:empty { display: none; }
 }
 .pw-summe { display: flex; flex-direction: column; min-inline-size: 8rem; }
 .pw-summe-label { font-size: 0.8rem; color: var(--color-text-maxcontrast); text-transform: uppercase; letter-spacing: 0.03em; }
@@ -1657,12 +2269,70 @@ export default {
 .pw-budget-tab:hover { background: color-mix(in srgb, var(--color-background-hover) 70%, transparent); }
 .pw-budget-tab:focus-visible { outline: 2px solid var(--color-primary-element); outline-offset: -2px; border-radius: 0.25rem 0.25rem 0 0; }
 .pw-budget-tabpanel { display: flex; flex-direction: column; gap: 1rem; }
+/* F123: Der Umschalter über der Grafik — zwei Knöpfe, von denen einer gilt. Er
+   steht als Gruppe zusammen, damit er nicht als zwei Befehle gelesen wird. */
+.pw-grafik-mass {
+  display: inline-flex;
+  align-self: start;
+  border: var(--pw-border-thin) solid var(--pw-border);
+  border-radius: var(--pw-radius-pill);
+  overflow: hidden;
+}
+.pw-grafik-mass button {
+  border: 0;
+  background: transparent;
+  padding: var(--pw-space-sm) var(--pw-space-xl);
+  font-size: var(--pw-font-md);
+  color: var(--pw-muted);
+  cursor: pointer;
+}
+.pw-grafik-mass button:hover { background: var(--color-background-hover); }
+/* Mit Nachdruck: Nextcloud legt auf jeden Knopf seinen eigenen Grund, und das
+   gewählte Mass stand dadurch als blasses Grau auf blassem Grau — am Bild vom
+   19.10.2026 war «Stellen» kaum zu lesen. */
+.pw-grafik-mass .pw-grafik-mass-gewaehlt {
+  background: var(--color-primary-element) !important;
+  color: var(--color-primary-element-text) !important;
+  font-weight: 600;
+}
 .pw-budget-dep-titel { font-size: 1.05rem; margin: 0.5rem 0 0.4rem; color: var(--color-primary-element); }
+/* F128: Die Orientierung steht leise unter dem Betrag — sie ordnet ihn ein und
+   tritt nicht an seine Stelle. */
+.pw-steuerbar {
+  margin: 0 0 var(--pw-space-xs);
+  font-size: var(--pw-font-sm);
+  color: var(--pw-muted);
+}
+.pw-steuerbar-gesamt { margin-block-end: var(--pw-space-sm); }
+/* F129: Die Seitenzahl begleitet die Nummer der Produktegruppe und steht so
+   leise wie sie. */
+.pw-buchseite {
+  margin-inline-start: var(--pw-space-xs);
+  white-space: nowrap;
+}
+/* F136: Die Karte des Departementssekretariats steht über den Produktegruppen
+   ihres Departements und ist als dessen Kopf erkennbar. */
+.pw-sekretariat { margin-block-end: var(--pw-gap-1); }
+.pw-sekretariat-hinweis { margin: 0 0 var(--pw-space-xs); font-size: var(--pw-font-sm); color: var(--pw-muted); }
+/* F135: die Verpflichtungskredite eines Vorhabens. */
+.pw-kredite > summary { cursor: pointer; font-weight: 600; padding-block: var(--pw-space-xs); }
+.pw-kredit { padding-block: var(--pw-space-xs); border-block-start: var(--pw-border-thin) solid var(--pw-border); }
+.pw-kredit-kopf { display: flex; gap: var(--pw-space-sm); flex-wrap: wrap; align-items: baseline; margin: 0; }
+.pw-kredit-konto { color: var(--pw-muted); font-variant-numeric: tabular-nums; }
+.pw-kredit-name { flex: 1 1 10rem; min-inline-size: 0; }
+.pw-kredit-kredit { color: var(--pw-muted); }
 /* Kopf einer Budget-Karte: links Bezeichnung, rechts die Werte. Der Titel darf
    schrumpfen und umbrechen, der Betrag nie — reicht die Breite nicht, rutscht er
    auf eine eigene Zeile, statt am Kartenrand abgeschnitten zu werden. */
 .pw-budget-kopf { flex-wrap: wrap; }
 .pw-budget-kopf-titel { flex: 1 1 12rem; min-inline-size: 0; }
+/* Unter 54rem steht der Kopf untereinander, und dort ist die Basis einer
+   Flex-Kurzform eine HÖHE: die 12rem gaben dem Titel 192 Pixel, und zwischen
+   ihm und dem Betrag klaffte eine leere Fläche über die ganze Kartenbreite
+   (Bild vom 24.10.2026, Tablet hochkant und jedes Telefon). */
+@media (max-width: 54rem) {
+  .pw-budget-kopf-titel { flex-basis: auto; }
+}
 /* Der Betrag des Budgetjahres ist der Wert, über den entschieden wird: der
    grösste und stärkste der Karte. */
 .pw-budget-betrag {

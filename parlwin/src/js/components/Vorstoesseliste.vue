@@ -11,8 +11,8 @@
   </Teleport>
   <Teleport v-if="filterReady" to="#pw-filter-slot">
     <FilterPanel @reset="filterZuruecksetzen">
-      <NcSelect v-model="herkunftOption" :options="herkunftOptionen" :clearable="false" input-label="Herkunft" />
-      <NcSelect v-model="statusOption" :options="statusOptionen" :clearable="false" input-label="Status" />
+      <NcSelect v-model="herkunftOption" :options="herkunftOptionen" :clearable="false" input-label="Herkunft" :calculate-position="filterDropdownPosition" />
+      <NcSelect v-model="statusOption" :options="statusOptionen" :clearable="false" input-label="Status" :calculate-position="filterDropdownPosition" />
     </FilterPanel>
   </Teleport>
 
@@ -232,6 +232,7 @@
           <PwField label="Inhalt">
             <PwWysiwyg
               :model-value="bearbeitung.inhalt"
+              aria-label="Inhalt"
               placeholder="Inhalt des Vorstosses"
               @update:model-value="v => bearbeitung.inhalt = v"
               @blur="inhaltAbschliessen"
@@ -307,6 +308,7 @@ import NcSelect from '@nextcloud/vue/components/NcSelect'
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 import NcEmptyContent from '@nextcloud/vue/components/NcEmptyContent'
 import FilterPanel from './FilterPanel.vue'
+import { filterDropdownPosition } from '../filter-dropdown'
 import PwField from './PwField.vue'
 import BeschlussWidget from './BeschlussWidget.vue'
 import PwMultiSelect from './PwMultiSelect.vue'
@@ -493,6 +495,9 @@ export default {
     this.lade()
   },
   methods: {
+    // Die Liste eines Filterfeldes bleibt im sichtbaren Bereich, auch wenn
+    // die Bildschirmtastatur ihn halbiert (filter-dropdown.js).
+    filterDropdownPosition,
     filterZuruecksetzen() {
       this.suche = ''
       this.herkunftOption = { label: 'Alle', value: '' }
@@ -670,7 +675,7 @@ export default {
       this.istEntwurf = false
     },
     async loeschen(vorstoss) {
-      if (!confirm(`Vorstoss „${vorstoss.titel || 'Ohne Titel'}" wirklich löschen?`)) return
+      if (!confirm(`Vorstoss «${vorstoss.titel || 'Ohne Titel'}» wirklich löschen?`)) return
       try {
         await axios.delete(generateUrl(`/apps/parlwin/vorstoesse/${vorstoss.id}`))
         await this.lade()

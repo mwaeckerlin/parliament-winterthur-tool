@@ -15,6 +15,8 @@ use OCP\AppFramework\Db\Entity;
  * @method int    getId()
  * @method string getObjektTyp()
  * @method void   setObjektTyp(string $v)
+ * @method ?string getObjektSchluessel()
+ * @method void    setObjektSchluessel(?string $v)
  * @method int    getGeschaeftId()
  * @method void   setGeschaeftId(int $v)
  * @method string getAktionTyp()
@@ -40,6 +42,17 @@ class GeschaeftAktion extends Entity {
     /** «geschaeft» oder «vorstoss» — trennt Notizen der beiden Objektarten. */
     protected string $objektTyp = 'geschaeft';
     protected int $geschaeftId = 0;
+    /**
+     * Zweite Kennung für Objekte, die keine Zahl haben: ein Departement und ein
+     * Tab der Budgetansicht tragen einen Namen. Alles Übrige führt den leeren
+     * Schlüssel.
+     *
+     * Die Eigenschaft duldet NULL, weil die Spalte es tut: Jede Aktion, die
+     * eine andere Stelle als die Notizen schreibt, lässt sie offen, und die
+     * Zeilen von vor der Migration führen sie ebenso. Nach aussen ist ein
+     * fehlender Schlüssel ein leerer Schlüssel.
+     */
+    protected ?string $objektSchluessel = '';
     protected string $aktionTyp = '';
     protected string $aktionCode = '';
     protected string $titel = '';

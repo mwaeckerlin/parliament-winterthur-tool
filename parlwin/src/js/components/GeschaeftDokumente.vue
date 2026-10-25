@@ -262,7 +262,7 @@ export default {
       // Tab synchron im Click-Kontext öffnen, damit Browser-Popup-Blocker
       // den window.open() spaeter nicht abfaengt. URL setzen wir, sobald
       // die fileId vom Server zurückkommt; bis dahin läuft der neue Tab im
-      // „about:blank“-Zustand und die Collabora-/Office-Lade­zeit beginnt
+      // «about:blank»-Zustand und die Collabora-/Office-Lade­zeit beginnt
       // direkt nach dem Server-Roundtrip (vermeidet die zusätzlichen
       // dutzend Sekunden, die ein nachgeschalteter manueller Klick kostet).
       let neuerTab = null

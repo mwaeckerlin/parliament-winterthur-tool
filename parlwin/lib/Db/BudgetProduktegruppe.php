@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OCA\ParliamentWinterthur\Db;
 
+use OCA\ParliamentWinterthur\Service\BudgetSteuerbarkeit;
 use OCP\AppFramework\Db\Entity;
 use JsonSerializable;
 
@@ -32,6 +33,9 @@ class BudgetProduktegruppe extends Entity implements JsonSerializable {
     protected ?string $name = null;
     protected ?string $departement = null;
     protected int $reihenfolge = 0;
+    // F129: Seite im Budgetbuch, aus dem Inhaltsverzeichnis. 0 heisst: aus
+    // diesem Buch nicht gelesen.
+    protected int $buchseite = 0;
     // Künstliche Produktegruppe (F89): trägt die aus Teil A geparsten Posten, die
     // nicht in einer echten Produktegruppe stehen (interne Verrechnung, Abgrenzung),
     // damit Σ aller Produktegruppen dem deklarierten Gesamtergebnis entspricht. Nicht
@@ -64,7 +68,7 @@ class BudgetProduktegruppe extends Entity implements JsonSerializable {
 
     public function __construct() {
         foreach ([
-            'jahr', 'reihenfolge',
+            'jahr', 'reihenfolge', 'buchseite',
             'globalkreditIst', 'globalkreditSollVorjahr', 'globalkreditSoll',
             'globalkreditPlan1', 'globalkreditPlan2', 'globalkreditPlan3',
             'aufwandIst', 'aufwandSollVorjahr', 'aufwandSoll',
@@ -79,6 +83,9 @@ class BudgetProduktegruppe extends Entity implements JsonSerializable {
 
     /** @return array<string, mixed> */
     public function jsonSerialize(): array {
+        $kostenzeilen = BudgetSteuerbarkeit::mitStufe(
+            $this->kostenzeilen ? (json_decode($this->kostenzeilen, true) ?: []) : []
+        );
         return [
             'id' => $this->getId(),
             'jahr' => $this->jahr,
@@ -86,6 +93,7 @@ class BudgetProduktegruppe extends Entity implements JsonSerializable {
             'name' => $this->name,
             'departement' => $this->departement,
             'reihenfolge' => $this->reihenfolge,
+            'buchseite' => $this->buchseite,
             'kuenstlich' => (bool) $this->kuenstlich,
             'antragbar' => !$this->kuenstlich,
             'globalkredit' => [
@@ -102,7 +110,11 @@ class BudgetProduktegruppe extends Entity implements JsonSerializable {
             'auszubildendeSoll' => $this->auszubildendeSoll,
             'auftrag' => $this->auftrag,
             'zielvorgaben' => $this->zielvorgaben ? (json_decode($this->zielvorgaben, true) ?: []) : [],
-            'kostenzeilen' => $this->kostenzeilen ? (json_decode($this->kostenzeilen, true) ?: []) : [],
+            'kostenzeilen' => $kostenzeilen,
+            // F128: Wie weit der Aufwand dieser Produktegruppe überhaupt
+            // beeinflussbar ist — je Kostenzeile und als Summe. Orientierung für
+            // die Anzeige, bindend allein für die automatische Verteilung.
+            'steuerbarkeit' => BudgetSteuerbarkeit::summen($kostenzeilen),
             'erlaeuterungStellen' => $this->erlaeuterungStellen,
             'begruendungAbweichung' => $this->begruendungAbweichung,
             'begruendungFap' => $this->begruendungFap,

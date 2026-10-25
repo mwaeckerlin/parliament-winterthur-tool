@@ -52,4 +52,30 @@ final class RichText
 
         return HtmlSanitizer::sauber($html);
     }
+
+    /**
+     * Gibt den Wortlaut als reinen Text zurück — für eine Zelle einer Tabelle,
+     * die keine Formatierung trägt (F138). Absätze, Listenpunkte und Zeilen
+     * bleiben als Zeilenumbruch erhalten, die Auszeichnung fällt weg.
+     */
+    public static function alsKlartext(string $text): string
+    {
+        $html = self::alsHtml($text);
+        if ($html === '') {
+            return '';
+        }
+        // Jedes Element, das am Bildschirm eine Zeile beginnt, wird hier zu
+        // einem Umbruch; ohne das klebt der nächste Absatz an das letzte Wort.
+        $mitUmbruch = (string) preg_replace('#</(p|div|li|h[1-6]|blockquote|tr)>#i', "\n", $html);
+        $mitUmbruch = (string) preg_replace('#<br\s*/?>#i', "\n", $mitUmbruch);
+        $mitUmbruch = (string) preg_replace('#<li[^>]*>#i', '• ', $mitUmbruch);
+        $klartext = html_entity_decode(strip_tags($mitUmbruch), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $klartext = (string) preg_replace('/[ \t]+/u', ' ', $klartext);
+        // In einer Zelle steht je Absatz und je Listenpunkt eine Zeile, ohne
+        // Leerzeile dazwischen: Das Markdown trägt den Umbruch schon zwischen
+        // den Listenpunkten, und mit dem Umbruch aus «</li>» standen zwei
+        // Zeilen zwischen «erstens» und «zweitens» (gemessen am 24.10.2026).
+        $klartext = (string) preg_replace('/ *\n[\s\n]*/u', "\n", $klartext);
+        return trim($klartext);
+    }
 }

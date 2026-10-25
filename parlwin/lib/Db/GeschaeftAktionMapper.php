@@ -90,13 +90,21 @@ class GeschaeftAktionMapper extends QBMapper
      *
      * @return GeschaeftAktion[]
      */
-    public function findNotizen(string $objektTyp, int $objektId, string $kategorie = 'notiz'): array
+    public function findNotizen(string $objektTyp, int $objektId, string $kategorie = 'notiz', string $schluessel = ''): array
     {
         $qb = $this->db->getQueryBuilder();
         $qb->select('*')
             ->from($this->getTableName())
             ->where($qb->expr()->eq('objekt_typ', $qb->createNamedParameter($objektTyp)))
             ->andWhere($qb->expr()->eq('geschaeft_id', $qb->createNamedParameter($objektId, IQueryBuilder::PARAM_INT)))
+            // Der leere Schlüssel trifft auch die Zeilen von vor der Migration,
+            // die ihn als NULL führen.
+            ->andWhere($schluessel === ''
+                ? $qb->expr()->orX(
+                    $qb->expr()->isNull('objekt_schluessel'),
+                    $qb->expr()->eq('objekt_schluessel', $qb->createNamedParameter(''))
+                )
+                : $qb->expr()->eq('objekt_schluessel', $qb->createNamedParameter($schluessel)))
             ->andWhere($qb->expr()->eq('aktion_typ', $qb->createNamedParameter($kategorie)))
             ->orderBy('erstellt_am', 'DESC')
             ->addOrderBy('id', 'DESC');

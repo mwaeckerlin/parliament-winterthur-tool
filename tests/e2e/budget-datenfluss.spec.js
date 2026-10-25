@@ -642,6 +642,50 @@ test.describe('Budget: Steuerfuss, Import und PDF (F88, F89, F91, F92)', () => {
       await popup.close().catch(() => {})
     }
   })
+
+  test('«Excel in die Dateien» legt die Tabelle im Fraktionsordner ab (F138)', async ({ page }) => {
+    await login(page, USERS.u1)
+    await gotoBudget(page)
+    await sorgeFuerBudgetjahr(page, JAHR)
+    await gotoBudget(page)
+
+    await page.evaluate(() => window.scrollTo(0, 0))
+    await page.locator('.pw-budget-tabs .pw-budget-tab', { hasText: /^\d+ Anträge$/ }).click()
+    await page.locator('.pw-excel-ablegen').click()
+
+    // Der Hinweis nennt den Pfad, den der Server zurückgibt.
+    const datei = `Budgetantraege-${JAHR}.xlsx`
+    await expect(
+      page.locator('.toastify', { hasText: datei }),
+      'kein Hinweis mit dem Ablagepfad der Tabelle (F138)',
+    ).toBeVisible({ timeout: 20_000 })
+
+    // Und die Datei liegt wirklich in den Dateien des Benutzers: über WebDAV
+    // abgeholt, mit der Sitzung des Browsers — derselbe Weg, den die Files-App
+    // nimmt.
+    const inDenDateien = await page.request.get(
+      `${BASE_URL}/remote.php/dav/files/${USERS.u1.name}/Fraktion/50_Budget/${JAHR}/${datei}`,
+    )
+    expect(inDenDateien.status(), 'die Tabelle steht nicht im Ordner des Budgetjahrs (F138)').toBe(200)
+    const bytes = await inDenDateien.body()
+    expect(bytes.subarray(0, 2).toString('latin1'), 'die abgelegte Datei ist keine xlsx-Datei').toBe('PK')
+  })
+
+  test('Dieselbe Tabelle kommt auch zum Herunterladen (F138)', async ({ page }) => {
+    await login(page, USERS.u1)
+    await gotoBudget(page)
+    await sorgeFuerBudgetjahr(page, JAHR)
+
+    // Der Abruf antwortet mit der Datei selbst und legt nichts ab.
+    const antwort = await api(page, 'get', `/budget/${JAHR}/antraege-excel`)
+    expect(antwort.status(), 'der Export antwortet nicht').toBe(200)
+    expect(
+      antwort.headers()['content-type'] || '',
+      'der Typ der Antwort ist keine Tabellenkalkulation (F138)',
+    ).toContain('spreadsheetml.sheet')
+    const bytes = await antwort.body()
+    expect(bytes.subarray(0, 2).toString('latin1'), 'die Antwort ist keine xlsx-Datei').toBe('PK')
+  })
 })
 
 test.describe('Budget: Grafische Übersicht (F111)', () => {
@@ -873,7 +917,9 @@ test.describe('Budget: Antragsmodell — Herkunft, Betrag, Haltung, Pauschal, No
     // jeder mit seinem Einreichen-Schalter. Die Liste startet leer, darum wird für
     // die Prüfung einer angelegt und am Ende wieder gelöscht.
     const kasten = page.locator('.pw-pauschalantraege')
-    await expect(kasten.getByText('Pauschalanträge', { exact: true }), 'Kasten «Pauschalanträge» fehlt (F100)').toBeVisible()
+    // Der Titel des Kastens trägt die Zahl der Anträge, sobald es welche gibt
+    // («Pauschalanträge (2)»), darum kein Vergleich auf den blossen Namen.
+    await expect(kasten.locator('summary'), 'Kasten «Pauschalanträge» fehlt (F100)').toContainText('Pauschalanträge')
     const vorher = await kasten.locator('.pw-pauschal-form').count()
     await kasten.getByRole('button', { name: '+ Pauschalantrag' }).click()
     await expect(kasten.locator('.pw-pauschal-form')).toHaveCount(vorher + 1, { timeout: 20_000 })
@@ -920,7 +966,11 @@ test.describe('Budget: Antragsmodell — Herkunft, Betrag, Haltung, Pauschal, No
 
     const karte = page.locator('.pw-budget-tabpanel .pw-data-card', { has: page.locator('.pw-pg-pauschale') }).first()
     await karte.waitFor({ state: 'visible', timeout: 30_000 })
-    const code = (await karte.locator('.pw-data-card-kicker').first().innerText()).replace(/\D+/g, '')
+    // Die Nummer ist die ERSTE Zahl des Kickers: dort steht seit F129 auch die
+    // Seite im Budgetbuch («Produktegruppe 121  Buch S. 5»), und wer alle
+    // Ziffern zusammenzieht, sucht danach die Produktegruppe «1215».
+    const kicker = await karte.locator('.pw-data-card-kicker').first().innerText()
+    const code = (kicker.match(/\d+/) || [''])[0]
     // Der Schalter des eben angelegten Pauschalantrags: beide Listen iterieren die
     // Pauschalanträge in derselben Reihenfolge, der neue steht also zuunterst.
     const schalter = karte.locator('.pw-pg-pauschale li').last()

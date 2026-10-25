@@ -35,11 +35,11 @@ class NotizService
      *
      * @return array<int, array<string, mixed>>
      */
-    public function liste(string $objektTyp, int $objektId, string $kategorie = 'notiz'): array
+    public function liste(string $objektTyp, int $objektId, string $kategorie = 'notiz', string $schluessel = ''): array
     {
         return array_map(
             fn(GeschaeftAktion $a): array => $this->mapNotiz($a),
-            $this->aktionMapper->findNotizen($objektTyp, $objektId, $kategorie)
+            $this->aktionMapper->findNotizen($objektTyp, $objektId, $kategorie, $schluessel)
         );
     }
 
@@ -64,7 +64,7 @@ class NotizService
     /**
      * @return array<string, mixed>
      */
-    public function hinzufuegen(string $objektTyp, int $objektId, string $text, string $kategorie = 'notiz'): array
+    public function hinzufuegen(string $objektTyp, int $objektId, string $text, string $kategorie = 'notiz', string $schluessel = ''): array
     {
         $text = trim($text);
         if ($text === '') {
@@ -80,6 +80,7 @@ class NotizService
         $aktion = new GeschaeftAktion();
         $aktion->setObjektTyp($objektTyp);
         $aktion->setGeschaeftId($objektId);
+        $aktion->setObjektSchluessel($schluessel);
         $aktion->setAktionTyp($kategorie);
         $aktion->setAktionCode('');
         $aktion->setTitel(ucfirst($kategorie));
@@ -230,6 +231,9 @@ class NotizService
         return [
             'id' => $aktion->getId(),
             'geschaeftId' => $aktion->getGeschaeftId(),
+            // Ein fehlender Schlüssel ist ein leerer Schlüssel: Aktionen, die
+            // nicht aus den Notizen kommen, lassen die Spalte offen.
+            'objektSchluessel' => (string) $aktion->getObjektSchluessel(),
             'aktionTyp' => $aktion->getAktionTyp(),
             'aktionCode' => $aktion->getAktionCode(),
             'titel' => $aktion->getTitel(),

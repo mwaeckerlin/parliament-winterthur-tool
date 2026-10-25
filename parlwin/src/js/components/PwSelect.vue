@@ -3,12 +3,14 @@
     v-bind="$attrs"
     :model-value="gewaehlt"
     :options="aufbereitet"
+    :calculate-position="filterDropdownPosition"
     @update:model-value="onUpdate"
   />
 </template>
 
 <script>
 import NcSelect from '@nextcloud/vue/components/NcSelect'
+import { filterDropdownPosition } from '../filter-dropdown'
 
 /**
  * Einheitliches Einzel-Auswahl-Widget — die gemeinsame Basis für ALLE
@@ -45,6 +47,9 @@ export default {
     },
   },
   methods: {
+    // Die Liste bleibt im sichtbaren Bereich, auch wenn die Bildschirmtastatur
+    // ihn halbiert (filter-dropdown.js).
+    filterDropdownPosition,
     eintrag(o) {
       const wert = (o !== null && typeof o === 'object') ? o.value : o
       const roh = (o !== null && typeof o === 'object') ? (o.label ?? o.value) : o

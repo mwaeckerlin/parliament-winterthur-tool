@@ -183,6 +183,8 @@ return [
         ['name' => 'budget#sitzungsantraege', 'url' => '/budget/{jahr}/sitzungsantraege', 'verb' => 'POST', 'requirements' => ['jahr' => '\d+']],
         ['name' => 'budget#reimport', 'url' => '/budget/{jahr}/reimport', 'verb' => 'POST', 'requirements' => ['jahr' => '\d+']],
         ['name' => 'budget#antraegePdf', 'url' => '/budget/{jahr}/antraege-pdf', 'verb' => 'GET', 'requirements' => ['jahr' => '\d+']],
+        ['name' => 'budget#antraegeExcel', 'url' => '/budget/{jahr}/antraege-excel', 'verb' => 'GET', 'requirements' => ['jahr' => '\d+']],
+        ['name' => 'budget#antraegeExcelAblegen', 'url' => '/budget/{jahr}/antraege-excel', 'verb' => 'POST', 'requirements' => ['jahr' => '\d+']],
         ['name' => 'budget#ansicht', 'url' => '/budget/{jahr}', 'verb' => 'GET', 'requirements' => ['jahr' => '\d+']],
         ['name' => 'budget#antragAendern', 'url' => '/budget/antraege/{id}', 'verb' => 'PUT', 'requirements' => ['id' => '\d+']],
         ['name' => 'budget#antragLoeschen', 'url' => '/budget/antraege/{id}', 'verb' => 'DELETE', 'requirements' => ['id' => '\d+']],
@@ -197,5 +199,16 @@ return [
         ['name' => 'budget#deleteNotiz', 'url' => '/budget/antraege/{id}/notizen/{aktionId}', 'verb' => 'DELETE', 'requirements' => ['id' => '\d+', 'aktionId' => '\d+']],
         ['name' => 'budget#restoreNotiz', 'url' => '/budget/antraege/{id}/notizen/{aktionId}/wiederherstellen', 'verb' => 'POST', 'requirements' => ['id' => '\d+', 'aktionId' => '\d+']],
         ['name' => 'budget#notizRevisionen', 'url' => '/budget/antraege/{id}/notizen/{aktionId}/revisionen', 'verb' => 'GET', 'requirements' => ['id' => '\d+', 'aktionId' => '\d+']],
+        // Dokumente an einem Budgetantrag (F125).
+        ['name' => 'budget#dokumente', 'url' => '/budget/antraege/{id}/dokumente', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
+        ['name' => 'budget#dokumentErstellen', 'url' => '/budget/antraege/{id}/dokumente', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
+        ['name' => 'budget#dokumentHochladen', 'url' => '/budget/antraege/{id}/dokumente/upload', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
+        // Notizen am übergeordneten Zusammenhang: ganzes Budgetjahr, Departement, Tab.
+        ['name' => 'budget#ebenenNotizen', 'url' => '/budget/{jahr}/ebene/{ebene}/notizen', 'verb' => 'GET', 'requirements' => ['jahr' => '\d+']],
+        ['name' => 'budget#addEbenenNotiz', 'url' => '/budget/{jahr}/ebene/{ebene}/notizen', 'verb' => 'POST', 'requirements' => ['jahr' => '\d+']],
+        ['name' => 'budget#updateEbenenNotiz', 'url' => '/budget/{jahr}/ebene/{ebene}/notizen/{aktionId}', 'verb' => 'PUT', 'requirements' => ['jahr' => '\d+', 'aktionId' => '\d+']],
+        ['name' => 'budget#deleteEbenenNotiz', 'url' => '/budget/{jahr}/ebene/{ebene}/notizen/{aktionId}', 'verb' => 'DELETE', 'requirements' => ['jahr' => '\d+', 'aktionId' => '\d+']],
+        ['name' => 'budget#restoreEbenenNotiz', 'url' => '/budget/{jahr}/ebene/{ebene}/notizen/{aktionId}/wiederherstellen', 'verb' => 'POST', 'requirements' => ['jahr' => '\d+', 'aktionId' => '\d+']],
+        ['name' => 'budget#ebenenNotizRevisionen', 'url' => '/budget/{jahr}/ebene/{ebene}/notizen/{aktionId}/revisionen', 'verb' => 'GET', 'requirements' => ['jahr' => '\d+', 'aktionId' => '\d+']],
     ],
 ];

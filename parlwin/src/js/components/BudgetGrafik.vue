@@ -20,7 +20,7 @@
       >
         <figcaption class="pw-grafik-seite-kopf">
           <span class="pw-grafik-seite-titel">{{ seite.name }}</span>
-          <span v-if="seite.fokus" class="pw-grafik-seite-betrag">{{ fr(seite.fokus.data.betrag) }}</span>
+          <span v-if="seite.fokus" class="pw-grafik-seite-betrag">{{ wert(seite.fokus.data.betrag) }}</span>
         </figcaption>
         <p v-if="!seite.fokus" class="pw-hinweis">Keine {{ seite.name }} für diesen Ausschnitt.</p>
         <svg
@@ -39,8 +39,10 @@
             class="pw-bubble"
             :class="[
               'pw-bubble-e' + Math.min(k.ebene, 4),
+              k.richtung ? 'pw-bubble-' + k.richtung : '',
               { 'pw-bubble-blatt': !k.knoten.children, 'pw-bubble-wach': schwebt === k.schluessel },
             ]"
+            :data-richtung="k.richtung || null"
             :style="{
               '--pw-bubble-farbton': k.farbton,
               transform: `translate(${k.x}px, ${k.y}px) scale(${k.r})`,
@@ -75,7 +77,7 @@
               x="0"
               :dy="zi === 0 ? '0' : '1.15em'"
             >{{ zeile }}</tspan>
-            <tspan v-if="k.ebene === 1" x="0" dy="1.15em" class="pw-bubble-betrag">{{ fr(k.knoten.data.betrag) }}</tspan>
+            <tspan v-if="k.ebene === 1" x="0" dy="1.15em" class="pw-bubble-betrag">{{ wert(k.knoten.data.betrag) }}</tspan>
           </text>
         </svg>
       </figure>
@@ -87,7 +89,7 @@
 <script>
 import { forceCollide, forceSimulation, forceX, forceY } from 'd3-force'
 import { hierarchy, pack } from 'd3-hierarchy'
-import { budgetHierarchie } from '../budget-hierarchie'
+import { budgetHierarchie, personalHierarchie } from '../budget-hierarchie'
 import { frankenFormat } from '../utils'
 
 // Koordinatensystem einer Seite; die Grösse auf dem Bildschirm macht das
@@ -174,6 +176,10 @@ export default {
     // Die Produktegruppen der Budgetansicht, bereits gefiltert (F76).
     produktegruppen: { type: Array, default: () => [] },
     jahr: { type: Number, default: 0 },
+    // F123: Was die Kreisfläche misst — «franken» das Budget (Einnahmen und
+    // Ausgaben nebeneinander), «stellen» den Stellenplan (eine Fläche, die
+    // Farbe sagt Aufbau oder Abbau).
+    masseinheit: { type: String, default: 'franken' },
   },
   data() {
     // `schwebt`: der Kreis unter dem Zeiger. Er wächst leicht an, und die Namen
@@ -187,7 +193,7 @@ export default {
     // Wie viele Bilder jede Simulation gelaufen ist — daraus folgt, wie fest der
     // Zug zum Zielplatz gerade anzieht.
     this.tickZaehler = new Map()
-    return { pfadNamen: ['Budget'], schwebt: '', lagen: {} }
+    return { pfadNamen: [this.masseinheit === 'stellen' ? 'Stellenplan' : 'Budget'], schwebt: '', lagen: {} }
   },
   mounted() {
     this.simulationNeu()
@@ -218,10 +224,21 @@ export default {
     produktegruppen() {
       this.simulationNeu()
     },
+    // F123: Der Wechsel zwischen Franken und Stellen baut einen anderen Baum,
+    // also suchen die Kreise ihre Plätze neu.
+    masseinheit() {
+      this.pfadNamen = [this.baum.name]
+      this.simulationNeu()
+    },
   },
   computed: {
+    stellenModus() {
+      return this.masseinheit === 'stellen'
+    },
     baum() {
-      return budgetHierarchie(this.produktegruppen)
+      return this.stellenModus
+        ? personalHierarchie(this.produktegruppen)
+        : budgetHierarchie(this.produktegruppen)
     },
     /** Je Seite der gepackte Kreisbaum (Einnahmen zuerst, dann Ausgaben). */
     baeume() {
@@ -306,7 +323,10 @@ export default {
             x: eintrag.x,
             y: eintrag.y,
             r,
-            farbton: this.farbtoene.get(this.departementVon(knoten)) ?? 210,
+            farbton: this.farbtonVon(knoten),
+            // F123: Im Stellen-Modus trägt jeder Kreis die Richtung gegenüber
+            // dem Vorjahr; sie bestimmt die Farbe und steht im Hinweistext.
+            richtung: this.stellenModus ? (knoten.data.richtung || 'gleich') : '',
             zeilen,
             schrift,
             // Der Text sitzt über der Mitte: In der Mitte liegen die Kindkreise,
@@ -369,6 +389,26 @@ export default {
   },
   methods: {
     fr: frankenFormat,
+    /** Stellen stehen mit zwei Nachkommastellen da, Franken als ganze Zahl. */
+    stellenFormat(wert) {
+      return (Number(wert) || 0).toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    },
+    /** Der angezeigte Wert eines Kreises, in der Einheit der Darstellung. */
+    wert(betrag) {
+      return this.stellenModus ? this.stellenFormat(betrag) : this.fr(betrag)
+    },
+    /**
+     * F123: Im Stellen-Modus trägt die Farbe die Aussage — Aufbau rot, Abbau
+     * grün, unverändert grau (der Farbton ist dort gleichgültig, die Sättigung
+     * nimmt ihn im Stylesheet zurück). Im Franken-Modus bleibt es beim Farbton
+     * des Departements, der beim Hineinzoomen die Herkunft zeigt.
+     */
+    farbtonVon(knoten) {
+      if (this.stellenModus) {
+        return { aufbau: 4, abbau: 135 }[knoten?.data?.richtung] ?? 210
+      }
+      return this.farbtoene.get(this.departementVon(knoten)) ?? 210
+    },
     /**
      * Die Kreise finden ihren Platz: d3s Kraftsimulation zieht jede Einheit an
      * die Stelle, die ihr die Packung zuweist (`forceX`/`forceY`), und hält sie
@@ -535,6 +575,9 @@ export default {
       return zeilen.length ? zeilen : [String(name)]
     },
     beschreibung(knoten) {
+      if (this.stellenModus) {
+        return this.stellenBeschreibung(knoten)
+      }
       const teile = [knoten.data.name, this.fr(knoten.data.betrag) + ' CHF']
       const eltern = knoten.parent
       if (eltern && eltern.value > 0) {
@@ -547,6 +590,27 @@ export default {
       const deckung = knoten.data.produktDeckung
       if (typeof deckung === 'number' && deckung < 99.5) {
         teile.push('Produkte weisen ' + Math.round(deckung) + '% aus')
+      }
+      return teile.join(' · ')
+    },
+    /**
+     * F123: Der Hinweistext im Stellen-Modus nennt die Stellen des Jahres, den
+     * Wert des Vorjahres und die Veränderung mit ihrem Vorzeichen — die Zahl,
+     * die hinter der Farbe steht.
+     */
+    stellenBeschreibung(knoten) {
+      const daten = knoten.data
+      const veraenderung = Number(daten.veraenderung) || 0
+      const vorzeichen = veraenderung > 0 ? '+' : (veraenderung < 0 ? '−' : '±')
+      const teile = [
+        daten.name,
+        this.stellenFormat(daten.betrag) + ' Stellen',
+        'Vorjahr ' + this.stellenFormat(daten.vorjahr),
+        vorzeichen + this.stellenFormat(Math.abs(veraenderung)),
+      ]
+      const eltern = knoten.parent
+      if (eltern && eltern.value > 0) {
+        teile.push(((knoten.value / eltern.value) * 100).toFixed(1).replace('.', ',') + '% von ' + eltern.data.name)
       }
       return teile.join(' · ')
     },
@@ -625,6 +689,14 @@ export default {
 .pw-bubble-e2 { --pw-bubble-helligkeit: 84%; }
 .pw-bubble-e3 { --pw-bubble-helligkeit: 74%; }
 .pw-bubble-e4 { --pw-bubble-helligkeit: 64%; }
+
+/* F123: Im Stellen-Modus trägt die Farbe die Aussage — rot, wo Stellen
+   dazukommen, grün, wo welche wegfallen. Den Farbton setzt die Komponente aus
+   der Richtung; hier steht, wie kräftig er auftritt. Wo sich nichts bewegt hat,
+   nimmt die Sättigung 0 die Farbe zurück: Grau behauptet nichts. */
+.pw-bubble-aufbau,
+.pw-bubble-abbau { --pw-bubble-saettigung: 68%; }
+.pw-bubble-gleich { --pw-bubble-saettigung: 0%; }
 
 /* Jeder Kreis nimmt den Zeiger an, auch der kleinste: Beim Überfahren nennt er
    seinen Namen und seinen Betrag, und gerade die kleinen tragen keine

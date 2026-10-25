@@ -5,16 +5,21 @@ declare(strict_types=1);
 namespace OCA\ParliamentWinterthur\Controller;
 
 use OCA\ParliamentWinterthur\AppInfo\Application;
+use OCA\ParliamentWinterthur\Service\BudgetAntraegeTabelle;
 use OCA\ParliamentWinterthur\Service\BudgetImportService;
 use OCA\ParliamentWinterthur\Service\BudgetService;
+use OCA\ParliamentWinterthur\Service\DokumentAblageService;
 use OCA\ParliamentWinterthur\Service\EreignisService;
 use OCA\ParliamentWinterthur\Service\RealtimePublisherService;
+use OCA\ParliamentWinterthur\Service\XlsxDatei;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
+use OCP\AppFramework\Http\DataDownloadResponse;
 use OCP\AppFramework\Http\DataResponse;
+use OCP\AppFramework\Http\Response;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IRequest;
 use Psr\Log\LoggerInterface;
@@ -23,6 +28,9 @@ use Psr\Log\LoggerInterface;
  * REST-Controller für das Budget-Modul.
  */
 class BudgetController extends Controller {
+    /** Der Typ einer Tabellenkalkulationsdatei (F138). */
+    private const XLSX_TYP = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
     public function __construct(
         IRequest $request,
         private readonly BudgetService $service,
@@ -30,6 +38,7 @@ class BudgetController extends Controller {
         private readonly LoggerInterface $logger,
         private readonly RealtimePublisherService $realtime,
         private readonly EreignisService $ereignisse,
+        private readonly DokumentAblageService $ablage,
     ) {
         parent::__construct(Application::APP_ID, $request);
     }
@@ -112,6 +121,155 @@ class BudgetController extends Controller {
             return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
         } catch (\RuntimeException $e) {
             return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_FORBIDDEN);
+        }
+    }
+
+    /**
+     * Notizen am übergeordneten Zusammenhang: am ganzen Budgetjahr, an einem
+     * Departement, an einem Tab der Ansicht. Die Ebene steht im Pfad, das Jahr
+     * ebenso; der Name des Departements oder des Tabs kommt als Schlüssel.
+     */
+    #[NoAdminRequired]
+    public function ebenenNotizen(string $ebene, int $jahr): DataResponse {
+        $schluessel = (string) $this->request->getParam('schluessel', '');
+        try {
+            return new DataResponse($this->service->ebenenNotizen($ebene, $jahr, $schluessel));
+        } catch (\InvalidArgumentException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+        }
+    }
+
+    #[NoAdminRequired]
+    public function addEbenenNotiz(string $ebene, int $jahr): DataResponse {
+        $text = (string) $this->request->getParam('text', '');
+        $schluessel = (string) $this->request->getParam('schluessel', '');
+        try {
+            $aktion = $this->service->ebeneNotizHinzufuegen($ebene, $jahr, $text, $schluessel);
+            $this->realtime->publish('budget.updated', ['aktionTyp' => 'notiz']);
+            return new DataResponse($aktion);
+        } catch (\InvalidArgumentException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+        } catch (\RuntimeException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_FORBIDDEN);
+        }
+    }
+
+    #[NoAdminRequired]
+    public function updateEbenenNotiz(string $ebene, int $jahr, int $aktionId): DataResponse {
+        $text = (string) $this->request->getParam('text', '');
+        try {
+            $aktion = $this->service->ebeneNotizAktualisieren($ebene, $jahr, $aktionId, $text);
+            $this->realtime->publish('budget.updated', ['aktionTyp' => 'notiz']);
+            return new DataResponse($aktion);
+        } catch (\InvalidArgumentException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+        } catch (\RuntimeException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_FORBIDDEN);
+        }
+    }
+
+    #[NoAdminRequired]
+    public function deleteEbenenNotiz(string $ebene, int $jahr, int $aktionId): DataResponse {
+        try {
+            $this->service->ebeneNotizLoeschen($ebene, $jahr, $aktionId);
+            $this->realtime->publish('budget.updated', ['aktionTyp' => 'notiz']);
+            return new DataResponse([]);
+        } catch (\InvalidArgumentException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+        } catch (\RuntimeException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_FORBIDDEN);
+        }
+    }
+
+    #[NoAdminRequired]
+    public function restoreEbenenNotiz(string $ebene, int $jahr, int $aktionId): DataResponse {
+        try {
+            $aktion = $this->service->ebeneNotizWiederherstellen($ebene, $jahr, $aktionId);
+            $this->realtime->publish('budget.updated', ['aktionTyp' => 'notiz']);
+            return new DataResponse($aktion);
+        } catch (\InvalidArgumentException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+        } catch (\RuntimeException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_FORBIDDEN);
+        }
+    }
+
+    #[NoAdminRequired]
+    public function ebenenNotizRevisionen(string $ebene, int $jahr, int $aktionId): DataResponse {
+        try {
+            return new DataResponse($this->service->ebeneNotizRevisionen($ebene, $jahr, $aktionId));
+        } catch (\InvalidArgumentException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+        } catch (\RuntimeException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_FORBIDDEN);
+        }
+    }
+
+    // ── Dokumente an Anträgen (F125) ───────────────────────────────────────────
+    //
+    // Marc am 24.10.2026: «im Weiteren ist beschwert worden, dass man bei den
+    // Anträgen im Budget kein Dokument aufladen kann». Jedes andere Objekt der
+    // Anwendung trägt Dokumente; der Budgetantrag legt sie unter
+    // «Fraktion/50_Budget/<Budgetjahr>» ab, mit der Antragsnummer als Präfix,
+    // sodass die Dateien eines Antrags im Jahresordner beieinander stehen.
+
+    /** Ablageordner und Dateipräfix eines Antrags. */
+    private function antragsAblage(int $id): array {
+        $antrag = $this->service->antrag($id);
+        $jahr = (int) $antrag['jahr'];
+        return ['Fraktion/50_Budget/' . $jahr, 'Antrag-' . $id . '-'];
+    }
+
+    #[NoAdminRequired]
+    public function dokumente(int $id): DataResponse {
+        try {
+            [$ordner, $praefix] = $this->antragsAblage($id);
+            return new DataResponse($this->ablage->liste($ordner, $praefix));
+        } catch (DoesNotExistException) {
+            return new DataResponse(['fehler' => 'Antrag nicht gefunden'], Http::STATUS_NOT_FOUND);
+        } catch (\RuntimeException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_UNAUTHORIZED);
+        }
+    }
+
+    #[NoAdminRequired]
+    public function dokumentErstellen(int $id): DataResponse {
+        $name = trim((string) $this->request->getParam('name', ''));
+        $extension = trim((string) $this->request->getParam('extension', ''));
+        if ($name === '' || $extension === '') {
+            return new DataResponse(['fehler' => 'Name und Endung erforderlich'], Http::STATUS_BAD_REQUEST);
+        }
+        try {
+            [$ordner, $praefix] = $this->antragsAblage($id);
+            $eintrag = $this->ablage->anlegen($ordner, $praefix . $name, $extension);
+            $this->realtime->publish('budget.updated', ['aktionTyp' => 'dokument']);
+            return new DataResponse($eintrag);
+        } catch (DoesNotExistException) {
+            return new DataResponse(['fehler' => 'Antrag nicht gefunden'], Http::STATUS_NOT_FOUND);
+        } catch (\InvalidArgumentException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+        } catch (\RuntimeException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_UNAUTHORIZED);
+        }
+    }
+
+    #[NoAdminRequired]
+    public function dokumentHochladen(int $id): DataResponse {
+        $datei = $this->request->getUploadedFile('datei');
+        if (!is_array($datei) || ($datei['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            return new DataResponse(['fehler' => 'Keine Datei hochgeladen'], Http::STATUS_BAD_REQUEST);
+        }
+        try {
+            [$ordner, $praefix] = $this->antragsAblage($id);
+            $eintrag = $this->ablage->hochladen($ordner, $datei, $praefix);
+            $this->realtime->publish('budget.updated', ['aktionTyp' => 'dokument']);
+            return new DataResponse($eintrag);
+        } catch (DoesNotExistException) {
+            return new DataResponse(['fehler' => 'Antrag nicht gefunden'], Http::STATUS_NOT_FOUND);
+        } catch (\InvalidArgumentException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+        } catch (\RuntimeException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_UNAUTHORIZED);
         }
     }
 
@@ -330,6 +488,54 @@ class BudgetController extends Controller {
         // Fraktion die Anträge); die Person erscheint nur in der Übersicht.
         $daten = $this->import->antraegePdf($jahr, $kommission, $mitFremden, $this->service->eigeneFraktion());
         return new TemplateResponse(Application::APP_ID, 'budget_antraege_pdf', $daten, 'blank');
+    }
+
+    /**
+     * Dieselben Anträge als Tabellenkalkulation zum Herunterladen (F138). Die
+     * Datei entsteht bei jedem Abruf neu und wird nirgends abgelegt.
+     */
+    #[NoAdminRequired]
+    #[NoCSRFRequired]
+    public function antraegeExcel(int $jahr): Response {
+        [$name, $inhalt] = $this->antraegeTabelle($jahr);
+        return new DataDownloadResponse($inhalt, $name . '.xlsx', self::XLSX_TYP);
+    }
+
+    /**
+     * Legt dieselbe Tabelle im Fraktionsordner des Budgetjahrs ab, wo auch die
+     * Dokumente der Anträge liegen (F138), und antwortet mit ihrem Pfad. Ein
+     * zweiter Export überschreibt die Datei.
+     *
+     * Das Ablegen ändert etwas und geht darum über POST, mit dem Token der
+     * Sitzung — anders als der Download, den ein Fenster ohne Token holt.
+     */
+    #[NoAdminRequired]
+    public function antraegeExcelAblegen(int $jahr): DataResponse {
+        [$name, $inhalt] = $this->antraegeTabelle($jahr);
+        try {
+            $eintrag = $this->ablage->schreiben('Fraktion/50_Budget/' . $jahr, $name . '.xlsx', $inhalt);
+            $this->realtime->publish('budget.updated', ['aktionTyp' => 'dokument']);
+            return new DataResponse($eintrag);
+        } catch (\InvalidArgumentException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+        } catch (\RuntimeException $e) {
+            return new DataResponse(['fehler' => $e->getMessage()], Http::STATUS_UNAUTHORIZED);
+        }
+    }
+
+    /**
+     * Name und Inhalt der Tabelle, mit derselben Auswahl wie das PDF: die
+     * gewählte Kommission grenzt ein, und die unterstützten fremden Anträge
+     * kommen nur auf ausdrückliche Option dazu (F92).
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function antraegeTabelle(int $jahr): array {
+        $kommission = $this->strOrNull('kommission');
+        $mitFremden = in_array((string) $this->request->getParam('mitFremden'), ['1', 'true'], true);
+        $daten = $this->import->antraegePdf($jahr, $kommission, $mitFremden, $this->service->eigeneFraktion());
+        $name = BudgetAntraegeTabelle::name($daten);
+        return [$name, XlsxDatei::erzeugen($name, BudgetAntraegeTabelle::zeilen($daten), BudgetAntraegeTabelle::BREITEN)];
     }
 
     /** Setzt oder löst eine Verknüpfung Vorbereitung↔Sitzung von Hand (F104). */

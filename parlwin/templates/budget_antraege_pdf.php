@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+use OCA\ParliamentWinterthur\Service\RichText;
+
 /**
  * Druckansicht «Budgetanträge der Fraktion» — gleiche Technik wie votum_pdf.php
  * (eigenständige A4-Seite, öffnet den Druck-Dialog automatisch, «Als PDF
@@ -34,6 +36,9 @@ $bereichLabel = [
     'globalbudget' => 'Globalbudget',
     'personal' => 'Personal',
     'investition' => 'Investition',
+    'verpflichtungskredit' => 'Verpflichtungskredit',
+    'bewilligungsorgan' => 'Bewilligungsorgan',
+    'departementssekretariat' => 'Sekretariat',
     'steuerfuss' => 'Steuerfuss',
 ];
 // Einsparungsverteilung eines Antrags (F109) als lesbare Zeile für die Begründung.
@@ -111,6 +116,7 @@ $aufteilungLabel = static function (array $t) use ($fr): string {
         }
         td.betrag { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
         .auto { color: #777; font-style: italic; }
+        .seite { color: #777; font-size: 8.5pt; }
         .leer { color: #888; font-style: italic; }
         footer.fuss {
             margin-top: 2em;
@@ -168,15 +174,39 @@ $aufteilungLabel = static function (array $t) use ($fr): string {
                         $auto = !empty($a['automatisch']);
                     ?>
                     <tr>
-                        <td><?php p((string) ($e['produktegruppe'] ?? '')); ?></td>
+                        <td><?php p((string) ($e['produktegruppe'] ?? '')); ?><?php
+                            // F129: die Seite im Budgetbuch, für alle, die in der
+                            // Debatte mit dem Buch arbeiten.
+                            $seite = (int) ($e['buchseite'] ?? 0);
+                        ?><?php if ($seite > 0): ?><br><span class="seite">Buch S. <?php p((string) $seite); ?></span><?php endif; ?></td>
                         <td><?php p($bereichLabel[(string) ($a['bereich'] ?? '')] ?? (string) ($a['bereich'] ?? '')); ?></td>
-                        <td class="betrag"><?php p($fr($a['betragDelta'] ?? 0)); ?></td>
+                        <td class="betrag"><?php
+                            // F137: Ein Antrag auf das Bewilligungsorgan trägt
+                            // keinen Betrag, sondern den neuen Wert.
+                            $neuerWert = trim((string) ($a['neuerWert'] ?? ''));
+                            if ((string) ($a['bereich'] ?? '') === 'bewilligungsorgan' && $neuerWert !== '') {
+                                p('→ ' . $neuerWert);
+                            } else {
+                                p($fr($a['betragDelta'] ?? 0));
+                            }
+                        ?></td>
                         <td class="betrag"><?php p((string) ((float) ($a['stellenDelta'] ?? 0) !== 0.0 ? ($a['stellenDelta'] ?? '') : '')); ?></td>
                         <td><?php p((string) ($a['antragsteller'] ?? '')); ?><?php if ($auto): ?> <span class="auto">(automatisch)</span><?php endif; ?></td>
-                        <td><?php p((string) ($a['begruendung'] ?? '')); ?><?php
+                        <td><?php
+                            // Die Begründung ist formatierter Text (F132): Auf dem
+                            // Papier steht sie mit ihrer Formatierung, gesäubert
+                            // durch denselben Weg wie jede Notiz.
+                            print(RichText::alsHtml((string) ($a['begruendung'] ?? '')));
+                        ?><?php
                             $zae = is_array($a['zielAenderungen'] ?? null) ? $a['zielAenderungen'] : [];
                             $auf = is_array($a['aufteilung'] ?? null) ? $a['aufteilung'] : [];
-                        ?><?php if ($zae): ?><br><em>Zielvorgaben:</em><?php foreach ($zae as $z): ?> Ziel <?php p((string) ($z['zielNummer'] ?? '')); ?> «<?php p((string) ($z['messgroesse'] ?? '')); ?>» → Soll <?php p((string) ($z['neuerWert'] ?? '')); ?>;<?php endforeach; ?><?php endif; ?><?php if ($auf): ?><br><em>Einsparung verteilt:</em><?php foreach ($auf as $t): ?> <?php p($aufteilungLabel($t)); ?>;<?php endforeach; ?><?php endif; ?></td>
+                        ?><?php if ($zae): ?><br><em>Zielvorgaben:</em><?php foreach ($zae as $z): ?> Ziel <?php p((string) ($z['zielNummer'] ?? '')); ?> «<?php
+                            $ut = trim((string) ($z['unterTitel'] ?? ''));
+                            p(($ut !== '' ? $ut . ' — ' : '') . (string) ($z['messgroesse'] ?? ''));
+                        ?>» → Soll <?php
+                            $heute = trim((string) ($z['soll'] ?? ''));
+                            p(($heute !== '' ? $heute . ' → ' : '') . (string) ($z['neuerWert'] ?? ''));
+                        ?>;<?php endforeach; ?><?php endif; ?><?php if ($auf): ?><br><em>Einsparung verteilt:</em><?php foreach ($auf as $t): ?> <?php p($aufteilungLabel($t)); ?>;<?php endforeach; ?><?php endif; ?></td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>

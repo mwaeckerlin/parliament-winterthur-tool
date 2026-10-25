@@ -4,7 +4,7 @@
   </Teleport>
   <Teleport v-if="filterReady" to="#pw-filter-slot">
     <FilterPanel @reset="resetFilter">
-      <NcSelect v-model="entscheidungsbedarfOption" :options="entscheidungsbedarfOptions" :clearable="false" input-label="Entscheidungsbedarf" />
+      <NcSelect v-model="entscheidungsbedarfOption" :options="entscheidungsbedarfOptions" :clearable="false" input-label="Entscheidungsbedarf" :calculate-position="filterDropdownPosition" />
       <PwMultiSelect :model-value="filterStatus" :options="alleStatus" input-label="Status" placeholder="Alle" @update:model-value="filterStatus = $event || []" />
       <PwMultiSelect :model-value="filterTyp" :options="alleTypen" input-label="Typ" placeholder="Alle" @update:model-value="filterTyp = $event || []" />
       <PwMultiSelect :model-value="filterZustaendigeOptions" :options="zustaendigeOptionen" input-label="Zuständigkeit" placeholder="Alle" @update:model-value="filterZustaendige = ($event || []).map(o => o.value)" />
@@ -235,6 +235,7 @@ import NcButton from '@nextcloud/vue/components/NcButton'
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 import NcEmptyContent from '@nextcloud/vue/components/NcEmptyContent'
 import FilterPanel from './FilterPanel.vue'
+import { filterDropdownPosition } from '../filter-dropdown'
 import PwAmtlicheDokumente from './PwAmtlicheDokumente.vue'
 
 export default {
@@ -526,6 +527,9 @@ export default {
     }
   },
   methods: {
+    // Die Liste eines Filterfeldes bleibt im sichtbaren Bereich, auch wenn
+    // die Bildschirmtastatur ihn halbiert (filter-dropdown.js).
+    filterDropdownPosition,
     dokumenteUmschalten(id) {
       this.dokumenteOffen = this.dokumenteOffen.includes(id)
         ? this.dokumenteOffen.filter(offen => offen !== id)

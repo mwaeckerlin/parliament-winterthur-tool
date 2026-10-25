@@ -372,12 +372,27 @@ if (!class_exists('OCP\AppFramework\Http')) {
     }');
 }
 
+if (!class_exists('OCP\AppFramework\Http\Response')) {
+    // phpcs:ignore
+    eval ('namespace OCP\AppFramework\Http; class Response {}');
+}
+
 if (!class_exists('OCP\AppFramework\Http\DataResponse')) {
     // phpcs:ignore
-    eval ('namespace OCP\AppFramework\Http; class DataResponse {
+    eval ('namespace OCP\AppFramework\Http; class DataResponse extends Response {
         public function __construct(private mixed $data = null, private int $status = 200) {}
         public function getData(): mixed { return $this->data; }
         public function getStatus(): int { return $this->status; }
+    }');
+}
+
+if (!class_exists('OCP\AppFramework\Http\DataDownloadResponse')) {
+    // phpcs:ignore
+    eval ('namespace OCP\AppFramework\Http; class DataDownloadResponse extends Response {
+        public function __construct(private string $data, private string $filename, private string $contentType) {}
+        public function getData(): string { return $this->data; }
+        public function getFilename(): string { return $this->filename; }
+        public function getContentType(): string { return $this->contentType; }
     }');
 }
 

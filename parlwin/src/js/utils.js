@@ -13,6 +13,32 @@ export function frankenFormat(n) {
   return (v < 0 ? '−' : '') + ziffern
 }
 
+/**
+ * Der Name einer parlamentarischen Zielvorgabe, wie das Buch ihn schreibt:
+ * Ziel, Unterabschnitt und Messgrösse. Der Unterabschnitt gliedert mehrere
+ * Blöcke mit denselben Messgrössen — Ziel 1 der Produktegruppe Immobilien führt
+ * «Wohnliegenschaften (in %)» unter «Minimale Nettorendite» und unter
+ * «Durchschnittliche Nettorendite». Ohne ihn stand dieselbe Bezeichnung
+ * mehrfach da (Befund von Marc am 24.10.2026).
+ */
+export function zielName(zv) {
+  if (!zv) return ''
+  return [zv.zielTitel, zv.unterTitel, zv.messgroesse].filter(t => t).join(' — ')
+}
+
+/**
+ * Ob eine Zielvorgaben-Änderung eines Antrags genau diese Zielvorgabe meint.
+ * Ein Antrag aus einem Buch, das noch ohne Unterabschnitt eingelesen wurde,
+ * trägt ihn leer und passt wie bisher auf die Messgrösse allein.
+ */
+export function gleicheZielvorgabe(aenderung, zv) {
+  if (!aenderung || !zv) return false
+  if (aenderung.zielNummer !== zv.zielNummer) return false
+  if (aenderung.messgroesse !== zv.messgroesse) return false
+  const a = aenderung.unterTitel || ''
+  return a === '' || a === (zv.unterTitel || '')
+}
+
 export function personKey(m) {
   const externId = m.externId || m.extern_id || ''
   if (externId) return `mitglied:${externId}`

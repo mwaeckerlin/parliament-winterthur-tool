@@ -48,6 +48,15 @@ class BudgetJahr extends Entity implements JsonSerializable {
     protected int $totalAufwandVorjahr = 0;
     protected int $totalErtragVorjahr = 0;
     protected int $gesamtergebnis = 0;
+    // F130: Stand des Einlesers, mit dem dieses Jahr gelesen wurde. Ist er
+    // kleiner als BudgetBuchParser::VERSION, liest der Hintergrundauftrag das
+    // Jahr zerstörungsfrei neu ein.
+    protected int $parserVersion = 0;
+    /**
+     * F136: Die Departementssekretariate aus Teil A als JSON — je Departement
+     * Saldo, Aufwand und Ertrag vor der Umlage auf die Produktegruppen.
+     */
+    protected ?string $sekretariate = null;
     protected ?string $weisungQuelle = null;
     protected ?string $novemberbriefQuelle = null;
     protected int $novemberbriefImportiert = 0;
@@ -64,7 +73,19 @@ class BudgetJahr extends Entity implements JsonSerializable {
         $this->addType('totalErtragVorjahr', 'integer');
         $this->addType('gesamtergebnis', 'integer');
         $this->addType('novemberbriefImportiert', 'integer');
+        $this->addType('parserVersion', 'integer');
         $this->addType('erstelltAm', 'integer');
+    }
+
+    /**
+     * Die Departementssekretariate (F136), je Eintrag Departement, Saldo,
+     * Aufwand und Ertrag.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function getSekretariateArray(): array {
+        $dekodiert = json_decode($this->sekretariate ?? '[]', true);
+        return \is_array($dekodiert) ? array_values($dekodiert) : [];
     }
 
     /** @return array<string, mixed> */
@@ -81,6 +102,8 @@ class BudgetJahr extends Entity implements JsonSerializable {
             'totalErtragVorjahr' => $this->getTotalErtragVorjahr(),
             'gesamtergebnis' => $this->getGesamtergebnis(),
             'novemberbriefImportiert' => (bool) $this->getNovemberbriefImportiert(),
+            'parserVersion' => $this->getParserVersion(),
+            'sekretariate' => $this->getSekretariateArray(),
         ];
     }
 }

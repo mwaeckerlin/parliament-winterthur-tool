@@ -55,6 +55,52 @@ class MigrationSchemaTest extends TestCase
         }
     }
 
+    /**
+     * Jede Tabelle, die eine Migration anfasst, muss es geben. Eine Migration
+     * prüft mit `hasTable()` und kehrt lautlos um, wenn die Tabelle fehlt: Ein
+     * Tippfehler im Namen legt also keine Spalte an, bricht kein Upgrade ab und
+     * fällt erst auf, wenn die Anwendung auf die fehlende Spalte schreibt.
+     *
+     * Gemessen am 24.10.2026: Vier Migrationen nannten die Budget-Tabellen im
+     * Plural («pw_budget_jahre», «pw_budget_antraege»,
+     * «pw_budget_produktegruppen»), angelegt sind sie im Singular. Die vier
+     * Spalten der Seite im Buch, des Einleserstands, des Bewilligungsorgans und
+     * der Departementssekretariate entstanden nie.
+     */
+    public function testJedeAngefassteTabelleWirdAuchAngelegt(): void
+    {
+        $verzeichnis = __DIR__ . '/../../lib/Migration';
+        $dateien = glob($verzeichnis . '/*.php') ?: [];
+        $angelegt = [];
+        $angefasst = [];
+        foreach ($dateien as $datei) {
+            $code = (string) file_get_contents($datei);
+            foreach (['createTable', 'hasTable', 'getTable'] as $methode) {
+                preg_match_all('/' . $methode . '\s*\(\s*[\'"]([a-z0-9_]+)[\'"]\s*\)/', $code, $treffer);
+                foreach ($treffer[1] as $tabelle) {
+                    if ($methode === 'createTable') {
+                        $angelegt[$tabelle] = true;
+                    } else {
+                        $angefasst[$tabelle][basename($datei)] = true;
+                    }
+                }
+            }
+        }
+        self::assertNotSame([], $angelegt, 'keine Migration legt eine Tabelle an');
+        $unbekannt = [];
+        foreach ($angefasst as $tabelle => $wo) {
+            if (!isset($angelegt[$tabelle])) {
+                $unbekannt[] = $tabelle . ' (' . implode(', ', array_keys($wo)) . ')';
+            }
+        }
+        self::assertSame(
+            [],
+            $unbekannt,
+            "Diese Tabellen fasst eine Migration an, angelegt werden sie nie — die Spalten entstehen "
+            . "lautlos nicht:\n" . implode("\n", $unbekannt)
+        );
+    }
+
     public function testKeineNotNullSpalteMitLeeremOderNullDefault(): void
     {
         $verzeichnis = __DIR__ . '/../../lib/Migration';

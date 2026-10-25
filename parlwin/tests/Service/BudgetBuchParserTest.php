@@ -23,6 +23,56 @@ class BudgetBuchParserTest extends TestCase {
         return \dirname(__DIR__, 1) . '/Fixtures/budget/' . $rel;
     }
 
+    /**
+     * Die Kontotabelle eines Investitionsprojekts trägt die Werte des Buches.
+     *
+     * Befund eines Fraktionsmitglieds vom 19.10.2026 am Projekt «SH X
+     * (Aussenwachten) Neubau» (5011980): Im Tool stand in der Spalte
+     * «Bezeichnung» der ganze Zeileninhalt («Grundstücke 0 24'738'420 V»),
+     * unter «Budget 2027» eine 1 und unter «Kredit» für jedes der fünf Konten
+     * dieselbe Zahl 5'011'980 — die Projektnummer.
+     *
+     * Das Buch führt (Teil A, Kontrolle der Investitionskredite, S. 150):
+     *   500000 Grundstücke                        0   24'738'420            V
+     *   504021 Schulgebäude, Projektierung  465'000    1'800'000 28.02.2022 P
+     *   504021 Schulgebäude, Projektierung        0    1'300'000            P
+     *   504022 Schulgebäude, Ausführung           0   28'400'000            V
+     *   631065 Sport-Toto-Beiträge                0     -100'000
+     * Summe der Kredite: 56'138'420 — der Gesamtkredit des Projekts.
+     */
+    public function testKontotabelleEinesProjektsTraegtDieWerteDesBuches2027(): void {
+        $parser = new BudgetBuchParser();
+        $struktur = $parser->struktur($this->fixture('2027/teil-b.pdf'), $this->fixture('2027/teil-a.pdf'), 2027);
+        $inv = [];
+        foreach ($struktur['investitionen'] as $i) {
+            $inv[explode(' ', $i['projekt'], 2)[0]] = $i;
+        }
+        $this->assertArrayHasKey('5011980', $inv, 'Projekt 5011980 fehlt');
+        $konten = $inv['5011980']['konten'] ?? [];
+        $this->assertCount(5, $konten, 'Das Buch führt fünf Konten zu diesem Projekt');
+
+        $erwartet = [
+            ['konto' => '500000', 'name' => 'Grundstücke', 'betrag' => 0, 'kredit' => 24738420, 'bewilligt' => ''],
+            ['konto' => '504021', 'name' => 'Schulgebäude, Projektierung', 'betrag' => 465000, 'kredit' => 1800000, 'bewilligt' => '28.02.2022'],
+            ['konto' => '504021', 'name' => 'Schulgebäude, Projektierung', 'betrag' => 0, 'kredit' => 1300000, 'bewilligt' => ''],
+            ['konto' => '504022', 'name' => 'Schulgebäude, Ausführung', 'betrag' => 0, 'kredit' => 28400000, 'bewilligt' => ''],
+            ['konto' => '631065', 'name' => 'Sport-Toto-Beiträge', 'betrag' => 0, 'kredit' => -100000, 'bewilligt' => ''],
+        ];
+        // Alle fünf Zeilen auf einmal vergleichen: Ein Fehlschlag Zeile für
+        // Zeile nennt nur die erste Abweichung, und jeder weitere Durchgang
+        // kostet einen Lauf über zehn Budgetbücher (51 Minuten, gemessen).
+        $ist = array_map(static fn ($k) => [
+            'konto' => (string) $k['konto'],
+            'name' => (string) $k['name'],
+            'betrag' => (int) $k['betrag'],
+            'kredit' => (int) $k['kredit'],
+            'bewilligt' => (string) $k['bewilligt'],
+        ], $konten);
+        $this->assertSame($erwartet, $ist, 'Die Konten des Projekts 5011980');
+        $summe = array_sum(array_map(static fn ($k) => (int) $k['kredit'], $konten));
+        $this->assertSame(56138420, $summe, 'Die Kredite der Konten summieren sich auf den Gesamtkredit');
+    }
+
     public function testParstProduktegruppenAusTeilB2026(): void {
         $parser = new BudgetBuchParser();
         $struktur = $parser->struktur($this->fixture('2026/teil-b.pdf'), $this->fixture('2026/teil-a.pdf'), 2026);
@@ -150,6 +200,140 @@ class BudgetBuchParserTest extends TestCase {
         $this->assertNotNull($ziel1);
         $this->assertStringStartsWith('Betrag pro Anstellung', $ziel1['messgroesse']);
         $this->assertStringNotContainsString('Gesamtkosten', $ziel1['messgroesse'], 'die Beschreibung wurde nicht ins Label verschmolzen');
+    }
+
+    /**
+     * Eine Zielvorgabe trägt den Unterabschnitt des Buchs in ihrem Namen, und
+     * zwei Vorgaben derselben Produktegruppe heissen nie gleich.
+     *
+     * Befund von Marc am 24.10.2026 am Budget 2027, Produktegruppe Immobilien
+     * (240): «Wohnliegenschaften (in %)», «Gewerbeliegenschaften (in %)» und
+     * «Restaurantbetriebe (in %)» standen je zweimal da, einmal mit Soll 1.00
+     * und einmal mit 2.31, 2.98 und 2.38 — ohne den Teil des Namens, der sie
+     * unterscheidet.
+     *
+     * Das Buch führt (Teil B, S. 75, Ziel 1 Wirtschaftlichkeit):
+     *   1.1 Minimale Nettorendite
+     *       Wohnliegenschaften (in %)      1.00 1.00 1.00 1.00 1.00 1.00
+     *       Gewerbeliegenschaften (in %)   1.00 1.00 1.00 1.00 1.00 1.00
+     *       Restaurantbetriebe (in %)      1.00 1.00 1.00 1.00 1.00 1.00
+     *   1.2 Durchschnittliche Nettorendite
+     *       Wohnliegenschaften (in %)      3.33 3.26 2.31 8.18 1.80 2.15
+     *       Gewerbeliegenschaften (in %)   8.70 -1.71 2.98 -0.85 6.22 0.18
+     *       Restaurantbetriebe (in %)      4.42 -2.64 2.38 2.38 4.02 2.34
+     */
+    public function testZielvorgabenTragenDenUnterabschnitt2027(): void {
+        $parser = new BudgetBuchParser();
+        $struktur = $parser->struktur($this->fixture('2027/teil-b.pdf'), $this->fixture('2027/teil-a.pdf'), 2027);
+        $pg = null;
+        foreach ($struktur['produktegruppen'] as $g) {
+            if ((string) $g['code'] === '240') {
+                $pg = $g;
+            }
+        }
+        $this->assertNotNull($pg, 'Produktegruppe 240 fehlt im Buch 2027');
+
+        $nach = [];
+        foreach ($pg['zielvorgaben'] as $z) {
+            $nach[trim(($z['unterTitel'] ?? '') . '|' . $z['messgroesse'])] = $z['soll'];
+        }
+        $this->assertSame('1.00', $nach['Minimale Nettorendite|Wohnliegenschaften (in %)'] ?? null);
+        $this->assertSame('1.00', $nach['Minimale Nettorendite|Gewerbeliegenschaften (in %)'] ?? null);
+        $this->assertSame('1.00', $nach['Minimale Nettorendite|Restaurantbetriebe (in %)'] ?? null);
+        $this->assertSame('2.31', $nach['Durchschnittliche Nettorendite|Wohnliegenschaften (in %)'] ?? null);
+        $this->assertSame('2.98', $nach['Durchschnittliche Nettorendite|Gewerbeliegenschaften (in %)'] ?? null);
+        $this->assertSame('2.38', $nach['Durchschnittliche Nettorendite|Restaurantbetriebe (in %)'] ?? null);
+
+        // Keine zwei Vorgaben einer Produktegruppe heissen gleich — sonst trifft
+        // ein Antrag auf die eine die andere. Gilt für jede Produktegruppe des
+        // Buchs, nicht nur für die, in der Marc es gesehen hat.
+        foreach ($struktur['produktegruppen'] as $g) {
+            $namen = [];
+            foreach ($g['zielvorgaben'] as $z) {
+                $namen[] = $z['zielNummer'] . '|' . ($z['unterTitel'] ?? '') . '|' . $z['messgroesse'];
+            }
+            $doppelt = array_keys(array_filter(array_count_values($namen), static fn ($n) => $n > 1));
+            $this->assertSame([], $doppelt, "Gleich benannte Zielvorgaben in {$g['code']}: " . implode(' / ', $doppelt));
+        }
+
+        // Eine Vorgabe, die das Buch mit «Bericht» statt mit Zahlen misst, ist
+        // eine Wertzeile wie jede andere. Ohne das blieb der Text davor im
+        // Puffer, der folgende Zieltitel «2 Quartiermanagement und» galt als
+        // dessen Fortsetzung, und die vier Messgrössen des Ziels 2 standen bei
+        // Stadtentwicklung (142) unter Ziel 1 (gemessen am 24.10.2026).
+        $stadt = null;
+        foreach ($struktur['produktegruppen'] as $g) {
+            if ((string) $g['code'] === '142') {
+                $stadt = $g;
+            }
+        }
+        $this->assertNotNull($stadt, 'Produktegruppe 142 fehlt im Buch 2027');
+        $ziele = [];
+        foreach ($stadt['zielvorgaben'] as $z) {
+            $ziele[(int) $z['zielNummer']] = true;
+        }
+        $this->assertSame([1, 2, 3], array_keys($ziele), 'Stadtentwicklung führt drei Ziele');
+        // Städtische Museen (158) gliedern Ziel 2 ohne Nummern: vor jedem Block
+        // steht der Satz, den das Buch misst, und dreimal dieselbe Messgrösse.
+        $museen = null;
+        foreach ($struktur['produktegruppen'] as $g) {
+            if ((string) $g['code'] === '158') {
+                $museen = $g;
+            }
+        }
+        $this->assertNotNull($museen, 'Produktegruppe 158 fehlt im Buch 2027');
+        $unter = [];
+        foreach ($museen['zielvorgaben'] as $z) {
+            if ((int) $z['zielNummer'] === 2) {
+                $unter[] = (string) ($z['unterTitel'] ?? '');
+            }
+        }
+        $this->assertCount(3, $unter, 'Ziel 2 der Museen führt drei Blöcke');
+        $this->assertSame(3, \count(array_unique($unter)), 'die drei Blöcke heissen gleich: ' . implode(' / ', $unter));
+
+        // Die Zeile «- Bericht - Bericht - Bericht» ist eine Wertzeile wie jede
+        // andere: Ihr Text bleibt nicht im Puffer stehen und hängt sich nicht an
+        // die Messgrösse der nächsten Vorgabe. Eine beantragbare Vorgabe ergibt
+        // sie nicht, weil im Soll des Budgetjahres keine Zahl steht — darüber
+        // könnte das Parlament nichts beschliessen.
+        $namen = array_map(static fn ($z) => (string) $z['messgroesse'], $stadt['zielvorgaben']);
+        foreach ($namen as $name) {
+            $this->assertStringNotContainsString(
+                'Tätigkeitsbericht',
+                $name,
+                'der Text der «Bericht»-Zeile hängt an einer Messgrösse: ' . $name,
+            );
+        }
+        $ziel1 = array_values(array_filter(
+            $stadt['zielvorgaben'],
+            static fn ($z) => (int) $z['zielNummer'] === 1
+        ));
+        $this->assertCount(3, $ziel1, 'Ziel 1 der Stadtentwicklung führt drei messbare Vorgaben');
+    }
+
+    /**
+     * Die Departementssekretariate aus Teil A (F136). Das Buch 2027 führt sie
+     * ab Seite 195 unter «Departementssekretariat — Ergebnis vor Umlagen auf
+     * die Produktegruppen», je Departement eine Seite; die Kommissionen und
+     * Fraktionen stellen Anträge darauf (Drehbücher 2022 und 2026).
+     */
+    public function testListDieDepartementssekretariate2027(): void {
+        $parser = new BudgetBuchParser();
+        $struktur = $parser->struktur($this->fixture('2027/teil-b.pdf'), $this->fixture('2027/teil-a.pdf'), 2027);
+        $sek = $struktur['sekretariate'] ?? [];
+        $this->assertNotEmpty($sek, 'kein einziges Departementssekretariat gelesen');
+        $nach = [];
+        foreach ($sek as $s) {
+            $nach[(string) $s['departement']] = $s;
+        }
+        $this->assertArrayHasKey('Präsidiales', $nach, 'Departemente: ' . implode(' / ', array_keys($nach)));
+        $p = $nach['Präsidiales'];
+        $this->assertSame(1616148, (int) $p['saldo'], 'Saldo des Präsidialen');
+        $this->assertSame(1623648, (int) $p['aufwand'], 'Aufwand des Präsidialen');
+        $this->assertSame(-7500, (int) $p['ertrag'], 'Ertrag des Präsidialen');
+        // Jedes Departement führt ein Sekretariat; das Buch 2027 zeigt zehn
+        // Seiten (Departemente und Behörden).
+        $this->assertGreaterThanOrEqual(7, \count($sek), 'zu wenige Sekretariate: ' . \count($sek));
     }
 
     public function testParstSteuerfussAusTeilA2026(): void {

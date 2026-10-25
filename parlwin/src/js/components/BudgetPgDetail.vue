@@ -4,7 +4,11 @@
        Rein informativ — Anträge stellt man im Antragsformular der Karte. -->
   <div class="pw-pg-detail">
     <header class="pw-pg-detail-kopf">
-      <p class="pw-data-card-kicker">Produktegruppe {{ gruppe.code }}</p>
+      <!-- F129: auch im Vollbild steht die Seite des Budgetbuchs dabei. -->
+      <p class="pw-data-card-kicker">
+        Produktegruppe {{ gruppe.code }}
+        <span v-if="gruppe.buchseite" class="pw-buchseite">Buch S.&nbsp;{{ gruppe.buchseite }}</span>
+      </p>
       <h2 class="pw-pg-detail-titel">{{ gruppe.name }}</h2>
       <p class="pw-pg-detail-kredit">
         Globalkredit <strong>{{ fr(gruppe.globalkredit.soll) }}</strong>

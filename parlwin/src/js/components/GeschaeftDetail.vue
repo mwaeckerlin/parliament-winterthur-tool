@@ -31,6 +31,7 @@
       <div v-if="istEigenes" class="pw-detail-inhalt">
         <PwWysiwyg
           :model-value="geschaeft.inhalt || ''"
+          aria-label="Inhalt"
           placeholder="Worum geht es?"
           @update:model-value="inhaltGeaendert"
           @blur="stammdatenSpeichern"
@@ -191,6 +192,7 @@
           <PwWysiwyg
             :model-value="votumHtml"
             :editable="votumSchreibbar"
+            aria-label="Votum im Rat"
             placeholder="Wortlaut des Votums"
             :status="votumStatus"
             :pdf-href="votumPdfUrl"

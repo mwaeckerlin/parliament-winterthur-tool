@@ -8,14 +8,14 @@
       <p class="pw-data-card-kicker">{{ projekt.departement }}<template v-if="projekt.cluster"> · {{ projekt.cluster }}</template></p>
       <h2 class="pw-pg-detail-titel">{{ projekt.projekt }}</h2>
       <p class="pw-pg-detail-kredit">
-        Budget {{ jahr }} <strong>{{ fr(projekt.bu) }}</strong>
+        Budget {{ jahr }}: <strong>{{ fr(projekt.bu) }}</strong>
       </p>
     </header>
 
     <section class="pw-pg-abschnitt">
       <h3>Investitionen über die Jahre</h3>
       <div class="pw-zv-scroll">
-        <table class="pw-produkt-kosten">
+        <table class="pw-produkt-kosten pw-inv-jahre">
           <thead>
             <tr>
               <th>bis {{ jahr - 1 }}</th>
@@ -23,7 +23,7 @@
               <th>Plan {{ jahr + 1 }}</th>
               <th>Plan {{ jahr + 2 }}</th>
               <th>Plan {{ jahr + 3 }}</th>
-              <th>Gesamtkosten</th>
+              <th>Summe der Jahre</th>
             </tr>
           </thead>
           <tbody>
@@ -33,13 +33,21 @@
               <td>{{ fr(projekt.fap1) }}</td>
               <td>{{ fr(projekt.fap2) }}</td>
               <td>{{ fr(projekt.fap3) }}</td>
-              <td>{{ fr(projekt.gesamtkosten) }}</td>
+              <td>{{ fr(summeDerJahre) }}</td>
             </tr>
           </tbody>
         </table>
       </div>
       <p v-if="projekt.planungskosten" class="pw-inv-planung">
         Davon Planung: <strong>{{ fr(projekt.planungskosten) }}</strong>
+      </p>
+      <!-- Zwei verschiedene Zahlen, zwei verschiedene Namen: Die Summe der
+           Jahre sagt, was das Vorhaben bis zum letzten Planjahr kostet; der
+           bewilligte Kredit sagt, was das Parlament dafür freigegeben hat. Ein
+           Fraktionsmitglied fand am 19.10.2026 beide unter dem Namen
+           «Gesamtkosten» und hielt sie für widersprüchlich. -->
+      <p v-if="projekt.gesamtkosten" class="pw-inv-kredit">
+        Bewilligter Kredit: <strong>{{ fr(projekt.gesamtkosten) }}</strong>
       </p>
     </section>
 
@@ -65,6 +73,19 @@
               <td>{{ k.bewilligt || '—' }}</td>
             </tr>
           </tbody>
+          <!-- Die Summe macht den bewilligten Kredit nachvollziehbar: Er ist
+               die Summe dieser Konten. Ohne sie war der Überblick nur im PDF
+               des Budgetbuchs zu holen (Rückmeldung eines Fraktionsmitglieds
+               vom 19.10.2026). -->
+          <tfoot>
+            <tr class="pw-inv-konten-summe">
+              <td />
+              <td class="pw-inv-konto-name">Total</td>
+              <td class="pw-kosten-soll">{{ fr(summeBetrag) }}</td>
+              <td>{{ fr(summeKredit) }}</td>
+              <td />
+            </tr>
+          </tfoot>
         </table>
       </div>
     </section>
@@ -91,6 +112,20 @@ export default {
     konten() {
       return Array.isArray(this.projekt.konten) ? this.projekt.konten : []
     },
+    /** Was das Vorhaben über alle ausgewiesenen Jahre kostet. */
+    summeDerJahre() {
+      const p = this.projekt
+      return ['bereitsGetaetigt', 'bu', 'fap1', 'fap2', 'fap3']
+        .reduce((summe, feld) => summe + (Number(p[feld]) || 0), 0)
+    },
+    /** Was die Konten im Budgetjahr tragen. */
+    summeBetrag() {
+      return this.konten.reduce((summe, k) => summe + (Number(k.betrag) || 0), 0)
+    },
+    /** Was an diesen Konten bewilligt ist — der bewilligte Kredit des Projekts. */
+    summeKredit() {
+      return this.konten.reduce((summe, k) => summe + (Number(k.kredit) || 0), 0)
+    },
   },
   methods: {
     fr: frankenFormat,
@@ -103,4 +138,10 @@ export default {
    Platz, die Zahlenspalten bleiben schmal und rechtsbündig. */
 .pw-inv-konto-name { text-align: start; }
 .pw-inv-planung { margin-block-start: 0.5rem; }
+/* Die Summe steht als Abschluss der Tabelle und trägt deshalb die obere Linie
+   und das Gewicht; die Spalten bleiben die der Zeilen darüber. */
+.pw-inv-konten-summe td {
+  border-block-start: 2px solid var(--color-border-dark);
+  font-weight: bold;
+}
 </style>

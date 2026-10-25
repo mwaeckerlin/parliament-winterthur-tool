@@ -426,7 +426,7 @@ export default {
       }
     },
     async loeschen(typ) {
-      if (!confirm(`Sitzungstyp „${typ.name}" wirklich löschen?`)) return
+      if (!confirm(`Sitzungstyp «${typ.name}» wirklich löschen?`)) return
       try {
         await axios.delete(generateUrl(`/apps/parlwin/sitzungstypen/${typ.id}`))
         await this.lade()

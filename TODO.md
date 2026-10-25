@@ -4,23 +4,29 @@ Ideen, die noch nicht umgesetzt sind. Umgesetzte Punkte wandern nach `FEATURES.m
 
 ## Aufträge von Marc
 
+- 2026-10-25 · offen · Marc: «Starte meinen lokalen Stack für mich wenn fertig» — nach dem grünen Regressionslauf `npm start` im Projekt (docker compose up --build), damit die Instanz für ihn läuft.
 
-
-- 2026-09-23 · offen · **Zusammenfassung je Geschäft** aus dem gelesenen Inhalt der amtlichen Dokumente (F121), mit einem lokalen Sprachmodell.
+- 2026-10-24 · umgesetzt, wartet auf den Regressionslauf · Excel-Export der Budgetanträge (F138), dazu die Seite im Budgetbuch und die drei neuen Antragsarten im PDF. Plan: `/tmp/claude-1000/-home-marc-git-mwaeckerlin/cc07bbc2-01c2-4ab3-ae2b-ea5016e0296e/scratchpad/plan-excel.md`
+- 2026-10-24 · umgesetzt, wartet auf den Regressionslauf · die übrigen Aufträge des Tages: Notizen auf jeder Ebene (F124), Dokumente am Antrag (F125), Massenerfassung und Tabellen-Übernahme (F126, F127), Steuerbarkeit des Aufwands (F128), Seite im Budgetbuch (F129), Neu-Einlesen nach einer Verbesserung (F130), Vollbild auf flachem Schirm (F131), formatierte Begründung (F132), Detail-Knopf auf jedem Tab (F133), Verpflichtungskredit, Departementssekretariat und Bewilligungsorgan (F135 bis F137), alle Antragsteller zur Wahl mit Vor- und Nachname, scrollende Navigationsleiste, flacher Schirm, `PARLAMENTSBETRIEB.md`
+- 2026-10-23 · offen · Session mwaeckerlin-04: `.github/workflows/docker.yml` auf die stündliche Prüfung von mwaeckerlin/scratch 1.1.12 umstellen (`cron: "17 * * * *"`, die beiden Kommentarzeilen über dem Zeitplan weg, Kopfkommentar und Zeile 10 auf die stündliche Prüfung umschreiben, `permissions` bleiben), dann unter Marcs `/commit` nur diese Datei committen und pushen, auf grüne Runner warten und sha und Ergebnis zurückmelden
 
 ## Offen aus dem Testlauf
 
-- 2026-10-03 · offen · **Lokale Gegenstelle für den Abgleich im E2E-Lauf.** Der Stack synchronisiert heute die echte Webseite des Parlaments: 1236 Geschäfte mit je einer Detailseite, ohne Limit, weil jedes Limit die Weisung wegschneidet, aus der die Budget-Familie ihr Budgetbuch holt. Auf dem GitHub-Runner war der Abgleich nach 34 Minuten nicht fertig, darum läuft der E2E-Teil dort nicht mit (`PARLWIN_TESTS_OHNE_E2E=1`). Nötig sind zwei Stücke: die Adresse der Quelle als Einstellung (heute steht `https://parlament.winterthur.ch` als Konstante in `ScraperService` und `BudgetImportService`), und ein Dienst im Compose, der die gespeicherten Seiten und PDF ausliefert. Danach läuft der ganze Lauf im Bau, schnell und ohne Last für die Stadt.
+- 2026-10-15 · offen · **Der Volltext eines Dokuments mit Tabellen zieht Zellen zusammen.** Gemessen am 2026-10-15: Die Vorstösse, die Antwort des Stadtrats, die Medienmitteilung und das Drehbuch liefern saubere Wörter; im Budgetbuch stehen Zellen ohne Trennzeichen beieinander, und dann entstehen Folgen wie «nbetreffend». Die Dokumentsuche zerlegt den Text in Wörter und findet solche Stellen nicht. Betroffen ist die Suche über den Inhalt (F121) bei Dokumenten mit Tabellen.
 
 ## Befunde aus dem Design-Test
 
 Diese Befunde sind noch nicht beauftragt.
 
-- 2026-09-14 · Übersichtstabellen (Geschäfte UND Vorstösse, dieselbe Tabelle): In der Spalte «Zuständig» wird der Name mitten im Wort abgeschnitten («Marc… ckerlin», «Mich… Gross»), obwohl daneben Platz frei ist. Zugleich machen die eingebetteten Auswahllisten die Zeilen etwa doppelt so hoch wie eine Textzeile, und rechts der Tabelle bleibt ein breiter Streifen ungenutzt. Betrifft beide Ansichten gleichermassen, weil sie sich die Tabelle teilen.
+- 2026-10-24 · Geschäfteliste bei 1280 Pixel Breite: Der Titel bekommt die wenigste Breite von allen Spalten und bricht mitten im Wort («Festset-zung»), während «Prio», «Status», «Zuständig» und «Beschluss» zusammen das Dreifache einnehmen und meist nur «—» zeigen. Die Mindestbreiten von «Status» (19 Zeichen für «Aufsichtskommission») und «Zuständig» (9em) stammen vom 20.10.2026; der Status steht in der Zelle ohnehin zweizeilig.
 
-- 2026-09-11 · Drucken ist nirgends gestaltet: die Anwendung hat kein einziges `@media print`. Auf A4 druckt die Kopfleiste von Nextcloud übereinander, «Weisung 2025.110» wird abgeschnitten, der blaue Hintergrund kommt als Vollton, und nach dem ersten Pauschalantrag bricht die Seite ab. Betrifft jede Ansicht, nicht nur das Budget.
-- 2026-09-11 · Kommissionen, auf dem Telefon: ein langer Geschäftstitel bricht mitten im Wort um («Informationsverordnun / g; InfV»).
-- 2026-09-11 · Kommissionen, Kachelanordnung: kurze Karten laufen bis zur Höhe der längsten Karte leer. Bei einer Spalte tritt das nicht auf.
+- 2026-09-14 · Übersichtstabellen (Geschäfte UND Vorstösse, dieselbe Tabelle): Die eingebetteten Auswahllisten machen die Zeilen etwa doppelt so hoch wie eine Textzeile. Betrifft beide Ansichten gleichermassen, weil sie sich die Tabelle teilen. Behoben sind der abgeschnittene Name in der Spalte «Zuständig» (`wortumbruch.test.js`), die auf zweieinhalb Zeichen geschrumpfte Spalte «Status» und der ungenutzte Streifen, der aus der unbegrenzt wachsenden Titel-Spalte kam (`spaltenbreite.test.js`).
+
+## Ideen ohne Auftrag
+
+Nichts davon hat Marc verlangt.
+
+- **Zusammenfassung je Geschäft** aus dem gelesenen Inhalt der amtlichen Dokumente, mit einem lokalen Sprachmodell. Stand bis zum 2026-10-15 unter seinen Aufträgen, ohne Beleg: Belegt ist sein Prompt vom 2026-09-23 «Und zuallererst: F121 umsetzen!», und F121 ist das Lesen der Dokumente, umgesetzt und getestet. Zu «Zusammenfassung», «zusammenfassen», «Sprachmodell» und «Inhaltsangabe» findet `find-spec.py` im Projekt keinen Prompt.
 
 ## Entwicklung über die Jahre
 

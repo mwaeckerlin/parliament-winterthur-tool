@@ -16,16 +16,38 @@ use Psr\Log\LoggerInterface;
  */
 class ScraperService
 {
-    private const BASE_URL = 'https://parlament.winterthur.ch';
+    /** Die Quelle im Betrieb: die Webseite des Parlaments. */
+    private const BASE_URL_STANDARD = 'https://parlament.winterthur.ch';
 
-    /** URLs der verschiedenen Datenquellen */
-    private const URLS = [
-        'geschaefte' => self::BASE_URL . '/politbusiness',
-        'sitzungen' => self::BASE_URL . '/sitzung',
-        'mitglieder' => self::BASE_URL . '/stadtparlament/27428',
-        'kommissionen' => self::BASE_URL . '/kommissionen',
-        'fraktionen' => self::BASE_URL . '/fraktionen',
+    /** Pfade der verschiedenen Datenquellen, unter der Basis-Adresse. */
+    private const PFADE = [
+        'geschaefte' => '/politbusiness',
+        'sitzungen' => '/sitzung',
+        'mitglieder' => '/stadtparlament/27428',
+        'kommissionen' => '/kommissionen',
+        'fraktionen' => '/fraktionen',
     ];
+
+    /**
+     * Die Adresse der Datenquelle.
+     *
+     * Im Betrieb die Webseite des Parlaments, im Testlauf eine lokale
+     * Gegenstelle: `PARLWIN_QUELLE_BASE_URL` zeigt dorthin, und dann holt der
+     * Abgleich die gespeicherten Seiten statt 1236 Detailseiten von der Stadt.
+     * Ein Schrägstrich am Ende fällt weg, damit jede zusammengesetzte Adresse
+     * genau einen trägt.
+     */
+    public static function basisUrl(): string
+    {
+        $wert = trim((string) getenv('PARLWIN_QUELLE_BASE_URL'));
+        return $wert === '' ? self::BASE_URL_STANDARD : rtrim($wert, '/');
+    }
+
+    /** Die Adresse einer Liste, oder null für einen unbekannten Bereich. */
+    private static function listenUrl(string $bereich): ?string
+    {
+        return isset(self::PFADE[$bereich]) ? self::basisUrl() . self::PFADE[$bereich] : null;
+    }
 
     /** Monatsnamen, wie sie in den Dokumenttiteln der Parlamentswebseite stehen */
     private const MONATE = [
@@ -74,13 +96,14 @@ class ScraperService
     {
         $ziele = [];
         foreach ($bereiche as $bereich) {
-            if (!isset(self::URLS[$bereich])) {
+            $url = self::listenUrl($bereich);
+            if ($url === null) {
                 continue;
             }
             if (isset($this->prefetchedListen[$bereich])) {
                 continue;
             }
-            $ziele[$bereich] = self::URLS[$bereich];
+            $ziele[$bereich] = $url;
         }
 
         if ($ziele === []) {
@@ -89,7 +112,7 @@ class ScraperService
 
         $antworten = $this->ladeHtmlFuerBereicheParallel($ziele, $this->leseParallelitaetAusEnv('PARLWIN_SYNC_SECTION_PARALLEL', 6, 1, 12));
         foreach ($antworten as $bereich => $html) {
-            if (!isset(self::URLS[$bereich])) {
+            if (self::listenUrl($bereich) === null) {
                 continue;
             }
             $label = ucfirst($bereich);
@@ -131,7 +154,7 @@ class ScraperService
     {
         $eintraege = $this->holePrefetchedListenEintraege('geschaefte');
         if ($eintraege === null) {
-            $roh = $this->ladeEntitaeten(self::URLS['geschaefte'], 'Geschäfte');
+            $roh = $this->ladeEntitaeten(self::basisUrl() . self::PFADE['geschaefte'], 'Geschäfte');
             $eintraege = $this->normalisiereGeschaeftslistenEntitaeten($roh);
         }
         $eintraege = $this->wendeSyncLimitAn('geschaefte', $eintraege);
@@ -246,7 +269,7 @@ class ScraperService
     {
         $eintraege = $this->holePrefetchedListenEintraege('sitzungen');
         if ($eintraege === null) {
-            $roh = $this->ladeEntitaeten(self::URLS['sitzungen'], 'Sitzungen');
+            $roh = $this->ladeEntitaeten(self::basisUrl() . self::PFADE['sitzungen'], 'Sitzungen');
             $eintraege = $this->normalisiereListenEntitaeten($roh);
         }
         $eintraege = $this->wendeSyncLimitAn('sitzungen', $eintraege);
@@ -386,7 +409,7 @@ class ScraperService
     {
         $eintraege = $this->holePrefetchedListenEintraege('mitglieder');
         if ($eintraege === null) {
-            $roh = $this->ladeEntitaeten(self::URLS['mitglieder'], 'Mitglieder');
+            $roh = $this->ladeEntitaeten(self::basisUrl() . self::PFADE['mitglieder'], 'Mitglieder');
             $eintraege = $this->normalisiereListenEntitaeten($roh);
         }
         $eintraege = $this->wendeSyncLimitAn('mitglieder', $eintraege);
@@ -419,7 +442,7 @@ class ScraperService
     {
         $eintraege = $this->holePrefetchedListenEintraege('kommissionen');
         if ($eintraege === null) {
-            $roh = $this->ladeEntitaeten(self::URLS['kommissionen'], 'Kommissionen');
+            $roh = $this->ladeEntitaeten(self::basisUrl() . self::PFADE['kommissionen'], 'Kommissionen');
             $eintraege = $this->normalisiereListenEntitaeten($roh);
         }
         $eintraege = $this->wendeSyncLimitAn('kommissionen', $eintraege);
@@ -455,7 +478,7 @@ class ScraperService
         foreach ($normalisiert as $idx => $daten) {
             $externId = (string) ($daten['id'] ?? '');
             if ($externId !== '') {
-                $urlJeIndex[$idx] = self::BASE_URL . '/_rte/behoerde/' . rawurlencode($externId);
+                $urlJeIndex[$idx] = self::basisUrl() . '/_rte/behoerde/' . rawurlencode($externId);
             }
         }
 
@@ -492,7 +515,7 @@ class ScraperService
         if ($externId === '') {
             return [];
         }
-        $url = self::BASE_URL . '/_rte/behoerde/' . rawurlencode($externId);
+        $url = self::basisUrl() . '/_rte/behoerde/' . rawurlencode($externId);
         try {
             $html = $this->ladeHtml($url);
             return $this->extrahiereBehoerdenMitgliederAusHtml($html, "Behoerde {$externId}");
@@ -597,7 +620,7 @@ class ScraperService
     {
         $eintraege = $this->holePrefetchedListenEintraege('fraktionen');
         if ($eintraege === null) {
-            $roh = $this->ladeEntitaeten(self::URLS['fraktionen'], 'Fraktionen');
+            $roh = $this->ladeEntitaeten(self::basisUrl() . self::PFADE['fraktionen'], 'Fraktionen');
             $eintraege = $this->normalisiereListenEntitaeten($roh);
         }
         $eintraege = $this->wendeSyncLimitAn('fraktionen', $eintraege);
@@ -1247,9 +1270,9 @@ class ScraperService
             return $url;
         }
         if (str_starts_with($url, '/')) {
-            return self::BASE_URL . $url;
+            return self::basisUrl() . $url;
         }
-        return self::BASE_URL . '/' . ltrim($url, '/');
+        return self::basisUrl() . '/' . ltrim($url, '/');
     }
 
     /**

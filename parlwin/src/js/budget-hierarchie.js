@@ -92,6 +92,71 @@ const departementKreise = (gruppen, seite) => {
 }
 
 /**
+ * F123: Derselbe Baum für den Stellenplan — Stellen → Departement →
+ * Produktegruppe. Bei der Produktegruppe hört er auf, weil das Budgetbuch die
+ * Stellen nur dort ausweist und nicht je Produkt.
+ *
+ * Jeder Knoten trägt neben der Fläche den Vorjahreswert, die Veränderung und
+ * daraus die Richtung: `aufbau` mehr Stellen als im Vorjahr, `abbau` weniger,
+ * `gleich` unverändert. Die Grafik färbt danach.
+ */
+const richtungVon = (veraenderung) => {
+  if (veraenderung > 0) { return 'aufbau' }
+  if (veraenderung < 0) { return 'abbau' }
+  return 'gleich'
+}
+
+const stellenKnoten = (name, betrag, vorjahr, rest = {}) => {
+  const veraenderung = betrag - vorjahr
+  return { name, betrag, flaeche: betrag, vorjahr, veraenderung, richtung: richtungVon(veraenderung), ...rest }
+}
+
+/**
+ * @param {Array<object>} produktegruppen Produktegruppen der Budgetansicht
+ * @return {object} Wurzel des Kreisbaums (ohne Kinder, wenn keine Stellen vorliegen)
+ */
+export function personalHierarchie(produktegruppen) {
+  const reihenfolge = []
+  const jeDepartement = new Map()
+  for (const gruppe of (Array.isArray(produktegruppen) ? produktegruppen : [])) {
+    const betrag = positiv(gruppe?.stellen?.soll)
+    if (betrag <= 0) {
+      continue
+    }
+    const dep = String(gruppe?.departement || 'Ohne Departement').trim()
+    if (!jeDepartement.has(dep)) {
+      jeDepartement.set(dep, [])
+      reihenfolge.push(dep)
+    }
+    jeDepartement.get(dep).push(stellenKnoten(
+      String(gruppe?.name || gruppe?.code || '').trim(),
+      betrag,
+      positiv(gruppe?.stellen?.sollVorjahr),
+      { code: String(gruppe?.code || '') },
+    ))
+  }
+  const departemente = reihenfolge.map(dep => {
+    const kinder = jeDepartement.get(dep)
+    return stellenKnoten(
+      dep,
+      kinder.reduce((s, k) => s + k.betrag, 0),
+      kinder.reduce((s, k) => s + k.vorjahr, 0),
+      { children: kinder },
+    )
+  })
+  if (departemente.length === 0) {
+    return { name: 'Stellenplan', betrag: 0, flaeche: 0 }
+  }
+  const stellen = stellenKnoten(
+    'Stellen',
+    departemente.reduce((s, k) => s + k.betrag, 0),
+    departemente.reduce((s, k) => s + k.vorjahr, 0),
+    { children: departemente },
+  )
+  return { ...stellenKnoten('Stellenplan', stellen.betrag, stellen.vorjahr), children: [stellen] }
+}
+
+/**
  * @param {Array<object>} produktegruppen Produktegruppen der Budgetansicht
  * @return {object} Wurzel des Kreisbaums (ohne Kinder, wenn nichts darstellbar ist)
  */

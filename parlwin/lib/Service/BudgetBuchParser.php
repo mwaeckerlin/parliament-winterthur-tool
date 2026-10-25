@@ -19,6 +19,26 @@ namespace OCA\ParliamentWinterthur\Service;
  */
 class BudgetBuchParser {
     /**
+     * Stand des Einlesers (F130). **Wird bei jeder Verbesserung erhöht, die das
+     * Ergebnis des Einlesens ändert** — ein neues Muster, ein weiteres Label,
+     * eine korrigierte Zuordnung, ein neues Feld.
+     *
+     * Ein Budgetjahr trägt den Stand, mit dem es gelesen wurde. Steht hier eine
+     * höhere Zahl, liest der Hintergrundauftrag das Jahr neu ein, und zwar
+     * zerstörungsfrei: Anträge, Notizen, Dokumente und Entscheide der Fraktion
+     * bleiben unberührt.
+     *
+     * 1 — Stand bis 24.10.2026.
+     * 2 — Unterabschnitt der Zielvorgaben, «Bericht» als Wert, Label
+     *     «Messung:», Seite im Budgetbuch (24.10.2026).
+     * 3 — Blocktitel nach dem Label, umgebrochene Unterüberschrift, und die
+     *     Departementssekretariate aus Teil A (24.10.2026).
+     * 4 — Die nummerierte Unterüberschrift als Messgrösse, wo die Wertzeile
+     *     keinen Namen trägt (24.10.2026).
+     */
+    public const VERSION = 4;
+
+    /**
      * Die Speichergrenze, unter der ein Budgetbuch nicht zu lesen ist. Sie gilt
      * nur während des Lesens; der Betrieb kann sie über
      * `PARLWIN_BUDGET_MEMORY_LIMIT` ändern (siehe `mitSpeichergrenze()`).
@@ -175,6 +195,8 @@ class BudgetBuchParser {
         //    Prosasatz, der zufällig „Departement …“ enthält.
         $codeZuDept = [];
         $codeZuName = [];
+        $codeZuSeite = [];
+        $letzterTocCode = '';
         $tocDept = '';
         $imToc = false;
         foreach ($zeilen as $zeile) {
@@ -194,9 +216,24 @@ class BudgetBuchParser {
             // „(Code)“ enthalten, aber keine Punkte. Der vollständige Name steht
             // hier auf einer Zeile — im Kapitel selbst kann die Überschrift auf
             // zwei Zeilen umbrechen.
-            if (preg_match('/^(.+?)\s*\((\d{3})\)\s*\.{2,}/u', $zeile, $m)) {
+            if (preg_match('/^(.+?)\s*\((\d{3})\)\s*\.{2,}\s*(\d+)?\s*$/u', $zeile, $m)) {
                 $codeZuDept[$m[2]] = $tocDept;
                 $codeZuName[$m[2]] = trim($m[1]);
+                // Die Seitenzahl des Buchs, mit der die Fraktion im PDF und auf
+                // Papier nachschlägt (F129, Auftrag von Marc am 24.10.2026).
+                // Bricht die Zeile um, steht sie allein auf der nächsten und
+                // wird dort nachgetragen.
+                $letzterTocCode = $m[2];
+                if (($m[3] ?? '') !== '') {
+                    $codeZuSeite[$m[2]] = (int) $m[3];
+                }
+                continue;
+            }
+            // Umgebrochene TOC-Zeile: nur Füllpunkte und die Seitenzahl. Sie
+            // gehört zum Eintrag davor.
+            if ($letzterTocCode !== '' && !isset($codeZuSeite[$letzterTocCode])
+                && preg_match('/^[.\s]*(\d+)\s*$/u', $zeile, $sm)) {
+                $codeZuSeite[$letzterTocCode] = (int) $sm[1];
                 continue;
             }
             // Departements-/Bereichskopf (auch ohne „Departement“-Präfix, z.B.
@@ -263,6 +300,8 @@ class BudgetBuchParser {
                     // Überschrift ($m[1]) nur als Rückfall.
                     $name = $codeZuName[$code] ?? trim($m[1]);
                     $nachCode[$code] = $this->leereGruppe($name, $code, $codeZuDept[$code]);
+                    // F129: die Seite, auf der diese Produktegruppe im Buch steht.
+                    $nachCode[$code]['buchseite'] = $codeZuSeite[$code] ?? 0;
                     $reihenfolge[] = $code;
                 }
                 $aktuellCode = $code;
@@ -563,6 +602,13 @@ class BudgetBuchParser {
         $ziele = [];
         $goalNr = 0;
         $goalTitel = '';
+        $unterTitel = '';      // Unterabschnitt «1.1 Minimale Nettorendite»
+        // Ob der Unterabschnitt aus einer nummerierten Zeile stammt. Dann gilt
+        // sie, und ein Beschreibungssatz tritt zurück.
+        $unterNummeriert = false;
+        // Direkt nach einer nummerierten Unterüberschrift: eine Textzeile ist
+        // ihre Fortsetzung, bis ein Label oder eine Wertzeile kommt.
+        $unterOffen = false;
         $titelOffen = false;   // direkt nach dem Zieltitel: eine Wortzeile ist Titel-Fortsetzung
         $mgBuf = null;         // Messgrösse-Label ab «Messgrösse:» bis zur Wertzeile
         $letzteTextzeile = ''; // Rückfall, wenn kein «Messgrösse:» vorausging
@@ -585,8 +631,15 @@ class BudgetBuchParser {
         // auch wenn die zweite Zahl in der Nachbarzelle steht und nur «32 /»
         // übrig bleibt), eine Spanne («1 bis 2») und eine Fussnote in Klammern
         // («12'300 1)»).
+        // «Bericht» ist der Wert einer Zielvorgabe, die das Buch nicht in Zahlen
+        // misst: «Tätigkeitsbericht Umsetzung städtische Politiken … - Bericht -
+        // Bericht - Bericht» (Buch 2027, Stadtentwicklung). Ohne ihn galt die
+        // Zeile nicht als Wertzeile, der Text davor blieb im Puffer stehen, und
+        // der folgende Zieltitel «2 Quartiermanagement und» wurde als dessen
+        // Fortsetzung gelesen: die vier Messgrössen des Ziels 2 standen unter
+        // Ziel 1, zwei davon unter demselben Namen (gemessen am 24.10.2026).
         $wert = "(?:[<>≤≥]\\s?)?(?:" . $zahl . "(?:\\s*\\/\\s*(?:" . $zahl . ")?)?"
-            . "(?:\\s+bis\\s+" . $zahl . ")?|N\\/A|n\\.a\\.|--|—|-)(?:\\**|\\s?\\d\\))";
+            . "(?:\\s+bis\\s+" . $zahl . ")?|N\\/A|n\\.a\\.|--|—|-|Bericht)(?:\\**|\\s?\\d\\))";
         // Vier bis sechs Spalten: Eine Zielvorgabe, die das Buch erst mit dem
         // Budgetjahr einführt, steht nur in den letzten vier Spalten (Soll
         // Budgetjahr und die drei Planjahre) — «… Langzeitabteilungen
@@ -612,6 +665,9 @@ class BudgetBuchParser {
                 && preg_match('/^(\d{1,2})\s+(\p{L}.*)$/u', $zeile, $gm)) {
                 $goalNr = (int) $gm[1];
                 $goalTitel = trim($gm[1] . ' ' . $gm[2]);
+                $unterTitel = '';
+                $unterNummeriert = false;
+                $unterOffen = false;
                 $titelOffen = true;
                 $mgBuf = null;
                 $letzteTextzeile = '';
@@ -625,6 +681,31 @@ class BudgetBuchParser {
                 continue;
             }
             $titelOffen = false;
+            // Unterabschnitt eines Ziels: «1.1 Minimale Nettorendite», «4.1
+            // Wohnliegenschaften» — eine Zeile aus Zielnummer, Punkt, laufender
+            // Nummer und Text, ohne Wertspalten. Das Buch gliedert damit mehrere
+            // Blöcke mit DENSELBEN Messgrössen: Ziel 1 der Produktegruppe
+            // Immobilien (240) führt «Wohnliegenschaften (in %)»,
+            // «Gewerbeliegenschaften (in %)» und «Restaurantbetriebe (in %)»
+            // zweimal, unter 1.1 mit der minimalen und unter 1.2 mit der
+            // durchschnittlichen Nettorendite (Buch 2027, S. 75). Ohne diesen
+            // Teil des Namens standen im Werkzeug sechs Vorgaben, von denen je
+            // zwei gleich hiessen (Befund von Marc am 24.10.2026), und bei Ziel 4
+            // trug «Anzahl Verträge» sieben Mal denselben Namen.
+            if (preg_match('/^(\d{1,2})\.(\d{1,2})\s+(\p{L}.*)$/u', trim($zeile), $um)
+                && (int) $um[1] === $goalNr
+                && preg_match($wertzeile, $zeile) !== 1) {
+                $unterTitel = trim($um[3]);
+                $unterNummeriert = true;
+                // Der Unterabschnitt kann umbrechen: «2.5 Langfristige und
+                // nachhaltige Sicherstellung» / «des Wasserversorgungsnetzes»
+                // (Buch 2027, Stadtwerk, S. 303). Ohne die Fortsetzung hiessen
+                // 2.5 und 2.7 gleich, beide mit der Messgrösse «Erneuerungsrate
+                // in Bezug zur gesamten Leitungslänge in %».
+                $unterOffen = true;
+                $letzteTextzeile = '';
+                continue;
+            }
             // «Messgrösse:» UND «Messung / Bewertung:» starten je einen Label-Abschnitt.
             // Der Abschnitt, der unmittelbar vor der Wertzeile steht, liefert das Label —
             // so gewinnt bei Ziel 1 (wo «Messgrösse:» vor «Messung / Bewertung:» steht)
@@ -634,15 +715,26 @@ class BudgetBuchParser {
             // die ganze Zielbeschreibung zum Namen der Messgrösse.
             if (str_starts_with($zeile, 'Messgrösse:') || str_starts_with($zeile, 'Messgrössen:')) {
                 $mgBuf = trim(substr($zeile, \strlen(str_starts_with($zeile, 'Messgrössen:') ? 'Messgrössen:' : 'Messgrösse:')));
+                $unterTitel = $this->beschreibungAlsUnterTitel($unterTitel, $unterNummeriert, $letzteTextzeile);
+                $unterOffen = false;
                 $letzteTextzeile = '';
                 continue;
             }
-            if (str_starts_with($zeile, 'Messung / Bewertung:')) {
-                $mgBuf = trim(substr($zeile, \strlen('Messung / Bewertung:')));
-                $letzteTextzeile = '';
-                continue;
+            // «Messung:» ohne den Zusatz «/ Bewertung» steht im Amt für
+            // Baubewilligungen (350), das seine Ziele mit «1.», «2.», «3.»
+            // gliedert und jede Messgrösse «Anzahl» nennt. Ohne dieses Label
+            // hiessen vier Vorgaben desselben Ziels gleich (Buch 2027, S. 131).
+            foreach (['Messung / Bewertung:', 'Messung:'] as $label) {
+                if (str_starts_with($zeile, $label)) {
+                    $mgBuf = trim(substr($zeile, \strlen($label)));
+                    $unterTitel = $this->beschreibungAlsUnterTitel($unterTitel, $unterNummeriert, $letzteTextzeile);
+                    $unterOffen = false;
+                    $letzteTextzeile = '';
+                    continue 2;
+                }
             }
             if (preg_match($wertzeile, $zeile, $wm)) {
+                $unterOffen = false;
                 // Fussnotenzeichen gehören nicht zum Wert: «50*» ist 50.
                 // Nach dem Wertmuster zerlegen statt an jedem Leerzeichen: eine
                 // Spanne («1 bis 2») und ein Vergleich («> 50%») tragen selbst
@@ -675,9 +767,38 @@ class BudgetBuchParser {
                             ($mgBuf !== null && $mgBuf !== '') ? $mgBuf : $letzteTextzeile
                         );
                     }
+                    // Bleibt es dabei, ist die nummerierte Unterüberschrift selbst
+                    // die Messgrösse. Schutz und Intervention (470) nummeriert
+                    // jede Messgrösse («2.4 Alle gemeldeten Berufsunfälle SIW in
+                    // % der Festangestellten SIW») und bricht sie vor der Einheit
+                    // um; die Werte stehen danach auf einer eigenen Zeile, die
+                    // keinen Text trägt. Ohne diesen Rückfall stand die Vorgabe
+                    // ohne Bezeichnung da — in den Büchern 2025, 2026 und 2027 je
+                    // zweimal (gemessen am 24.10.2026).
+                    $ausUeberschrift = false;
+                    if ($label === '' && $unterTitel !== '') {
+                        $label = $saeubern($unterTitel);
+                        $ausUeberschrift = true;
+                    }
+                    // Steht vor der Wertzeile eine Textzeile, die selbst keine
+                    // Werte trägt, während die Wertzeile ihr Label schon
+                    // mitbringt, dann ist diese Textzeile der Name des Blocks:
+                    // «Zufriedenheitsgrad Einwohnerkontrolle» vor «zufrieden und
+                    // sehr zufrieden in % 87 85 …» (Buch 2027, Melde- und
+                    // Zivilstandswesen, S. 168). Dort steht der Blocktitel NACH
+                    // dem Label «Messgrössen», nicht davor; ohne ihn hiessen drei
+                    // Vorgaben desselben Ziels gleich.
+                    // Ist die Überschrift selbst der Name, steht sie nicht noch
+                    // einmal als Unterabschnitt davor.
+                    $blockTitel = $ausUeberschrift
+                        ? ''
+                        : ($vorne !== ''
+                            ? $this->beschreibungAlsUnterTitel($unterTitel, $unterNummeriert, $letzteTextzeile)
+                            : $unterTitel);
                     $ziele[] = [
                         'zielNummer' => $goalNr,
                         'zielTitel' => $goalTitel,
+                        'unterTitel' => $blockTitel,
                         'messgroesse' => $label,
                         'werte' => $werte,
                         'soll' => $werte[2],
@@ -698,13 +819,86 @@ class BudgetBuchParser {
             if ($text === '') {
                 continue;
             }
-            if ($mgBuf !== null) {
+            if ($unterOffen && $this->istFortsetzung($unterTitel, $text)) {
+                // Fortsetzung einer umgebrochenen Unterüberschrift.
+                $unterTitel = trim($unterTitel . ' ' . $text);
+            } elseif ($mgBuf !== null) {
+                $unterOffen = false;
                 $mgBuf = trim($mgBuf . ' ' . $text);
+            } elseif (preg_match('/^\d{1,2}\.\s+\p{L}/u', $text)) {
+                $unterOffen = false;
+                // Eine laufende Nummer mit Punkt gliedert ein Ziel in Blöcke:
+                // «1. Amtliche Abwicklungsdauer», «2. Gewonnene
+                // Rechtsmittelverfahren» (Buch 2027, Amt für Baubewilligungen).
+                // Sie beginnt einen neuen Block, also auch einen neuen Puffer —
+                // sonst sammelt er den Text des vorigen Absatzes mit, wird zu
+                // lang für einen Namen, und der Unterabschnitt des vorigen
+                // Blocks bleibt stehen: zwei Vorgaben hiessen dann gleich.
+                $letzteTextzeile = $text;
             } else {
+                $unterOffen = false;
                 $letzteTextzeile = trim($letzteTextzeile . ' ' . $text);
             }
         }
         return $ziele;
+    }
+
+    /**
+     * Der Satz, mit dem das Buch mehrere Blöcke EINES Ziels voneinander trennt,
+     * wird zum Unterabschnitt. Städtische Museen (158) führen unter Ziel 2
+     * «Kundenorientierung» dreimal dieselbe Messgrösse «Prozentsatz der auf alle
+     * Fragen mit zufrieden oder sehr zufrieden Antwortenden», je nach dem Satz
+     * davor für die Museen, die Alte Kaserne und die Kulturvermittlung (Buch
+     * 2027, S. 29). Ohne diesen Teil des Namens stand die Vorgabe dreimal unter
+     * demselben Namen da, und ein Antrag auf die eine traf die andere (gemessen
+     * am 24.10.2026).
+     *
+     * Eine nummerierte Unterüberschrift («1.1 Minimale Nettorendite») ist der
+     * stärkere Schlüssel und bleibt stehen; der Satz greift nur, wo keine steht.
+     * Ein Satz, der länger ist als eine Überschrift, taugt als Name nicht und
+     * wird übergangen.
+     */
+    /**
+     * Setzt diese Zeile eine umgebrochene Unterüberschrift fort?
+     *
+     * Das Stadtwerk bricht sie mitten im Satz um: «2.5 Langfristige und
+     * nachhaltige Sicherstellung» / «des Wasserversorgungsnetzes», und «2.7 …
+     * des Werterhalts der Wärmenetze (QWV und» / «Fernwärme)» (Buch 2027,
+     * S. 303). Eine Fortsetzung beginnt klein, oder sie schliesst eine Klammer,
+     * die die Überschrift geöffnet hat.
+     *
+     * Ohne diese Prüfung verschlingt die Überschrift die Zeilen, die zur
+     * Messgrösse gehören: In allen sechs Jahrgängen standen danach Zahlenreste
+     * als Messgrösse da, und die Vorgabe mit dem Wert «Bericht» verschwand
+     * (gemessen am 24.10.2026).
+     */
+    private function istFortsetzung(string $ueberschrift, string $zeile): bool {
+        $z = trim($zeile);
+        if ($z === '') {
+            return false;
+        }
+        if (preg_match('/^\p{Ll}/u', $z) === 1) {
+            return true;
+        }
+        $offeneKlammer = substr_count($ueberschrift, '(') > substr_count($ueberschrift, ')');
+        return $offeneKlammer && str_contains($z, ')');
+    }
+
+    private function beschreibungAlsUnterTitel(string $bisher, bool $nummeriert, string $beschreibung): string {
+        if ($nummeriert) {
+            return $bisher;
+        }
+        $satz = trim($beschreibung);
+        if ($satz === '' || mb_strlen($satz) > 200) {
+            return $bisher;
+        }
+        // Das Wort, das den Abschnitt ankündigt, ist kein Name: «Messgrössen»
+        // ohne Doppelpunkt steht im Melde- und Zivilstandswesen (460) als eigene
+        // Zeile über den Blöcken.
+        if (preg_match('/^Mess(grösse|grössen|ung)\s*:?$/u', $satz) === 1) {
+            return $bisher;
+        }
+        return rtrim($satz, '.');
     }
 
     /** @return array<string, mixed> */
@@ -794,6 +988,8 @@ class BudgetBuchParser {
             // Kostenzeilen der Kostentabelle im Informationsteil (F109): je Zeile
             // ein Label und der Soll-Wert des Budgetjahres — für die Antrags-Aufteilung.
             'kostenzeilen' => [],
+            // F129: Seite im Budgetbuch, aus dem Inhaltsverzeichnis.
+            'buchseite' => 0,
             // Sammelpuffer; nach dem Body-Loop geparst und wieder entfernt.
             '_zvZeilen' => [],
             '_kostenZeilen' => [],
@@ -1182,7 +1378,69 @@ class BudgetBuchParser {
             'totalErtrag' => $totalErtrag,
             'totalAufwandVorjahr' => $totalAufwandVorjahr,
             'totalErtragVorjahr' => $totalErtragVorjahr,
+            'sekretariate' => $this->parseSekretariate($text),
         ];
+    }
+
+    /**
+     * Die Departementssekretariate aus Teil A (F136).
+     *
+     * Das Buch führt sie in einem eigenen Kapitel, je Departement eine Seite,
+     * überschrieben mit «Departementssekretariat / Ergebnis vor Umlagen auf die
+     * Produktegruppen» (Buch 2027, S. 195 bis 204). Darunter steht eine Zeile je
+     * Departement mit Saldo, Vorjahr und Rechnung, gefolgt von «Aufwand» und
+     * «Ertrag».
+     *
+     * Die Kosten eines Sekretariats werden auf die Globalkredite der
+     * Produktegruppen seines Departements umgelegt; darum stellen die
+     * Kommissionen und Fraktionen Anträge darauf (Drehbücher 2022 und 2026).
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function parseSekretariate(string $text): array {
+        $zeilen = $this->zeilen($text);
+        $sekretariate = [];
+        $aktuell = null;
+        $imKapitel = false;
+        foreach ($zeilen as $zeile) {
+            $z = trim($zeile);
+            if ($z === '') {
+                continue;
+            }
+            if (str_starts_with($z, 'Ergebnis vor Umlagen auf die Produktegruppen')) {
+                $imKapitel = true;
+                continue;
+            }
+            if (!$imKapitel) {
+                continue;
+            }
+            // «1 Departement Präsidiales 1'616'148.42 1'592'098.24 -24'050 -2 …»
+            // und «9 Behörden und Stadtkanzlei …»: die Zeile beginnt mit der
+            // Nummer des Departements und trägt danach seinen Namen.
+            if (preg_match('/^(\d{1,2})\s+(\p{L}[^\d]*?)\s+(-?[\d’\']+\.\d{2})\b/u', $z, $m)) {
+                $name = trim((string) preg_replace('/^Departement\s+/u', '', trim($m[2])));
+                $aktuell = $name;
+                $sekretariate[$name] = [
+                    'departement' => $name,
+                    'saldo' => $this->frankenZahl($m[3]),
+                    'aufwand' => 0,
+                    'ertrag' => 0,
+                ];
+                continue;
+            }
+            if ($aktuell === null) {
+                continue;
+            }
+            if (preg_match('/^Aufwand\s+(-?[\d’\']+\.\d{2})\b/u', $z, $m)) {
+                $sekretariate[$aktuell]['aufwand'] = $this->frankenZahl($m[1]);
+                continue;
+            }
+            if (preg_match('/^Ertrag\s+(-?[\d’\']+\.\d{2})\b/u', $z, $m)) {
+                $sekretariate[$aktuell]['ertrag'] = $this->frankenZahl($m[1]);
+                continue;
+            }
+        }
+        return array_values($sekretariate);
     }
 
     /**
@@ -1849,6 +2107,18 @@ class BudgetBuchParser {
      * @param list<array{x: float, t: string}> $frags
      * @return list<array{x: float, t: string}>
      */
+    /**
+     * Die Textspalte einer Zeile der Kreditkontrolle: alles LINKS der
+     * Wertspalten. Dort steht die Kontonummer und die Bezeichnung, und nur
+     * dort — rechts davon führt das Buch Beträge und weitere Spalten.
+     *
+     * @param list<array{x: float, t: string}> $frags
+     * @return list<array{x: float, t: string}>
+     */
+    private function textFragmente(array $frags): array {
+        return array_values(array_filter($frags, static fn ($f): bool => (float) $f['x'] < 300.0));
+    }
+
     private function wertFragmente(array $frags): array {
         $rechts = [];
         foreach ($frags as $f) {
@@ -1891,18 +2161,34 @@ class BudgetBuchParser {
             // lesen hält die Zahlen des Namens heraus: «Masterplan Bahnhof:
             // Rahmenkredit (11334) AP1 + AP2» ergab sonst Betrag 1 und Kredit 2
             // (Buch 2022), «… -Querung Grüze AP2» den Betrag 2.
-            $zahlen = $this->zahlen(preg_replace(
-                '/\d{2}\.\d{2}\.\d{4}/u',
-                '',
-                $this->fragmentText($this->wertFragmente($frags))
-            ) ?? $rest);
+            // Die ERSTEN beiden Zahlen rechts der Textspalte sind Betrag und
+            // Kredit. Die frühere Regel nahm die beiden LETZTEN: Im alten
+            // Buchsatz war das dasselbe, seit die Bücher 2026 und 2027 rechts
+            // weitere Spalten führen (Nummer des Kredits bei x=679, ein Zähler
+            // bei x=744, eine Wiederholung bei x=838) sind es der Zähler und
+            // die Nummer. Im Tool stand dadurch je Konto «1» als Betrag und
+            // die Projektnummer als Kredit (Befund eines Fraktionsmitglieds
+            // vom 19.10.2026).
+            $werteText = $this->fragmentText($this->wertFragmente($frags));
+            $zahlen = $this->zahlen((string) preg_replace('/\d{2}\.\d{2}\.\d{4}/u', '', $werteText));
             if (\count($zahlen) < 2) {
                 continue;
             }
-            $betrag = $zahlen[\count($zahlen) - 2];
-            $kredit = $zahlen[\count($zahlen) - 1];
-            $name = trim((string) preg_replace('/\s+[-\d\'’.\s]+$/u', '', $rest));
-            preg_match('/(\d{2}\.\d{2}\.\d{4})/u', $rest, $dm);
+            $betrag = $zahlen[0];
+            $kredit = $zahlen[1];
+            // Die Bezeichnung steht LINKS der Wertspalten. Sie von rechts her
+            // um Zahlen zu kürzen griff zu kurz, seit die Zeile rechts
+            // weitergeht: Aus «Grundstücke 0 24'738'420 V 5'011'980 1 …» blieb
+            // «Grundstücke 0 24'738'420 V» stehen, und genau so stand es im
+            // Tool.
+            $name = trim((string) preg_replace(
+                '/^\d{4,}\s*/u',
+                '',
+                $this->fragmentText($this->textFragmente($frags))
+            ));
+            // Das Bewilligungsdatum steht in den Wertspalten; der Name links
+            // davon trägt keines.
+            preg_match('/(\d{2}\.\d{2}\.\d{4})/u', $werteText, $dm);
             if (isset($projektNummern[$nr])) {
                 // Projektzeile: eigener Eintrag, die folgenden Konten hängen daran.
                 // Der Betrag ist der des Budgetjahres — diese Tabelle hat nur zwei

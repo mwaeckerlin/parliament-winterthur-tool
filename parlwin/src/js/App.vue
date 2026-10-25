@@ -25,6 +25,28 @@
       </template>
     </NcAppNavigation>
 
+    <!-- F131: Vollbild. Der Knopf ist das Geschwister des Griffs, der die
+         Seitenleiste einklappt: dieselbe Komponente, derselbe Behälter,
+         dieselbe Ebene, dasselbe CSS — nur das Symbol ist ein anderes. Er
+         erscheint auf flachem Schirm und dort, wo der Browser das Vollbild
+         anbietet; dieses nimmt die Adressleiste des Browsers und seine
+         Schaltflächen weg, und eine Webseite darf dorthin nur auf eine Geste
+         des Benutzers hin. -->
+    <Teleport v-if="vollbildKnopfZeigen" to=".app-navigation-toggle-wrapper" :disabled="!navigationBereit">
+      <NcButton
+        class="pw-vollbild-knopf"
+        variant="tertiary"
+        :aria-pressed="imVollbild"
+        :title="imVollbild ? 'Vollbild verlassen' : 'Vollbild'"
+        :aria-label="imVollbild ? 'Vollbild verlassen' : 'Vollbild'"
+        @click="vollbildUmschalten"
+      >
+        <template #icon>
+          <NcIconSvgWrapper :path="imVollbild ? mdiFullscreenExit : mdiFullscreen" />
+        </template>
+      </NcButton>
+    </Teleport>
+
     <NcAppContent>
       <div v-if="syncMeldung" class="pw-sync-meldung" :class="syncFehler ? 'fehler' : 'erfolg'">
         {{ syncMeldung }}
@@ -86,6 +108,7 @@ import NcContent from '@nextcloud/vue/components/NcContent'
 import NcAppNavigation from '@nextcloud/vue/components/NcAppNavigation'
 import NcAppNavigationItem from '@nextcloud/vue/components/NcAppNavigationItem'
 import NcAppContent from '@nextcloud/vue/components/NcAppContent'
+import NcButton from '@nextcloud/vue/components/NcButton'
 import NcIconSvgWrapper from '@nextcloud/vue/components/NcIconSvgWrapper'
 import {
   mdiClipboardTextOutline,
@@ -99,6 +122,8 @@ import {
   mdiHistory,
   mdiClipboardListOutline,
   mdiCommentQuestionOutline,
+  mdiFullscreen,
+  mdiFullscreenExit,
 } from '@mdi/js'
 import { subscribeRealtime } from './realtime'
 import Geschaeftsliste from './components/Geschaeftsliste.vue'
@@ -120,6 +145,7 @@ export default {
     NcAppNavigation,
     NcAppNavigationItem,
     NcAppContent,
+    NcButton,
     NcIconSvgWrapper,
     Geschaeftsliste,
     Sitzungsliste,
@@ -156,7 +182,24 @@ export default {
         { key: 'changelog', bezeichnung: 'Änderungsverlauf', icon: mdiHistory },
       ],
       unsubRealtime: null,
+      // F131: Vollbild. Der Knopf erscheint nur, wo der Browser es anbietet und
+      // der Schirm flach ist; dort gewinnt er die Adressleiste und die
+      // Schaltflächen des Browsers als Fläche dazu.
+      mdiFullscreen,
+      mdiFullscreenExit,
+      vollbildVerfuegbar: false,
+      flacherSchirm: false,
+      imVollbild: false,
+      flachListe: null,
+      // Der Knopf zieht zum Griff der Navigationsleiste; dessen Behälter gibt
+      // es erst, wenn die Leiste steht.
+      navigationBereit: false,
     }
+  },
+  computed: {
+    vollbildKnopfZeigen() {
+      return this.vollbildVerfuegbar && this.flacherSchirm
+    },
   },
   mounted() {
     // Deep-Link: eine im URL-Hash genannte Ansicht direkt öffnen (z.B. …/#budget),
@@ -167,6 +210,9 @@ export default {
     this.ladeFraktionen()
     this.ladeKommissionen()
     this.unsubRealtime = subscribeRealtime(this.handleRealtimeEvent)
+    this.vollbildEinrichten()
+    this.navigationBereit = typeof document !== 'undefined'
+      && !!document.querySelector('.app-navigation-toggle-wrapper')
   },
   beforeUnmount() {
     window.removeEventListener('hashchange', this.ansichtAusHashAnwenden)
@@ -174,8 +220,48 @@ export default {
       this.unsubRealtime()
       this.unsubRealtime = null
     }
+    if (this.flachListe) { this.flachListe.removeEventListener('change', this.flacherSchirmGewechselt) }
+    if (typeof document !== 'undefined') { document.removeEventListener('fullscreenchange', this.vollbildGewechselt) }
   },
   methods: {
+    /**
+     * F131: Vollbild. Der Knopf erscheint nur, wo beides zutrifft — der Browser
+     * bietet das Vollbild an, und der Schirm ist flach (dieselbe Grenze von
+     * 56rem Bildhöhe wie im Stylesheet). Auf einem hohen Schirm gewinnt das
+     * Vollbild zu wenig, um einen Knopf zu rechtfertigen.
+     */
+    vollbildEinrichten() {
+      if (typeof document === 'undefined') { return }
+      const el = document.documentElement
+      this.vollbildVerfuegbar = !!(document.fullscreenEnabled && el && typeof el.requestFullscreen === 'function')
+      this.imVollbild = !!document.fullscreenElement
+      document.addEventListener('fullscreenchange', this.vollbildGewechselt)
+      if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+        this.flachListe = window.matchMedia('(max-height: 56rem)')
+        this.flacherSchirmGewechselt()
+        this.flachListe.addEventListener('change', this.flacherSchirmGewechselt)
+      }
+    },
+    flacherSchirmGewechselt() {
+      this.flacherSchirm = !!(this.flachListe && this.flachListe.matches)
+    },
+    // Der Browser verlässt das Vollbild auch von sich aus, etwa mit der
+    // Zurück-Taste; der Knopf folgt diesem Zustand, statt ihn zu raten.
+    vollbildGewechselt() {
+      this.imVollbild = !!document.fullscreenElement
+    },
+    async vollbildUmschalten() {
+      try {
+        if (document.fullscreenElement) {
+          await document.exitFullscreen()
+        } else {
+          await document.documentElement.requestFullscreen()
+        }
+      } catch (e) {
+        // Lehnt der Browser ab (keine Geste, Richtlinie des Geräts), bleibt
+        // alles, wie es war; der Zustand kommt aus dem Ereignis.
+      }
+    },
     // Ansicht wechseln und als Deep-Link in den URL-Hash schreiben (direkt
     // aufrufbar und teilbar, z.B. für Design-Scans einzelner Seiten).
     ansichtWechseln(key) {
