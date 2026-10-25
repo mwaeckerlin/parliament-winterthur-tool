@@ -4,10 +4,6 @@ Ideen, die noch nicht umgesetzt sind. Umgesetzte Punkte wandern nach `FEATURES.m
 
 ## Aufträge von Marc
 
-- 2026-10-25 · offen · Marc: «Starte meinen lokalen Stack für mich wenn fertig» — nach dem grünen Regressionslauf `npm start` im Projekt (docker compose up --build), damit die Instanz für ihn läuft.
-
-- 2026-10-24 · umgesetzt, wartet auf den Regressionslauf · Excel-Export der Budgetanträge (F138), dazu die Seite im Budgetbuch und die drei neuen Antragsarten im PDF. Plan: `/tmp/claude-1000/-home-marc-git-mwaeckerlin/cc07bbc2-01c2-4ab3-ae2b-ea5016e0296e/scratchpad/plan-excel.md`
-- 2026-10-24 · umgesetzt, wartet auf den Regressionslauf · die übrigen Aufträge des Tages: Notizen auf jeder Ebene (F124), Dokumente am Antrag (F125), Massenerfassung und Tabellen-Übernahme (F126, F127), Steuerbarkeit des Aufwands (F128), Seite im Budgetbuch (F129), Neu-Einlesen nach einer Verbesserung (F130), Vollbild auf flachem Schirm (F131), formatierte Begründung (F132), Detail-Knopf auf jedem Tab (F133), Verpflichtungskredit, Departementssekretariat und Bewilligungsorgan (F135 bis F137), alle Antragsteller zur Wahl mit Vor- und Nachname, scrollende Navigationsleiste, flacher Schirm, `PARLAMENTSBETRIEB.md`
 - 2026-10-23 · offen · Session mwaeckerlin-04: `.github/workflows/docker.yml` auf die stündliche Prüfung von mwaeckerlin/scratch 1.1.12 umstellen (`cron: "17 * * * *"`, die beiden Kommentarzeilen über dem Zeitplan weg, Kopfkommentar und Zeile 10 auf die stündliche Prüfung umschreiben, `permissions` bleiben), dann unter Marcs `/commit` nur diese Datei committen und pushen, auf grüne Runner warten und sha und Ergebnis zurückmelden
 
 ## Offen aus dem Testlauf
