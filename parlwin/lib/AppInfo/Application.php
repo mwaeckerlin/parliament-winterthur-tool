@@ -22,6 +22,7 @@ use OCA\ParliamentWinterthur\Db\SitzungstypTeilnehmerMapper;
 use OCA\ParliamentWinterthur\Db\SitzungstypTraktandumMapper;
 use OCA\ParliamentWinterthur\Db\TraktandumMapper;
 use OCA\ParliamentWinterthur\Db\VorstossEntwurfMapper;
+use OCA\ParliamentWinterthur\Middleware\FehlerMiddleware;
 use OCA\ParliamentWinterthur\Service\FraktionsarbeitService;
 use OCA\ParliamentWinterthur\Service\FraktionsraumService;
 use OCA\ParliamentWinterthur\Service\GeschaeftDokumentService;
@@ -239,6 +240,9 @@ class Application extends App implements IBootstrap
                 $c->get(SyncProcessService::class),
             );
         });
+
+        // Jede Ausnahme wird zu einer Meldung, die der Benutzer lesen kann (F139).
+        $context->registerMiddleware(FehlerMiddleware::class);
 
         // Unified Search Provider für Geschäfte
         $context->registerSearchProvider(GeschaeftSearchProvider::class);

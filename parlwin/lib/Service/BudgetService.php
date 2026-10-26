@@ -450,11 +450,9 @@ class BudgetService {
         // F109: fehlt oben ein Betrag, wird die Summe der Aufteilung eingesetzt.
         $this->aufteilungSummeAnwenden($a);
         // Phase (F93): «fraktion» (Vorbereitung) oder «sitzung» (offizielle
-        // Sitzungsanträge). Sie steht VOR der Kürzungsprüfung, denn diese
-        // vergleicht die Phase — mit einer noch leeren verglich sie ins Leere.
+        // Sitzungsanträge).
         $phase = (string) ($daten['phase'] ?? 'fraktion');
         $a->setPhase($phase === 'sitzung' ? 'sitzung' : 'fraktion');
-        $this->kuerzungPruefen($a, $jahr, null);
         // Ein Steuerfussantrag ist ein Antrag der eigenen Fraktion (F88/F96): fehlt
         // der Antragsteller, tragen wir den eigenen Fraktionsnamen ein, damit er im
         // Antrags-PDF nicht leer bleibt.
@@ -576,63 +574,6 @@ class BudgetService {
         }
         $a->setBetragDelta($chf);
         $a->setProzentDelta($prozent);
-    }
-
-    /**
-     * Ein Budget lässt sich höchstens auf null kürzen — was nicht ausgegeben wird,
-     * kann nicht gespart werden. Die Grenze gilt für die SUMME aller Anträge auf
-     * dasselbe Ziel: drei Anträge zu je 40% kürzen zusammen um 120% und sind damit
-     * unmöglich, auch wenn jeder für sich passt. Nach oben gibt es keine Grenze.
-     *
-     * Geprüft wird beim Anlegen und beim Ändern; beim Ändern zählt der eigene
-     * bisherige Betrag nicht mit (er wird ja ersetzt).
-     */
-    private function kuerzungPruefen(BudgetAntrag $a, int $jahr, ?int $eigeneId): void {
-        $neu = (int) $a->getBetragDelta();
-        if ($neu >= 0 || (string) $a->getBereich() === 'steuerfuss') {
-            return;
-        }
-        // Gezählt wird nur, was ZUSAMMEN WIRKT: die eigenen Anträge und die
-        // fremden, die die Fraktion unterstützt. In einer Sitzung stellen mehrere
-        // Fraktionen Anträge auf dieselbe Produktegruppe; zusammengezählt kürzen
-        // sie weit über das Budget hinaus, ohne dass davon je mehr als einer
-        // angenommen würde. Ein fremder, offener Antrag hält nur fest, was im Rat
-        // gestellt wurde — an ihm scheiterte das Einlesen des ganzen Drehbuchs.
-        if (!$a->wirdUnterstuetzt()) {
-            return;
-        }
-        $budget = $this->basisFuerPosition((string) $a->getBereich(), (string) $a->getZielRef(), $jahr);
-        if ($budget <= 0) {
-            return; // ohne bekannten Budgetwert gibt es keine Grenze zu prüfen
-        }
-        $bereits = 0;
-        foreach ($this->antraege->findByJahr($jahr) as $vorhanden) {
-            if ((int) $vorhanden->getId() === $eigeneId
-                || !$vorhanden->wirdUnterstuetzt()
-                || (string) $vorhanden->getBereich() !== (string) $a->getBereich()
-                || (string) $vorhanden->getZielRef() !== (string) $a->getZielRef()
-                || (string) $vorhanden->getPhase() !== (string) $a->getPhase()) {
-                continue;
-            }
-            $bereits += min(0, (int) $vorhanden->getBetragDelta());
-        }
-        if ($bereits + $neu >= -$budget) {
-            return;
-        }
-        throw new \RuntimeException(sprintf(
-            'Es kann nicht mehr gekürzt werden, als budgetiert ist: %s stehen zur Verfügung, '
-            . 'davon sind %s bereits beantragt, und dieser Antrag kürzt um weitere %s. '
-            . 'Höchstens auf null — also noch %s.',
-            $this->franken($budget),
-            $this->franken(-$bereits),
-            $this->franken(-$neu),
-            $this->franken($budget + $bereits),
-        ));
-    }
-
-    /** Ein Betrag in Schweizer Schreibweise, für Meldungen an den Nutzer. */
-    private function franken(int $betrag): string {
-        return number_format($betrag, 0, '.', "'") . ' CHF';
     }
 
     /**
@@ -878,7 +819,6 @@ class BudgetService {
         $this->felderSetzen($a, $daten);
         // F109: fehlt oben ein Betrag, wird die Summe der Aufteilung eingesetzt.
         $this->aufteilungSummeAnwenden($a);
-        $this->kuerzungPruefen($a, $jahr, $id);
         $gespeichert = $this->antraege->update($a);
         $this->nachAenderung($jahr);
         return $gespeichert;

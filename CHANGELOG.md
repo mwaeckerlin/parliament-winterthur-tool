@@ -1,5 +1,9 @@
 # Changelog
 
+- 2026-10-26 **1.9.9**
+    - Budget: **eine Position lässt sich über ihr Budget hinaus kürzen** — wer mehr streicht, als sie kostet, will aus ihr Ertrag statt Aufwand machen. Bisher wies der Server einen solchen Antrag ab, und im Browser stand «Antrag speichern fehlgeschlagen: Request failed with status code 500». Der beeinflussbare Anteil ist die Orientierung und keine Sperre; die einzige harte Grenze bleibt die automatische Pauschalverteilung, die nur auf den beeinflussbaren Aufwand verteilt
+    - Alle Ansichten: **jeder Fehler im Server wird zu einer Meldung, die man lesen kann** — die Meldung nennt den Grund im Klartext, bei einem fehlenden Eintrag den Hinweis auf das Neuladen und bei einem unerwarteten Fehler eine achtstellige Kennung, unter der die Einzelheiten im Protokoll der Nextcloud-Installation stehen. «Request failed with status code 500» erscheint nie mehr
+
 - 2026-10-25 **1.9.8**
     - Budget: **der Hintergrundauftrag liest ein Budgetjahr je Lauf neu ein** — mit allen Jahren in einem Lauf stand der Hintergrund von Nextcloud minutenlang still, und die Synchronisation kam erst danach
     - Alle Ansichten: **der Vollbild-Knopf ist derselbe Knopf wie der Griff daneben** — dieselbe Komponente, derselbe Behälter, dasselbe CSS; er stand vorher als eigene Fläche daneben

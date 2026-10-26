@@ -332,6 +332,13 @@ if (!class_exists('OCP\AppFramework\Controller')) {
     }');
 }
 
+if (!class_exists('OCP\AppFramework\Middleware')) {
+    // phpcs:ignore
+    eval ('namespace OCP\AppFramework; class Middleware {
+        public function afterException($controller, $methodName, \Exception $exception) { throw $exception; }
+    }');
+}
+
 if (!class_exists('OCP\AppFramework\App')) {
     // phpcs:ignore
     eval ('namespace OCP\AppFramework; class App {
@@ -351,6 +358,8 @@ if (!interface_exists('OCP\AppFramework\Bootstrap\IRegistrationContext')) {
     // phpcs:ignore
     eval ('namespace OCP\AppFramework\Bootstrap; interface IRegistrationContext {
         public function registerService(string $name, \Closure $closure): void;
+        public function registerMiddleware(string $class): void;
+        public function registerSearchProvider(string $class): void;
     }');
 }
 

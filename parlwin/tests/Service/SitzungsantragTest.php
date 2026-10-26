@@ -24,8 +24,8 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * F93: In der Sitzung entstehen offizielle Sitzungsanträge neben den
- * Fraktionsanträgen derselben Produktegruppe. Beide dürfen nebeneinander
- * bestehen — die Kürzungsgrenze vergleicht je Phase.
+ * Fraktionsanträgen derselben Produktegruppe. Beide bleiben nebeneinander
+ * bestehen, jeder in seiner Phase.
  */
 class SitzungsantragTest extends TestCase
 {

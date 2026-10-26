@@ -1707,9 +1707,8 @@ export default {
       await this.antragSenden({ bereich: 'investition', zielTyp: 'investition', zielRef: String(inv.id), ...betrag, ...this.gemeinsameFelder(e) })
     },
     // Ein abgelehnter Aufruf wird dem Benutzer gemeldet, mit dem Grund, den der
-    // Server nennt — bei einer zu weit gehenden Kürzung etwa das Budget, das
-    // bereits Beantragte und den verbleibenden Rest (F112). Ohne diese Meldung
-    // blieb das Formular offen und es geschah nichts, ohne jede Erklärung.
+    // Server im Feld «fehler» nennt (F139). Ohne diese Meldung blieb das
+    // Formular offen und es geschah nichts, ohne jede Erklärung.
     meldeFehler(was, f) {
       const daten = (f && f.response && f.response.data) || {}
       const grund = daten.fehler || daten.message || (f && f.message) || ''

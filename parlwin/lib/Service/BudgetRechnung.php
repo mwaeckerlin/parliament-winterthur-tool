@@ -160,11 +160,13 @@ class BudgetRechnung {
     }
 
     /**
-     * Eine Position lässt sich höchstens auf null kürzen — was nicht ausgegeben
-     * wird, kann nicht gespart werden. Was eine Position darüber hinaus tragen
-     * müsste, geht an die übrigen, solange dort Platz ist; reicht auch das nicht,
-     * bleibt der Rest liegen. Erfunden wird nichts: die Summe der Verteilung ist
-     * dann kleiner als der gewünschte Betrag, und das ist im Budget sichtbar.
+     * Die automatische Verteilung kürzt eine Position höchstens um ihren
+     * beeinflussbaren Aufwand (F128) — sie ist die einzige Stelle mit einer
+     * harten Grenze, ein Antrag von Hand kennt keine (F112). Was eine Position
+     * darüber hinaus tragen müsste, geht an die übrigen, solange dort Platz
+     * ist; reicht auch das nicht, bleibt der Rest liegen. Erfunden wird nichts:
+     * die Summe der Verteilung ist dann kleiner als der gewünschte Betrag, und
+     * das ist im Budget sichtbar.
      *
      * @param array<string, int> $verteilung
      * @param array<int, array<string, float|int|string>> $gruppen

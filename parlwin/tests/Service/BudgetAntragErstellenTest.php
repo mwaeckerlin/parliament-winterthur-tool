@@ -128,23 +128,18 @@ class BudgetAntragErstellenTest extends TestCase {
     }
 
     /**
-     * Ein Budget lässt sich höchstens auf null kürzen — was nicht ausgegeben wird,
-     * kann nicht gespart werden. Die Grenze gilt für die SUMME aller Anträge auf
-     * dasselbe Ziel, nicht für den einzelnen: drei Anträge zu je 40% eines Budgets
-     * kürzen zusammen um 120% und sind damit unmöglich.
+     * Eine Position lässt sich über ihr Budget hinaus kürzen (F112): Wer mehr
+     * streicht, als die Position kostet, will Ertrag statt Aufwand, und das ist
+     * ein zulässiges Ziel. Bis zum 25.10.2026 wies der Dienst einen solchen
+     * Antrag mit einer Ausnahme ab, die als Status 500 im Browser ankam.
      */
-    public function testKuerzungHoechstensAufNull(): void {
-        // Genau auf null geht.
-        $a = $this->service()->antragErstellen(2026, ['bereich' => 'globalbudget', 'zielRef' => '121', 'betragDelta' => -100000]);
-        self::assertSame(-100000, $a->getBetragDelta(), 'die Kürzung auf genau null ist erlaubt');
-
-        // Einen Franken weiter nicht.
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessageMatches('/mehr gekürzt|höchstens auf null|100/u');
-        $this->service()->antragErstellen(2026, ['bereich' => 'globalbudget', 'zielRef' => '121', 'betragDelta' => -100001]);
+    public function testKuerzungUeberDasBudgetHinausWirdGespeichert(): void {
+        $a = $this->service()->antragErstellen(2026, ['bereich' => 'globalbudget', 'zielRef' => '121', 'betragDelta' => -120000]);
+        self::assertSame(-120000, $a->getBetragDelta(), 'eine Kürzung über das Budget hinaus wird gespeichert');
+        self::assertEqualsWithDelta(-120.0, $a->getProzentDelta(), 0.001, '−120\'000 von 100\'000 sind −120%');
     }
 
-    public function testKuerzungsgrenzeGiltFuerDieSummeAllerAntraege(): void {
+    public function testMehrereAntraegeKuerzenZusammenUeberHundertProzent(): void {
         $vorhanden = new BudgetAntrag();
         $vorhanden->setJahr(2026);
         $vorhanden->setBereich('globalbudget');
@@ -153,23 +148,20 @@ class BudgetAntragErstellenTest extends TestCase {
         $vorhanden->setBetragDelta(-60000);
         $vorhanden->setPhase('fraktion');
 
-        // −60'000 liegen schon auf der Gruppe; −50'000 mehr wären zusammen −110'000
-        // auf ein Budget von 100'000.
-        $this->expectException(\RuntimeException::class);
-        $this->service(null, [$vorhanden])->antragErstellen(
+        // −60'000 liegen schon auf der Gruppe; −50'000 mehr sind zusammen −110'000
+        // auf ein Budget von 100'000, und beide Anträge bleiben bestehen.
+        $a = $this->service(null, [$vorhanden])->antragErstellen(
             2026,
             ['bereich' => 'globalbudget', 'zielRef' => '121', 'betragDelta' => -50000],
         );
+        self::assertSame(-50000, $a->getBetragDelta());
     }
 
     /**
-     * Bug 2026-08-31: Das Einlesen der Sitzungsanträge aus dem Drehbuch scheiterte
-     * an der Kürzungsgrenze. In einer Sitzung stellen mehrere Fraktionen Anträge
-     * auf dieselbe Produktegruppe; zusammengezählt kürzen sie weit über das Budget
-     * hinaus, ohne dass davon je mehr als einer angenommen würde. Die Grenze gilt
-     * für die Anträge, die ZUSAMMEN WIRKEN — die eigenen und die unterstützten —,
-     * nicht für konkurrierende fremde Anträge, die nur festhalten, was im Rat
-     * gestellt wurde.
+     * In einer Sitzung stellen mehrere Fraktionen Anträge auf dieselbe
+     * Produktegruppe; zusammengezählt kürzen sie weit über das Budget hinaus,
+     * ohne dass davon je mehr als einer angenommen würde. Jeder von ihnen hält
+     * fest, was im Rat gestellt wurde, und wird gespeichert.
      */
     public function testFremdeAntraegeBlockierenEinanderNicht(): void {
         $fremd = new BudgetAntrag();
@@ -182,7 +174,7 @@ class BudgetAntragErstellenTest extends TestCase {
         $fremd->setHerkunft('fremde');
 
         // Ein zweiter fremder Antrag auf dieselbe Gruppe, zusammen weit über dem
-        // Budget von 100'000 — er wird trotzdem angelegt.
+        // Budget von 100'000.
         $a = $this->service(null, [$fremd])->antragErstellen(2026, [
             'bereich' => 'globalbudget',
             'zielRef' => '121',
@@ -190,11 +182,11 @@ class BudgetAntragErstellenTest extends TestCase {
             'herkunft' => 'fremde',
             'phase' => 'sitzung',
         ]);
-        self::assertSame(-80000, $a->getBetragDelta(), 'ein fremder Antrag wird an der Grenze abgewiesen');
+        self::assertSame(-80000, $a->getBetragDelta(), 'der zweite fremde Antrag wurde nicht gespeichert');
     }
 
-    /** Ein unterstützter fremder Antrag zählt dagegen mit. */
-    public function testUnterstuetzteFremdeAntraegeZaehlenZurGrenze(): void {
+    /** Auch zusammen mit einem unterstützten fremden Antrag gibt es keine Grenze. */
+    public function testUnterstuetzterFremderAntragBegrenztDenEigenenNicht(): void {
         $fremd = new BudgetAntrag();
         $fremd->setJahr(2026);
         $fremd->setBereich('globalbudget');
@@ -205,24 +197,24 @@ class BudgetAntragErstellenTest extends TestCase {
         $fremd->setHerkunft('fremde');
         $fremd->setHaltung('unterstuetzen');
 
-        $this->expectException(\RuntimeException::class);
-        $this->service(null, [$fremd])->antragErstellen(2026, [
+        $a = $this->service(null, [$fremd])->antragErstellen(2026, [
             'bereich' => 'globalbudget',
             'zielRef' => '121',
             'betragDelta' => -20000,
         ]);
+        self::assertSame(-20000, $a->getBetragDelta());
     }
 
-    public function testKuerzungsgrenzeGiltAuchFuerInvestitionen(): void {
-        $this->expectException(\RuntimeException::class);
-        $this->service()->antragErstellen(
+    public function testAuchEineInvestitionLaesstSichUeberIhrBudgetHinausKuerzen(): void {
+        $a = $this->service()->antragErstellen(
             2026,
             ['bereich' => 'investition', 'zielTyp' => 'investition', 'zielRef' => '7', 'betragDelta' => -500001],
         );
+        self::assertSame(-500001, $a->getBetragDelta());
     }
 
     public function testErhoehungBleibtUnbegrenzt(): void {
-        // Nach oben gibt es keine Grenze — nur das Sparen ist bei null zu Ende.
+        // Nach oben gab es nie eine Grenze.
         $a = $this->service()->antragErstellen(2026, ['bereich' => 'globalbudget', 'zielRef' => '121', 'betragDelta' => 900000]);
         self::assertSame(900000, $a->getBetragDelta());
     }

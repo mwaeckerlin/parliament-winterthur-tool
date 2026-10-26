@@ -276,19 +276,19 @@ describe('Budgetliste', () => {
     expect(call[1].phase).toBe('sitzung')
   })
 
-  // F112: Ein Antrag, der über das Budget hinaus kürzt, wird vom Server abgelehnt.
-  // Bis zum Fix landete diese Ablehnung nur in der Browser-Konsole: das Formular
+  // F139: Lehnt der Server einen Antrag ab, steht sein Grund in der Meldung.
+  // Bis zum Fix landete die Ablehnung nur in der Browser-Konsole: das Formular
   // blieb offen, nichts geschah, und niemand erfuhr warum.
-  it('meldet die abgelehnte Kürzung mit dem Grund des Servers (F112)', async () => {
+  it('meldet den abgelehnten Antrag mit dem Grund des Servers (F139)', async () => {
     const w = await mitAnsicht()
     axios.post.mockRejectedValueOnce({
-      response: { status: 400, data: { fehler: 'Budget 4866124, bereits beantragt 150000, Rest 4716124' } },
+      response: { status: 400, data: { fehler: 'Auf eine künstliche Produktegruppe sind keine Anträge möglich' } },
     })
     w.vm.neu['121'].betrag = '-9000000'
     await w.vm.antragGlobalbudget('121')
     await flushPromises()
     expect(meldungen.fehler.join(' | '), 'Die Ablehnung wird nicht gemeldet')
-      .toContain('Rest 4716124')
+      .toContain('künstliche Produktegruppe')
   })
 
   // F76: zwei verknüpfte Filter — Kommission (aus der Zuordnung) und Departement

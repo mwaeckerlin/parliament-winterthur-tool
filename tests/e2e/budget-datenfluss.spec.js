@@ -283,6 +283,41 @@ test.describe('Budget: Globalbudgets — Anträge und Live-Entscheid (F80, F81, 
     expect(jsFehler, `JS-Fehler: ${jsFehler.join(' | ')}`).toEqual([])
   })
 
+  /**
+   * F112: Eine Position lässt sich über ihr Budget hinaus kürzen — wer mehr
+   * streicht, als sie kostet, will aus ihr Ertrag statt Aufwand machen. Bis
+   * zum 25.10.2026 wies der Server einen solchen Antrag ab, und im Browser
+   * stand «Antrag speichern fehlgeschlagen: Request failed with status code
+   * 500»; der Antrag entstand nie.
+   */
+  test('Eine Kürzung über das ganze Budget hinaus wird gespeichert', async ({ page }) => {
+    const jsFehler = fehlerWaechter(page)
+    await login(page, USERS.u1)
+    await gotoBudget(page)
+    await sorgeFuerBudgetjahr(page, JAHR)
+    await gotoBudget(page)
+
+    const karte = page.locator('.pw-budget-tabpanel .pw-data-card', { has: page.locator('.pw-data-card-kicker', { hasText: 'Produktegruppe' }) }).first()
+    await karte.waitFor({ state: 'visible', timeout: 30_000 })
+
+    // Der Betrag der Position, und danach eine Kürzung, die weit darüber liegt.
+    const budget = Number((await karte.locator('.pw-budget-betrag').first().innerText()).replace(/[^0-9]/g, ''))
+    expect(budget, 'die Karte nennt keinen Betrag').toBeGreaterThan(0)
+
+    const begruendung = eindeutig('Ertrag statt Aufwand')
+    await karte.getByRole('button', { name: '+ Antrag' }).click()
+    await karte.locator('.pw-antrag-form input[type="number"]').first().fill(String(-(budget * 2)))
+    await karte.locator('.pw-antrag-form').getByLabel('Begründung').fill(begruendung)
+    await karte.getByRole('button', { name: 'Antrag', exact: true }).click()
+    await page.waitForLoadState('networkidle')
+
+    const antrag = karte.locator('.pw-budget-antraege li', { hasText: begruendung }).first()
+    await expect(antrag, 'der Antrag über das Budget hinaus wurde nicht angelegt').toBeVisible({ timeout: 15_000 })
+    await expect(page.locator('.toastify.toast-error'), 'eine Fehlermeldung erschien trotzdem').toHaveCount(0)
+
+    expect(jsFehler, `JS-Fehler: ${jsFehler.join(' | ')}`).toEqual([])
+  })
+
   // F116/F117: Der Kopf der Karte rechnet unsere Anträge mit, und ein Antrag
   // lässt sich durch einen Klick in seine Zeile bearbeiten.
   test('Der Kopf der Karte zeigt Stadtrat und Fraktion; ein Klick macht den Antrag bearbeitbar', async ({ page }) => {
