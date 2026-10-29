@@ -70,8 +70,20 @@ const ANSICHTEN = [
   // F138: der Tab «Anträge» mit seiner Kopfzeile — der PDF-Knopf und die
   // beiden Wege der Tabelle («Excel in die Dateien», «Excel herunterladen»).
   // Der Tab heisst nach der Zahl der Anträge, darum über das Muster.
+  //
+  // Eine leere Liste zeigt nichts: Die Instanz des Laufs hat keine Anträge, und
+  // das Bild davon beantwortet keine Frage über ihre Darstellung. Der Lauf legt
+  // deshalb zwei Anträge an — einen mit Betrag und einen auf Zielwerte, der
+  // keinen trägt und den Zielwert in der Betragsspalte zeigt (F109).
   ['budget-antraege', 'Budget', '.pw-antraege-kopf', async (page) => {
+    await antraegeAnlegen(page)
     await page.getByRole('tab', { name: /Anträge$/ }).click()
+    await page.waitForTimeout(1200)
+  }],
+  // F129: der Tab «Personalbestand» trägt seit dem 26.10.2026 die Seite im
+  // Budgetbuch, wie die Karte im Globalbudget.
+  ['budget-personal', 'Budget', '.pw-budget-personal .pw-data-card', async (page) => {
+    await page.getByRole('tab', { name: 'Personalbestand' }).click()
     await page.waitForTimeout(1200)
   }],
   // F87: die Karten der Investitionsrechnung mit «Summe der Jahre» und
@@ -105,6 +117,52 @@ const ANSICHTEN = [
     await page.waitForTimeout(800)
   }],
 ]
+
+/**
+ * Legt im Tab «Globalbudgets» zwei Anträge an, damit die Antragsübersicht
+ * etwas zeigt: einen mit Betrag und einen auf Zielwerte ohne Betrag. Die
+ * Instanz des Laufs beginnt leer, und das Bild einer leeren Liste beantwortet
+ * keine Frage über ihre Darstellung.
+ *
+ * Zweimal derselbe Antrag schadet nicht: Der Lauf fotografiert einen Zustand,
+ * er pflegt keine Daten.
+ */
+async function antraegeAnlegen(page) {
+  // Alle Tabs liegen im Dokument und werden nur ein- und ausgeblendet; ohne die
+  // Eingrenzung auf den Tab «Globalbudgets» trifft der Wähler auch unsichtbare
+  // Karten, und der Klick landet im Nichts (gemessen am 26.10.2026: die
+  // Antragsliste blieb leer).
+  // Nur Karten mit der Aktionszeile: Die erste Karte eines Departements ist
+  // sein Sekretariat und trägt keine (gemessen am 26.10.2026, der Klick lief in
+  // seine Zeitgrenze).
+  const karten = page.locator('.pw-budget-global .pw-data-card:has(.pw-budget-card-aktionen)')
+  await karten.first().waitFor({ state: 'visible', timeout: 30_000 })
+  if ((await karten.count()) < 2) { return }
+
+  // Ein Antrag mit Betrag, auf der ersten Karte.
+  await karten.nth(0).locator('.pw-budget-card-aktionen button', { hasText: '+ Antrag' }).click()
+  await page.waitForTimeout(600)
+  const erste = karten.nth(0).locator('.pw-antrag-form')
+  await erste.locator('input[type="number"]').first().fill('-250000')
+  await erste.locator('[aria-label="Begründung"]').fill('Verzicht auf den Ausbau der Architektur, solange die Sicherheit gedeckt bleibt.')
+  await erste.getByRole('button', { name: 'Antrag', exact: true }).click()
+  await page.waitForTimeout(1500)
+
+  // Ein Antrag auf Zielwerte: kein Betrag, dafür ein neuer Soll in der ersten
+  // Zielvorgabe. Genommen wird eine Karte, die überhaupt Zielvorgaben hat.
+  const mitZielen = page.locator('.pw-budget-global .pw-data-card:has(.pw-budget-card-aktionen)')
+  const zweite = mitZielen.nth(1)
+  await zweite.locator('.pw-budget-card-aktionen button', { hasText: '+ Antrag' }).click()
+  await page.waitForTimeout(600)
+  const ziele = zweite.locator('.pw-antrag-ziele')
+  if ((await ziele.count()) === 0) { return }
+  await ziele.locator('summary').click()
+  await page.waitForTimeout(400)
+  await zweite.locator('.pw-antrag-ziel-eingabe input').first().fill('4')
+  await zweite.locator('[aria-label="Begründung"]').fill('Die bisherigen Zielwerte liegen deutlich unter den tatsächlich erzielten Nettorenditen.')
+  await zweite.getByRole('button', { name: 'Antrag', exact: true }).click()
+  await page.waitForTimeout(1500)
+}
 
 const PAPIERE = [['A4', false], ['A4-quer', true], ['A3', false], ['A5', false], ['Letter', false]]
 
@@ -264,6 +322,60 @@ test('Kästen messen', async ({ browser }) => {
     await kontext.close()
   }
   expect(true).toBe(true)
+})
+
+/**
+ * Wo die beiden Griffe liegen: der Behälter, die Navigationsleiste und der
+ * Inhaltsbereich, offen und zugeklappt. Marc am 26.10.2026: beide Knöpfe ganz
+ * in die Leiste, rechts an deren Rand; zugeklappt beide nach links, bis der
+ * linke am linken Rand steht.
+ */
+test('Griffe messen', async ({ browser }) => {
+  test.setTimeout(300_000)
+  const kontext = await browser.newContext({ storageState: SITZUNG, viewport: BREIT })
+  const page = await kontext.newPage()
+  await ansichtOeffnen(page, 'Budget', '.pw-budget-tabpanel')
+  for (const zustand of ['offen', 'zu']) {
+    if (zustand === 'zu') {
+      await page.evaluate(() => {
+        const knopf = [...document.querySelectorAll('button')]
+          .find((b) => /navigation/i.test(b.getAttribute('aria-label') || ''))
+        if (knopf) { knopf.click() }
+      })
+      await page.waitForTimeout(800)
+    }
+    const mass = await page.evaluate(() => {
+      const kasten = (wahl) => {
+        const el = document.querySelector(wahl)
+        if (!el) { return wahl + ': fehlt' }
+        const r = el.getBoundingClientRect()
+        const s = getComputedStyle(el)
+        return `${wahl}: x=${Math.round(r.x)} rechts=${Math.round(r.right)} breite=${Math.round(r.width)}`
+          + ` y=${Math.round(r.y)} unten=${Math.round(r.bottom)} hoehe=${Math.round(r.height)}`
+          + ` position=${s.position} margin-left=${s.marginLeft}`
+      }
+      const nav = document.querySelector('#app-navigation-vue, #app-navigation, .app-navigation')
+      const wrap = document.querySelector('.app-navigation-toggle-wrapper')
+      return [
+        'nav-klassen: ' + (nav ? nav.className : 'fehlt'),
+        'body-klassen: ' + document.body.className,
+        'wrapper-klassen: ' + (wrap ? wrap.className : 'fehlt'),
+        'wrapper-inset: ' + (wrap ? getComputedStyle(wrap).insetInlineStart : 'fehlt'),
+        'wrapper-eltern: ' + (wrap && wrap.offsetParent ? wrap.offsetParent.id + '.' + wrap.offsetParent.className : 'fehlt'),
+        kasten('#app-navigation-vue, #app-navigation, .app-navigation'),
+        kasten('#app-content-vue, #app-content, .app-content'),
+        kasten('.app-navigation-toggle-wrapper'),
+        kasten('.app-navigation-toggle-wrapper > *:first-child'),
+        kasten('.pw-vollbild-knopf'),
+        kasten('#pw-search-slot'),
+        kasten('#pw-search-slot button'),
+        kasten('#pw-filter-slot'),
+        kasten('.app-navigation__content, .app-navigation-list'),
+      ].join('\n')
+    })
+    console.log(`[griffe ${zustand}]\n${mass}`)
+  }
+  await kontext.close()
 })
 
 test('Überlauf messen', async ({ browser }) => {

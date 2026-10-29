@@ -24,8 +24,5 @@ leer.
   Eigenschaft und trifft den Fall mit NULL NIE.
 
 Zur selben Fehlerklasse gehört ein fehlendes `implements \JsonSerializable`: dann
-liefert `DataResponse` nur `{id}`. Beide Fehler liegen auf dem ganzen Weg von der
-Entity über die Datenbank und die Schnittstelle zurück in die Anzeige, und diesen Weg
-sichert nur ein e2e-Test mit echten Daten (speichern, laden, anzeigen) — nie ein Mock
-und nie eine frisch erzeugte Entity. Post-Mortem:
+liefert `DataResponse` nur `{id}`. Post-Mortem:
 `~/.claude/post-mortems/2026-07-18-vorstoss-liste-leer-null-property-e2e-nie-gelaufen.md`.
