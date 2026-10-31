@@ -1,5 +1,8 @@
 # Changelog
 
+- 2026-10-31 **1.8.18-1**
+    - Betrieb: **parlwin 1.8.18 läuft mit dem gepatchten PHP** — die Images `php-fpm-v1.8.18`, `nginx-v1.8.18` und `realtime-v1.8.18` trugen PHP 8.5.9 ohne die Korrekturen von CVE-2026-109618 und CVE-2026-109619. Sie sind neu gebaut, auf der Nextcloud-34-Linie, die sie schon trugen (`mwaeckerlin/nextcloud:php-fpm-nc34` und `nginx-nc34`), und stehen unter denselben Marken, jetzt für amd64 und arm64
+
 - 2026-09-23 **1.8.18**
     - Betrieb: **der Server gibt jeder Anfrage 1024 MB Speicher** — bisher waren es 512 MB, und das reichte für ein Budgetbuch nicht mehr. Der Wert lässt sich im Betrieb setzen (`PARLWIN_PHP_MEMORY_LIMIT`) und gilt für die Oberfläche, die Kommandozeile und den Hintergrundauftrag gleichermassen
     - Budget: **ein Budgetbuch lässt sich auch dann lesen, wenn es gewachsen ist** — das Budget 2027 brach beim Einlesen mit «Allowed memory size exhausted» ab, weil das neue Buch mehr Speicher braucht, als eine Nextcloud-Installation einer Anfrage gibt. Für die Dauer des Lesens gilt jetzt eine höhere Grenze, danach wieder die der Installation; wer sie anders will, setzt sie im Betrieb (`PARLWIN_BUDGET_MEMORY_LIMIT`)
