@@ -10,6 +10,10 @@
 # tags. GitHub starts scheduled runs on the default branch only, so the
 # scheduled run of master starts this workflow on every nc branch as well; that needs
 # «actions: write».
+#
+# A git tag v<X.Y.Z>-<n> rebuilds an earlier release v<X.Y.Z> on its own
+# base images and publishes it under the tags of that release, php-fpm-v<X.Y.Z>
+# and the others, so a release keeps its tags and gets the fixes of its base.
 
 name: docker
 
@@ -21,7 +25,7 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: git tag nc<version>-v<X.Y.Z> to build
+        description: git tag nc<version>-v<X.Y.Z> or v<X.Y.Z>-<n> to build
         type: string
         default: ''
 
@@ -35,7 +39,7 @@ jobs:
       actions: write
       contents: read
     with:
-      branch-tags: '[{"branch": "nc([0-9]+)", "suffix": "-nc\\1", "version": "v"}, {"tag": "(nc[0-9]+-v[0-9.]+)", "suffix": "-\\1"}]'
+      branch-tags: '[{"branch": "nc([0-9]+)", "suffix": "-nc\\1", "version": "v"}, {"tag": "(nc[0-9]+-v[0-9.]+)", "suffix": "-\\1"}, {"tag": "(v[0-9.]+)-[0-9]+", "suffix": "-\\1"}]'
       # The runner has no PHPUnit and no `parlwin/vendor` (git-ignored, built in
       # the image), so the plain `npm test` cannot start the PHP suites.
       # `test:ci` fetches both out of the build stage php-vendor first.
@@ -45,7 +49,7 @@ jobs:
     if: inputs.ref != ''
     uses: mwaeckerlin/scratch/.github/workflows/docker-image.yml@master
     with:
-      branch-tags: '[{"tag": "(nc[0-9]+-v[0-9.]+)", "suffix": "-\\1"}]'
+      branch-tags: '[{"tag": "(nc[0-9]+-v[0-9.]+)", "suffix": "-\\1"}, {"tag": "(v[0-9.]+)-[0-9]+", "suffix": "-\\1"}]'
       ref: ${{ inputs.ref }}
       test: npm run test:image
     secrets: inherit
