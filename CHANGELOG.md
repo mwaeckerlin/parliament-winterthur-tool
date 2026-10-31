@@ -1,5 +1,8 @@
 # Changelog
 
+- 2026-10-31 **1.7.35-1**
+    - Betrieb: **parlwin 1.7.35 läuft mit dem gepatchten PHP** — die Images `php-fpm-v1.7.35`, `nginx-v1.7.35` und `realtime-v1.7.35` trugen PHP 8.5.9 ohne die Korrekturen von CVE-2026-109618 und CVE-2026-109619. Sie sind neu gebaut, auf der Nextcloud-34-Linie, die sie schon trugen (`mwaeckerlin/nextcloud:php-fpm-nc34` und `nginx-nc34`), und stehen unter denselben Marken, jetzt für amd64 und arm64
+
 - 2026-09-01 **1.7.35**
     - Kommissionen: **ein eigenes Geschäft, das einer Kommission zugewiesen ist, erscheint bei ihr** — die Lasche «Kommissionen» suchte die Geschäfte einer Kommission allein in deren Status («Bei Kommission … pendent»), wie ihn das Parlament schreibt. Ein selbst angelegtes Geschäft trägt den Status «Pendent» und nennt darin keine Kommission: Die Zuweisung im Feld «Kommission» blieb dort ohne Wirkung. Jetzt zählt beides, und der Hinweis auf der Karte sagt, dass weder ein Status noch eine Zuweisung auf sie zeigt
     - Geschäfte: **die automatische Zuständigkeit folgt derselben Regel** — wer in der zugewiesenen Kommission sitzt, wird nach der Synchronisation zuständig, auch wenn die Kommission nur im Feld «Kommission» steht. Bestehende Zuweisungen bleiben unberührt, und wer das Geschäft eingereicht hat, geht weiterhin vor
