@@ -327,6 +327,73 @@ test('Kästen messen', async ({ browser }) => {
 })
 
 /**
+ * Die offene Liste des Filters «Departement», in jedem Format und in drei
+ * Zuständen: geöffnet mit geladenen Einträgen, geöffnet bevor die Einträge
+ * ankamen (die Antwort des Servers wird bis dahin zurückgehalten), und mit
+ * der Fläche, die eine Bildschirmtastatur übrig lässt. Fotografiert wird das
+ * Fenster, weil die Liste fest im Fenster steht.
+ */
+test('Filterliste aufnehmen', async ({ browser }) => {
+  test.setTimeout(1_800_000)
+  const budgetAnsicht = (url) => /\/apps\/parlwin\/budget\/\d{4}$/.test(new URL(url).pathname)
+  const ruhig = async (menu) => {
+    let vorher = ''
+    let gleich = 0
+    await expect.poll(async () => {
+      const jetzt = JSON.stringify(await menu.boundingBox())
+      gleich = jetzt === vorher ? gleich + 1 : 0
+      vorher = jetzt
+      return gleich
+    }, { timeout: 10_000, intervals: [100] }).toBeGreaterThanOrEqual(3)
+  }
+  const sichtbarX = async (link) => ((await link.boundingBox().catch(() => null)) || { x: -1 }).x
+  for (const [format, breite, hoehe] of FORMATE) {
+    for (const zustand of ['geladen', 'spaet', 'tastatur']) {
+      const kontext = await browser.newContext({ storageState: SITZUNG, viewport: { width: breite, height: hoehe } })
+      const page = await kontext.newPage()
+      let freigeben = () => {}
+      if (zustand === 'spaet') {
+        const freigabe = new Promise((weiter) => { freigeben = weiter })
+        await page.route((url) => budgetAnsicht(url.href), async (route) => {
+          await freigabe
+          await route.continue()
+        })
+      }
+      await page.goto(`${BASE_URL}/index.php/apps/parlwin/`)
+      await page.waitForSelector('.pw-view-content', { timeout: 30_000 })
+      const schalter = page.getByRole('button', { name: /navigation/i }).first()
+      const budget = page.getByRole('link', { name: 'Budget', exact: true })
+      if ((await sichtbarX(budget)) < 0) { await schalter.click() }
+      await budget.click()
+      await expect(page.locator('.pw-view-title')).toHaveText('Budget', { timeout: 20_000 })
+      if (zustand !== 'spaet') {
+        await page.waitForLoadState('networkidle').catch(() => {})
+      }
+      if ((await sichtbarX(budget)) < 0) {
+        await schalter.click()
+        await expect.poll(() => sichtbarX(budget)).toBeGreaterThanOrEqual(0)
+      }
+      const beschriftung = page.locator('#pw-filter-slot label', { hasText: /^\s*Departement\s*$/ }).first()
+      await beschriftung.scrollIntoViewIfNeeded()
+      await beschriftung.locator('xpath=ancestor::*[.//div[contains(@class,"v-select")]][1]')
+        .locator('.v-select .vs__dropdown-toggle').first().click()
+      const menu = page.locator('.vs__dropdown-menu').first()
+      await menu.waitFor({ state: 'visible', timeout: 10_000 })
+      if (zustand === 'spaet') {
+        freigeben()
+        await menu.locator('.vs__dropdown-option').first().waitFor({ state: 'visible', timeout: 30_000 })
+      }
+      if (zustand === 'tastatur') {
+        await page.setViewportSize({ width: breite, height: Math.round(hoehe * 0.52) })
+      }
+      await ruhig(menu)
+      await page.screenshot({ path: `${AUS}/${format}--filterliste-${zustand}.png` })
+      await kontext.close()
+    }
+  }
+})
+
+/**
  * Wo die beiden Griffe liegen: der Behälter, die Navigationsleiste und der
  * Inhaltsbereich, offen und zugeklappt. Marc am 26.10.2026: beide Knöpfe ganz
  * in die Leiste, rechts an deren Rand; zugeklappt beide nach links, bis der
