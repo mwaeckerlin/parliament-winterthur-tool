@@ -6,6 +6,10 @@ The domain of this tool is the Winterthur city parliament, and that domain speak
 
 **An English word stays in those documents only where the trade speaks it and no German word says the same:** «Guard», «Fixture», «Viewport», «Endpoint», and the names of the Nextcloud apps «Deck», «Talk», «Forms». Everything else is said in German: «Benutzername» not «Username», «Unsinn» not «Gibberish», «Ruhezustand» not «Idle», «Standard» not «Default», «Kennzeichen» not «Flag». «Vorlauf», «Doppellauf» and «Auslieferungspfad» were invented for this project and are written nowhere, in a document as little as in the name of a test. This is a deliberate exception to the `german` skill, which keeps the English terms of the trade: the readers of these documents are members of the city parliament, and they know «Standard», not «Default».
 
+## Translation Fallbacks
+
+This project permits translation fallback text under its existing translation contract. This is the project-local exception to the global code skill's prohibition of fallback text; other projects retain that prohibition.
+
 ## PARLAMENTSBETRIEB.md — das Fachwissen des Rates
 
 `PARLAMENTSBETRIEB.md` im Wurzelverzeichnis sammelt, was ein Mitglied des
