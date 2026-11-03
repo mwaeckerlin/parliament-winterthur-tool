@@ -55,6 +55,8 @@ const ANSICHTEN = [
   ['geschaefte', 'Geschäfte', '.pw-geschaefte'],
   ['vorstoesse', 'Vorstösse', '.pw-vorstoesse'],
   ['kommissionen', 'Kommissionen', '.pw-kommissionen'],
+  // F144: die Beschlüsse des Stadtrats, als Karten mit Dokumenten und Notizen.
+  ['stadtratsbeschluesse', 'Stadtratsbeschlüsse', '.pw-srb-karte'],
   ['mitglieder', 'Mitglieder', '.pw-mitglieder'],
   // F123: die Grafik in beiden Massen. Der vierte Eintrag sagt, was nach dem
   // Öffnen der Ansicht noch zu tun ist.
