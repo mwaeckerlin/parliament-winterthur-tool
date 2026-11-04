@@ -32,6 +32,13 @@ aufraeumen() {
 }
 trap aufraeumen EXIT
 
+# Ende des Laufs: Exit 1, wenn die Aufnahme nicht mit 0 endet oder kein Bild liefert.
+ende_mit_bildern() {
+  local rc="$1" bilder="$2"
+  [[ "$rc" -eq 0 && "$bilder" -gt 0 ]] || { echo "[design] FEHLER: die Aufnahme endete mit ${rc} und lieferte ${bilder} Bilder" >&2; exit 1; }
+  exit 0
+}
+
 echo "[design] Stack hoch, mit der lokalen Gegenstelle als Quelle"
 docker compose up -d --build --remove-orphans --force-recreate || exit 1
 
@@ -110,6 +117,7 @@ CMD ["npx", "playwright", "test", "--config", "playwright.config.js", "design-ca
 ENDE
   docker build --tag parlwin-design-capture:lokal "${ZIEL}/aufnahme" || exit 1
   docker rm -f parlwin-design-capture >/dev/null 2>&1 || true
+  AUFNAHME_RC=0
   docker run --name parlwin-design-capture \
     --network "${COMPOSE_PROJECT_NAME}_nginx-php" \
     -e "PARLWIN_BASE_URL=http://nextcloud-nginx:8080" \
@@ -117,15 +125,17 @@ ENDE
     -e "PW_DESIGN_PASS=${PASSWORT}" \
     -e "PW_DESIGN_OUT=/work/bilder" \
     -e CI=1 \
-    parlwin-design-capture:lokal || echo "[design] Aufnahme endete mit Fehler, Bilder trotzdem holen"
+    parlwin-design-capture:lokal || AUFNAHME_RC=$?
+  [[ "$AUFNAHME_RC" -eq 0 ]] || echo "[design] Aufnahme endete mit ${AUFNAHME_RC}, Bilder trotzdem holen"
   rm -rf "${ZIEL}/out"
   # Unter /work darf der unprivilegierte Nutzer des Abbilds schreiben; am
   # Wurzelverzeichnis scheiterte es mit «EACCES: mkdir '/bilder'».
   docker cp parlwin-design-capture:/work/bilder "${ZIEL}/out" >/dev/null 2>&1 || true
   docker rm -f parlwin-design-capture >/dev/null 2>&1 || true
-  echo "[design] Bilder: $(find "${ZIEL}/out" -type f 2>/dev/null | wc -l)"
+  BILDER="$(find "${ZIEL}/out" -type f 2>/dev/null | wc -l)"
+  echo "[design] Bilder: ${BILDER}"
   find "${ZIEL}/out" -type f 2>/dev/null | sort | head -60
-  exit 0
+  ende_mit_bildern "$AUFNAHME_RC" "$BILDER"
 fi
 
 echo "[design] Scanner bauen und laufen lassen"
@@ -140,15 +150,19 @@ ENV WORKFLOW_FILE=/etc/webdesign-scanner/workflow.yaml
 ENDE
 docker build --tag parlwin-design-scanner:lokal "${ZIEL}/scanner" || exit 1
 docker rm -f parlwin-design-scanner >/dev/null 2>&1 || true
+SCAN_RC=0
 docker run --name parlwin-design-scanner --network host \
   -e "TARGET_URL=http://localhost:${PORT}/index.php/apps/parlwin/" \
   -e "SCAN_USER=design-review" \
   -e "SCAN_PASSWORD=${PASSWORT}" \
   -e ON_EXISTING=overwrite \
-  parlwin-design-scanner:lokal || echo "[design] Scanner endete mit Fehler, Bilder trotzdem holen"
+  parlwin-design-scanner:lokal || SCAN_RC=$?
+[[ "$SCAN_RC" -eq 0 ]] || echo "[design] Scanner endete mit ${SCAN_RC}, Bilder trotzdem holen"
 rm -rf "${ZIEL}/out"
 docker cp parlwin-design-scanner:/out "${ZIEL}/out" >/dev/null 2>&1 || true
 docker rm -f parlwin-design-scanner >/dev/null 2>&1 || true
 
-echo "[design] Bilder: $(find "${ZIEL}/out" -type f 2>/dev/null | wc -l)"
+BILDER="$(find "${ZIEL}/out" -type f 2>/dev/null | wc -l)"
+echo "[design] Bilder: ${BILDER}"
 find "${ZIEL}/out" -type f -name '*.png' 2>/dev/null | sort | head -40
+ende_mit_bildern "$SCAN_RC" "$BILDER"
