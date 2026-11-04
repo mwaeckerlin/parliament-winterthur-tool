@@ -20,12 +20,15 @@
 
 import { test, expect } from '@playwright/test'
 import { mkdirSync } from 'node:fs'
+import { dirname } from 'node:path'
 
 const BASE_URL = process.env.PARLWIN_BASE_URL || 'http://nextcloud-nginx:8080'
 const AUS = process.env.PW_DESIGN_OUT || '/work/bilder'
 const NUTZER = process.env.PW_DESIGN_USER || 'design-review'
 const KENNWORT = process.env.PW_DESIGN_PASS || ''
-const SITZUNG = `${AUS}/sitzung.json`
+// Die Sitzung mit ihren Cookies liegt ausserhalb von AUS: tests/regression/stack.mjs
+// und .claude/design-scan.sh kopieren AUS mit den Bildern auf den Rechner.
+const SITZUNG = process.env.PW_DESIGN_SITZUNG || '/work/.anmeldung/design-review.json'
 
 // Der Katalog des webdesign-scanner, dazu die Teilbreiten, an denen ein
 // Layout zuerst bricht.
@@ -251,6 +254,7 @@ test.describe.configure({ mode: 'serial' })
 test('anmelden', async ({ browser }) => {
   test.setTimeout(120_000)
   mkdirSync(AUS, { recursive: true })
+  mkdirSync(dirname(SITZUNG), { recursive: true })
   const kontext = await browser.newContext()
   const page = await kontext.newPage()
   await anmelden(page)
