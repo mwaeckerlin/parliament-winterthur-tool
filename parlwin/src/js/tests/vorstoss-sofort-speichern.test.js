@@ -18,9 +18,9 @@ describe('Vorstoesseliste — jede Eingabe speichert sofort', () => {
   const mountFn = () => mount(Vorstoesseliste, {
     props: {
       mitglieder: [
-        { id: 1, vorname: 'Anna', name: 'Müller', fraktion: 'Grüne', nextcloudUid: 'amueller', aktiv: true, externId: 'e1' },
+        { id: 1, vorname: 'Anna', name: 'Müller', fraktion: 'MPW', nextcloudUid: 'amueller', aktiv: true, externId: 'e1' },
       ],
-      fraktionen: [{ id: 1, name: 'Grüne', aktiv: true }],
+      fraktionen: [{ id: 1, name: 'MPW', aktiv: true }],
     },
     global: {
       stubs: {

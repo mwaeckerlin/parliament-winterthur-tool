@@ -1,4 +1,9 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, sperreVorAllem } from './fixtures.js'
+import { login } from './anmeldung.js'
+
+// Die Sperre aus sperre.js steht vor jedem anderen `beforeAll` dieser Datei,
+// weil schon ein `beforeAll` globale Einstellungen schreiben kann.
+test.beforeAll(sperreVorAllem)
 
 /**
  * E2E-Abdeckung der Domäne «Sitzungen + Sitzungstypen» im echten Browser gegen
@@ -45,26 +50,6 @@ const inEinerWoche = () => {
   const d = new Date()
   d.setDate(d.getDate() + 7)
   return d.toISOString().slice(0, 10)
-}
-
-/** Meldet einen Nutzer über das Nextcloud-Login-Formular an (identisch zur Referenz). */
-async function login(page, user) {
-  await page.goto(`${BASE_URL}/index.php/login`)
-  await page.waitForSelector('input[name="user"]', { state: 'visible', timeout: 30_000 })
-  await page.fill('input[name="user"]', user.name)
-  await page.fill('input[name="password"]', user.pass)
-  let zuletzt
-  for (let versuch = 0; versuch < 3; versuch++) {
-    void page.click('button[type="submit"], input[type="submit"]', { noWaitAfter: true }).catch(() => {})
-    try {
-      await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 12_000, waitUntil: 'commit' })
-      await page.waitForLoadState('domcontentloaded').catch(() => {})
-      return
-    } catch (e) {
-      zuletzt = e
-    }
-  }
-  throw zuletzt
 }
 
 /** CSRF-Token der laufenden Session für schreibende REST-Aufrufe. */
@@ -1284,5 +1269,83 @@ test.describe('Sitzungsnotiz: haftet am Geschäft', () => {
     await zeitleiste.locator('button[title="Löschen rückgängig machen"]').first().click()
     await expect(nl.getByText(notiz, { exact: false }).first()).toBeVisible({ timeout: 15_000 })
     expect(jsFehler, `JS-Fehler: ${jsFehler.join(' | ')}`).toEqual([])
+  })
+})
+
+// ===========================================================================
+// Nachladen während der Sitzung: zwei Fenster, eines mit langsamer Leitung
+// ===========================================================================
+test.describe('Sitzungen: Nachladen während der Sitzung', () => {
+  test.use({ viewport: { width: 1600, height: 1000 } })
+
+  test('Eine Notiz aus einem anderen Fenster erscheint, ohne dass die Traktanden verschwinden', async ({ browser }) => {
+    const stamp = Date.now()
+    const trTitel = `E2E-Nachladen-Traktandum ${stamp}`
+    const notiz = `E2E-Nachladen-Notiz ${stamp}`
+    const schreiber = await (await browser.newContext()).newPage()
+    const leser = await (await browser.newContext()).newPage()
+    try {
+      await login(schreiber, USER)
+      const typId = await createSitzungstyp(schreiber, { name: `E2E-Nachladen-Typ ${stamp}` })
+      const s = await createSitzung(schreiber, {
+        typId, datum: inEinerWoche(), titel: `E2E-Nachladen-Sitzung ${stamp}`,
+        traktanden: [{ titel: trTitel, beschreibung: '' }, { titel: `${trTitel} B`, beschreibung: '' }],
+      })
+      await login(leser, USER)
+      await gotoView(schreiber, 'Sitzungen')
+      await oeffneSitzung(schreiber, s.id)
+      // Gemessen wird erst, wenn der Leser seine Sitzung fertig geöffnet hat:
+      // Das Aufklappen holt nacheinander die Liste der Geschäfte, die
+      // verknüpften Geschäfte und zuletzt die verknüpften Vorstösse, und diese
+      // Anfragen gehören nicht zum Nachladen.
+      await gotoView(leser, 'Sitzungen')
+      const geoeffnet = leser.waitForResponse((antwort) =>
+        new URL(antwort.url()).pathname.endsWith(`/sitzungen/${s.id}/vorstoesse`), { timeout: 60_000 })
+      await oeffneSitzung(leser, s.id)
+      await geoeffnet
+      await leser.waitForLoadState('networkidle')
+
+      // Langsame Leitung beim Leser: jede Antwort der App kommt zwei Sekunden
+      // später. Mitgeschrieben wird jede Anfrage, die er danach stellt, und ob
+      // seine Traktandentabelle je verschwindet oder «Traktanden laden...» zeigt.
+      const anfragen = []
+      await leser.route('**/apps/parlwin/**', async (route) => {
+        anfragen.push(`${route.request().method()} ${new URL(route.request().url()).pathname}`)
+        await new Promise((weiter) => setTimeout(weiter, 2000))
+        await route.continue()
+      })
+      await leser.evaluate((id) => {
+        window.__pwTabelleWeg = []
+        const karte = document.querySelector(`#pw-sitzung-${id}`)
+        new MutationObserver(() => {
+          const tabelle = karte.querySelector('table.pw-tabelle-intern')
+          const laden = [...karte.querySelectorAll('.pw-laden')].some((el) => el.textContent.includes('Traktanden laden'))
+          if (!tabelle || laden) { window.__pwTabelleWeg.push(laden ? 'Traktanden laden...' : 'Tabelle fehlt') }
+        }).observe(karte, { childList: true, subtree: true })
+      }, s.id)
+
+      // Der Schreiber legt eine Notiz am ersten Traktandum an.
+      const zelle = schreiber.locator(`#pw-sitzung-${s.id} table.pw-tabelle-intern tr.pw-traktandum-notizen-zeile`).first()
+      await notizenListeSchreiben(schreiber, zelle.locator('.pw-notizen-liste'), notiz)
+      await expect(zelle.getByText(notiz, { exact: false }).first()).toBeVisible({ timeout: 15_000 })
+
+      // Beim Leser erscheint sie, und seine Tabelle stand die ganze Zeit da.
+      const leserKarte = leser.locator(`#pw-sitzung-${s.id}`)
+      await expect(leserKarte.getByText(notiz, { exact: false }).first(),
+        'die Notiz erscheint im anderen Fenster nicht').toBeVisible({ timeout: 30_000 })
+      expect(await leser.evaluate(() => window.__pwTabelleWeg),
+        'die Traktandentabelle verschwand während des Nachladens').toEqual([])
+      // Und er hat nur die Notizen dieses Traktandums geholt, nicht die ganze
+      // Sitzung und nicht die Notizen der übrigen Traktanden.
+      const nurNotizen = new RegExp(`^GET .*/sitzungen/${s.id}/traktanden/(\\d+)/notizen$`)
+      expect(anfragen.length, 'der Leser hat nichts nachgeladen').toBeGreaterThan(0)
+      expect(anfragen.filter((a) => !nurNotizen.test(a)), 'der Leser lädt mehr als die Notizen des Traktandums')
+        .toEqual([])
+      expect(new Set(anfragen.map((a) => a.match(nurNotizen)[1])).size,
+        'der Leser lädt die Notizen mehrerer Traktanden').toBe(1)
+    } finally {
+      await schreiber.context().close()
+      await leser.context().close()
+    }
   })
 })

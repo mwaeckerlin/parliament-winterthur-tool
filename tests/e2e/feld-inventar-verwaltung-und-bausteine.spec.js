@@ -1,4 +1,9 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, sperreVorAllem } from './fixtures.js'
+import { login } from './anmeldung.js'
+
+// Die Sperre aus sperre.js steht vor jedem anderen `beforeAll` dieser Datei,
+// weil schon ein `beforeAll` globale Einstellungen schreiben kann.
+test.beforeAll(sperreVorAllem)
 
 /**
  * Feld-Inventar der zuletzt noch ungeprüften Masken: der Verwaltungsbereich für
@@ -147,25 +152,6 @@ const TEILNEHMER_ARTEN = [
 // ===========================================================================
 // Basis-Helfer (identisch zu den übrigen Specs)
 // ===========================================================================
-
-async function login(page, user) {
-  await page.goto(`${BASE_URL}/index.php/login`)
-  await page.waitForSelector('input[name="user"]', { state: 'visible', timeout: 30_000 })
-  await page.fill('input[name="user"]', user.name)
-  await page.fill('input[name="password"]', user.pass)
-  let zuletzt
-  for (let versuch = 0; versuch < 3; versuch++) {
-    void page.click('button[type="submit"], input[type="submit"]', { noWaitAfter: true }).catch(() => {})
-    try {
-      await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 12_000, waitUntil: 'commit' })
-      await page.waitForLoadState('domcontentloaded').catch(() => {})
-      return
-    } catch (e) {
-      zuletzt = e
-    }
-  }
-  throw zuletzt
-}
 
 /** Öffnet die Verwaltungsseite und wartet, bis ihre Wurzel gerendert ist. */
 async function openAdmin(page) {
@@ -539,6 +525,11 @@ test.describe('Feld-Inventar: Dialog «Mit Geschäft verknüpfen»', () => {
     // Funktion: Die Suche grenzt die Trefferliste ein; ohne Treffer erscheint
     // die Leermeldung statt einer stumm leeren Liste.
     const treffer = dialog.locator('.pw-verknuepfen-liste .pw-verknuepfen-eintrag')
+    // Die Liste kommt über eine Abfrage, also wird auf den ersten Eintrag
+    // gewartet statt sofort gezählt: Eine Zählung im selben Augenblick ergibt
+    // unter Last null, und der Lauf scheiterte daran am 26.10.2026.
+    await expect(treffer.first(), 'keine Geschäfte zur Verknüpfung angeboten')
+      .toBeVisible({ timeout: 30_000 })
     expect(await treffer.count(), 'keine Geschäfte zur Verknüpfung angeboten').toBeGreaterThan(0)
     await suchfeld.fill(`zzz-kein-treffer-${stamp}`)
     await expect(treffer, 'die Suche grenzt die Trefferliste nicht ein').toHaveCount(0)

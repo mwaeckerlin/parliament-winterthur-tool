@@ -668,21 +668,17 @@
     </div>
   </section>
 
-  <Teleport to="body">
-    <div v-if="ausgewaehlteGeschaeftId" class="pw-modal-overlay" @click.self="schliesseGeschaeft">
-      <div class="pw-modal">
-        <div class="pw-modal-kopf pw-modal-kopf-leer">
-          <button type="button" class="button pw-btn-schliessen" aria-label="Dialog schliessen" @click.stop="schliesseGeschaeft">✕</button>
-        </div>
-        <GeschaeftDetail
-          :geschaeft-id="ausgewaehlteGeschaeftId"
-          :mitglieder="mitglieder"
-          :traktandum-kontext="ausgewaehltesGeschaeftTraktandumKontext"
-          @oeffne-traktandum="sprungZuSitzung"
-        />
-      </div>
-    </div>
-  </Teleport>
+  <GeschaeftMaske
+    :geschaeft-id="ausgewaehlteGeschaeftId"
+    :bestand="bestand"
+    :mitglieder="mitglieder"
+    :traktandum-kontext="ausgewaehltesGeschaeftTraktandumKontext"
+    @schliessen="schliesseGeschaeft"
+    @gespeichert="geschaeftGespeichert"
+    @sitzungsnotizen-geaendert="sitzungsnotizenUebernehmen"
+    @oeffne-geschaeft="geschaeftOeffnen"
+    @oeffne-traktandum="sprungZuSitzung"
+  />
 </template>
 
 <script>
@@ -693,7 +689,9 @@ import { vollerName, personKey, parseNotizen, kuerze } from '../utils'
 import { showError } from '@nextcloud/dialogs'
 import '@nextcloud/dialogs/style.css'
 import { subscribeRealtime } from '../realtime'
-import GeschaeftDetail from './GeschaeftDetail.vue'
+import { ereignisseBuendeln, listeAbgleichen } from '../nachladen'
+import { ABGLEICH_ENDE, BESTAND_SCHLUESSEL, bestandAnbinden, istErledigt } from '../geschaefte-bestand.js'
+import GeschaeftMaske from './GeschaeftMaske.vue'
 import BudgetSitzungsantraege from './BudgetSitzungsantraege.vue'
 import NotizenListe from './NotizenListe.vue'
 import Aktionszeitleiste from './Aktionszeitleiste.vue'
@@ -712,7 +710,8 @@ import PwDatumInput from './PwDatumInput.vue'
 
 export default {
   name: 'Sitzungsliste',
-  components: { GeschaeftDetail, BudgetSitzungsantraege, NotizenListe, Aktionszeitleiste, GeschaeftDokumente, NcActions, NcActionButton, NcButton, NcCheckboxRadioSwitch, NcLoadingIcon, NcSelect, NcTextField, PwMultiSelect, PwField, PwDatumInput, FilterPanel },
+  components: { GeschaeftMaske, BudgetSitzungsantraege, NotizenListe, Aktionszeitleiste, GeschaeftDokumente, NcActions, NcActionButton, NcButton, NcCheckboxRadioSwitch, NcLoadingIcon, NcSelect, NcTextField, PwMultiSelect, PwField, PwDatumInput, FilterPanel },
+  inject: { geteilterBestand: { from: BESTAND_SCHLUESSEL, default: null } },
   props: {
     mitglieder:   { type: Array, default: () => [] },
     fraktionen:   { type: Array, default: () => [] },
@@ -886,10 +885,17 @@ export default {
       })
     },
   },
+  created() {
+    const { bestand, eigener } = bestandAnbinden(this, this.geteilterBestand, () => this.geschaefteUebernehmen())
+    this.bestand = bestand
+    this.eigenerBestand = eigener
+  },
   mounted() {
     this.$nextTick(() => { this.filterReady = true })
     this.ladeSitzungen()
     this.ladeSitzungstypen()
+    // Ereignisse kommen gebündelt an, eigene fallen weg (nachladen.js).
+    this.ereignisAnnehmen = ereignisseBuendeln(this.ereignisseVerarbeiten)
     this.unsubRealtime = subscribeRealtime(this.handleRealtimeEvent)
   },
   beforeUnmount() {
@@ -897,6 +903,8 @@ export default {
       this.unsubRealtime()
       this.unsubRealtime = null
     }
+    if (this.ereignisAnnehmen) { this.ereignisAnnehmen.abbrechen() }
+    if (this.eigenerBestand) { this.bestand.abbrechen() }
   },
   methods: {
     kuerze,
@@ -949,6 +957,7 @@ export default {
           teilnehmer:  this.neueSitzungTeilnehmer,
         })
         let neueSitzung = data
+        let verknuepftMitAnderer = false
         // Optional mit einer bestehenden Sitzung verknüpfen (gemeinsame Sicht).
         if (this.neueSitzungVerknuepfungId) {
           try {
@@ -957,12 +966,15 @@ export default {
               { zielId: this.neueSitzungVerknuepfungId },
             )
             neueSitzung = verknuepft || data
+            verknuepftMitAnderer = true
           } catch (e) {
             showError('Sitzung erstellt, Verknüpfung fehlgeschlagen: ' + (e?.response?.data?.fehler || e?.message || ''))
           }
         }
         this.sitzungen.push(neueSitzung)
         this.sitzungen.sort((a, b) => (a.datum || '').localeCompare(b.datum || ''))
+        // Die andere Sitzung trägt jetzt dieselbe Verknüpfung.
+        if (verknuepftMitAnderer) { this.ladeSitzungen(false) }
         this.sitzungNotizenNs[neueSitzung.id] = []
         this.offeneSitzungen.push(neueSitzung.id)
         await this.ladeTraktandenFuerSitzung(neueSitzung.id)
@@ -1046,24 +1058,10 @@ export default {
         if (zeigeLaden) this.laden = false
       }
     },
-    // Aktualisiert die Sitzungsliste in-place, damit ein Realtime-Sync nicht das
-    // ganze DOM neu aufbaut (sonst springt der Scrollbalken). Bestehende Objekte
-    // werden gemerged (Referenz bleibt), neue ergänzt, entfernte gelöscht.
+    // Aktualisiert die Sitzungsliste an Ort und Stelle, damit ein Realtime-Sync
+    // nicht das ganze DOM neu aufbaut (sonst springt der Scrollbalken).
     mergeSitzungen(neu) {
-      const neuMap = new Map(neu.map(s => [s.id, s]))
-      for (const s of this.sitzungen) {
-        const n = neuMap.get(s.id)
-        if (n) Object.assign(s, n)
-      }
-      const vorhanden = new Set(this.sitzungen.map(s => s.id))
-      for (const n of neu) {
-        if (!vorhanden.has(n.id)) this.sitzungen.push(n)
-      }
-      for (let i = this.sitzungen.length - 1; i >= 0; i--) {
-        if (!neuMap.has(this.sitzungen[i].id)) this.sitzungen.splice(i, 1)
-      }
-      const reihenfolge = new Map(neu.map((s, i) => [s.id, i]))
-      this.sitzungen.sort((a, b) => (reihenfolge.get(a.id) ?? 0) - (reihenfolge.get(b.id) ?? 0))
+      listeAbgleichen(this.sitzungen, neu)
     },
     async toggleSitzung(id) {
       if (this.offeneSitzungen.includes(id)) {
@@ -1087,14 +1085,28 @@ export default {
         this.verknuepfteGeschaeftIds = { ...this.verknuepfteGeschaeftIds, [id]: [] }
       }
     },
+    // Die Geschäfte kommen aus der Liste, die die Ansichten teilen (F150):
+    // Aufklappen einer Sitzung lädt sie nur beim ersten Mal.
     async ladeGeschaefteAlle() {
-      if (this.geschaefteAlle.length) return
-      try {
-        const { data } = await axios.get(generateUrl('/apps/parlwin/geschaefte'), { params: { limit: 500 } })
-        this.geschaefteAlle = Array.isArray(data) ? data : []
-      } catch (e) {
-        this.geschaefteAlle = []
-      }
+      await this.bestand.laden()
+      this.geschaefteUebernehmen()
+    },
+    geschaefteUebernehmen() {
+      listeAbgleichen(this.geschaefteAlle, this.bestand.zustand.geschaefte)
+    },
+    // Was die Maske gespeichert hat, kommt in den Traktanden der offenen
+    // Sitzungen neu, auf denen das Geschäft steht; die geteilte Liste lädt die Maske.
+    geschaeftGespeichert(id) {
+      this.sitzungenMitGeschaeft(id).forEach((sid) => this.ladeTraktandenFuerSitzung(sid, true, true))
+    },
+    // Die Maske meldet die Sitzungsnotizen, die die Zeile des Traktandums zeigt.
+    sitzungsnotizenUebernehmen(geschaeftId, liste) {
+      this.sitzungsnotizen = { ...this.sitzungsnotizen, [geschaeftId]: liste }
+    },
+    // Die offenen Sitzungen, auf denen dieses Geschäft als Traktandum steht.
+    sitzungenMitGeschaeft(geschaeftId) {
+      return this.offeneSitzungen
+        .filter((sid) => (this.traktanden[sid] || []).some((t) => this.geschaeftIdVon(t) === geschaeftId))
     },
     // Geschäfte heissen für den Leser immer bei ihrer Nummer des Parlaments und
     // ihrem Titel; die Zeilennummer der Datenbank sagt ihm nichts.
@@ -1104,8 +1116,9 @@ export default {
     },
     geschaefteOptionenFuer(sitzungId) {
       const verknuepft = new Set(this.verknuepfteGeschaeftIds[sitzungId] || [])
+      // Zur Auswahl stehen die hängigen Geschäfte, wie vor der geteilten Liste.
       return this.geschaefteAlle
-        .filter(g => !verknuepft.has(g.id))
+        .filter(g => !verknuepft.has(g.id) && !istErledigt(g))
         .map(g => ({ id: g.id, label: `${g.nummer || ''} ${g.titel || ''}`.trim() }))
     },
     geschaeftAusgewaehlt(sitzungId, opt) {
@@ -1213,21 +1226,39 @@ export default {
         const { data } = await axios.post(generateUrl(`/apps/parlwin/sitzungen/${sitzung.id}/entkoppeln`))
         sitzung.verknuepfungId = (data && data.verknuepfungId) || null
         this.verknuepfteSitzungen = { ...this.verknuepfteSitzungen, [sitzung.id]: [] }
+        // Auch die andere Sitzung ist jetzt entkoppelt.
+        this.ladeSitzungen(false)
       } catch (e) {
         showError('Entkoppeln fehlgeschlagen: ' + (e?.response?.data?.fehler || e?.message || ''))
       }
     },
-    async ladeTraktandenFuerSitzung(sitzungId, force = false, silent = false) {
+    /**
+     * Lädt die Traktanden einer Sitzung. Beim ersten Öffnen erscheint «Traktanden
+     * laden...» und jedes Traktandum holt seine Notizen. Nach einem Ereignis
+     * (`hintergrund`) lädt nur die Liste nach: Die angezeigte Tabelle bleibt
+     * stehen und wird danach an Ort und Stelle angeglichen; die Notizen der
+     * Traktanden, die schon dastanden, kommen über ihr eigenes Ereignis, die
+     * eines neuen Traktandums gleich mit.
+     */
+    async ladeTraktandenFuerSitzung(sitzungId, force = false, hintergrund = false) {
       if (this.traktanden[sitzungId] && !force) return
-      if (!silent) this.ladenTraktanden = { ...this.ladenTraktanden, [sitzungId]: true }
+      const vorhanden = Array.isArray(this.traktanden[sitzungId])
+      const bekannt = new Set(vorhanden ? this.traktanden[sitzungId].map((t) => t.id) : [])
+      if (!hintergrund && !vorhanden) this.ladenTraktanden = { ...this.ladenTraktanden, [sitzungId]: true }
       try {
         const { data } = await axios.get(
           generateUrl(`/apps/parlwin/sitzungen/${sitzungId}/traktanden`)
         )
-        this.traktanden = { ...this.traktanden, [sitzungId]: data }
+        const liste = Array.isArray(data) ? data : []
+        if (vorhanden) {
+          listeAbgleichen(this.traktanden[sitzungId], liste)
+        } else {
+          this.traktanden = { ...this.traktanden, [sitzungId]: liste }
+        }
         const notizen = { ...this.traktandumNotizen }
-        data.forEach(t => {
+        liste.forEach(t => {
           notizen[t.id] = this.parseNotizen(t.notizen)
+          if (hintergrund && bekannt.has(t.id)) return
           // Für verknüpfte Geschäfte die am Geschäft haftenden Sitzungsnotizen laden;
           // für geschäftslose Traktanden die am Traktandum haftenden Notizen.
           const gid = this.geschaeftIdVon(t)
@@ -1237,7 +1268,7 @@ export default {
         // Wenn aktive Suche Treffer ergibt, Sitzung automatisch aufklappen.
         const term = (this.suche || '').trim().toLowerCase()
         if (term && !this.offeneSitzungen.includes(sitzungId)) {
-          const hit = data.some((t) => {
+          const hit = liste.some((t) => {
             const tt = (t.geschaeft?.titel || t.titel || '').toLowerCase()
             const tn = (t.geschaeft?.nummer || '').toLowerCase()
             return tt.includes(term) || tn.includes(term)
@@ -1251,20 +1282,88 @@ export default {
       }
     },
     handleRealtimeEvent(event) {
-      const type = event?.type || ''
-      if (type === 'sync.completed' || type === 'sitzungen.updated') {
-        this.ladeSitzungen(false)
+      // Die geteilte Liste der Geschäfte bekommt ihre Ereignisse von App.vue.
+      if (this.eigenerBestand) { this.bestand.ereignis(event) }
+      if (this.ereignisAnnehmen) {
+        this.ereignisAnnehmen(event)
+      } else {
+        this.ereignisseVerarbeiten([event])
       }
-      if (type === 'traktanden.updated') {
-        const sitzungId = Number(event?.payload?.sitzungId || 0)
-        if (sitzungId > 0 && this.offeneSitzungen.includes(sitzungId)) {
-          this.ladeTraktandenFuerSitzung(sitzungId, true)
+    },
+    /**
+     * Eine Runde gebündelter Ereignisse anderer Fenster: Geladen wird nur, was
+     * sich geändert hat, und jedes nur einmal je Runde.
+     * - eine Notiz an einem Traktandum ohne Geschäft: nur dessen Notizen;
+     * - eine Notiz an einer Sitzung: nur deren Notizen;
+     * - eine Aktion an einem Geschäft: nur dessen Sitzungsnotizen, und nur wenn
+     *   es auf einer offenen Sitzung steht;
+     * - geänderte Stammdaten eines Geschäfts: die Traktanden der offenen
+     *   Sitzungen, auf denen es steht, im Hintergrund;
+     * - geänderte Felder eines Traktandums: die Traktanden seiner Sitzung, im
+     *   Hintergrund.
+     * Eine zugeklappte Sitzung lädt nichts: Betrifft sie ein Ereignis, fallen
+     * ihre geladenen Traktanden weg, und das nächste Aufklappen lädt sie neu.
+     */
+    ereignisseVerarbeiten(ereignisse) {
+      let sitzungslisteNeu = false
+      const sitzungNotizen = new Set()
+      const traktandenNeu = new Set()
+      const traktandumNotizen = new Map()
+      const geschaeftNotizen = new Set()
+      const verwerfen = new Set()
+      const offen = (sid) => sid > 0 && this.offeneSitzungen.includes(sid)
+      const zugeklappt = () => Object.keys(this.traktanden).map(Number).filter((sid) => !offen(sid))
+      // Die zugeklappten Sitzungen, auf denen dieses Geschäft steht, verwerfen ihre Traktanden.
+      const zugeklappteVerwerfen = (gid) => zugeklappt()
+        .filter((sid) => this.traktanden[sid].some((t) => this.geschaeftIdVon(t) === gid))
+        .forEach((sid) => verwerfen.add(sid))
+      // Ein Geschäft mit geänderten Angaben: Zugeklappte Sitzungen verwerfen ihre
+      // Traktanden, offene laden sie im Hintergrund.
+      const geschaeftGeaendert = (gid) => {
+        zugeklappteVerwerfen(gid)
+        this.sitzungenMitGeschaeft(gid).forEach((sid) => traktandenNeu.add(sid))
+      }
+      for (const event of ereignisse) {
+        const type = event?.type || ''
+        const p = event?.payload || {}
+        const id = Number(p.id || 0)
+        if (ABGLEICH_ENDE.includes(type)) {
+          if (type === 'sync.completed') { sitzungslisteNeu = true }
+          // Der Abgleich nennt die Geschäfte, die er bis zu seinem Ende geändert hat (F150).
+          if (Array.isArray(p.geschaeftIds)) { p.geschaeftIds.map(Number).filter((gid) => gid > 0).forEach(geschaeftGeaendert) }
+        } else if (type === 'sitzungen.updated') {
+          if (p.aktionTyp === 'notiz' && id > 0) { sitzungNotizen.add(id) } else { sitzungslisteNeu = true }
+        } else if (type === 'traktanden.updated') {
+          const sid = Number(p.sitzungId || 0)
+          if (!offen(sid)) {
+            if (sid > 0) { verwerfen.add(sid) }
+            continue
+          }
+          if (p.aktionTyp === 'notiz' && id > 0) { traktandumNotizen.set(id, sid) } else { traktandenNeu.add(sid) }
+        } else if (type === 'geschaefte.updated' || type === 'geschaefte.action') {
+          if (id <= 0) {
+            this.offeneSitzungen.forEach((sid) => traktandenNeu.add(sid))
+            zugeklappt().forEach((sid) => verwerfen.add(sid))
+            continue
+          }
+          if (type === 'geschaefte.action' && p.aktionTyp === 'sitzungsnotiz') {
+            zugeklappteVerwerfen(id)
+            if (this.sitzungenMitGeschaeft(id).length) { geschaeftNotizen.add(id) }
+          } else {
+            geschaeftGeaendert(id)
+          }
         }
       }
-      if (type === 'geschaefte.updated' || type === 'geschaefte.action') {
-        // Geschäftsdaten geändert – betroffene offene Sitzungen neu laden.
-        this.offeneSitzungen.forEach((sid) => this.ladeTraktandenFuerSitzung(sid, true))
+      if (verwerfen.size) {
+        const rest = { ...this.traktanden }
+        verwerfen.forEach((sid) => { delete rest[sid] })
+        this.traktanden = rest
       }
+      if (sitzungslisteNeu) this.ladeSitzungen(false)
+      sitzungNotizen.forEach((sid) => this.ladeSitzungNotizen(sid))
+      traktandenNeu.forEach((sid) => this.ladeTraktandenFuerSitzung(sid, true, true))
+      traktandumNotizen.forEach((sid, tid) => this.ladeTraktandumNotizen(sid, tid))
+      geschaeftNotizen.forEach((gid) => this.ladeSitzungsnotizen(gid))
     },
     parseNotizen,
     parseTraktandumNotizen(tId) {
@@ -1397,7 +1496,8 @@ export default {
           zustaendigkeiten: payload,
           haupt_person_key: haupt,
         })
-        await this.ladeTraktandenFuerSitzung(sitzungId, true, true)
+        await this.traktandenMitGeschaeftNachladen(geschaeft.id, sitzungId)
+        await this.bestand.nachladen([geschaeft.id])
       } catch (fehler) {
         console.error('Fehler beim Speichern der Zuständigkeit:', fehler)
       }
@@ -1410,10 +1510,17 @@ export default {
         } else {
           await axios.delete(generateUrl(`/apps/parlwin/geschaefte/${geschaeft.id}/beschluesse`))
         }
-        await this.ladeTraktandenFuerSitzung(sitzungId, true, true)
+        await this.traktandenMitGeschaeftNachladen(geschaeft.id, sitzungId)
+        await this.bestand.nachladen([geschaeft.id])
       } catch (fehler) {
         console.error('Fehler beim Speichern des Beschlusses:', fehler)
       }
+    },
+    // Nach einer Änderung in der Zeile laden die Traktanden dieser Sitzung und
+    // jeder weiteren offenen Sitzung mit demselben Geschäft im Hintergrund.
+    async traktandenMitGeschaeftNachladen(geschaeftId, sitzungId) {
+      const sitzungen = new Set([sitzungId, ...this.sitzungenMitGeschaeft(geschaeftId)])
+      await Promise.all([...sitzungen].map((sid) => this.ladeTraktandenFuerSitzung(sid, true, true)))
     },
     // Ein Klick in die Zeile öffnet das Geschäft. Die Links darin gehören sich
     // selbst: «↗» führt zur Quelle, «Protokoll» zum Protokoll. Geprüft wird das
@@ -1437,6 +1544,11 @@ export default {
     schliesseGeschaeft() {
       this.ausgewaehlteGeschaeftId = null
       this.ausgewaehltesGeschaeftTraktandumKontext = null
+    },
+    // Ein Verweis in der Maske öffnet ein anderes Geschäft, ohne Traktandum.
+    geschaeftOeffnen(id) {
+      this.ausgewaehltesGeschaeftTraktandumKontext = null
+      this.ausgewaehlteGeschaeftId = id
     },
     async sprungZuSitzung(sitzungId) {
       this.schliesseGeschaeft()

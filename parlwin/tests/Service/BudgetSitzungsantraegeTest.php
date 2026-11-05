@@ -176,7 +176,7 @@ class BudgetSitzungsantraegeTest extends TestCase {
     private function geparst(): array {
         return [
             ['code' => '121', 'bereich' => 'globalbudget', 'antragsteller' => 'AK', 'gremium' => 'kommission', 'betragDelta' => 103000, 'begruendung' => 'HR-Tool', 'ergebnis' => '11:0 angenommen'],
-            ['code' => '157', 'bereich' => 'globalbudget', 'antragsteller' => 'Fraktion SP', 'gremium' => 'fraktion', 'betragDelta' => 50000, 'begruendung' => 'Kunstankäufe', 'ergebnis' => ''],
+            ['code' => '157', 'bereich' => 'globalbudget', 'antragsteller' => 'Fraktion MPW', 'gremium' => 'fraktion', 'betragDelta' => 50000, 'begruendung' => 'Kunstankäufe', 'ergebnis' => ''],
         ];
     }
 

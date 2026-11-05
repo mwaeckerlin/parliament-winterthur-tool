@@ -6,6 +6,7 @@ namespace OCA\ParliamentWinterthur\Service;
 
 use OCA\ParliamentWinterthur\Db\GeschaeftDokument;
 use OCA\ParliamentWinterthur\Db\GeschaeftDokumentMapper;
+use OCP\AppFramework\Db\DoesNotExistException;
 use OCP\Http\Client\IClientService;
 use OCP\ITempManager;
 use Psr\Log\LoggerInterface;
@@ -252,6 +253,31 @@ class GeschaeftDokumentService
     public function zuGeschaeften(array $geschaeftIds): array
     {
         return $this->mapper->findByGeschaefte($geschaeftIds);
+    }
+
+    /**
+     * Die Köpfe der Dokumente mehrerer Geschäfte, ohne ihren Text, mit der
+     * Angabe, ob ein Inhalt gelesen ist.
+     *
+     * @param int[] $geschaeftIds
+     * @return array<int, list<array{dokument: GeschaeftDokument, hatInhalt: bool}>>
+     */
+    public function koepfeZuGeschaeften(array $geschaeftIds): array
+    {
+        return $this->mapper->findKoepfeByGeschaefte($geschaeftIds);
+    }
+
+    /**
+     * Ein Dokument mit seinem Inhalt, wenn es zu diesem Geschäft gehört.
+     */
+    public function einDokument(int $geschaeftId, int $dokumentId): ?GeschaeftDokument
+    {
+        try {
+            $dokument = $this->mapper->find($dokumentId);
+        } catch (DoesNotExistException) {
+            return null;
+        }
+        return (int) $dokument->getGeschaeftId() === $geschaeftId ? $dokument : null;
     }
 
     /**

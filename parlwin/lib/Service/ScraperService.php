@@ -19,6 +19,9 @@ class ScraperService
     /** Die Quelle im Betrieb: die Webseite des Parlaments. */
     private const BASE_URL_STANDARD = 'https://parlament.winterthur.ch';
 
+    /** So vielen Weiterleitungen folgt ein Abruf höchstens. */
+    private const WEITERLEITUNGEN_HOECHSTENS = 5;
+
     /** Pfade der verschiedenen Datenquellen, unter der Basis-Adresse. */
     private const PFADE = [
         'geschaefte' => '/politbusiness',
@@ -79,6 +82,14 @@ class ScraperService
      * @var array<string, array<int, array<string, mixed>>>
      */
     private array $prefetchedListen = [];
+
+    /**
+     * Die Adresse nach den Weiterleitungen, je angefragter Adresse, nur wo sie
+     * von der angefragten abweicht.
+     *
+     * @var array<string, string>
+     */
+    private array $weitergeleitet = [];
 
     public function __construct(
         private readonly IClientService $clientService,
@@ -707,6 +718,7 @@ class ScraperService
         $client = $this->clientService->newClient();
         $connectTimeout = $this->leseIntAusEnv('PARLWIN_SYNC_HTTP_CONNECT_TIMEOUT', 8, 1, 60);
         $timeout = $this->leseIntAusEnv('PARLWIN_SYNC_HTTP_TIMEOUT', 25, 5, 180);
+        $effektiv = $url;
         $response = $client->get($url, [
             'timeout' => $timeout,
             'connect_timeout' => $connectTimeout,
@@ -715,8 +727,72 @@ class ScraperService
                 'Accept' => 'text/html,application/xhtml+xml',
                 'Accept-Language' => 'de-CH,de;q=0.9',
             ],
+            // Guzzle ruft `on_redirect` vor jeder Weiterleitung; eine Adresse
+            // ausserhalb der Basis bricht den Abruf ab, bevor sie angefragt wird.
+            'allow_redirects' => [
+                'max' => self::WEITERLEITUNGEN_HOECHSTENS,
+                'protocols' => ['http', 'https'],
+                'on_redirect' => static function ($anfrage, $antwort, $ziel) use ($url): void {
+                    if (!self::darfWeiterleiten($url, (string) $ziel)) {
+                        throw new \RuntimeException('Die Weiterleitung von ' . $url . ' nach ' . $ziel . ' verlässt die Quelle.');
+                    }
+                },
+            ],
+            // Guzzle meldet hier die Adresse nach den Weiterleitungen.
+            'on_stats' => static function (object $stats) use (&$effektiv): void {
+                if (method_exists($stats, 'getEffectiveUri')) {
+                    $effektiv = (string) $stats->getEffectiveUri();
+                }
+            },
         ]);
+        $this->merkeEffektiveAdresse($url, $effektiv);
         return $response->getBody();
+    }
+
+    /**
+     * Ob der Abruf von `$url` der Weiterleitung nach `$ziel` folgen darf: nur
+     * innerhalb der Basis, zu der `$url` gehört, also der Stadt-Webseite, der
+     * Parlamentswebseite oder, für jede andere Adresse, ihres eigenen Rechners.
+     */
+    private static function darfWeiterleiten(string $url, string $ziel): bool
+    {
+        $basis = self::basisVon($url);
+        return $basis !== '' && str_starts_with($ziel, $basis . '/');
+    }
+
+    /** Die Basis, unter der eine Adresse liegt, ohne Schrägstrich am Ende. */
+    private static function basisVon(string $url): string
+    {
+        try {
+            if (self::liegtUnterStadtBasis($url)) {
+                return self::stadtBasisUrl();
+            }
+        } catch (\RuntimeException) {
+            // Eine ungültige Basis der Stadt gilt für keine Adresse.
+        }
+        if (str_starts_with($url, self::basisUrl() . '/')) {
+            return self::basisUrl();
+        }
+        $teile = parse_url($url);
+        if (!is_array($teile) || !in_array(strtolower((string) ($teile['scheme'] ?? '')), ['http', 'https'], true) || ($teile['host'] ?? '') === '') {
+            return '';
+        }
+        return strtolower((string) $teile['scheme']) . '://' . $teile['host'] . (isset($teile['port']) ? ':' . $teile['port'] : '');
+    }
+
+    private function merkeEffektiveAdresse(string $url, string $effektiv): void
+    {
+        if ($effektiv !== '' && $effektiv !== $url) {
+            $this->weitergeleitet[$url] = $effektiv;
+        } else {
+            unset($this->weitergeleitet[$url]);
+        }
+    }
+
+    /** Die Adresse, unter der die Antwort auf `$url` zuletzt tatsächlich kam. */
+    private function effektiveAdresse(string $url): string
+    {
+        return $this->weitergeleitet[$url] ?? $url;
     }
 
     /**
@@ -1254,11 +1330,16 @@ class ScraperService
         return '';
     }
 
+    /**
+     * Text aus HTML, ohne Auszeichnung und mit einfachen Leerzeichen.
+     *
+     * `\s` trifft unter `/u` auch das geschützte Leerzeichen (U+00A0), mit dem
+     * die Webseite der Stadt ihre Daten schreibt: «28.&nbsp;Oktober&nbsp;2026».
+     */
     public static function bereinigeHtmlText(string $text): string
     {
         $dekodiert = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $ohneTags = strip_tags($dekodiert);
-        return trim((string) preg_replace('/\s+/u', ' ', $ohneTags));
+        return trim((string) preg_replace('/\s+/u', ' ', strip_tags($dekodiert)));
     }
 
     public static function absolutUrl(string $url): string
@@ -1427,17 +1508,20 @@ class ScraperService
         $aktiv = [];
         $next = 0;
 
-        $starteHandle = function (string $url) use (&$mh, &$aktiv): void {
+        // curl folgt keiner Weiterleitung selbst: Jede Location wird erst gegen
+        // die Basis der angefragten Adresse geprüft und dann neu angefragt.
+        $starteHandle = function (string $url, string $ziel, int $schritte) use (&$mh, &$aktiv): void {
             $connectTimeout = $this->leseIntAusEnv('PARLWIN_SYNC_HTTP_CONNECT_TIMEOUT', 8, 1, 60);
             $timeout = $this->leseIntAusEnv('PARLWIN_SYNC_HTTP_TIMEOUT', 25, 5, 180);
             $lowSpeedTime = min($timeout, $this->leseIntAusEnv('PARLWIN_SYNC_HTTP_LOW_SPEED_TIME', 12, 3, 120));
             $lowSpeedLimit = $this->leseIntAusEnv('PARLWIN_SYNC_HTTP_LOW_SPEED_LIMIT', 1, 1, 1024);
             $ch = curl_init();
             curl_setopt_array($ch, [
-                CURLOPT_URL => $url,
+                CURLOPT_URL => $ziel,
                 CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_FOLLOWLOCATION => true,
-                CURLOPT_MAXREDIRS => 5,
+                CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
+                CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
+                CURLOPT_FOLLOWLOCATION => false,
                 CURLOPT_CONNECTTIMEOUT => $connectTimeout,
                 CURLOPT_TIMEOUT => $timeout,
                 CURLOPT_LOW_SPEED_TIME => $lowSpeedTime,
@@ -1449,12 +1533,12 @@ class ScraperService
                 ],
             ]);
             curl_multi_add_handle($mh, $ch);
-            $aktiv[(int) $ch] = ['handle' => $ch, 'url' => $url];
+            $aktiv[(int) $ch] = ['handle' => $ch, 'url' => $url, 'ziel' => $ziel, 'schritte' => $schritte];
         };
 
         while ($next < count($queue) || $aktiv !== []) {
             while ($next < count($queue) && count($aktiv) < $parallel) {
-                $starteHandle($queue[$next]);
+                $starteHandle($queue[$next], $queue[$next], 0);
                 $next++;
             }
 
@@ -1466,14 +1550,31 @@ class ScraperService
                 $ch = $info['handle'];
                 $id = (int) $ch;
                 $url = (string) ($aktiv[$id]['url'] ?? '');
+                $ziel = (string) ($aktiv[$id]['ziel'] ?? $url);
+                $schritte = (int) ($aktiv[$id]['schritte'] ?? 0);
                 $body = (string) curl_multi_getcontent($ch);
                 $errno = curl_errno($ch);
                 $httpCode = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+                $weiter = $httpCode >= 300 && $httpCode < 400 ? (string) curl_getinfo($ch, CURLINFO_REDIRECT_URL) : '';
+                curl_multi_remove_handle($mh, $ch);
+                unset($aktiv[$id]);
+                if ($url !== '' && $errno === 0 && $weiter !== '') {
+                    if ($schritte < self::WEITERLEITUNGEN_HOECHSTENS && self::darfWeiterleiten($url, $weiter)) {
+                        $starteHandle($url, $weiter, $schritte + 1);
+                        continue;
+                    }
+                    $this->logger->warning('Parlament Winterthur: Weiterleitung nicht gefolgt', [
+                        'url' => $url,
+                        'nach' => $weiter,
+                        'schritte' => $schritte,
+                    ]);
+                }
                 $erfolg = false;
-                if ($url !== '' && $errno === 0 && $httpCode >= 200 && $httpCode < 400 && $body !== '') {
+                if ($url !== '' && $errno === 0 && $weiter === '' && $httpCode >= 200 && $httpCode < 300 && $body !== '') {
                     $ergebnisse[$url] = $body;
+                    $this->merkeEffektiveAdresse($url, $ziel);
                     $erfolg = true;
-                } elseif ($url !== '') {
+                } elseif ($url !== '' && $weiter === '') {
                     $this->logger->warning('Parlament Winterthur: Parallel-Download fehlgeschlagen', [
                         'url' => $url,
                         'errno' => $errno,
@@ -1483,8 +1584,6 @@ class ScraperService
 
                 // Kein curl_close(): Seit PHP 8.0 wirkt es nicht mehr, und seit
                 // 8.5 ist es verworfen. Der Handle verschwindet mit $aktiv.
-                curl_multi_remove_handle($mh, $ch);
-                unset($aktiv[$id]);
 
                 if ($onComplete !== null && $url !== '') {
                     try {
@@ -2029,5 +2128,435 @@ class ScraperService
             return null;
         }
         return $limit;
+    }
+
+    // ------------------------------------------------------------------
+    // Stadtratsbeschlüsse (F146)
+    //
+    // Die Beschlüsse des Stadtrats stehen auf der Webseite der Stadt und nicht
+    // auf der des Parlaments, darum eine eigene Basis-Adresse. Der Aufbau ist
+    // eine Suchliste mit zwölf Einträgen je Seite: ein Link je Beschluss, der
+    // Nummer und Titel in einer Überschrift trägt, dazu Datum und Departement,
+    // und eine Detailseite mit dem Departement, dem Datum der Veröffentlichung
+    // und den PDF-Dokumenten.
+    // ------------------------------------------------------------------
+
+    /** Die Quelle im Betrieb: die Webseite der Stadt. */
+    private const BASE_URL_STADT_STANDARD = 'https://stadt.winterthur.ch';
+
+    /** Der Pfad der Liste der Stadtratsbeschlüsse, unter der Basis-Adresse der Stadt. */
+    private const PFAD_STADTRATSBESCHLUESSE = '/stadtratsbeschluesse';
+
+    /** So viele Beschlüsse führt eine Listenseite der Stadt. */
+    private const BESCHLUESSE_JE_SEITE = 12;
+
+    /**
+     * Die Adresse der Stadt-Webseite.
+     *
+     * Im Testlauf zeigt `PARLWIN_STADT_BASE_URL` auf die lokale Gegenstelle,
+     * gleich wie `PARLWIN_QUELLE_BASE_URL` für die Parlamentswebseite. Erlaubt
+     * ist eine Adresse mit http oder https und einem Rechnernamen, ohne
+     * Benutzer, Abfrage und Anker.
+     *
+     * @throws \RuntimeException wenn die Einstellung keine solche Adresse ist
+     */
+    public static function stadtBasisUrl(): string
+    {
+        $wert = trim((string) getenv('PARLWIN_STADT_BASE_URL'));
+        if ($wert === '') {
+            return self::BASE_URL_STADT_STANDARD;
+        }
+        $teile = parse_url($wert);
+        $mangel = match (true) {
+            !is_array($teile) => 'sie lässt sich nicht lesen',
+            !in_array(strtolower((string) ($teile['scheme'] ?? '')), ['http', 'https'], true) => 'sie beginnt nicht mit http:// oder https://',
+            trim((string) ($teile['host'] ?? '')) === '' => 'ihr fehlt der Rechnername',
+            isset($teile['user']) || isset($teile['pass']) => 'sie enthält Benutzer oder Passwort',
+            isset($teile['query']) => 'sie enthält eine Abfrage mit «?»',
+            isset($teile['fragment']) => 'sie enthält einen Anker mit «#»',
+            default => '',
+        };
+        if ($mangel !== '') {
+            throw new \RuntimeException(
+                'PARLWIN_STADT_BASE_URL ist keine gültige Adresse der Stadt-Webseite: ' . $mangel
+                . '. Erlaubt ist etwa https://stadt.winterthur.ch.'
+            );
+        }
+        return rtrim($wert, '/');
+    }
+
+    /** Ob eine Adresse unter der Basis der Stadt-Webseite liegt. */
+    private static function liegtUnterStadtBasis(string $url): bool
+    {
+        return str_starts_with($url, self::stadtBasisUrl() . '/');
+    }
+
+    /** Macht eine Adresse der Stadt-Webseite absolut. */
+    public static function stadtAbsolutUrl(string $url): string
+    {
+        if ($url === '') {
+            return '';
+        }
+        if (str_starts_with($url, 'http://') || str_starts_with($url, 'https://')) {
+            return $url;
+        }
+        return self::stadtBasisUrl() . '/' . ltrim($url, '/');
+    }
+
+    /**
+     * Wie viele Listenseiten der Abgleich höchstens liest.
+     *
+     * Die Quelle führt 3160 Beschlüsse auf 264 Seiten. Eine Fraktion arbeitet
+     * mit den jüngsten, darum liest der Abgleich standardmässig die ersten zehn
+     * Seiten, also 120 Beschlüsse; `PARLWIN_SRB_SEITEN` setzt eine andere Zahl,
+     * und 0 heisst: alle Seiten.
+     */
+    public function beschlussSeitenGrenze(): int
+    {
+        $standard = 10;
+        $wert = getenv('PARLWIN_SRB_SEITEN');
+        if ($wert === false || trim((string) $wert) === '') {
+            return $standard;
+        }
+        $wert = trim((string) $wert);
+        if (!ctype_digit($wert)) {
+            // Ein Tippfehler im Deployment soll nicht lautlos zum Standard
+            // führen: der Betreiber sucht sonst die Wirkung seiner Einstellung.
+            $this->logger->warning(sprintf(
+                'Parlament Winterthur: PARLWIN_SRB_SEITEN ist «%s» und keine Zahl; gelesen werden %d Seiten.',
+                $wert,
+                $standard
+            ));
+            return $standard;
+        }
+        return (int) $wert;
+    }
+
+    /**
+     * Liest die Stadtratsbeschlüsse von der Webseite der Stadt.
+     *
+     * Eine unerreichbare Quelle und eine Listenseite ohne einen einzigen
+     * Beschluss sind Fehler und keine leere Antwort: sonst meldete der Abgleich
+     * «0 gelesen, 0 neu» als Erfolg, und niemand erfuhr, dass die Adresse falsch
+     * ist oder die Quelle ihren Aufbau geändert hat.
+     *
+     * @param ?callable $fortschritt Wird je gelesener Seite gerufen: (int $gelesen, int $gesamt).
+     *        Der Zähler läuft über Listen- und Detailseiten durch; bis die Zahl
+     *        der Beschlüsse feststeht, rechnet er mit zwölf je Listenseite.
+     * @return array<int, array<string, mixed>> Je Beschluss Nummer, Titel, Datum,
+     *         Departement, Sitzung, Adresse, Datum der Veröffentlichung und Dokumente
+     * @throws \RuntimeException wenn die Quelle nicht antwortet oder nichts hergibt
+     */
+    public function ladeStadtratsbeschluesse(?callable $fortschritt = null): array
+    {
+        $listenUrl = self::stadtBasisUrl() . self::PFAD_STADTRATSBESCHLUESSE;
+        try {
+            $ersteSeite = $this->ladeHtml($listenUrl);
+        } catch (\Throwable $e) {
+            $this->logger->error(
+                'Parlament Winterthur: Stadtratsbeschlüsse nicht erreichbar: ' . $e->getMessage(),
+                ['url' => $listenUrl, 'exception' => $e]
+            );
+            throw new \RuntimeException(self::nichtErreichbar($listenUrl, $e), 0, $e);
+        }
+        $effektiv = $this->effektiveAdresse($listenUrl);
+        if (!self::liegtUnterStadtBasis($effektiv)) {
+            throw new \RuntimeException(
+                'Die Liste der Stadtratsbeschlüsse unter ' . $listenUrl . ' leitet auf ' . $effektiv
+                . ' weiter, und diese Adresse liegt nicht unter ' . self::stadtBasisUrl() . '/.'
+            );
+        }
+
+        $seitenGesamt = $this->extrahiereLetzteSeitenzahl($ersteSeite);
+        $grenze = $this->beschlussSeitenGrenze();
+        $zuLesen = $grenze === 0 ? $seitenGesamt : min($grenze, $seitenGesamt);
+
+        $eintraege = $this->extrahiereStadtratsbeschluesseAusHtml($ersteSeite);
+        if ($eintraege === []) {
+            throw new \RuntimeException(
+                'Die Liste der Stadtratsbeschlüsse unter ' . $listenUrl
+                . ' nennt keinen einzigen Beschluss. Die Quelle hat ihren Aufbau geändert,'
+                . ' oder die Adresse zeigt auf die falsche Seite.'
+            );
+        }
+        $geschaetzt = $zuLesen * (1 + self::BESCHLUESSE_JE_SEITE);
+        if ($fortschritt !== null) {
+            $fortschritt(1, $geschaetzt);
+        }
+
+        $weitereUrls = [];
+        for ($seite = 2; $seite <= $zuLesen; $seite++) {
+            $weitereUrls[] = $listenUrl . '?page=' . $seite;
+        }
+        if ($weitereUrls !== []) {
+            $gelesen = 1;
+            $seitenHtml = $this->ladeHtmlParallel(
+                $weitereUrls,
+                $this->leseParallelitaetAusEnv('PARLWIN_SYNC_PARALLEL_LISTEN', 4, 1, 16),
+                true,
+                function () use (&$gelesen, $geschaetzt, $fortschritt): void {
+                    $gelesen++;
+                    if ($fortschritt !== null) {
+                        $fortschritt($gelesen, $geschaetzt);
+                    }
+                }
+            );
+            foreach ($weitereUrls as $url) {
+                $html = $seitenHtml[$url] ?? '';
+                if ($html !== '' && $this->kamVonDerStadt($url)) {
+                    $eintraege = array_merge($eintraege, $this->extrahiereStadtratsbeschluesseAusHtml($html));
+                }
+            }
+        }
+
+        $eintraege = $this->wendeSyncLimitAn('stadtratsbeschluesse', $eintraege);
+        return $this->reichereBeschluesseMitDetailsAn($eintraege, $fortschritt, $zuLesen);
+    }
+
+    /** Gründe von curl, nach seiner Fehlernummer, für die Meldung an die Verwaltung. */
+    private const CURL_GRUENDE = [
+        6 => 'Rechnername nicht gefunden',
+        7 => 'keine Verbindung zum Rechner',
+        28 => 'Zeitüberschreitung',
+        35 => 'TLS-Verbindung gescheitert',
+        52 => 'leere Antwort',
+        56 => 'Verbindung abgebrochen',
+        60 => 'Zertifikat nicht anerkannt',
+    ];
+
+    /**
+     * Die Meldung für eine Liste der Stadtratsbeschlüsse, die nicht kam. Sie
+     * nennt die Adresse und den HTTP-Status oder den Grund des Netzfehlers, nie
+     * den Rumpf der Antwort: Die Ausnahme von Guzzle hängt dessen Anfang an
+     * ihre Meldung, bei einer Fehlerseite also HTML.
+     */
+    private static function nichtErreichbar(string $url, \Throwable $e): string
+    {
+        $anfang = 'Die Liste der Stadtratsbeschlüsse unter ' . $url . ' ist nicht erreichbar';
+        $antwort = method_exists($e, 'getResponse') ? $e->getResponse() : null;
+        if (is_object($antwort) && method_exists($antwort, 'getStatusCode')) {
+            return $anfang . ' (HTTP ' . (int) $antwort->getStatusCode() . ').';
+        }
+        $kontext = method_exists($e, 'getHandlerContext') ? $e->getHandlerContext() : [];
+        $nummer = (int) ($kontext['errno'] ?? 0);
+        if ($nummer > 0) {
+            return $anfang . ' (' . (self::CURL_GRUENDE[$nummer] ?? 'Netzfehler, curl-Fehler ' . $nummer) . ').';
+        }
+        $grund = trim(strip_tags((string) strtok($e->getMessage(), "\n")));
+        return $anfang . ($grund === '' ? '.' : ' (' . $grund . ').');
+    }
+
+    /**
+     * Ob die Antwort auf `$url` nach allen Weiterleitungen unter der Basis der
+     * Stadt-Webseite lag. Eine Antwort von anderswo wird verworfen.
+     */
+    private function kamVonDerStadt(string $url): bool
+    {
+        $effektiv = $this->effektiveAdresse($url);
+        if (self::liegtUnterStadtBasis($effektiv)) {
+            return true;
+        }
+        $this->logger->warning(
+            'Parlament Winterthur: Seite der Stadtratsbeschlüsse leitet aus der Quelle hinaus und wird verworfen',
+            ['url' => $url, 'effektiv' => $effektiv, 'basis' => self::stadtBasisUrl()]
+        );
+        return false;
+    }
+
+    /**
+     * Holt je Beschluss die Detailseite und übernimmt Departement, Datum der
+     * Veröffentlichung und die Dokumente. `detailseiteGelesen` sagt je
+     * Beschluss, ob das gelang. Der Fortschritt zählt nach den `$listenseiten`
+     * weiter.
+     *
+     * @param array<int, array<string, mixed>> $eintraege
+     * @return array<int, array<string, mixed>>
+     */
+    private function reichereBeschluesseMitDetailsAn(array $eintraege, ?callable $fortschritt = null, int $listenseiten = 0): array
+    {
+        $urls = [];
+        foreach ($eintraege as $index => $eintrag) {
+            $eintraege[$index]['detailseiteGelesen'] = false;
+            $url = (string) ($eintrag['url'] ?? '');
+            if ($url !== '' && self::liegtUnterStadtBasis($url)) {
+                $urls[] = $url;
+            } elseif ($url !== '') {
+                $this->logger->warning(
+                    'Parlament Winterthur: Stadtratsbeschluss mit fremder Adresse übersprungen',
+                    ['url' => $url, 'basis' => self::stadtBasisUrl()]
+                );
+            }
+        }
+        if ($urls === []) {
+            return $eintraege;
+        }
+
+        $urls = array_values(array_unique($urls));
+        $gelesen = 0;
+        $gesamt = $listenseiten + count($urls);
+        $seiten = $this->ladeHtmlParallel(
+            $urls,
+            $this->leseParallelitaetAusEnv('PARLWIN_SYNC_PARALLEL_DETAILS', 8, 1, 32),
+            true,
+            function () use (&$gelesen, $gesamt, $listenseiten, $fortschritt): void {
+                $gelesen++;
+                if ($fortschritt !== null) {
+                    $fortschritt($listenseiten + $gelesen, $gesamt);
+                }
+            }
+        );
+
+        foreach ($eintraege as $index => $eintrag) {
+            $url = (string) ($eintrag['url'] ?? '');
+            $html = $seiten[$url] ?? '';
+            if ($html === '' || !$this->kamVonDerStadt($url)) {
+                continue;
+            }
+            $eintraege[$index] = array_merge(
+                $eintrag,
+                $this->extrahiereStadtratsbeschlussDetailsAusHtml($html),
+                ['detailseiteGelesen' => true]
+            );
+        }
+        return $eintraege;
+    }
+
+    /**
+     * Die Zahl der Listenseiten, aus den Seitenlinks der Paginierung.
+     *
+     * Die Quelle verlinkt die erste, die zweite, die dritte und die letzte
+     * Seite; die grösste dieser Zahlen ist die Gesamtzahl.
+     */
+    public function extrahiereLetzteSeitenzahl(string $html): int
+    {
+        if (!preg_match_all('#\?page=(\d+)#', $html, $treffer)) {
+            return 1;
+        }
+        $zahlen = array_map('intval', $treffer[1]);
+        return $zahlen === [] ? 1 : max(1, max($zahlen));
+    }
+
+    /**
+     * Zerlegt eine Listenseite der Stadtratsbeschlüsse.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function extrahiereStadtratsbeschluesseAusHtml(string $html): array
+    {
+        $muster = '#<a[^>]+href="(' . preg_quote(self::PFAD_STADTRATSBESCHLUESSE, '#')
+            . '/(\d{4}-\d{2}-\d{2})/(\d+))"[^>]*>(.*?)</a>#s';
+        preg_match_all($muster, $html, $treffer, PREG_SET_ORDER);
+
+        $eintraege = [];
+        foreach ($treffer as $t) {
+            [$_, $pfad, $datumAusPfad, $externId, $block] = $t;
+
+            $titelRoh = '';
+            if (preg_match('#<h3[^>]*>(.*?)</h3>#s', $block, $h3) === 1) {
+                $titelRoh = self::bereinigeHtmlText($h3[1]);
+            }
+            [$nummer, $titel] = self::teileNummerUndTitel($titelRoh);
+
+            $datum = $datumAusPfad;
+            if (preg_match('#<time[^>]+datetime="(\d{4}-\d{2}-\d{2})#', $block, $zeit) === 1) {
+                $datum = $zeit[1];
+            }
+
+            $departement = '';
+            if (preg_match_all('#<li class="inline dot-list-item[^"]*">(.*?)</li>#s', $block, $punkte)) {
+                foreach ($punkte[1] as $punkt) {
+                    $text = self::bereinigeHtmlText($punkt);
+                    // Der erste Punkt trägt das Datum, der zweite das Departement.
+                    if ($text !== '' && !str_contains($punkt, '<time')) {
+                        $departement = $text;
+                        break;
+                    }
+                }
+            }
+
+            $sitzung = '';
+            if (preg_match('#(Stadtratssitzung vom [^<]{3,60})#u', $block, $s) === 1) {
+                $sitzung = self::bereinigeHtmlText($s[1]);
+            }
+
+            $eintraege[$externId] = [
+                'externId' => $externId,
+                'nummer' => $nummer,
+                'titel' => $titel,
+                'datum' => $datum,
+                'departement' => $departement,
+                'sitzung' => $sitzung,
+                'url' => self::stadtAbsolutUrl($pfad),
+                'publiziertAm' => '',
+                'dokumente' => [],
+            ];
+        }
+        return array_values($eintraege);
+    }
+
+    /**
+     * Trennt «2026/1279 Festlegung …» in Nummer und Titel.
+     *
+     * @return array{0: string, 1: string}
+     */
+    public static function teileNummerUndTitel(string $text): array
+    {
+        $text = trim($text);
+        if (preg_match('#^(\d{4}/\d+)\s+(.*)$#s', $text, $m) === 1) {
+            return [$m[1], trim($m[2])];
+        }
+        return ['', $text];
+    }
+
+    /**
+     * Zerlegt die Detailseite eines Stadtratsbeschlusses.
+     *
+     * @return array<string, mixed> Departement, Datum der Veröffentlichung,
+     *         Sitzung und die Dokumente
+     */
+    public function extrahiereStadtratsbeschlussDetailsAusHtml(string $html): array
+    {
+        $details = [];
+
+        if (preg_match_all('#<th[^>]*>(.*?)</th>\s*<td[^>]*>(.*?)</td>#s', $html, $zeilen, PREG_SET_ORDER)) {
+            foreach ($zeilen as $zeile) {
+                $label = self::kleinbuchstaben(self::bereinigeHtmlText($zeile[1]));
+                $wert = self::bereinigeHtmlText($zeile[2]);
+                if ($wert === '') {
+                    continue;
+                }
+                if ($label === 'departement') {
+                    $details['departement'] = $wert;
+                } elseif ($label === 'datum beschluss') {
+                    $details['sitzung'] = $wert;
+                } elseif ($label === 'datum veröffentlichung') {
+                    $details['publiziertAm'] = self::datumAusText($wert);
+                }
+            }
+        }
+
+        $dokumente = [];
+        // Nur die Dokumente des Beschlusses: die Quelle führt sie unter
+        // «/download/resolution-document/<id>/<name>.pdf». Ein anderer Verweis
+        // auf «/download/» im Kopf oder im Fuss der Seite ist keines.
+        $muster = '#<a[^>]+href="(/download/resolution-document/[^"]+)"[^>]*>(.*?)</a>#s';
+        if (preg_match_all($muster, $html, $treffer, PREG_SET_ORDER)) {
+            foreach ($treffer as $t) {
+                $titel = '';
+                if (preg_match('#<div class="font-bold"[^>]*>(.*?)</div>#s', $t[2], $fett) === 1) {
+                    $titel = self::bereinigeHtmlText($fett[1]);
+                }
+                if ($titel === '') {
+                    $titel = basename($t[1]);
+                }
+                $dokumente[] = [
+                    'titel' => $titel,
+                    'url' => self::stadtAbsolutUrl($t[1]),
+                ];
+            }
+        }
+        $details['dokumente'] = $dokumente;
+
+        return $details;
     }
 }

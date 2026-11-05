@@ -25,6 +25,7 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
                     <span id="pw-sync-percent" class="settings-hint">0%</span>
                 </div>
                 <p id="pw-sync-details" class="settings-hint"></p>
+                <ul id="pw-sync-fehler" class="settings-hint pw-sync-fehler" hidden></ul>
                 <div class="pw-admin-statusline">
                     <span id="pw-admin-autosave"
                         class="pw-admin-autosave"><?php p($l->t('Bereit für automatische Speicherung')); ?></span>
@@ -78,7 +79,7 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
                             </label>
                             <input type="text" id="pw-nextcloud-gruppe" name="nextcloud_gruppe" class="pw-input"
                                 list="pw-nextcloud-gruppen" value="<?php p($_['nextcloud_gruppe']); ?>"
-                                placeholder="z.B. Fraktion-SP-Gruene" />
+                                placeholder="<?php p($l->t('z.B. Fraktion-Muster')); ?>" />
                             <datalist id="pw-nextcloud-gruppen">
                                 <?php foreach ($gruppenOptionen as $gruppe): ?>
                                     <option value="<?php p($gruppe); ?>"></option>
@@ -159,7 +160,7 @@ $fraktionAktuellInOptionen = in_array($fraktionAktuell, $fraktionOptionen, true)
                     <ul class="settings-hint" style="margin-left:1.5rem;list-style:disc">
                         <li><?php p($l->t('Kommissionsname → Kürzel: «Kommission Bildung, Sport und Kultur» → «BSKK»')); ?></li>
                         <li><?php p($l->t('Status-Text → Kurzform: «Bei der Kommission Bildung, Sport und Kultur pendent» → «Pendent: BSKK»')); ?></li>
-                        <li><?php p($l->t('Fraktions- oder Parteiname → Abkürzung: «Sozialdemokratische Partei» → «SP»')); ?></li>
+                        <li><?php p($l->t('Fraktions- oder Parteiname → Abkürzung: «Musterpartei» → «MPW»')); ?></li>
                     </ul>
                     <div id="pw-kuerzel-liste"></div>
                     <datalist id="pw-status-kuerzel-liste"></datalist>
@@ -233,8 +234,12 @@ $parlwinAdminNonce = \OCP\Server::get(\OC\Security\CSP\ContentSecurityPolicyNonc
         const form = document.getElementById('pw-settings-form');
         const btnSync = document.getElementById('pw-btn-sync');
         const btnSyncCancel = document.getElementById('pw-btn-sync-cancel');
+        // Hat dieses Fenster den Abbruch verlangt? Die Meldung bleibt dann
+        // stehen, bis der Lauf wirklich endet (siehe den Klick-Handler unten).
+        let abbruchAngefordert = false;
         const syncStatus = document.getElementById('pw-sync-status');
         const syncDetails = document.getElementById('pw-sync-details');
+        const syncFehler = document.getElementById('pw-sync-fehler');
         const syncProgress = document.getElementById('pw-sync-progress');
         const syncPercent = document.getElementById('pw-sync-percent');
         const inputGruppe = document.getElementById('pw-nextcloud-gruppe');
@@ -248,6 +253,8 @@ $parlwinAdminNonce = \OCP\Server::get(\OC\Security\CSP\ContentSecurityPolicyNonc
         const btnMembersProvision = document.getElementById('pw-btn-members-provision');
         let pollTimer = null;
         let syncRequestInFlight = false;
+        // Wann die Antwort auf den letzten Start ankam (Date.now()).
+        let startBeantwortetUm = 0;
         let realtimeSocket = null;
         let realtimeReconnectTimer = null;
         let realtimeReconnectDelayMs = 1000;
@@ -265,11 +272,11 @@ $parlwinAdminNonce = \OCP\Server::get(\OC\Security\CSP\ContentSecurityPolicyNonc
         // gesamten Init-Block (inkl. pollSyncStatus / connectRealtime) abbrechen.
         const t = (typeof window !== 'undefined' && typeof window.t === 'function')
             ? window.t
-            : ((app, text, vars) => {
+            : ((app, text, vars, count, options) => {
                 let result = String(text);
                 if (typeof window !== 'undefined' && window.OC?.L10N && typeof window.OC.L10N.translate === 'function') {
                     try {
-                        return window.OC.L10N.translate(app, text, vars);
+                        return window.OC.L10N.translate(app, text, vars, count, options);
                     } catch (_e) {
                         // Fallback unten benutzen.
                     }
@@ -725,7 +732,7 @@ $parlwinAdminNonce = \OCP\Server::get(\OC\Security\CSP\ContentSecurityPolicyNonc
                         const count = Number(payload?.summary?.anzahl || 0);
                         const orphans = Number(payload?.summary?.verwaiste || 0);
                         membersStatus.textContent = orphans > 0
-                            ? t('parlwin', '{count} Mitglieder geladen, {orphans} verwaiste lokale User', { count, orphans })
+                            ? t('parlwin', '{count} Mitglieder geladen, {orphans} verwaiste lokale Benutzer', { count, orphans })
                             : t('parlwin', '{count} Mitglieder geladen', { count });
                     }
                 })
@@ -995,10 +1002,29 @@ $parlwinAdminNonce = \OCP\Server::get(\OC\Security\CSP\ContentSecurityPolicyNonc
             realtimeReconnectDelayMs = Math.min(realtimeReconnectDelayMs * 2, 15000);
         };
 
-        const renderProgress = (status) => {
+        // Je Bereich, den die Synchronisation nicht lesen oder nicht ganz
+        // speichern konnte, eine Zeile mit dem Bereich und der Meldung des Servers.
+        const renderBereichsFehler = (status) => {
+            const sections = status && typeof status === 'object' ? (status.sections || {}) : {};
+            const zeilen = Object.entries(sections)
+                .filter(([, section]) => section && typeof section === 'object' && String(section.fehler || '').trim() !== '')
+                .map(([scope, section]) => t('parlwin', 'Fehler im Bereich {bereich}: {meldung}', {
+                    bereich: section.label || scope,
+                    meldung: String(section.fehler).trim(),
+                }, undefined, { escape: false }));
+            syncFehler.replaceChildren(...zeilen.map((text) => {
+                const li = document.createElement('li');
+                li.textContent = text;
+                return li;
+            }));
+            syncFehler.hidden = zeilen.length === 0;
+        };
+
+        const renderProgress = (status, gesendetUm = Date.now()) => {
             if (!status || typeof status !== 'object') {
                 return;
             }
+            renderBereichsFehler(status);
             const current = status.current || {};
             const label = current.label || '';
             const db = current.db || '-';
@@ -1014,17 +1040,26 @@ $parlwinAdminNonce = \OCP\Server::get(\OC\Security\CSP\ContentSecurityPolicyNonc
             syncPercent.textContent = `${global.percent}%`;
 
             if (running) {
-                syncStatus.textContent = cancelRequested
+                syncStatus.textContent = (cancelRequested || abbruchAngefordert)
                     ? t('parlwin', 'Abbruch angefragt...')
                     : t('parlwin', 'Synchronisiere...');
                 syncDetails.textContent = `${label} (${db}) - ${processed}/${total} | Gesamt ${global.processed}/${global.total} (${global.percent}%) | Quelle ${source} | Restzeit ${eta} | Laufzeit ${elapsed}`;
                 btnSync.disabled = true;
-                btnSyncCancel.disabled = cancelRequested;
+                btnSyncCancel.disabled = cancelRequested || abbruchAngefordert;
                 return;
             }
 
+            // Ein Stand ohne Lauf aus einer Abfrage, die vor der Antwort auf den
+            // Start hinausging, beschreibt den vorigen Lauf. Er kann nach dem
+            // Klick auf «Synchronisierung abbrechen» ankommen und darf weder
+            // den Abbruch-Wunsch löschen noch die Meldung ersetzen.
+            if (syncRequestInFlight || gesendetUm < startBeantwortetUm) {
+                return;
+            }
             btnSync.disabled = false;
             btnSyncCancel.disabled = true;
+            // Der Lauf steht; der nächste beginnt wieder ohne Abbruch-Wunsch.
+            abbruchAngefordert = false;
             if (status.phase === 'abgebrochen') {
                 syncStatus.textContent = t('parlwin', 'Synchronisation abgebrochen');
                 syncDetails.textContent = `Laufzeit: ${elapsed}`;
@@ -1053,6 +1088,7 @@ $parlwinAdminNonce = \OCP\Server::get(\OC\Security\CSP\ContentSecurityPolicyNonc
         };
 
         const pollSyncStatus = () => {
+            const gesendetUm = Date.now();
             return fetch(generateUrl('/apps/parlwin/sync/status'), {
                 method: 'GET',
                 headers: authHeaders(),
@@ -1065,7 +1101,7 @@ $parlwinAdminNonce = \OCP\Server::get(\OC\Security\CSP\ContentSecurityPolicyNonc
                     return parseJsonSafe(body) || {};
                 })
                 .then((status) => {
-                    renderProgress(status);
+                    renderProgress(status, gesendetUm);
                     return status;
                 });
         };
@@ -1172,6 +1208,7 @@ $parlwinAdminNonce = \OCP\Server::get(\OC\Security\CSP\ContentSecurityPolicyNonc
                 headers: authHeaders(),
             })
                 .then(async (r) => {
+                    startBeantwortetUm = Date.now();
                     const body = await r.text();
                     const data = parseJsonSafe(body);
 
@@ -1242,6 +1279,10 @@ $parlwinAdminNonce = \OCP\Server::get(\OC\Security\CSP\ContentSecurityPolicyNonc
                 return;
             }
             btnSyncCancel.disabled = true;
+            // Bis der Lauf steht, zeigt renderProgress den Abbruch an und lässt
+            // «Synchronisierung abbrechen» gesperrt, auch solange der Server
+            // das Signal noch nicht aufgenommen hat.
+            abbruchAngefordert = true;
             syncStatus.textContent = t('parlwin', 'Abbruch wird angefordert...');
 
             fetch(generateUrl('/apps/parlwin/sync/cancel'), {
@@ -1261,6 +1302,9 @@ $parlwinAdminNonce = \OCP\Server::get(\OC\Security\CSP\ContentSecurityPolicyNonc
                     pollSyncStatus().catch(() => { });
                 })
                 .catch((err) => {
+                    // Der Abbruch kam nicht an: Die nächste Meldung des
+                    // Laufs gibt «Synchronisierung abbrechen» wieder frei.
+                    abbruchAngefordert = false;
                     syncStatus.textContent = t('parlwin', 'Fehler: {msg}', {
                         msg: (err && err.message) ? err.message : t('parlwin', 'Verbindungsfehler'),
                     });

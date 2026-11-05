@@ -12,8 +12,8 @@ vi.mock('../realtime', () => ({
 // Werte bleiben unverändert (nur die Anzeige kürzt).
 describe('Kürzel gelten überall (Status, Parteien, Fraktionen, Kommissionen)', () => {
   const KUERZEL = [
-    { suche: 'Sozialdemokratische Partei-Fraktion (SP)', kuerzel: 'SP-Fraktion' },
-    { suche: 'Sozialdemokratische Partei', kuerzel: 'SP' },
+    { suche: 'Musterpartei-Fraktion (MPW)', kuerzel: 'MPW-Fraktion' },
+    { suche: 'Musterpartei', kuerzel: 'MPW' },
     { suche: 'Kommission Bildung, Sport und Kultur', kuerzel: 'BSKK' },
     { suche: 'Beim Stadtrat pendent', kuerzel: 'Pendent: Stadtrat' },
   ]
@@ -29,11 +29,11 @@ describe('Kürzel gelten überall (Status, Parteien, Fraktionen, Kommissionen)',
 
   it('utils.kuerze ersetzt alle konfigurierten Suchtexte; ohne Treffer bleibt der Text', async () => {
     const { kuerze } = await import('../utils')
-    expect(kuerze('Sozialdemokratische Partei', KUERZEL)).toBe('SP')
+    expect(kuerze('Musterpartei', KUERZEL)).toBe('MPW')
     expect(kuerze('Kommission Bildung, Sport und Kultur', KUERZEL)).toBe('BSKK')
-    expect(kuerze('Grüne', KUERZEL)).toBe('Grüne')
+    expect(kuerze('Beispielpartei', KUERZEL)).toBe('Beispielpartei')
     // Die vorgegebene Liste kommt aus der Konfiguration der App.
-    expect(kuerze('Sozialdemokratische Partei')).toBe('SP')
+    expect(kuerze('Musterpartei')).toBe('MPW')
   })
 
   it('Mitgliederliste zeigt Partei, Fraktion und Kommission gekürzt', async () => {
@@ -42,8 +42,8 @@ describe('Kürzel gelten überall (Status, Parteien, Fraktionen, Kommissionen)',
       props: {
         mitglieder: [{
           id: 1, externId: 'e1', vorname: 'Anna', name: 'Müller', aktiv: true,
-          partei: 'Sozialdemokratische Partei',
-          fraktion: 'Sozialdemokratische Partei-Fraktion (SP)',
+          partei: 'Musterpartei',
+          fraktion: 'Musterpartei-Fraktion (MPW)',
         }],
         fraktionen: [],
         kommissionen: [{ id: 9, name: 'Kommission Bildung, Sport und Kultur', aktiv: true, mitglieder: JSON.stringify([{ externId: 'e1', funktion: 'Mitglied' }]) }],
@@ -51,10 +51,10 @@ describe('Kürzel gelten überall (Status, Parteien, Fraktionen, Kommissionen)',
       global: { stubs: { NcTextField: true, NcSelect: true, NcCheckboxRadioSwitch: true, NcEmptyContent: true } },
     })
     const text = wrapper.text()
-    expect(text).toContain('SP')
-    expect(text).toContain('SP-Fraktion')
+    expect(text).toContain('MPW')
+    expect(text).toContain('MPW-Fraktion')
     expect(text).toContain('BSKK')
-    expect(text).not.toContain('Sozialdemokratische Partei')
+    expect(text).not.toContain('Musterpartei')
     expect(text).not.toContain('Kommission Bildung, Sport und Kultur')
   })
 
@@ -63,12 +63,12 @@ describe('Kürzel gelten überall (Status, Parteien, Fraktionen, Kommissionen)',
     const wrapper = shallowMount(Vorstoesseliste, {
       props: {
         mitglieder: [],
-        fraktionen: [{ id: 2, name: 'Sozialdemokratische Partei-Fraktion (SP)', aktiv: true }],
+        fraktionen: [{ id: 2, name: 'Musterpartei-Fraktion (MPW)', aktiv: true }],
       },
     })
     const opt = wrapper.vm.fremdeFraktionsOptionen[0]
-    expect(opt.label).toBe('SP-Fraktion')
-    expect(opt.value).toBe('Sozialdemokratische Partei-Fraktion (SP)')
+    expect(opt.label).toBe('MPW-Fraktion')
+    expect(opt.value).toBe('Musterpartei-Fraktion (MPW)')
   })
 
   it('Kürzel-Verwaltung schlägt Status, aktuelle Fraktions- und Parteinamen vor', async () => {
@@ -76,22 +76,25 @@ describe('Kürzel gelten überall (Status, Parteien, Fraktionen, Kommissionen)',
     axios.get.mockImplementation((url) => {
       if (String(url).includes('/fraktionen')) {
         return Promise.resolve({ data: [
-          { name: 'Sozialdemokratische Partei-Fraktion (SP)', aktiv: true },
+          { name: 'Musterpartei-Fraktion (MPW)', aktiv: true },
           { name: 'Alte Fraktion', aktiv: false },
         ] })
       }
       if (String(url).includes('/mitglieder')) {
-        return Promise.resolve({ data: [{ partei: 'Sozialdemokratische Partei' }, { partei: 'Grüne' }] })
+        return Promise.resolve({ data: [{ partei: 'Musterpartei' }, { partei: 'Beispielpartei' }] })
       }
-      return Promise.resolve({ data: [{ status: 'Beim Stadtrat pendent' }] })
+      if (String(url).includes('/geschaefte/statuswerte')) {
+        return Promise.resolve({ data: ['Beim Stadtrat pendent'] })
+      }
+      return Promise.reject(new Error(`unerwartete Anfrage ${url}`))
     })
     const { ladeVorschlagswerte } = await import('../admin')
     await ladeVorschlagswerte()
     const werte = [...document.querySelectorAll('#pw-status-kuerzel-liste option')].map(o => o.value)
     expect(werte).toContain('Beim Stadtrat pendent')
-    expect(werte).toContain('Sozialdemokratische Partei-Fraktion (SP)')
-    expect(werte).toContain('Sozialdemokratische Partei')
-    expect(werte).toContain('Grüne')
+    expect(werte).toContain('Musterpartei-Fraktion (MPW)')
+    expect(werte).toContain('Musterpartei')
+    expect(werte).toContain('Beispielpartei')
     expect(werte).not.toContain('Alte Fraktion')
   })
 

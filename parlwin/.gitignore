@@ -16,9 +16,6 @@
 /coverage.xml
 .phpunit.result.cache
 
-# Composer-Lock nur in Entwicklung
-composer.lock
-
 # NPM-Lock
 # package-lock.json  # Für Production einkommentieren
 

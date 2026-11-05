@@ -33,6 +33,7 @@ use OCA\ParliamentWinterthur\Service\RealtimePublisherService;
 use OCA\ParliamentWinterthur\Service\ScraperService;
 use OCA\ParliamentWinterthur\Service\SitzungService;
 use OCA\ParliamentWinterthur\Service\SitzungstypService;
+use OCA\ParliamentWinterthur\Service\StadtratsbeschlussService;
 use OCA\ParliamentWinterthur\Service\SyncLockService;
 use OCA\ParliamentWinterthur\Service\SyncProcessService;
 use OCA\ParliamentWinterthur\Search\GeschaeftSearchProvider;
@@ -191,6 +192,8 @@ class Application extends App implements IBootstrap
                 $c->get(\OCP\Http\Client\IClientService::class),
                 $c->get(\OCP\IConfig::class),
                 $c->get(\Psr\Log\LoggerInterface::class),
+                $c->get(\OCP\IRequest::class),
+                $c->get(\OCP\IUserSession::class),
             );
         });
         $context->registerService(FraktionsraumService::class, function ($c) {
@@ -224,12 +227,14 @@ class Application extends App implements IBootstrap
                 $c->get(GeschaeftService::class),
                 $c->get(SitzungService::class),
                 $c->get(MitgliedService::class),
+                $c->get(StadtratsbeschlussService::class),
                 $c->get(KalenderService::class),
                 $c->get(RealtimePublisherService::class),
                 $c->get(ScraperService::class),
                 $c->get(SyncLockService::class),
                 $c->get(FraktionsarbeitService::class),
                 $c->get(\OCP\IConfig::class),
+                $c->get(\OCA\ParliamentWinterthur\Service\EreignisService::class),
             );
         });
         $context->registerService(SyncCancelCommand::class, function ($c) {

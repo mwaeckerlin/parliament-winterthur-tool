@@ -184,8 +184,23 @@ $aufteilungLabel = static function (array $t) use ($fr): string {
                             // F137: Ein Antrag auf das Bewilligungsorgan trägt
                             // keinen Betrag, sondern den neuen Wert.
                             $neuerWert = trim((string) ($a['neuerWert'] ?? ''));
+                            // F109: Ein Antrag auf Zielwerte trägt auch keinen
+                            // Betrag — dort steht der geänderte Zielwert, wie in
+                            // der Antragsübersicht am Schirm.
+                            $zielwerte = is_array($a['zielAenderungen'] ?? null) ? $a['zielAenderungen'] : [];
                             if ((string) ($a['bereich'] ?? '') === 'bewilligungsorgan' && $neuerWert !== '') {
                                 p('→ ' . $neuerWert);
+                            } elseif ($zielwerte !== [] && (int) ($a['betragDelta'] ?? 0) === 0) {
+                                foreach ($zielwerte as $i => $z) {
+                                    if ($i > 0) {
+                                        print('<br>');
+                                    }
+                                    $ut = trim((string) ($z['unterTitel'] ?? ''));
+                                    $heute = trim((string) ($z['soll'] ?? ''));
+                                    p(($ut !== '' ? $ut . ' — ' : '') . (string) ($z['messgroesse'] ?? ''));
+                                    print('<br>');
+                                    p(($heute !== '' ? $heute . ' → ' : '') . (string) ($z['neuerWert'] ?? ''));
+                                }
                             } else {
                                 p($fr($a['betragDelta'] ?? 0));
                             }
@@ -198,7 +213,11 @@ $aufteilungLabel = static function (array $t) use ($fr): string {
                             // durch denselben Weg wie jede Notiz.
                             print(RichText::alsHtml((string) ($a['begruendung'] ?? '')));
                         ?><?php
+                            // Die Zielwerte stehen in der Betragsspalte; sie
+                            // stehen nur dann hier, wenn der Antrag auch einen
+                            // Betrag trägt und die Spalte deshalb belegt ist.
                             $zae = is_array($a['zielAenderungen'] ?? null) ? $a['zielAenderungen'] : [];
+                            $zae = (int) ($a['betragDelta'] ?? 0) === 0 ? [] : $zae;
                             $auf = is_array($a['aufteilung'] ?? null) ? $a['aufteilung'] : [];
                         ?><?php if ($zae): ?><br><em>Zielvorgaben:</em><?php foreach ($zae as $z): ?> Ziel <?php p((string) ($z['zielNummer'] ?? '')); ?> «<?php
                             $ut = trim((string) ($z['unterTitel'] ?? ''));

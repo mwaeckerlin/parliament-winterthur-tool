@@ -70,6 +70,7 @@ class GeschaeftAmtlicheDokumenteTest extends TestCase
         $dokumente = $this->createStub(GeschaeftDokumentService::class);
         $dokumente->method('zuGeschaeft')->willReturn([$this->dokument()]);
         $dokumente->method('zuGeschaeften')->willReturn([42 => [$this->dokument()]]);
+        $dokumente->method('koepfeZuGeschaeften')->willReturn([42 => [['dokument' => $this->dokument(), 'hatInhalt' => true]]]);
 
         return new FraktionsarbeitService(
             $geschaeftMapper,
@@ -109,5 +110,37 @@ class GeschaeftAmtlicheDokumenteTest extends TestCase
         self::assertCount(1, $dokumente);
         self::assertStringContainsString('# Schriftliche Anfrage', $dokumente[0]['markdown']);
         self::assertSame('Schriftliche Anfrage', $dokumente[0]['abschnitte'][0]['text']);
+    }
+
+    private function dokumentDienst(\OCA\ParliamentWinterthur\Db\GeschaeftDokumentMapper $mapper): GeschaeftDokumentService
+    {
+        return new GeschaeftDokumentService(
+            $mapper,
+            $this->createStub(\OCA\ParliamentWinterthur\Service\DokumentInhaltParser::class),
+            $this->createStub(\OCP\Http\Client\IClientService::class),
+            $this->createStub(\OCP\ITempManager::class),
+            $this->createStub(\Psr\Log\LoggerInterface::class),
+        );
+    }
+
+    /**
+     * F149: Ein Dokument kommt nur über das Geschäft, zu dem es gehört.
+     */
+    public function testEinDokumentKommtNurUeberSeinGeschaeft(): void
+    {
+        $mapper = $this->createStub(\OCA\ParliamentWinterthur\Db\GeschaeftDokumentMapper::class);
+        $mapper->method('find')->willReturn($this->dokument());
+        $dienst = $this->dokumentDienst($mapper);
+
+        self::assertSame(7, $dienst->einDokument(42, 7)?->getId());
+        self::assertNull($dienst->einDokument(41, 7), 'ein Dokument von Geschäft 42 über Geschäft 41');
+    }
+
+    public function testEinUnbekanntesDokumentIstNichtGefunden(): void
+    {
+        $mapper = $this->createStub(\OCA\ParliamentWinterthur\Db\GeschaeftDokumentMapper::class);
+        $mapper->method('find')->willThrowException(new \OCP\AppFramework\Db\DoesNotExistException('weg'));
+
+        self::assertNull($this->dokumentDienst($mapper)->einDokument(42, 99));
     }
 }

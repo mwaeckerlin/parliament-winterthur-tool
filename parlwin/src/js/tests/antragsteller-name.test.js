@@ -9,16 +9,15 @@ vi.mock('@nextcloud/auth', () => ({ getCurrentUser: () => ({ uid: 'mw', displayN
 /**
  * Ein Antragsteller trägt Vorname und Nachname.
  *
- * Befund von Marc am 24.10.2026 am Budget 2027 der SVP-Fraktion: In der Auswahl
- * und auf jedem Antrag stand «Wäckerlin». Das Feld `name` eines Mitglieds ist
- * im Datenmodell der Nachname (ScraperService: `'name' => $nachname`), der
- * Vorname steht in `vorname`; die Auswahl nahm nur `name`.
+ * Das Feld `name` eines Mitglieds ist im Datenmodell der Nachname
+ * (ScraperService: `'name' => $nachname`), der Vorname steht in `vorname`.
+ * Die Auswahl und jeder Antrag nennen beide, nie den Nachnamen allein.
  *
  * vitest läuft im Projekt-Root.
  */
 const ANSICHT = {
   jahr: { jahr: 2027, steuerfuss: 125, steuerfussEffektiv: 125 },
-  eigeneFraktion: 'Schweizerische Volkspartei-Fraktion (SVP)',
+  eigeneFraktion: 'Musterpartei-Fraktion (MPW)',
   produktegruppen: [{
     code: '240', name: 'Immobilien', departement: 'Finanzen',
     globalkredit: { soll: 1000, sollFraktion: 1000 },
@@ -30,13 +29,13 @@ const ANSICHT = {
 }
 
 const MITGLIEDER = [
-  { id: 1, externId: 'e1', vorname: 'Marc', name: 'Wäckerlin', fraktion: 'Schweizerische Volkspartei-Fraktion (SVP)', aktiv: true },
-  { id: 2, externId: 'e2', vorname: 'Anna', name: 'Müller', fraktion: 'SP-Fraktion', aktiv: true },
+  { id: 1, externId: 'e1', vorname: 'Marc', name: 'Wäckerlin', fraktion: 'Musterpartei-Fraktion (MPW)', aktiv: true },
+  { id: 2, externId: 'e2', vorname: 'Anna', name: 'Müller', fraktion: 'Fraktion-Beispiel', aktiv: true },
 ]
 
 const FRAKTIONEN = [
-  { id: 1, name: 'Schweizerische Volkspartei-Fraktion (SVP)', eigene: true, aktiv: true },
-  { id: 2, name: 'SP-Fraktion', eigene: false, aktiv: true },
+  { id: 1, name: 'Musterpartei-Fraktion (MPW)', eigene: true, aktiv: true },
+  { id: 2, name: 'Fraktion-Beispiel', eigene: false, aktiv: true },
 ]
 
 describe('Antragsteller', () => {
@@ -46,7 +45,7 @@ describe('Antragsteller', () => {
       if (String(url).includes('budget/ansicht')) { return Promise.resolve({ data: ANSICHT }) }
       if (String(url).includes('mitglieder')) { return Promise.resolve({ data: MITGLIEDER }) }
       if (String(url).includes('fraktionen')) {
-        return Promise.resolve({ data: [{ id: 1, name: 'Schweizerische Volkspartei-Fraktion (SVP)', eigene: true, aktiv: true }] })
+        return Promise.resolve({ data: [{ id: 1, name: 'Musterpartei-Fraktion (MPW)', eigene: true, aktiv: true }] })
       }
       return Promise.resolve({ data: [] })
     })

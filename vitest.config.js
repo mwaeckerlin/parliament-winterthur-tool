@@ -22,6 +22,9 @@ export default defineConfig({
   plugins: [vue()],
   test: {
     environment: 'jsdom',
+    // Höchstens zwei Worker: vitest läuft in der Speichergrenze der
+    // Entwicklungsumgebung (Snap-Scope mit memory.high 24GiB, memory.max 30GiB).
+    maxWorkers: 2,
     globals: true,
     setupFiles: [hier('./parlwin/src/js/tests/setup.js')],
     // `.claude` enthält die Aufnahme für den Design-Test: ein Playwright-Lauf

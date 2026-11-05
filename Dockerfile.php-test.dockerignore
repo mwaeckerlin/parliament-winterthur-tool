@@ -18,3 +18,6 @@ tests/e2e/test-results
 tests/e2e/playwright-report
 test-results
 playwright-report
+# Journal und Sicherungen des Testlaufs: Sie wechseln mit jedem Lauf und
+# gehören keinem Image an.
+tests/.regression

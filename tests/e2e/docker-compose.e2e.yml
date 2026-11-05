@@ -33,6 +33,11 @@ services:
       # damit der automatische Background-Job-Lauf im Test zügig greift.
       PARLWIN_CRON_INTERVAL: "5"
       PARLWIN_QUELLE_BASE_URL: "http://parlwin-quelle:8080"
+      # Die Stadtratsbeschlüsse kommen im Lauf von derselben Gegenstelle, die
+      # auch die Seiten der Stadt unter ihren Adressen ausliefert.
+      PARLWIN_STADT_BASE_URL: "http://parlwin-quelle:8080"
+      # Eine Listenseite genügt: die Aufnahme trägt zwölf Beschlüsse.
+      PARLWIN_SRB_SEITEN: "1"
     depends_on:
       nextcloud-db:
         condition: service_healthy
@@ -45,7 +50,8 @@ services:
   # Browser-basierter Multi-User-E2E-Test. Läuft im selben Compose-Netz und
   # erreicht Nextcloud daher über den internen Hostnamen nextcloud-nginx:8080.
   # Wird gezielt über `docker compose run --rm playwright` aus run-compose-e2e.sh
-  # gestartet (Profil verhindert Autostart bei `docker compose up`).
+  # gestartet; der volle Lauf (`tests/regression/stack.mjs`) startet den Dienst
+  # mit `--profile tools up` (Profil verhindert Autostart bei `docker compose up`).
   playwright:
     # Eigenes Image: @playwright/test und die Testdateien sind eingebacken, damit
     # der Testlauf ohne npm, ohne npm-Registry und ohne Zugriff auf das Arbeits-

@@ -9,9 +9,8 @@ vi.mock('@nextcloud/auth', () => ({ getCurrentUser: () => ({ uid: 'mw', displayN
 /**
  * Die Seite im Budgetbuch (F129).
  *
- * Marc am 24.10.2026: «Zu jedem Punkt, zu jeder Produktegruppe in jeder Ansicht
- * schreibe die Seitennummer der PG im Budgetbuch auf die Karte, damit man die
- * Position jederzeit auch im Buch schnell finden kann.»
+ * Jede Produktegruppe nennt in jeder Ansicht ihre Seite im Budgetbuch, damit
+ * sich die Position auch im gedruckten Buch sofort finden lässt.
  *
  * vitest läuft im Projekt-Root.
  */
@@ -23,7 +22,7 @@ function ansicht(buchseite) {
     summen: SUMMEN,
     summenStadtrat: SUMMEN,
     departemente: ['Finanzen'],
-    eigeneFraktion: 'SVP-Fraktion',
+    eigeneFraktion: 'Fraktion-Muster',
     produktegruppen: [{
       code: '240', name: 'Immobilien', departement: 'Finanzen', buchseite,
       globalkredit: { soll: 1000, sollFraktion: 900, vorjahr: 1000 },
@@ -57,6 +56,25 @@ describe('Seite im Budgetbuch', () => {
     await flushPromises()
     const seite = w.find('.pw-buchseite')
     expect(seite.exists(), 'die Seitenzahl fehlt auf der Karte').toBe(true)
+    expect(seite.text()).toContain('75')
+  })
+
+  /**
+   * Der Tab «Personalbestand» zeigt dieselben Produktegruppen wie das
+   * Globalbudget, und jede Karte nennt auch dort ihre Seite im Budgetbuch.
+   */
+  it('steht auch auf der Karte im Tab «Personalbestand»', async () => {
+    const w = mounten(75)
+    await flushPromises()
+    await w.vm.tabWechseln('personal')
+    await flushPromises()
+    // v-show lässt jeden Tab im DOM, also wird auf den Personal-Tab eingegrenzt;
+    // ohne das fände der Test die Karte des Globalbudgets und bliebe grün.
+    const panel = w.find('.pw-budget-personal')
+    expect(panel.exists(), 'der Personal-Tab fehlt').toBe(true)
+    expect(panel.findAll('.pw-data-card').length, 'der Tab zeigt keine Karte').toBeGreaterThan(0)
+    const seite = panel.find('.pw-buchseite')
+    expect(seite.exists(), 'die Seitenzahl fehlt auf der Personalkarte').toBe(true)
     expect(seite.text()).toContain('75')
   })
 

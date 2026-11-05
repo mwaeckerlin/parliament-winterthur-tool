@@ -253,10 +253,10 @@ class BudgetAntragErstellenTest extends TestCase {
         // F98: die Liste der unterstützenden Fraktionen wird als [{key,name}] gespeichert.
         $a = $this->service()->antragErstellen(2026, [
             'bereich' => 'globalbudget', 'zielRef' => '121', 'betragDelta' => -1000,
-            'unterstuetzer' => ['Grüne', 'SP'],
+            'unterstuetzer' => ['BPW', 'MPW'],
         ]);
         $namen = array_map(static fn ($f) => $f['name'], $a->getUnterstuetzerArray());
-        self::assertSame(['Grüne', 'SP'], $namen, 'unterstützende Fraktionen gespeichert (F98)');
+        self::assertSame(['BPW', 'MPW'], $namen, 'unterstützende Fraktionen gespeichert (F98)');
     }
 
     public function testZielAenderungenGespeichert(): void {

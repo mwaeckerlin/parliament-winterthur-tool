@@ -4,8 +4,8 @@ import { describe, it, expect } from 'vitest'
 /**
  * Die Begründung eines Antrags ist formatierter Text (F132).
  *
- * Marc am 24.10.2026: «Das Begründungsfeld bei den Anträgen muss die
- * mehrzeilige Komponente mit den Formatierungen sein.»
+ * Das Begründungsfeld der Anträge ist die mehrzeilige Komponente mit den
+ * Formatierungen.
  *
  * Geprüft wird, dass überall dieselbe geteilte Komponente steht — im
  * Antragsformular, im Pauschalantrag und in der Erfassungstabelle — und dass

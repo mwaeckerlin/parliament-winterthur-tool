@@ -578,8 +578,8 @@ class MitgliedService
      * Bevorzugte Quelle ist die in der Fraktions-Entität gespeicherte Mitglieder-
      * liste (mit externId). Damit funktioniert das Matching auch dann zuverlässig,
      * wenn die Schreibweise des Fraktionsnamens im Mitgliedsdatensatz von der
-     * offiziellen Bezeichnung abweicht (z.B. "Die Mitte (Die Mitte)" auf der
-     * Fraktionsliste vs. "Die Mitte / EVP" im Tätig-in-Feld des Mitglieds).
+     * offiziellen Bezeichnung abweicht (z.B. "Musterpartei (MPW)" auf der
+     * Fraktionsliste vs. "MPW / BPW" im Tätig-in-Feld des Mitglieds).
      *
      * @return Mitglied[]
      */

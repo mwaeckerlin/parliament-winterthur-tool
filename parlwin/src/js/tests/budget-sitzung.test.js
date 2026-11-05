@@ -9,7 +9,7 @@ function fixture() {
   return {
     produktegruppen: [{ id: 1, code: '121', name: 'Personalamt', departement: 'Präsidiales' }],
     antraege: [
-      { id: 20, bereich: 'globalbudget', zielRef: '121', betragDelta: -30000, antragsteller: 'SVP', begruendung: 'Offizielle Kürzung', entscheid: 'offen', phase: 'sitzung' },
+      { id: 20, bereich: 'globalbudget', zielRef: '121', betragDelta: -30000, antragsteller: 'MPW', begruendung: 'Offizielle Kürzung', entscheid: 'offen', phase: 'sitzung' },
       { id: 21, bereich: 'globalbudget', zielRef: '121', betragDelta: -1, antragsteller: 'X', begruendung: 'Interner Antrag', entscheid: 'offen', phase: 'fraktion' },
     ],
   }

@@ -9,10 +9,9 @@ vi.mock('@nextcloud/auth', () => ({ getCurrentUser: () => ({ uid: 'mw', displayN
 /**
  * Ein Antrag auf Zielwerte zeigt die Zielwerte.
  *
- * Befund von Marc am 24.10.2026 am Budget 2027, Produktegruppe Immobilien
- * (240): Der Antrag ändert drei Zielwerte und zeigte auf der Karte wie in der
- * Antragsliste nur die Begründung. Wer den Antrag stellt, sieht nicht, worüber
- * er abstimmen lässt.
+ * Der Antrag auf die Produktegruppe Immobilien (240) im Budget 2027 ändert
+ * drei Zielwerte. Die Karte und die Antragsliste nennen sie, denn die
+ * Begründung allein sagt nicht, worüber abgestimmt wird.
  *
  * Gezeigt wird je Änderung die Messgrösse, der heutige Soll und der neue.
  *
@@ -51,7 +50,7 @@ const ANSICHT = {
   summen: SUMMEN,
   summenStadtrat: SUMMEN,
   verteilung: { automatikEin: false, zielModus: 'schwarze_null', zielBetrag: 0, haltung: 'einreichen', ausnahmen: [] },
-  eigeneFraktion: 'Schweizerische Volkspartei-Fraktion (SVP)',
+  eigeneFraktion: 'Musterpartei-Fraktion (MPW)',
   produktegruppen: [{
     id: 1, code: '240', name: 'Immobilien', departement: 'Finanzen',
     globalkredit: { ist: 0, sollVorjahr: 0, soll: 55764, sollFraktion: 55764, plan1: 0, plan2: 0, plan3: 0 },
@@ -65,12 +64,12 @@ const ANSICHT = {
   pauschalantraege: [],
 }
 
-async function liste() {
+async function liste(antraege = ANSICHT.antraege) {
   axios.get.mockImplementation((url) => {
     const u = String(url)
     if (u.includes('/budget/verfuegbar')) { return Promise.resolve({ data: { verfuegbar: [2027], importierbar: [] } }) }
     if (u.includes('/budget/jahre')) { return Promise.resolve({ data: [{ jahr: 2027 }] }) }
-    return Promise.resolve({ data: ANSICHT })
+    return Promise.resolve({ data: { ...ANSICHT, antraege } })
   })
   const w = mount(Budgetliste, { global: { stubs: { Teleport: true } } })
   await flushPromises()
@@ -101,6 +100,47 @@ describe('Zielwerte eines Antrags', () => {
     expect(zeile.exists(), 'die Antragsliste hat keine Zeile').toBe(true)
     expect(zeile.text(), 'die Zielwerte fehlen in der Antragsliste').toContain('Gewerbeliegenschaften (in %)')
     expect(zeile.text()).toContain('5')
+  })
+
+  /**
+   * Ein Antrag auf Zielwerte hat keinen Betrag. Der geänderte Zielwert steht
+   * darum dort, wo sonst der Betrag steht: in der Spalte, in der man liest,
+   * worüber abgestimmt wird, und nicht am Ende der Begründung.
+   */
+  it('stehen in der Antragsliste in der Betragsspalte, nicht in der Begründung', async () => {
+    const w = await liste()
+    await w.vm.tabWechseln('antraege')
+    await flushPromises()
+    const zeile = w.find('.pw-antrag-zeile')
+
+    const betrag = zeile.find('.pw-antrag-betrag')
+    expect(betrag.exists(), 'die Antragszeile hat keine Betragsspalte').toBe(true)
+    expect(betrag.text(), 'der geänderte Zielwert steht nicht in der Betragsspalte')
+      .toContain('Durchschnittliche Nettorendite — Wohnliegenschaften (in %): 2.31 → 4')
+    expect(betrag.text()).toContain('Minimale Nettorendite — Gewerbeliegenschaften (in %): 1.00 → 5')
+
+    const grund = zeile.find('.pw-antrag-begruendung')
+    expect(grund.text(), 'die Begründung wiederholt die Zielwerte')
+      .not.toContain('Gewerbeliegenschaften (in %)')
+    expect(grund.text(), 'die Begründung selbst fehlt')
+      .toContain('Die bisherigen Zielwerte von 1 % liegen deutlich unter den erzielten Nettorenditen.')
+  })
+
+  /**
+   * Ein Antrag mit Betrag UND Zielwerten verliert keinen der beiden: Der Betrag
+   * bleibt in seiner Spalte, die Zielwerte folgen der Begründung, wie im PDF.
+   */
+  it('lassen den Betrag in seiner Spalte, wenn der Antrag auch einen trägt', async () => {
+    const w = await liste([{ ...ANTRAG, betragDelta: -250000 }])
+    await w.vm.tabWechseln('antraege')
+    await flushPromises()
+    const zeile = w.find('.pw-antrag-zeile')
+
+    const betrag = zeile.find('.pw-antrag-betrag')
+    expect(betrag.text(), 'der Betrag fehlt in der Betragsspalte').toMatch(/250/)
+    expect(betrag.text(), 'die Zielwerte verdrängen den Betrag').not.toContain('Gewerbeliegenschaften')
+    expect(zeile.find('.pw-antrag-begruendung').text(), 'die Zielwerte fehlen ganz')
+      .toContain('Minimale Nettorendite — Gewerbeliegenschaften (in %): 1.00 → 5')
   })
 
   it('nennen je Änderung Messgrösse, heutigen und neuen Soll', async () => {

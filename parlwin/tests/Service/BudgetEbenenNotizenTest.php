@@ -17,9 +17,6 @@ use PHPUnit\Framework\TestCase;
  * Departement und ein Tab tragen Notizen. Das Jahr ist die Kennung, der Name
  * des Departements oder des Tabs der Schlüssel; zwei Ebenen mit demselben Jahr
  * und verschiedenen Schlüsseln führen getrennte Notizen.
- *
- * Marc am 24.10.2026: «Notizen sollte man überall anlegen, auch in einem
- * übergeordneten Zusammenhang.»
  */
 final class BudgetEbenenNotizenTest extends TestCase {
     private GeschaeftAktionMapper $aktionen;

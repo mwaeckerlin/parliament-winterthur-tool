@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { dropdownLage } from '../filter-dropdown'
+import { dropdownLage, filterDropdownPosition } from '../filter-dropdown'
 
 /**
  * Die Liste eines Filterfeldes bleibt im sichtbaren Bereich.
@@ -57,5 +57,59 @@ describe('Lage der Filterliste', () => {
     // Teil endet bei 700, also rückt sie so weit hoch, wie sie muss.
     expect(lage.top, 'die Liste steht tiefer als nötig').toBeLessThanOrEqual(540)
     imBild(lage, 400, 300)
+  })
+})
+
+describe('Die Filterliste folgt ihrem Inhalt', () => {
+  /**
+   * jsdom rechnet kein Layout; die Liste meldet darum die Höhen, die der
+   * Telefonlauf vom 01.11.2026 am iPhone gemessen hat: leer 31 Punkte, mit
+   * den acht Departementen rund 310.
+   */
+  function aufbauen() {
+    const feld = document.createElement('div')
+    feld.getBoundingClientRect = () => ({ top: 200, bottom: 240, left: 12, width: 276 })
+    const liste = document.createElement('ul')
+    let hoehe = 31
+    Object.defineProperty(liste, 'scrollHeight', { get: () => hoehe })
+    const leer = document.createElement('li')
+    leer.className = 'vs__no-options'
+    liste.appendChild(leer)
+    document.body.appendChild(liste)
+    const komponente = { $refs: { toggle: feld }, $el: document.createElement('div') }
+    return { liste, komponente, leer, setzeHoehe: (h) => { hoehe = h } }
+  }
+
+  it('wächst mit, wenn die Einträge erst nach dem Öffnen ankommen', async () => {
+    const { liste, komponente, leer, setzeHoehe } = aufbauen()
+    const aufraeumen = filterDropdownPosition(liste, komponente)
+    expect(liste.style.maxHeight).toBe('31px')
+
+    // Die Einträge kommen an, so wie vue-select sie setzt: Die leere Zeile
+    // geht, die Optionen kommen. Kein Fenster- oder Scroll-Ereignis.
+    setzeHoehe(310)
+    leer.remove()
+    for (let i = 0; i < 8; i++) {
+      const option = document.createElement('li')
+      option.className = 'vs__dropdown-option'
+      option.textContent = `Departement ${i + 1}`
+      liste.appendChild(option)
+    }
+    await new Promise((fertig) => setTimeout(fertig, 0))
+
+    expect(liste.style.maxHeight, 'die Liste behält die Höhe der leeren Liste').toBe('310px')
+    aufraeumen()
+    liste.remove()
+  })
+
+  it('lässt die Liste nach dem Schliessen in Ruhe', async () => {
+    const { liste, komponente, setzeHoehe } = aufbauen()
+    const aufraeumen = filterDropdownPosition(liste, komponente)
+    aufraeumen()
+    setzeHoehe(310)
+    liste.appendChild(document.createElement('li'))
+    await new Promise((fertig) => setTimeout(fertig, 0))
+    expect(liste.style.maxHeight, 'ein Beobachter läuft nach dem Schliessen weiter').toBe('31px')
+    liste.remove()
   })
 })

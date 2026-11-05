@@ -1,4 +1,9 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, sperreVorAllem } from './fixtures.js'
+import { login } from './anmeldung.js'
+
+// Die Sperre aus sperre.js steht vor jedem anderen `beforeAll` dieser Datei,
+// weil schon ein `beforeAll` globale Einstellungen schreiben kann.
+test.beforeAll(sperreVorAllem)
 
 /**
  * E2E-Datenfluss der GESCHÄFTE im echten Browser gegen das reale System
@@ -20,6 +25,8 @@ import { test, expect } from '@playwright/test'
 
 const BASE_URL = process.env.PARLWIN_BASE_URL || 'http://nextcloud-nginx:8080'
 const APP_URL = `${BASE_URL}/index.php/apps/parlwin/`
+// So viele Geschäfte zeichnet die Liste höchstens (F150, Geschaeftsliste.vue).
+const GESCHAEFTE_ANZEIGE = 500
 
 const USERS = {
   u1: { name: process.env.PW_U1 || 'parlwin_praesidium', pass: process.env.PW_P1 || '' },
@@ -40,26 +47,6 @@ function fehlerWaechter(page) {
   const arr = []
   page.on('pageerror', (e) => arr.push(e.message))
   return arr
-}
-
-/** Meldet einen Nutzer über das Nextcloud-Login-Formular an (verbatim aus der Referenz). */
-async function login(page, user) {
-  await page.goto(`${BASE_URL}/index.php/login`)
-  await page.waitForSelector('input[name="user"]', { state: 'visible', timeout: 30_000 })
-  await page.fill('input[name="user"]', user.name)
-  await page.fill('input[name="password"]', user.pass)
-  let zuletzt
-  for (let versuch = 0; versuch < 3; versuch++) {
-    void page.click('button[type="submit"], input[type="submit"]', { noWaitAfter: true }).catch(() => {})
-    try {
-      await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 12_000, waitUntil: 'commit' })
-      await page.waitForLoadState('domcontentloaded').catch(() => {})
-      return
-    } catch (e) {
-      zuletzt = e
-    }
-  }
-  throw zuletzt
 }
 
 /** Öffnet die parlwin-App in der Geschäfte-Ansicht (Standardansicht). */
@@ -555,6 +542,10 @@ test.describe('Geschäfteliste: Filter und Suche', () => {
     await expect
       .poll(async () => page.locator('.pw-tabelle-geschaefte tbody tr').count(), { timeout: 30_000 })
       .toBeGreaterThan(vorher)
+    // F150: Mit den erledigten stehen mehr als 500 Geschäfte im Bestand, die
+    // Liste zeichnet davon die neuesten 500.
+    await expect(page.locator('.pw-tabelle-geschaefte tbody tr.pw-table-row-clickable'))
+      .toHaveCount(GESCHAEFTE_ANZEIGE)
   })
 
   test('«Filter zurücksetzen» leert Suche und Erledigte-Schalter', async ({ page }) => {
@@ -572,7 +563,7 @@ test.describe('Geschäfteliste: Filter und Suche', () => {
     await expect(page.locator('#pw-filter-slot').getByRole('checkbox', { name: 'Erledigte anzeigen' })).not.toBeChecked()
   })
 
-  test('Entscheidungsbedarf-Auswahl lädt die Liste neu und behält Geschäfte', async ({ page }) => {
+  test('Entscheidungsbedarf-Auswahl grenzt die geteilte Liste ein und behält Geschäfte', async ({ page }) => {
     await login(page, USERS.u1)
     await gotoGeschaefte(page)
     // Sicherstellen, dass der teleportierte Filter-Slot mitsamt Selects gemountet ist.
@@ -1111,5 +1102,115 @@ test.describe('Verknüpfte Vorstösse am Geschäft', () => {
     await expect(block, 'Haltung fehlt').toContainText('Unterstützen')
     await expect(block, 'Zuständigkeit fehlt').toContainText('E2E Zuständige Person')
     await expect(block, 'Vorstoss-Notiz fehlt').toContainText(vNotiz)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Ausfall am 03.11.2026: Der erste Block der Liste mit 1000 Geschäften belegte
+// 362'176 KB PHP-Speicher, weil jedes amtliche Dokument mit seinem Text kam.
+test.describe('Geschäfteliste: leichte Liste und Nachladen einzelner Geschäfte', () => {
+  /** Mitgeschrieben: jede Anfrage der Seite an die App, mit Pfad und Parametern. */
+  function anfragenMitschreiben(page) {
+    const anfragen = []
+    page.on('request', (req) => {
+      const url = new URL(req.url())
+      if (url.pathname.includes('/apps/parlwin/')) {
+        anfragen.push({ methode: req.method(), pfad: url.pathname, suche: url.searchParams })
+      }
+    })
+    return anfragen
+  }
+
+  test('Ein aufgeklapptes Dokument holt nur seinen eigenen Text (F149)', async ({ page }) => {
+    await login(page, USERS.u1)
+    await gotoGeschaefte(page)
+    // Ein Geschäft mit einem gelesenen Dokument. Die Liste trägt die Dokumente
+    // ohne Text.
+    const liste = await (await api(page, 'get', '/geschaefte?show_erledigt=1&limit=2000')).json()
+    const dokumente = liste.flatMap((g) => g.amtlicheDokumente || [])
+    expect(dokumente.length, 'der Stack hat keine amtlichen Dokumente').toBeGreaterThan(0)
+    for (const d of dokumente) {
+      expect(d, 'die Liste trägt den Text eines Dokuments').not.toHaveProperty('markdown')
+      expect(d, 'die Liste trägt die Abschnitte eines Dokuments').not.toHaveProperty('abschnitte')
+    }
+    // Unter den 500 neuesten, die die Tabelle mit «Erledigte anzeigen» zeigt.
+    const geschaeft = liste.slice(0, 500)
+      .find((g) => g.nummer && (g.amtlicheDokumente || []).some((d) => d.hatInhalt && !d.fehler))
+    expect(geschaeft, 'kein Geschäft mit einem gelesenen Dokument').toBeTruthy()
+    const dokument = geschaeft.amtlicheDokumente.find((d) => d.hatInhalt && !d.fehler)
+
+    await page.locator('#pw-filter-slot').getByText('Erledigte anzeigen').click()
+    await page.fill('#pw-search-slot input', geschaeft.nummer)
+    // In den Testdaten stehen mehrere Budgetgeschäfte unter derselben Nummer;
+    // die Zeile ist die mit Nummer und Titel.
+    const zeile = page.locator('.pw-tabelle-geschaefte tbody')
+      .getByRole('button', { name: `Geschäft ${geschaeft.nummer} öffnen`, exact: true })
+      .filter({ hasText: geschaeft.titel })
+    await zeile.waitFor({ state: 'visible', timeout: 30_000 })
+    await page.waitForLoadState('networkidle')
+    const anfragen = anfragenMitschreiben(page)
+    await zeile.locator('.pw-dokumente-schalter').click()
+    const kopf = page.locator('.pw-tabelle-geschaefte .pw-dokument-kopf', { hasText: dokument.titel }).first()
+    await kopf.click()
+    await expect(page.locator('.pw-dokument-inhalt .pw-markdown').first(), 'der Text des Dokuments erscheint nicht')
+      .toBeVisible({ timeout: 30_000 })
+    await page.waitForLoadState('networkidle')
+
+    const dokumentAnfragen = anfragen.filter((a) => a.pfad.includes('/amtliche-dokumente'))
+    expect(dokumentAnfragen.map((a) => `${a.methode} ${a.pfad}`), 'das Aufklappen holt mehr als dieses eine Dokument')
+      .toEqual([`GET ${new URL(APP_URL).pathname}geschaefte/${geschaeft.id}/amtliche-dokumente/${dokument.id}`])
+
+    // Ein Dokument eines anderen Geschäfts kommt über dieses Geschäft nicht.
+    const fremd = await api(page, 'get', `/geschaefte/${geschaeft.id + 1000000}/amtliche-dokumente/${dokument.id}`)
+    expect(fremd.status(), 'ein fremdes Dokument liess sich lesen').toBe(404)
+  })
+
+  test('Nach einer Änderung in einem anderen Fenster lädt die App nur dieses Geschäft, für alle drei Ansichten (F150)', async ({ browser }) => {
+    const schreiber = await (await browser.newContext()).newPage()
+    const leser = await (await browser.newContext()).newPage()
+    let geschaeftId = 0
+    try {
+      await login(schreiber, USERS.u1)
+      await gotoGeschaefte(schreiber)
+      const offen = await (await api(schreiber, 'get', '/geschaefte?limit=50')).json()
+      const geschaeft = offen.find((g) => !g.prioritaet && g.nummer)
+      expect(geschaeft, 'kein hängiges Geschäft ohne Priorität').toBeTruthy()
+      geschaeftId = geschaeft.id
+
+      await login(leser, USERS.u1)
+      await gotoGeschaefte(leser)
+      await leser.fill('#pw-search-slot input', geschaeft.nummer)
+      // In den Testdaten stehen mehrere Budgetgeschäfte unter derselben Nummer;
+      // die Zeile ist die mit Nummer und Titel.
+      const zeile = leser.locator('.pw-tabelle-geschaefte tbody')
+        .getByRole('button', { name: `Geschäft ${geschaeft.nummer} öffnen`, exact: true })
+        .filter({ hasText: geschaeft.titel })
+      await zeile.waitFor({ state: 'visible', timeout: 30_000 })
+      await leser.waitForLoadState('networkidle')
+      const anfragen = anfragenMitschreiben(leser)
+      const listenAnfragen = () => anfragen.filter((a) => a.methode === 'GET' && /\/apps\/parlwin\/geschaefte$/.test(a.pfad))
+
+      // Der Schreiber setzt die Priorität; der Leser zeigt sie ohne Neuladen.
+      const res = await api(schreiber, 'put', `/geschaefte/${geschaeftId}/prioritaet`, { prioritaet: 'hoch' })
+      expect(res.ok(), `Priorität setzen fehlgeschlagen (${res.status()})`).toBeTruthy()
+      await expect(zeile.locator('.pw-col-prio'), 'die Priorität erscheint im anderen Fenster nicht')
+        .toContainText('Hoch', { timeout: 30_000 })
+      await leser.waitForLoadState('networkidle')
+      expect(listenAnfragen().map((a) => a.suche.toString()), 'der Leser lädt mehr als das geänderte Geschäft')
+        .toEqual([`ids=${geschaeftId}`])
+
+      // «Kommissionen» und «Sitzungen» nehmen dieselbe Liste: Der Wechsel lädt
+      // die Geschäfte nicht noch einmal.
+      for (const ansicht of ['Kommissionen', 'Sitzungen', 'Geschäfte']) {
+        await leser.getByRole('link', { name: ansicht, exact: true }).click()
+        await expect(leser.locator('.pw-view-title')).toHaveText(ansicht, { timeout: 30_000 })
+        await leser.waitForLoadState('networkidle')
+      }
+      expect(listenAnfragen().length, 'ein Wechsel der Ansicht lädt die Liste der Geschäfte neu').toBe(1)
+    } finally {
+      if (geschaeftId) { await api(schreiber, 'put', `/geschaefte/${geschaeftId}/prioritaet`, { prioritaet: '' }) }
+      await schreiber.context().close()
+      await leser.context().close()
+    }
   })
 })

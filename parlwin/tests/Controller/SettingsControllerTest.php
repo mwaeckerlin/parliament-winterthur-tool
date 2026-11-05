@@ -4,19 +4,15 @@ declare(strict_types=1);
 
 namespace OCA\ParliamentWinterthur\Tests\Controller;
 
+use OCA\ParliamentWinterthur\Command\SyncCommand;
 use OCA\ParliamentWinterthur\Controller\SettingsController;
 use OCA\ParliamentWinterthur\Db\Fraktion;
 use OCA\ParliamentWinterthur\Db\Mitglied;
 use OCA\ParliamentWinterthur\Db\FraktionMapper;
 use OCA\ParliamentWinterthur\Service\FraktionsarbeitService;
-use OCA\ParliamentWinterthur\Service\EreignisService;
 use OCA\ParliamentWinterthur\Service\FraktionsraumService;
-use OCA\ParliamentWinterthur\Service\GeschaeftService;
-use OCA\ParliamentWinterthur\Service\KalenderService;
 use OCA\ParliamentWinterthur\Service\MitgliedService;
 use OCA\ParliamentWinterthur\Service\RealtimePublisherService;
-use OCA\ParliamentWinterthur\Service\ScraperService;
-use OCA\ParliamentWinterthur\Service\SitzungService;
 use OCA\ParliamentWinterthur\Service\SyncLockService;
 use OCA\ParliamentWinterthur\Service\SyncProcessService;
 use OCP\AppFramework\Http;
@@ -137,11 +133,7 @@ class SettingsControllerTest extends TestCase {
             $controller = new SettingsController(
                 $request,
                 $config,
-                $this->createStub(GeschaeftService::class),
-                $this->createStub(SitzungService::class),
                 $this->createStub(MitgliedService::class),
-                $this->createStub(ScraperService::class),
-                $this->createStub(KalenderService::class),
                 $this->createStub(FraktionsarbeitService::class),
                 $this->createStub(RealtimePublisherService::class),
                 new SyncLockService($sperrdatei),
@@ -150,7 +142,7 @@ class SettingsControllerTest extends TestCase {
                 $this->createStub(IGroupManager::class),
                 $this->createStub(IUserManager::class),
                 $this->createStub(FraktionsraumService::class),
-                $this->createStub(EreignisService::class),
+                $this->createStub(SyncCommand::class),
             );
 
             $antwort = $controller->cancelSync();
@@ -215,11 +207,7 @@ class SettingsControllerTest extends TestCase {
             $controller = new SettingsController(
                 $request,
                 $config,
-                $this->createStub(GeschaeftService::class),
-                $this->createStub(SitzungService::class),
                 $this->createStub(MitgliedService::class),
-                $this->createStub(ScraperService::class),
-                $this->createStub(KalenderService::class),
                 $this->createStub(FraktionsarbeitService::class),
                 $this->createStub(RealtimePublisherService::class),
                 $lock,
@@ -228,7 +216,7 @@ class SettingsControllerTest extends TestCase {
                 $this->createStub(IGroupManager::class),
                 $this->createStub(IUserManager::class),
                 $this->createStub(FraktionsraumService::class),
-                $this->createStub(EreignisService::class),
+                $this->createStub(SyncCommand::class),
             );
 
             // Der Worker lebt: Als seine Nummer dient die des Testprozesses.
@@ -245,6 +233,15 @@ class SettingsControllerTest extends TestCase {
             self::assertNotNull(
                 $lock->pidLesen(),
                 'Die Prozessnummer des noch laufenden Workers ist weg'
+            );
+            // F59: Der Stand bleibt beim Abbruch, bis der Prozess sein Ende
+            // selbst meldet; ein vorzeitiges «abgebrochen» liess die Oberfläche
+            // wieder «Synchronisiere...» zeigen.
+            $gespeichert = json_decode((string) $stand['sync_progress'], true);
+            self::assertSame(
+                'abbruch_angefragt',
+                $gespeichert['phase'] ?? null,
+                'Der Stand meldet den startenden Lauf als beendet, obwohl sein Prozess noch lebt'
             );
         } finally {
             @unlink($sperrdatei);
@@ -284,26 +281,30 @@ class SettingsControllerTest extends TestCase {
         $prozesse = $this->createStub(SyncProcessService::class);
         $prozesse->method('ensureStopped')->willReturn(['stopped' => true, 'forced' => true, 'signalled' => true]);
 
+        $ereignisse = [];
+        $realtime = $this->createStub(RealtimePublisherService::class);
+        $realtime->method('publish')->willReturnCallback(
+            static function (string $typ, array $nutzlast) use (&$ereignisse): void {
+                $ereignisse[$typ] = $nutzlast;
+            }
+        );
+
         $sperrdatei = '/tmp/parlwin-sync-hartstopp-test-' . uniqid('', true) . '.lock';
         $lock = new SyncLockService($sperrdatei);
         try {
             $controller = new SettingsController(
                 $request,
                 $config,
-                $this->createStub(GeschaeftService::class),
-                $this->createStub(SitzungService::class),
                 $this->createStub(MitgliedService::class),
-                $this->createStub(ScraperService::class),
-                $this->createStub(KalenderService::class),
                 $this->createStub(FraktionsarbeitService::class),
-                $this->createStub(RealtimePublisherService::class),
+                $realtime,
                 $lock,
                 $prozesse,
                 $this->createStub(FraktionMapper::class),
                 $this->createStub(IGroupManager::class),
                 $this->createStub(IUserManager::class),
                 $this->createStub(FraktionsraumService::class),
-                $this->createStub(EreignisService::class),
+                $this->createStub(SyncCommand::class),
             );
 
             (new \ReflectionMethod(SettingsController::class, 'setCurrentWorkerPid'))
@@ -313,6 +314,10 @@ class SettingsControllerTest extends TestCase {
 
             self::assertFalse($lock->abbruchAngefordert(), 'Das Abbruch-Signal bleibt nach dem harten Stopp stehen');
             self::assertNull($lock->pidLesen(), 'Die Prozessnummer bleibt nach dem harten Stopp stehen');
+            // F150: Der beendete Lauf meldet seine Geschäfte nicht mehr; `null` lässt die Oberfläche die ganze Liste laden.
+            self::assertArrayHasKey('sync.cancelled', $ereignisse);
+            self::assertArrayHasKey('geschaeftIds', $ereignisse['sync.cancelled']);
+            self::assertNull($ereignisse['sync.cancelled']['geschaeftIds']);
         } finally {
             @unlink($sperrdatei);
             @unlink($sperrdatei . '.abbruch');
@@ -333,11 +338,7 @@ class SettingsControllerTest extends TestCase {
         return new SettingsController(
             $request,
             $config,
-            $this->createStub(GeschaeftService::class),
-            $this->createStub(SitzungService::class),
             $this->createStub(MitgliedService::class),
-            $this->createStub(ScraperService::class),
-            $this->createStub(KalenderService::class),
             $this->createStub(FraktionsarbeitService::class),
             $this->createStub(RealtimePublisherService::class),
             $lock,
@@ -346,7 +347,7 @@ class SettingsControllerTest extends TestCase {
             $this->createStub(IGroupManager::class),
             $this->createStub(IUserManager::class),
             $this->createStub(FraktionsraumService::class),
-            $this->createStub(EreignisService::class),
+            $this->createStub(SyncCommand::class),
         );
     }
 
@@ -382,11 +383,7 @@ class SettingsControllerTest extends TestCase {
         $controller = new SettingsController(
             $request,
             $config,
-            $this->createStub(GeschaeftService::class),
-            $this->createStub(SitzungService::class),
             $this->createStub(MitgliedService::class),
-            $this->createStub(ScraperService::class),
-            $this->createStub(KalenderService::class),
             $this->createStub(FraktionsarbeitService::class),
             $publisher,
             $syncLock,
@@ -395,7 +392,7 @@ class SettingsControllerTest extends TestCase {
             $this->createStub(IGroupManager::class),
             $this->createStub(IUserManager::class),
             $this->createStub(FraktionsraumService::class),
-            $this->createStub(EreignisService::class),
+            $this->createStub(SyncCommand::class),
         );
 
         $response = $controller->run();
@@ -440,11 +437,7 @@ class SettingsControllerTest extends TestCase {
         $controller = new SettingsController(
             $request,
             $config,
-            $this->createStub(GeschaeftService::class),
-            $this->createStub(SitzungService::class),
             $this->createStub(MitgliedService::class),
-            $this->createStub(ScraperService::class),
-            $this->createStub(KalenderService::class),
             $this->createStub(FraktionsarbeitService::class),
             $publisher,
             $syncLock,
@@ -453,7 +446,7 @@ class SettingsControllerTest extends TestCase {
             $this->createStub(IGroupManager::class),
             $this->createStub(IUserManager::class),
             $this->createStub(FraktionsraumService::class),
-            $this->createStub(EreignisService::class),
+            $this->createStub(SyncCommand::class),
         );
 
         $response = $controller->syncStatus();
@@ -469,7 +462,7 @@ class SettingsControllerTest extends TestCase {
     public function testSetLehntUnbekannteFraktionAb(): void {
         [$controller, $config, $publisher] = $this->buildController(
             ['fraktion' => 'Unbekannte Fraktion'],
-            ['SP/Grüne'],
+            ['MPW'],
             []
         );
 
@@ -485,10 +478,10 @@ class SettingsControllerTest extends TestCase {
 
     public function testSetLehntInaktiveFraktionAb(): void {
         [$controller, $config, $publisher] = $this->buildController(
-            ['fraktion' => 'SVP-Fraktion'],
+            ['fraktion' => 'MPW-Fraktion'],
             [
-                ['name' => 'SVP-Fraktion', 'aktiv' => false],
-                ['name' => 'Schweizerische Volkspartei-Fraktion (SVP)', 'aktiv' => true],
+                ['name' => 'MPW-Fraktion', 'aktiv' => false],
+                ['name' => 'Musterpartei-Fraktion (MPW)', 'aktiv' => true],
             ],
             []
         );
@@ -511,12 +504,12 @@ class SettingsControllerTest extends TestCase {
 
         [$controller, $config, $publisher] = $this->buildController(
             [
-                'fraktion' => 'SP/Grüne',
-                'nextcloud_gruppe' => 'Fraktion-SP-Gruene',
+                'fraktion' => 'MPW',
+                'nextcloud_gruppe' => 'Fraktion-Muster',
                 'absender_email' => 'noreply@example.com',
                 'absender_name' => 'Parliament',
             ],
-            ['SP/Grüne', 'FDP'],
+            ['MPW', 'BPW'],
             ['admin' => $bekannterUser]
         );
 
@@ -534,17 +527,17 @@ class SettingsControllerTest extends TestCase {
         self::assertSame(Http::STATUS_OK, $response->getStatus());
         $data = $response->getData();
         self::assertIsArray($data);
-        self::assertSame('SP/Grüne', $writes['fraktion'] ?? null);
+        self::assertSame('MPW', $writes['fraktion'] ?? null);
         self::assertArrayNotHasKey('kalender_nutzer', $writes);
-        self::assertSame('Fraktion-SP-Gruene', $writes['nextcloud_gruppe'] ?? null);
-        self::assertSame(['FDP', 'SP/Grüne'], $data['optionen']['fraktionen'] ?? []);
+        self::assertSame('Fraktion-Muster', $writes['nextcloud_gruppe'] ?? null);
+        self::assertSame(['BPW', 'MPW'], $data['optionen']['fraktionen'] ?? []);
     }
 
     public function testFraktionMitgliederLiefertUsernameUndLokaleGruppen(): void
     {
         $request = $this->createStub(IRequest::class);
         $request->method('getParam')->willReturnCallback(static fn(string $key, mixed $default = null): mixed => [
-            'fraktion' => 'SP/Grüne',
+            'fraktion' => 'MPW',
         ][$key] ?? $default);
 
         $config = $this->createStub(IConfig::class);
@@ -558,13 +551,13 @@ class SettingsControllerTest extends TestCase {
         $mitglied->setExternId('123');
         $mitglied->setVorname('Max');
         $mitglied->setName('Muster');
-        $mitglied->setFraktion('SP/Grüne');
+        $mitglied->setFraktion('MPW');
         $mitglied->setEmail('max@example.org');
 
         $mitgliedService = $this->createMock(MitgliedService::class);
         $mitgliedService->expects(self::once())
             ->method('aktiveDerFraktion')
-            ->with('SP/Grüne')
+            ->with('MPW')
             ->willReturn([$mitglied]);
 
         $localUser = $this->createStub(IUser::class);
@@ -582,18 +575,14 @@ class SettingsControllerTest extends TestCase {
 
         $groupManager = $this->createStub(IGroupManager::class);
         $groupManager->method('getUserGroupIds')
-            ->willReturnCallback(static fn(IUser $user): array => $user === $localUser ? ['Fraktion-SP-Gruene', 'users'] : []);
+            ->willReturnCallback(static fn(IUser $user): array => $user === $localUser ? ['Fraktion-Muster', 'users'] : []);
 
         $publisher = $this->createStub(RealtimePublisherService::class);
 
         $controller = new SettingsController(
             $request,
             $config,
-            $this->createStub(GeschaeftService::class),
-            $this->createStub(SitzungService::class),
             $mitgliedService,
-            $this->createStub(ScraperService::class),
-            $this->createStub(KalenderService::class),
             $this->createStub(FraktionsarbeitService::class),
             $publisher,
             $this->createStub(SyncLockService::class),
@@ -602,26 +591,26 @@ class SettingsControllerTest extends TestCase {
             $groupManager,
             $userManager,
             $this->createStub(FraktionsraumService::class),
-            $this->createStub(EreignisService::class),
+            $this->createStub(SyncCommand::class),
         );
 
         $response = $controller->fraktionMitglieder();
         self::assertSame(Http::STATUS_OK, $response->getStatus());
         $data = $response->getData();
         self::assertIsArray($data);
-        self::assertSame('SP/Grüne', $data['fraktion'] ?? '');
+        self::assertSame('MPW', $data['fraktion'] ?? '');
         self::assertCount(1, $data['mitglieder'] ?? []);
         self::assertSame('max-muster', $data['mitglieder'][0]['username'] ?? null);
         self::assertTrue((bool) ($data['mitglieder'][0]['lokalerUserExistiert'] ?? false));
-        self::assertSame(['Fraktion-SP-Gruene', 'users'], $data['mitglieder'][0]['lokaleGruppen'] ?? []);
+        self::assertSame(['Fraktion-Muster', 'users'], $data['mitglieder'][0]['lokaleGruppen'] ?? []);
     }
 
     public function testProvisionFraktionMitgliederLegtUserAnUndFuegtGruppeHinzu(): void
     {
         $request = $this->createStub(IRequest::class);
         $request->method('getParam')->willReturnCallback(static fn(string $key, mixed $default = null): mixed => [
-            'fraktion' => 'SP/Grüne',
-            'nextcloud_gruppe' => 'Fraktion-SP-Gruene',
+            'fraktion' => 'MPW',
+            'nextcloud_gruppe' => 'Fraktion-Muster',
             'mitglied_ids' => [7],
             'mappings' => [
                 ['mitgliedId' => 7, 'username' => 'Max Muster'],
@@ -639,7 +628,7 @@ class SettingsControllerTest extends TestCase {
         $mitglied->setExternId('777');
         $mitglied->setVorname('Max');
         $mitglied->setName('Muster');
-        $mitglied->setFraktion('SP/Grüne');
+        $mitglied->setFraktion('MPW');
         $mitglied->setEmail('max@example.org');
 
         $mitgliedService = $this->createStub(MitgliedService::class);
@@ -648,7 +637,7 @@ class SettingsControllerTest extends TestCase {
         $mitgliedService->method('setzeNextcloudUid')
             ->willReturnCallback(static fn(int $id, string $uid): ?Mitglied => $id === 7 && $uid === 'max-muster' ? $mitglied : null);
         $mitgliedService->method('aktiveDerFraktion')
-            ->willReturnCallback(static fn(string $fraktion): array => $fraktion === 'SP/Grüne' ? [$mitglied] : []);
+            ->willReturnCallback(static fn(string $fraktion): array => $fraktion === 'MPW' ? [$mitglied] : []);
         $mitgliedService->method('gehoertZurFraktion')->willReturn(true);
 
         $localUser = $this->createStub(IUser::class);
@@ -674,12 +663,12 @@ class SettingsControllerTest extends TestCase {
 
         $groupManager = $this->createMock(IGroupManager::class);
         $groupManager->method('groupExists')
-            ->willReturnCallback(static fn(string $gid): bool => $gid === 'Fraktion-SP-Gruene' ? false : true);
-        $groupManager->expects(self::once())->method('createGroup')->with('Fraktion-SP-Gruene')->willReturn($group);
+            ->willReturnCallback(static fn(string $gid): bool => $gid === 'Fraktion-Muster' ? false : true);
+        $groupManager->expects(self::once())->method('createGroup')->with('Fraktion-Muster')->willReturn($group);
         $groupManager->method('get')
-            ->willReturnCallback(static fn(string $gid): ?IGroup => $gid === 'Fraktion-SP-Gruene' ? $group : null);
+            ->willReturnCallback(static fn(string $gid): ?IGroup => $gid === 'Fraktion-Muster' ? $group : null);
         $groupManager->method('getUserGroupIds')
-            ->willReturnCallback(static fn(IUser $user): array => $user === $localUser ? ['Fraktion-SP-Gruene'] : []);
+            ->willReturnCallback(static fn(IUser $user): array => $user === $localUser ? ['Fraktion-Muster'] : []);
 
         $publisher = $this->createMock(RealtimePublisherService::class);
         $publisher->expects(self::once())->method('publish')->with(
@@ -690,11 +679,7 @@ class SettingsControllerTest extends TestCase {
         $controller = new SettingsController(
             $request,
             $config,
-            $this->createStub(GeschaeftService::class),
-            $this->createStub(SitzungService::class),
             $mitgliedService,
-            $this->createStub(ScraperService::class),
-            $this->createStub(KalenderService::class),
             $this->createStub(FraktionsarbeitService::class),
             $publisher,
             $this->createStub(SyncLockService::class),
@@ -703,7 +688,7 @@ class SettingsControllerTest extends TestCase {
             $groupManager,
             $userManager,
             $this->createStub(FraktionsraumService::class),
-            $this->createStub(EreignisService::class),
+            $this->createStub(SyncCommand::class),
         );
 
         $response = $controller->provisionFraktionMitglieder();
@@ -755,12 +740,12 @@ class SettingsControllerTest extends TestCase {
         $request = $this->createStub(IRequest::class);
         $request->method('getParam')->willReturnCallback(
             static fn(string $key, mixed $default = null): mixed => match ($key) {
-                'fraktion' => 'SP',
+                'fraktion' => 'MPW',
                 default => $default,
             }
         );
 
-        $store = ['nextcloud_gruppe' => 'sp-gruppe', 'fraktion' => 'SP'];
+        $store = ['nextcloud_gruppe' => 'Fraktion-Muster', 'fraktion' => 'MPW'];
         $config = $this->createStub(IConfig::class);
         $config->method('getAppValue')->willReturnCallback(
             static fn(string $_app, string $key, string $default = ''): string => $store[$key] ?? $default
@@ -783,11 +768,7 @@ class SettingsControllerTest extends TestCase {
 
         $controller = new SettingsController(
             $request, $config,
-            $this->createStub(GeschaeftService::class),
-            $this->createStub(SitzungService::class),
             $mitgliedService,
-            $this->createStub(ScraperService::class),
-            $this->createStub(KalenderService::class),
             $this->createStub(FraktionsarbeitService::class),
             $this->createStub(RealtimePublisherService::class),
             $this->createStub(SyncLockService::class),
@@ -796,7 +777,7 @@ class SettingsControllerTest extends TestCase {
             $groupManager,
             $userManager,
             $this->createStub(FraktionsraumService::class),
-            $this->createStub(EreignisService::class),
+            $this->createStub(SyncCommand::class),
         );
 
         $data = $controller->fraktionMitglieder()->getData();
@@ -823,8 +804,8 @@ class SettingsControllerTest extends TestCase {
         $request = $this->createStub(IRequest::class);
         $request->method('getParam')->willReturnCallback(
             static fn(string $key, mixed $default = null): mixed => match ($key) {
-                'fraktion' => 'SP',
-                'nextcloud_gruppe' => 'sp-gruppe',
+                'fraktion' => 'MPW',
+                'nextcloud_gruppe' => 'Fraktion-Muster',
                 'mitglied_ids' => [],
                 'orphan_uids' => ['zu-loeschen'],
                 'mappings' => [],
@@ -835,7 +816,7 @@ class SettingsControllerTest extends TestCase {
             static fn(string $key): bool => in_array($key, ['fraktion', 'nextcloud_gruppe', 'mitglied_ids', 'orphan_uids', 'mappings'], true)
         );
 
-        $store = ['nextcloud_gruppe' => 'sp-gruppe', 'fraktion' => 'SP'];
+        $store = ['nextcloud_gruppe' => 'Fraktion-Muster', 'fraktion' => 'MPW'];
         $config = $this->createStub(IConfig::class);
         $config->method('getAppValue')->willReturnCallback(
             static fn(string $_app, string $key, string $default = ''): string => $store[$key] ?? $default
@@ -865,11 +846,7 @@ class SettingsControllerTest extends TestCase {
 
         $controller = new SettingsController(
             $request, $config,
-            $this->createStub(GeschaeftService::class),
-            $this->createStub(SitzungService::class),
             $mitgliedService,
-            $this->createStub(ScraperService::class),
-            $this->createStub(KalenderService::class),
             $this->createStub(FraktionsarbeitService::class),
             $this->createStub(RealtimePublisherService::class),
             $this->createStub(SyncLockService::class),
@@ -878,7 +855,7 @@ class SettingsControllerTest extends TestCase {
             $groupManager,
             $userManager,
             $this->createStub(FraktionsraumService::class),
-            $this->createStub(EreignisService::class),
+            $this->createStub(SyncCommand::class),
         );
 
         $data = $controller->provisionFraktionMitglieder()->getData();
@@ -956,11 +933,7 @@ class SettingsControllerTest extends TestCase {
         return new SettingsController(
             $request,
             $config,
-            $this->createStub(GeschaeftService::class),
-            $this->createStub(SitzungService::class),
             $this->createStub(MitgliedService::class),
-            $this->createStub(ScraperService::class),
-            $this->createStub(KalenderService::class),
             $this->createStub(FraktionsarbeitService::class),
             $this->createStub(RealtimePublisherService::class),
             $this->createStub(SyncLockService::class),
@@ -969,7 +942,7 @@ class SettingsControllerTest extends TestCase {
             $this->createStub(IGroupManager::class),
             $this->createStub(IUserManager::class),
             $this->createStub(FraktionsraumService::class),
-            $this->createStub(EreignisService::class),
+            $this->createStub(SyncCommand::class),
         );
     }
 
@@ -1030,11 +1003,7 @@ class SettingsControllerTest extends TestCase {
         $controller = new SettingsController(
             $request,
             $config,
-            $this->createStub(GeschaeftService::class),
-            $this->createStub(SitzungService::class),
             $this->createStub(MitgliedService::class),
-            $this->createStub(ScraperService::class),
-            $this->createStub(KalenderService::class),
             $fraktionsarbeit,
             $publisher,
             $this->createStub(SyncLockService::class),
@@ -1043,7 +1012,7 @@ class SettingsControllerTest extends TestCase {
             $groupManager,
             $userManager,
             $this->createStub(FraktionsraumService::class),
-            $this->createStub(EreignisService::class),
+            $this->createStub(SyncCommand::class),
         );
 
         return [$controller, $config, $publisher];

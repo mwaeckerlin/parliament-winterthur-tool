@@ -13,6 +13,7 @@ vi.mock('@nextcloud/axios', () => ({
 
 import axios from '@nextcloud/axios'
 import GeschaeftDetail from '../components/GeschaeftDetail.vue'
+import { BESTAND_SCHLUESSEL, erzeugeBestand } from '../geschaefte-bestand.js'
 
 // Feature: Ein eigenes Geschäft lässt sich mit einem offiziellen Parlaments-
 // geschäft verknüpfen (wie Vorstoss→Geschäft): Knopf «Mit offiziellem Geschäft
@@ -21,7 +22,7 @@ import GeschaeftDetail from '../components/GeschaeftDetail.vue'
 describe('Eigenes Geschäft → offizielles Geschäft verknüpfen', () => {
   beforeEach(() => { axios.post.mockClear() })
 
-  const maske = async (geschaeft, eigeneListe = []) => {
+  const maske = async (geschaeft, eigeneListe = [], provide = {}) => {
     axios.get.mockImplementation((url) => {
       const u = String(url)
       if (u.includes('/verknuepfte-eigene')) return Promise.resolve({ data: eigeneListe })
@@ -31,7 +32,7 @@ describe('Eigenes Geschäft → offizielles Geschäft verknüpfen', () => {
     const wrapper = shallowMount(GeschaeftDetail, {
       props: { geschaeftId: 7, mitglieder: [], traktandumKontext: null },
       // NcButton-Stub, der seinen Slot rendert, damit die Knopfbeschriftung im Text erscheint.
-      global: { stubs: { NcButton: { template: '<button class="nc-button-stub"><slot /></button>' } } },
+      global: { provide, stubs: { NcButton: { template: '<button class="nc-button-stub"><slot /></button>' } } },
     })
     await Promise.resolve()
     await Promise.resolve()
@@ -86,5 +87,19 @@ describe('Eigenes Geschäft → offizielles Geschäft verknüpfen', () => {
     expect(axios.post.mock.calls[0][1]).toEqual({ zielGeschaeftId: 42 })
     expect(wrapper.vm.geschaeft.verknuepftGeschaeftId).toBe(42)
     expect(wrapper.vm.geschaeft.status).toBe('erledigt')
+  })
+
+  // F150: Das offizielle Geschäft übernimmt die Priorität; die geteilte Liste
+  // lädt es nach, weil das eigene Ereignis nichts lädt.
+  it('lädt nach dem Verknüpfen das offizielle Geschäft in der geteilten Liste nach', async () => {
+    let ziel = { id: 42, titel: 'Amtliches Geschäft', status: 'In Kommission', datum: '2026-01-01', prioritaet: '' }
+    const bestand = erzeugeBestand({ client: { get: () => Promise.resolve({ data: [{ ...ziel }] }) } })
+    await bestand.laden()
+    const wrapper = await maske(eigenes(), [], { [BESTAND_SCHLUESSEL]: bestand })
+    ziel = { ...ziel, prioritaet: 'hoch' }
+
+    await wrapper.vm.verknuepfen({ id: 42, titel: 'Amtliches Geschäft' })
+    await flushPromises()
+    expect(bestand.zustand.geschaefte.find((g) => g.id === 42).prioritaet, 'die geteilte Liste zeigt das offizielle Geschäft alt').toBe('hoch')
   })
 })

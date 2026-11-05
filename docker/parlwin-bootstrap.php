@@ -82,12 +82,14 @@ function pwbCopyTree(string $src, string $dst): void
   }
 }
 
-// Speichergrenze von PHP: Das Basis-Image liefert 512 MB, ein Budgetbuch
-// braucht beim Einlesen mehr (gemessen am Buch 2027: 574,7 MB).  Der Wert steht
-// in `PARLWIN_PHP_MEMORY_LIMIT` und gilt fuer alles, was in diesem Container
-// laeuft: php-fpm, `occ` und der Hintergrundauftrag.  Geschrieben wird er,
-// bevor php-fpm und der Watcher starten — beide lesen das Verzeichnis beim
-// eigenen Start.
+// Speichergrenze von PHP auf der Kommandozeile: Ein Budgetbuch braucht beim
+// Einlesen mehr als 512 MB (gemessen am Buch 2027: 574,7 MB).  Der Wert steht
+// in `PARLWIN_PHP_MEMORY_LIMIT` und gilt fuer `occ`, den Hintergrundauftrag
+// und die Synchronisation, die als eigener Prozess laeuft.  Fuer die Anfragen an
+// php-fpm gilt er nicht: office-bootstrap.php des Images startet php-fpm mit
+// `-d memory_limit` aus `MEMORY_LIMIT`, und `-d` geht jeder ini-Datei vor.
+// Geschrieben wird er, bevor der Watcher startet, der das Verzeichnis beim
+// eigenen Start liest.
 function pwbWritePhpIni(): void
 {
   $grenze = (string) (getenv('PARLWIN_PHP_MEMORY_LIMIT') ?: PARLWIN_MEMORY_LIMIT_DEFAULT);

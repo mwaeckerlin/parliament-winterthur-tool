@@ -11,12 +11,9 @@ use PHPUnit\Framework\TestCase;
 /**
  * Gebundene, interne und beeinflussbare Kosten (F128).
  *
- * Marc am 24.10.2026: «man kann in der Anzeige splitten zwischen fix und
- * flexibel. Vor allem sollte sich der kürzbare Anteil, insbesondere bei der
- * automatischen Verteilung prozentual, auf den flexiblen Teil beschränken. […]
- * Daher soll es vor allem eine Orientierung sein und nicht eine feste Sperre
- * oder feste Regel. Ausser bei der automatischen Verteilung, da soll nur auf
- * den flexiblen Anteil verteilt werden.»
+ * Die Anzeige trennt fixe und flexible Kosten. Die Trennung dient der
+ * Orientierung und sperrt keine Eingabe; nur die automatische, prozentuale
+ * Verteilung verteilt allein auf den flexiblen Anteil.
  */
 final class BudgetSteuerbarkeitTest extends TestCase {
     /**

@@ -8,10 +8,8 @@ vi.mock('@nextcloud/axios')
 /**
  * Viele Anträge erfassen (F126) und aus einer Tabelle übernehmen (F127).
  *
- * Marc am 24.10.2026: «Die Eingabe von vielen Anträgen, irgendwie 50 Anträge
- * oder so, ist sehr mühsam. Wie kann man das vereinfachen? Erstens, dass die
- * Eingabe einfacher ist. Zweitens, was vielleicht gut wäre, wäre so etwas wie
- * ein Excel-Upload oder so.»
+ * Die Erfassungstabelle nimmt viele Anträge in einem Durchgang auf, und eine
+ * Tabellendatei füllt sie mit allen Zeilen auf einmal.
  *
  * vitest läuft im Projekt-Root.
  */

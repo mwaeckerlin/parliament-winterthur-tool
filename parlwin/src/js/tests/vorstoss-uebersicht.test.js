@@ -89,7 +89,7 @@ describe('Vorstoesseliste — Tabelle wie bei den Geschäften (F119)', () => {
     titel: 'V19-2026 08 24 PO Areal Maienried v2',
     art: 'Postulat',
     herkunft: 'fremde',
-    herkunftFraktion: 'Grüne/Alternative Linke-Fraktion',
+    herkunftFraktion: 'Fraktion-Muster',
     status: 'neu',
     prioritaet: 'hoch',
     beschluss: 'unterstützen',
@@ -130,7 +130,7 @@ describe('Vorstoesseliste — Tabelle wie bei den Geschäften (F119)', () => {
     // Die Herkunftsfraktion gehört zum Titel wie der Erstunterzeichner beim
     // Geschäft. Angezeigt wird sie gekürzt; ohne konfiguriertes Kürzel — wie
     // hier — steht der volle Name.
-    expect(zeile.find('.pw-col-herkunftsfraktion').text()).toBe('Grüne/Alternative Linke-Fraktion')
+    expect(zeile.find('.pw-col-herkunftsfraktion').text()).toBe('Fraktion-Muster')
   })
 
   it('macht die Zeile anklickbar und öffnet damit die Maske', async () => {

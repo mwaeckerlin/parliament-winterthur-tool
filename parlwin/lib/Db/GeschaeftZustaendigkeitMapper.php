@@ -31,6 +31,33 @@ class GeschaeftZustaendigkeitMapper extends QBMapper {
         return $this->findEntities($qb);
     }
 
+    /**
+     * Die aktiven Zuständigkeiten jedes Geschäfts der Liste in der Ordnung von
+     * {@see findAktiveByGeschaeft()}, mit einer Abfrage je Block von 500
+     * Geschäften. Die Hauptzuständigkeit steht damit vorn.
+     *
+     * @param int[] $geschaeftIds
+     * @return array<int, GeschaeftZustaendigkeit[]> nach Geschäft
+     */
+    public function findAktiveByGeschaefte(array $geschaeftIds): array {
+        $ids = array_values(array_unique(array_map('intval', $geschaeftIds)));
+        $gruppiert = [];
+        foreach (array_chunk($ids, 500) as $block) {
+            $qb = $this->db->getQueryBuilder();
+            $qb->select('*')
+                ->from($this->getTableName())
+                ->where($qb->expr()->in('geschaeft_id', $qb->createNamedParameter($block, IQueryBuilder::PARAM_INT_ARRAY)))
+                ->andWhere($qb->expr()->eq('aktiv', $qb->createNamedParameter(true, IQueryBuilder::PARAM_BOOL)))
+                ->orderBy('geschaeft_id', 'ASC')
+                ->addOrderBy('ist_haupt', 'DESC')
+                ->addOrderBy('person_name', 'ASC');
+            foreach ($this->findEntities($qb) as $zustaendigkeit) {
+                $gruppiert[(int) $zustaendigkeit->getGeschaeftId()][] = $zustaendigkeit;
+            }
+        }
+        return $gruppiert;
+    }
+
     public function findHauptByGeschaeft(int $geschaeftId): ?GeschaeftZustaendigkeit {
         $qb = $this->db->getQueryBuilder();
         $qb->select('*')

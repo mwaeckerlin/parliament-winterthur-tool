@@ -6,8 +6,8 @@ import BudgetGrafik from '../components/BudgetGrafik.vue'
 /**
  * Wie die Kreise zusammenfinden — die Bewegung selbst, nicht ihr Ergebnis.
  *
- * Marcs Anforderung (2026-08-31): «Ca. 2-5s wären gut, und alles kommt von weit
- * zusammen.» Gemessen wird deshalb beides: die Strecke, die ein Kreis vom
+ * Die Kreise kommen von weit her zusammen und brauchen dafür etwa 2s bis 5s.
+ * Gemessen wird deshalb beides: die Strecke, die ein Kreis vom
  * Startpunkt bis an seinen Platz zurücklegt, und wie lange er dafür braucht.
  * Ein Tick der Simulation ist ein Bild; bei 60 Bildern je Sekunde sind 60 Ticks
  * eine Sekunde.

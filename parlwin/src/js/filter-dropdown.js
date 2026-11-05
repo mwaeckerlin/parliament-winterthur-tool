@@ -44,8 +44,11 @@ export function dropdownLage(feld, menuHoehe, sichtbareHoehe, versatz = 0) {
 
 /**
  * Die Positionierung, die NcSelect als `calculate-position` entgegennimmt.
- * Sie hängt die Liste an den sichtbaren Bereich und folgt ihm, solange sie
- * offen ist; der Rückgabewert räumt die Beobachter wieder ab.
+ * Sie hängt die Liste an den sichtbaren Bereich und folgt ihm und ihrem
+ * Inhalt, solange sie offen ist; der Rückgabewert räumt die Beobachter wieder
+ * ab. Der Inhalt zählt, weil die Höhe der Liste aus ihm folgt: Wer ein Feld
+ * öffnet, bevor seine Einträge geladen sind, bekommt zuerst die leere Liste,
+ * und ohne diesen Beobachter behielt sie deren Höhe.
  *
  * @param {HTMLElement} liste die Liste
  * @param {object} komponente die vue-select-Komponente
@@ -75,6 +78,10 @@ export function filterDropdownPosition(liste, komponente) {
   }
   setzen()
   const sicht = typeof window !== 'undefined' ? window.visualViewport : null
+  // Beobachtet werden nur die Einträge und ihr Text: `setzen` ändert Stil und
+  // Klasse der Liste, und ein Beobachter dieser Attribute riefe sich selbst auf.
+  const inhalt = typeof MutationObserver === 'function' ? new MutationObserver(setzen) : null
+  if (inhalt) { inhalt.observe(liste, { childList: true, subtree: true, characterData: true }) }
   window.addEventListener('resize', setzen)
   window.addEventListener('scroll', setzen, true)
   if (sicht) {
@@ -82,6 +89,7 @@ export function filterDropdownPosition(liste, komponente) {
     sicht.addEventListener('scroll', setzen)
   }
   return () => {
+    if (inhalt) { inhalt.disconnect() }
     window.removeEventListener('resize', setzen)
     window.removeEventListener('scroll', setzen, true)
     if (sicht) {

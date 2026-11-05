@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { mount, shallowMount } from '@vue/test-utils'
+import { mount, shallowMount, flushPromises } from '@vue/test-utils'
 import Vorstoesseliste from '../components/Vorstoesseliste.vue'
+import { BESTAND_SCHLUESSEL, erzeugeBestand } from '../geschaefte-bestand.js'
 import NotizenListe from '../components/NotizenListe.vue'
 import axios from '@nextcloud/axios'
 
@@ -89,6 +90,27 @@ describe('Vorstoesseliste — Notizen & Geschäfts-Verknüpfung', () => {
     expect(gerufen.body).toEqual({ geschaeftId: 42 })
     expect(wrapper.vm.bearbeitung.geschaeftId).toBe(42)
     expect(wrapper.vm.bearbeitung.status).toBe('erledigt')
+  })
+
+  // F150: Das eigene Ereignis lädt nichts; die Ansicht lädt das Geschäft, das
+  // die Priorität des Vorstosses übernommen hat, in der geteilten Liste selbst nach.
+  it('lädt nach dem Verknüpfen das Geschäft in der geteilten Liste nach', async () => {
+    let server = { id: 42, titel: 'Geschäft', status: 'Pendent', datum: '2026-01-01', prioritaet: '' }
+    const bestand = erzeugeBestand({ client: { get: () => Promise.resolve({ data: [{ ...server }] }) } })
+    await bestand.laden()
+    const wrapper = shallowMount(Vorstoesseliste, {
+      props: { mitglieder: [], fraktionen: [] },
+      global: { provide: { [BESTAND_SCHLUESSEL]: bestand } },
+    })
+    wrapper.vm.bearbeiten({ id: 5, titel: 'X', prioritaet: 'hoch' })
+    axios.post = () => {
+      server = { ...server, prioritaet: 'hoch' }
+      return Promise.resolve({ data: { geschaeftId: 42, status: 'erledigt' } })
+    }
+
+    await wrapper.vm.verknuepfen({ id: 42, titel: 'Geschäft' })
+    await flushPromises()
+    expect(bestand.zustand.geschaefte[0].prioritaet, 'die geteilte Liste zeigt die alte Priorität').toBe('hoch')
   })
 
   // Die Ähnlichkeitssuche steckt jetzt im GETEILTEN Verknüpfen-Dialog (kein

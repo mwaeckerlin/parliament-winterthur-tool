@@ -5,21 +5,17 @@
     <name>Parlament Winterthur Tool</name>
     <summary>Fraktionsarbeitstool für das Winterthurer Parlament</summary>
     <description><![CDATA[
-Dieses Plugin synchronisiert täglich die öffentlich zugänglichen Daten des
-Parlaments Winterthur (https://parlament.winterthur.ch/) in die Nextcloud-Datenbank
-und stellt diese der konfigurierten Fraktion als strukturierte Arbeitsoberfläche
-zur Verfügung.
+Dieses Plugin synchronisiert nach Zeitplan die öffentlich zugänglichen Daten des Parlaments Winterthur (https://parlament.winterthur.ch/) und die Beschlüsse des Stadtrats (https://stadt.winterthur.ch/stadtratsbeschluesse) in die Nextcloud-Datenbank und stellt sie der konfigurierten Fraktion als strukturierte Arbeitsoberfläche zur Verfügung.
 
 Funktionen:
-- Tägliche automatische Synchronisation von Geschäften, Sitzungen, Mitgliedern,
-  Kommissionen und Fraktionen
-- Fraktionsinterne Zusatzfelder pro Geschäft (Bemerkungen, Zuständigkeit, Anträge,
-  Entscheide, Notizen)
+- Automatische Synchronisation von Geschäften, Sitzungen, Mitgliedern, Kommissionen, Fraktionen und Stadtratsbeschlüssen, standardmässig täglich um 10:00 und 18:00; der Zeitplan lässt sich in der Verwaltung einstellen
+- Fraktionsinterne Bearbeitung pro Geschäft (Priorität, Zuständigkeit, Beschluss, Votum, Notizen, Dokumente)
+- Notizen der Fraktion zu jedem Stadtratsbeschluss
 - Sitzungsvorbereitung mit Traktanden und Notizen
 - Automatische Kalendereinträge für Sitzungen
 - Synchronisation der Fraktionsmitglieder als Nextcloud-Gruppe
     ]]></description>
-    <version>1.9.9</version>
+    <version>1.10.0</version>
     <licence>mit</licence>
     <author mail="marc@waeckerlin.org" homepage="https://github.com/mwaeckerlin">Marc Wäckerlin</author>
     <namespace>ParliamentWinterthur</namespace>

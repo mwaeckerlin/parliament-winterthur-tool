@@ -12,19 +12,36 @@
 # very-base ist Alpine mit Shell und Paketmanager; Composer kommt als Paket.
 # --ignore-platform-reqs: die PHP-Erweiterungen sind erst im Runtime-Image
 # (nextcloud:php-fpm) vorhanden, hier wird nur heruntergeladen.
-FROM mwaeckerlin/very-base AS php-deps
+FROM mwaeckerlin/very-base AS composer
 WORKDIR /deps
 RUN ${PKG_INSTALL} composer
 COPY parlwin/composer.json ./composer.json
-RUN composer update --no-dev --no-interaction --no-progress --prefer-dist --ignore-platform-reqs
+
+# `npm run composer:update -- --lock` löst composer.json neu auf und holt die
+# Stufe `composer-lock` heraus (tests/vendor-aktualisieren.sh).
+FROM composer AS composer-lock-bau
+RUN composer update --no-install --no-interaction --no-progress --ignore-platform-reqs
+
+FROM scratch AS composer-lock
+COPY --from=composer-lock-bau /deps/composer.lock /composer.lock
+
+# Der Bau installiert genau die Fassungen aus parlwin/composer.lock.
+FROM composer AS php-deps
+COPY parlwin/composer.lock ./composer.lock
+RUN composer install --no-dev --no-interaction --no-progress --prefer-dist --ignore-platform-reqs
+
+# Prüft die ausgelieferten Fassungen aus composer.lock auf gemeldete Lücken und
+# bricht bei einem Treffer ab.
+FROM php-deps AS php-audit
+RUN composer audit --locked --no-dev --no-interaction
 
 # Dieselben Abhängigkeiten samt Entwicklungswerkzeugen (PHPUnit), für den
 # Testlauf auf dem Rechner und auf dem GitHub-Runner: beide haben kein PHPUnit
-# im Pfad, und `parlwin/vendor` ist git-ignoriert. `npm run php:deps` holt die
-# Stufe `php-vendor` heraus (tests/php-abhaengigkeiten.sh). Das ausgelieferte
-# Image bleibt ohne Testwerkzeug, es kopiert aus `php-deps`.
+# im Pfad, und `parlwin/vendor` ist git-ignoriert. `npm run composer:update`
+# holt die Stufe `php-vendor` heraus (tests/vendor-aktualisieren.sh). Das
+# ausgelieferte Image bleibt ohne Testwerkzeug, es kopiert aus `php-deps`.
 FROM php-deps AS php-deps-test
-RUN composer update --no-interaction --no-progress --prefer-dist --ignore-platform-reqs
+RUN composer install --no-interaction --no-progress --prefer-dist --ignore-platform-reqs
 
 FROM scratch AS php-vendor
 COPY --from=php-deps-test /deps/vendor /vendor
@@ -36,6 +53,19 @@ FROM mwaeckerlin/very-base AS iconv
 RUN ${PKG_INSTALL} gnu-libiconv gnu-libiconv-dev build-base
 COPY docker/iconv-shim.c /shim.c
 RUN gcc -shared -fPIC -O2 -o /preloadable_libiconv.so /shim.c -liconv
+
+# `npm run lock:aktualisieren` löst die Abhängigkeiten mit dem npm dieser Basis
+# neu auf und holt die Stufe `npm-lock` heraus (tests/lock-aktualisieren.sh):
+# npm 9 bricht beim Auflösen dieses Baums mit den `overrides` ab.
+FROM mwaeckerlin/nodejs-build AS npm-lock-bau
+WORKDIR /build
+COPY --chown=${BUILD_USER} package*.json ./
+RUN npm --version > npm-version
+RUN npm install --package-lock-only --no-audit --no-fund
+
+FROM scratch AS npm-lock
+COPY --from=npm-lock-bau /build/package-lock.json /package-lock.json
+COPY --from=npm-lock-bau /build/npm-version /npm-version
 
 FROM mwaeckerlin/nodejs-build AS app-build
 WORKDIR /build
@@ -49,8 +79,11 @@ COPY --chown=${BUILD_USER} parlwin/ ./parlwin/
 # der Webpack-Build im Image.
 COPY --chown=${BUILD_USER} CHANGELOG.md ./CHANGELOG.md
 COPY --chown=${BUILD_USER} README.md ./README.md
+# Ein parlwin/vendor aus dem Arbeitsverzeichnis trägt die Werkzeuge der
+# Entwicklung; das Image bekommt vendor allein aus der Stufe php-deps.
 RUN npm run build:app \
     && rm -rf node_modules \
+    parlwin/vendor \
     parlwin/src \
     parlwin/tests \
     parlwin/phpunit.xml \

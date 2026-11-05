@@ -5,6 +5,13 @@ import axios from '@nextcloud/axios'
 
 vi.mock('@nextcloud/auth', () => ({ getCurrentUser: () => ({ uid: 'u', displayName: 'U' }) }))
 
+// Lädt die geteilte Liste neu vom Server (F150), wie nach einem Abgleich, der
+// Geschäfte als gelöscht markiert hat.
+async function neuLaden(wrapper) {
+  await wrapper.vm.bestand.laden({ neu: true })
+  await wrapper.vm.$nextTick()
+}
+
 describe('Geschaeftsliste — In-place-Update beim Sync (kein DOM-Rebuild)', () => {
   beforeEach(() => {
     axios.post.mockReset()
@@ -18,7 +25,7 @@ describe('Geschaeftsliste — In-place-Update beim Sync (kein DOM-Rebuild)', () 
     const ref1 = wrapper.vm.geschaefte.find(g => g.id === 1)
 
     axios.get.mockResolvedValue({ data: [{ id: 1, titel: 'A geändert' }] })
-    await wrapper.vm.ladeGeschaefte()
+    await neuLaden(wrapper)
     const ref2 = wrapper.vm.geschaefte.find(g => g.id === 1)
 
     expect(ref2).toBe(ref1)
@@ -31,7 +38,7 @@ describe('Geschaeftsliste — In-place-Update beim Sync (kein DOM-Rebuild)', () 
     await wrapper.vm.ladeGeschaefte()
 
     axios.get.mockResolvedValue({ data: [{ id: 2, titel: 'B' }, { id: 3, titel: 'C' }] })
-    await wrapper.vm.ladeGeschaefte()
+    await neuLaden(wrapper)
 
     expect(wrapper.vm.geschaefte.map(g => g.id)).toEqual([2, 3])
   })

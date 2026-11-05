@@ -35,6 +35,7 @@ return [
         ['name' => 'geschaeft#votumPdf', 'url' => '/geschaefte/{id}/votum/pdf', 'verb' => 'GET'],
         ['name' => 'geschaeft#dokumente', 'url' => '/geschaefte/{id}/dokumente', 'verb' => 'GET'],
         ['name' => 'geschaeft#amtlicheDokumente', 'url' => '/geschaefte/{id}/amtliche-dokumente', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
+        ['name' => 'geschaeft#amtlichesDokument', 'url' => '/geschaefte/{id}/amtliche-dokumente/{dokumentId}', 'verb' => 'GET', 'requirements' => ['id' => '\d+', 'dokumentId' => '\d+']],
         ['name' => 'geschaeft#dokumentErstellen', 'url' => '/geschaefte/{id}/dokumente', 'verb' => 'POST'],
         ['name' => 'geschaeft#dokumentHochladen', 'url' => '/geschaefte/{id}/dokumente/upload', 'verb' => 'POST'],
         ['name' => 'geschaeft#create', 'url' => '/geschaefte', 'verb' => 'POST'],
@@ -90,6 +91,17 @@ return [
         ['name' => 'sitzung#deleteNotiz', 'url' => '/sitzungen/{id}/notizen/{aktionId}', 'verb' => 'DELETE', 'requirements' => ['id' => '\d+', 'aktionId' => '\d+']],
         ['name' => 'sitzung#restoreNotiz', 'url' => '/sitzungen/{id}/notizen/{aktionId}/wiederherstellen', 'verb' => 'POST', 'requirements' => ['id' => '\d+', 'aktionId' => '\d+']],
         ['name' => 'sitzung#notizRevisionen', 'url' => '/sitzungen/{id}/notizen/{aktionId}/revisionen', 'verb' => 'GET', 'requirements' => ['id' => '\d+', 'aktionId' => '\d+']],
+
+        // Stadtratsbeschlüsse
+        ['name' => 'stadtratsbeschluss#index', 'url' => '/stadtratsbeschluesse', 'verb' => 'GET'],
+        ['name' => 'stadtratsbeschluss#show', 'url' => '/stadtratsbeschluesse/{id}', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
+        // Notizen — GLEICHE Endpunkte wie beim Geschäft und beim Vorstoss (geteilter Notiz-Code)
+        ['name' => 'stadtratsbeschluss#notizen', 'url' => '/stadtratsbeschluesse/{id}/notizen', 'verb' => 'GET', 'requirements' => ['id' => '\d+']],
+        ['name' => 'stadtratsbeschluss#addNotiz', 'url' => '/stadtratsbeschluesse/{id}/notizen', 'verb' => 'POST', 'requirements' => ['id' => '\d+']],
+        ['name' => 'stadtratsbeschluss#updateNotiz', 'url' => '/stadtratsbeschluesse/{id}/notizen/{aktionId}', 'verb' => 'PUT', 'requirements' => ['id' => '\d+', 'aktionId' => '\d+']],
+        ['name' => 'stadtratsbeschluss#deleteNotiz', 'url' => '/stadtratsbeschluesse/{id}/notizen/{aktionId}', 'verb' => 'DELETE', 'requirements' => ['id' => '\d+', 'aktionId' => '\d+']],
+        ['name' => 'stadtratsbeschluss#restoreNotiz', 'url' => '/stadtratsbeschluesse/{id}/notizen/{aktionId}/wiederherstellen', 'verb' => 'POST', 'requirements' => ['id' => '\d+', 'aktionId' => '\d+']],
+        ['name' => 'stadtratsbeschluss#notizRevisionen', 'url' => '/stadtratsbeschluesse/{id}/notizen/{aktionId}/revisionen', 'verb' => 'GET', 'requirements' => ['id' => '\d+', 'aktionId' => '\d+']],
 
         // Vorstösse
         ['name' => 'vorstoss#index', 'url' => '/vorstoesse', 'verb' => 'GET'],

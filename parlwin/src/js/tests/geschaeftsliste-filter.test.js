@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { shallowMount } from '@vue/test-utils'
+import { shallowMount, flushPromises } from '@vue/test-utils'
 import Geschaeftsliste from '../components/Geschaeftsliste.vue'
 import axios from '@nextcloud/axios'
+import { BUENDEL_MS } from '../nachladen'
 
 // Die Geschäftsliste filtert nach Status, Typ, Zuständigkeit, Beschluss und
 // Suche; erledigte sind standardmässig ausgeblendet; sortiert wird natürlich
@@ -29,9 +30,14 @@ describe('Geschaeftsliste — Filter, Sortierung, Eigenes Geschäft', () => {
   it('blendet erledigte Geschäfte standardmässig aus (auch «abgeschlossen»/«aufgehoben»)', async () => {
     const wrapper = await mountMit([...daten, { id: 4, nummer: '2024.1', titel: 'Alt', status: 'Durch Rechtsmittelinstanz aufgehoben', datum: '2024-01-01' }])
     expect(wrapper.vm.gefilterteGeschaefte.map(g => g.id).sort()).toEqual([1, 2])
+    axios.get.mockClear()
     wrapper.vm.zeigeErledigte = true
-    // zeigeErledigte lädt neu vom Server — die Filterlogik selbst lässt dann alle durch.
+    // Die Ansicht zeichnet die neue Auswahl im nächsten Durchgang des Browsers.
+    await new Promise((weiter) => setTimeout(weiter))
+    await flushPromises()
+    // Der Schalter wählt aus der geteilten Liste aus, ohne den Server zu fragen (F150).
     expect(wrapper.vm.gefilterteGeschaefte).toHaveLength(4)
+    expect(axios.get).not.toHaveBeenCalled()
   })
 
   it('filtert nach Status, Typ, Zuständigkeit und Beschluss (Mehrfachauswahl)', async () => {
@@ -63,14 +69,21 @@ describe('Geschaeftsliste — Filter, Sortierung, Eigenes Geschäft', () => {
   // verschwindet die Liste kurz und Scrollbalken und Fokus springen bei allen).
   it('lädt bei einer Änderung in Echtzeit ohne Lade-Flackern (kein Springen von Bildlauf und Fokus)', async () => {
     const wrapper = await mountMit(daten)
-    const spy = vi.spyOn(wrapper.vm, 'ladeGeschaefte')
-    wrapper.vm.handleRealtimeEvent({ type: 'geschaefte.updated' })
-    await new Promise(r => setTimeout(r, 300))
-    expect(spy, 'das Ereignis hat kein Neuladen ausgelöst').toHaveBeenCalled()
-    expect(
-      spy.mock.calls.every(c => c[0] === false),
-      'das Neuladen lief mit Lade-Zustand (verursacht das Springen des Bildlaufs)',
-    ).toBe(true)
+    const ladeZustaende = []
+    wrapper.vm.$watch('laden', (wert) => ladeZustaende.push(wert))
+    axios.get.mockClear()
+    vi.useFakeTimers()
+    try {
+      // Ein Ereignis ohne Geschäft lädt die ganze Liste neu.
+      wrapper.vm.handleRealtimeEvent({ type: 'geschaefte.updated' })
+      await vi.advanceTimersByTimeAsync(BUENDEL_MS)
+      await flushPromises()
+    } finally {
+      vi.useRealTimers()
+    }
+    expect(axios.get.mock.calls.some(([url]) => String(url).includes('/apps/parlwin/geschaefte')),
+      'das Ereignis hat kein Neuladen ausgelöst').toBe(true)
+    expect(ladeZustaende, 'das Neuladen lief mit Lade-Zustand (verursacht das Springen des Bildlaufs)').toEqual([])
   })
 
   it('sortiert Nummern natürlich: 2026.9 vor 2026.10', async () => {
@@ -110,15 +123,24 @@ describe('Geschaeftsliste — Filter, Sortierung, Eigenes Geschäft', () => {
   })
 
   it('«Abbrechen» schliesst die Neu-Maske, ein Klick daneben nicht', async () => {
-    const wrapper = await mountMit([])
+    // Die Maske selbst (GeschaeftMaske), ihr Inhalt als Attrappe.
+    const wrapper = shallowMount(Geschaeftsliste, {
+      props: { mitglieder: [] },
+      global: { stubs: { teleport: true, GeschaeftMaske: false } },
+    })
+    await flushPromises()
     wrapper.vm.neuesGeschaeftOeffnen()
+    await wrapper.vm.$nextTick()
 
     // Klick neben die Maske darf beim Erfassen nichts verwerfen.
-    wrapper.vm.overlayKlick()
+    await wrapper.find('.pw-modal-overlay').trigger('click')
     expect(wrapper.vm.detailOffen, 'Ein Klick daneben hat die Neu-Maske geschlossen').toBe(true)
+    expect(wrapper.find('.pw-btn-schliessen').exists(), 'Beim Anlegen steht ein ✕').toBe(false)
 
-    wrapper.vm.neuAbbrechen()
+    wrapper.findComponent({ name: 'GeschaeftDetail' }).vm.$emit('abbrechen')
+    await wrapper.vm.$nextTick()
     expect(wrapper.vm.detailOffen).toBe(false)
+    expect(wrapper.find('.pw-modal-overlay').exists()).toBe(false)
   })
 })
 
@@ -130,9 +152,9 @@ describe('Geschaeftsliste — Filter nach Einreicher und Partei', () => {
   })
 
   const mitglieder = [
-    { name: 'Anna Müller', partei: 'SP', externId: '10' },
-    { name: 'Bob Meier', partei: 'FDP', externId: '20' },
-    { name: 'Clara Weiss', partei: 'SP', externId: '30' },
+    { name: 'Anna Müller', partei: 'MPW', externId: '10' },
+    { name: 'Bob Meier', partei: 'BPW', externId: '20' },
+    { name: 'Clara Weiss', partei: 'MPW', externId: '30' },
   ]
   const daten = [
     { id: 1, nummer: '2026.1', titel: 'A', status: 'Pendent', datum: '2026-01-01', einreicher: [{ name: 'Anna Müller', rolle: 'Erstunterzeichner', externId: '10' }, { name: 'Bob Meier', rolle: 'Mitunterzeichner', externId: '20' }] },
@@ -151,7 +173,7 @@ describe('Geschaeftsliste — Filter nach Einreicher und Partei', () => {
   it('bietet die Einreicher-Namen und die vorkommenden Parteien zur Auswahl', async () => {
     const wrapper = await mount()
     expect(wrapper.vm.einreicherOptionen).toEqual(['Anna Müller', 'Bob Meier', 'Clara Weiss'])
-    expect(wrapper.vm.parteiOptionen).toEqual(['FDP', 'SP'])
+    expect(wrapper.vm.parteiOptionen).toEqual(['BPW', 'MPW'])
   })
 
   it('filtert nach Einreicher-Person: standardmässig zählt jeder Einreicher', async () => {
@@ -171,15 +193,15 @@ describe('Geschaeftsliste — Filter nach Einreicher und Partei', () => {
 
   it('filtert nach Partei über die Einreicher (via Mitglieder aufgelöst)', async () => {
     const wrapper = await mount()
-    wrapper.vm.filterPartei = ['SP']
-    // SP-Einreicher: Anna (1) und Clara (3); Geschäft 2 nur FDP.
+    wrapper.vm.filterPartei = ['MPW']
+    // MPW-Einreicher: Anna (1) und Clara (3); Geschäft 2 nur BPW.
     expect(wrapper.vm.gefilterteGeschaefte.map(g => g.id).sort()).toEqual([1, 3])
   })
 
   it('«Filter zurücksetzen» leert Einreicher, Partei und den Ersteinreicher-Schalter', async () => {
     const wrapper = await mount()
     wrapper.vm.filterEinreicher = ['Bob Meier']
-    wrapper.vm.filterPartei = ['SP']
+    wrapper.vm.filterPartei = ['MPW']
     wrapper.vm.nurErsteinreicher = true
     wrapper.vm.resetFilter()
     expect(wrapper.vm.filterEinreicher).toEqual([])

@@ -202,6 +202,28 @@ class GeschaeftMapper extends QBMapper
     }
 
     /**
+     * Die nicht gelöschten Geschäfte mit diesen IDs, erledigte eingeschlossen,
+     * in Blöcken von 500 IDs. Eine ID ohne Geschäft fehlt im Ergebnis.
+     *
+     * @param int[] $ids
+     * @return Geschaeft[]
+     */
+    public function findByIds(array $ids): array
+    {
+        $geschaefte = [];
+        foreach (array_chunk(array_values(array_unique(array_map('intval', $ids))), 500) as $block) {
+            $qb = $this->db->getQueryBuilder();
+            $qb->select('*')
+                ->from($this->getTableName())
+                ->where($qb->expr()->in('id', $qb->createNamedParameter($block, IQueryBuilder::PARAM_INT_ARRAY)))
+                ->andWhere($qb->expr()->eq('geloescht', $qb->createNamedParameter(false, IQueryBuilder::PARAM_BOOL)))
+                ->orderBy('datum', 'DESC');
+            $geschaefte = [...$geschaefte, ...$this->findEntities($qb)];
+        }
+        return $geschaefte;
+    }
+
+    /**
      * Die eigenen Geschäfte, die mit einem offiziellen Geschäft verknüpft sind
      * (neueste zuerst) — Gegenstück zur Vorstoss→Geschäft-Verknüpfung.
      *

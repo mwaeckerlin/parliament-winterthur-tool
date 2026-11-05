@@ -60,8 +60,10 @@ describe('ladeGeschaefte', () => {
       data: String(url).includes('/geschaefte') ? [{ id: 1, status: 'Pendent: Aufsichtskommission' }] : [],
     }))
 
+    // Der Aufbau der Ansicht lädt die Liste; der zweite Aufruf nimmt dieselbe
+    // Liste, ohne den Server noch einmal zu fragen (F150).
     const wrapper = mountComponent()
-    axios.get.mockClear() // die Aufrufe beim Aufbau der Ansicht zählen nicht mit
+    await wrapper.vm.ladeGeschaefte()
     await wrapper.vm.ladeGeschaefte()
 
     const seiten = axios.get.mock.calls.filter(c => String(c[0]).includes('/geschaefte'))
@@ -119,31 +121,44 @@ describe('geschaefteFuer', () => {
   })
 })
 
-describe('nachSpeichern', () => {
-  it('schliesst das Popup NICHT nach dem Speichern', async () => {
-    const wrapper = mountComponent()
-    wrapper.vm.ladeGeschaefte = vi.fn(() => Promise.resolve())
+// Die Maske meldet ein Speichern über GeschaeftMaske; der Test meldet es dort so,
+// wie GeschaeftDetail es tut.
+describe('Nach dem Speichern in der Maske', () => {
+  const mitMaske = () => shallowMount(Kommissionsliste, {
+    data() { return { geschaefte: [], kommissionen: [], ausgewaehlteGeschaeftId: 99, laden: false } },
+    global: { stubs: { teleport: true, GeschaeftMaske: false } },
+  })
 
-    await wrapper.vm.nachSpeichern()
+  it('schliesst das Popup NICHT nach dem Speichern', async () => {
+    const wrapper = mitMaske()
+    await flushPromises()
+
+    wrapper.findComponent({ name: 'GeschaeftMaske' }).vm.melden('gespeichert', 99)
+    await flushPromises()
 
     expect(wrapper.vm.ausgewaehlteGeschaeftId).toBe(99)
   })
 
-  it('ruft ladeGeschaefte auf', async () => {
-    const wrapper = mountComponent()
-    const ladeGeschaefte = vi.fn(() => Promise.resolve())
-    wrapper.vm.ladeGeschaefte = ladeGeschaefte
+  // F150: Nach dem Speichern kommt nur das gespeicherte Geschäft neu.
+  it('lädt nur das gespeicherte Geschäft nach', async () => {
+    axios.get.mockReset().mockResolvedValue({ data: [{ id: 99, titel: 'Gespeichert', status: 'Pendent' }] })
+    const wrapper = mitMaske()
+    await wrapper.vm.ladeGeschaefte()
+    axios.get.mockClear()
 
-    await wrapper.vm.nachSpeichern()
+    wrapper.findComponent({ name: 'GeschaeftMaske' }).vm.melden('gespeichert', 99)
+    await flushPromises()
 
-    expect(ladeGeschaefte).toHaveBeenCalledOnce()
+    const anfragen = axios.get.mock.calls.filter(c => String(c[0]).includes('/geschaefte'))
+    expect(anfragen.map(c => c[1]?.params)).toEqual([{ ids: '99' }])
   })
 
   it('emittiert aktualisiert', async () => {
-    const wrapper = mountComponent()
-    wrapper.vm.ladeGeschaefte = vi.fn(() => Promise.resolve())
+    const wrapper = mitMaske()
+    await flushPromises()
 
-    await wrapper.vm.nachSpeichern()
+    wrapper.findComponent({ name: 'GeschaeftMaske' }).vm.melden('gespeichert', 99)
+    await flushPromises()
 
     expect(wrapper.emitted('aktualisiert')).toBeTruthy()
   })
@@ -167,8 +182,8 @@ describe('Kommissionskarte: Geschäfte offen, Mitglieder eingeklappt (F118)', ()
     aktiv: true,
     mitglieder: '[]',
     mitgliederArray: [
-      { label: 'Anna Beispiel', funktion: 'Präsidentin', partei: 'SVP', fraktion: 'SVP', email: 'anna@example.ch', aktiv: true },
-      { label: 'Beat Muster', funktion: 'Mitglied', partei: 'SP', fraktion: 'SP', email: 'beat@example.ch', aktiv: true },
+      { label: 'Anna Beispiel', funktion: 'Präsidentin', partei: 'MPW', fraktion: 'MPW', email: 'anna@example.ch', aktiv: true },
+      { label: 'Beat Muster', funktion: 'Mitglied', partei: 'BPW', fraktion: 'BPW', email: 'beat@example.ch', aktiv: true },
     ],
   }
   const geschaefte = [

@@ -10,12 +10,10 @@ vi.mock('@nextcloud/auth', () => ({ getCurrentUser: () => ({ uid: 'mw', displayN
 /**
  * Flacher Schirm: Tablet und Telefon quer.
  *
- * Marcs Bild vom 24.10.2026 zeigt das Budget auf einem Tablet quer: oben die
- * Adressleiste des Browsers, unten die Navigationsleiste des Geräts, dazwischen
- * der Kopf mit drei Zeilen, die Tab-Leiste und die Karte der Pauschalanträge —
- * vom scrollbaren Bereich blieben zwei Zeilen. Marc: «Im Tablet ist der
- * scrollbare Bereich zu klein. Nimm bei kleiner Höhe den grünen Rand unten
- * weg.»
+ * Auf einem Tablet quer stehen oben die Adressleiste des Browsers, unten die
+ * Navigationsleiste des Geräts, dazwischen der Kopf, die Tab-Leiste und die
+ * Karte der Pauschalanträge. Bei kleiner Höhe fällt darum der grüne Rand unten
+ * weg, damit dem scrollbaren Bereich Platz bleibt.
  *
  * vitest läuft im Projekt-Root.
  */
@@ -23,7 +21,7 @@ const CSS = readFileSync('parlwin/src/css/style.scss', 'utf8')
 
 const ANSICHT = {
   jahr: { jahr: 2027, steuerfuss: 125, steuerfussEffektiv: 125 },
-  eigeneFraktion: 'SVP-Fraktion',
+  eigeneFraktion: 'Fraktion-Muster',
   produktegruppen: [{
     code: '240', name: 'Immobilien', departement: 'Finanzen',
     globalkredit: { soll: 1000, sollFraktion: 1000 },

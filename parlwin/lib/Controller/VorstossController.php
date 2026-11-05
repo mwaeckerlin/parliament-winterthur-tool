@@ -213,6 +213,8 @@ class VorstossController extends Controller
             return new DataResponse(['fehler' => 'Vorstoss nicht gefunden'], Http::STATUS_NOT_FOUND);
         }
         $this->realtimePublisher->publish('vorstoesse.updated', ['id' => $id]);
+        // Das Geschäft trägt jetzt die Priorität und die Verknüpfung des Vorstosses.
+        $this->realtimePublisher->publish('geschaefte.updated', ['id' => $geschaeftId, 'grund' => 'verknuepft']);
         return new DataResponse($vorstoss);
     }
 

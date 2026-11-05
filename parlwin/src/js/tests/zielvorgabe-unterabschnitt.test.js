@@ -6,13 +6,12 @@ import { zielName, gleicheZielvorgabe } from '../utils'
 /**
  * Zwei Zielvorgaben mit derselben Messgrösse sind zwei Zielvorgaben.
  *
- * Befund von Marc am 24.10.2026 am Budget 2027, Produktegruppe Immobilien
- * (240): «Wirtschaftlichkeit — Wohnliegenschaften», «Gewerbeliegenschaften»
- * und «Restaurantbetriebe» standen je zweimal da, einmal mit Soll 1.00 und
- * einmal mit 2.31, 2.98 und 2.38. Das Buch gliedert sie (S. 75) in «1.1
- * Minimale Nettorendite» und «1.2 Durchschnittliche Nettorendite»; dieser Teil
- * des Namens fehlte in der Anzeige, und ein Antrag auf die eine traf die
- * andere.
+ * Im Budget 2027, Produktegruppe Immobilien (240), kommen
+ * «Wirtschaftlichkeit — Wohnliegenschaften», «Gewerbeliegenschaften» und
+ * «Restaurantbetriebe» je zweimal vor, einmal mit Soll 1.00 und einmal mit
+ * 2.31, 2.98 und 2.38. Das Buch gliedert sie (S. 75) in «1.1 Minimale
+ * Nettorendite» und «1.2 Durchschnittliche Nettorendite». Dieser Teil steht im
+ * Namen, damit ein Antrag auf die eine Vorgabe nie die andere trifft.
  *
  * vitest läuft im Projekt-Root.
  */

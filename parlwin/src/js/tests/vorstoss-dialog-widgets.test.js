@@ -22,12 +22,12 @@ describe('Vorstoesseliste — Dialog nutzt die gemeinsamen Widgets', () => {
   const mountFn = () => mount(Vorstoesseliste, {
     props: {
       mitglieder: [
-        { id: 1, vorname: 'Anna', name: 'Müller', fraktion: 'Grüne', nextcloudUid: 'amueller', aktiv: true, externId: 'e1' },
-        { id: 2, vorname: 'Bob', name: 'Meier', fraktion: 'SP', nextcloudUid: 'bmeier', aktiv: true, externId: 'e2' },
+        { id: 1, vorname: 'Anna', name: 'Müller', fraktion: 'MPW', nextcloudUid: 'amueller', aktiv: true, externId: 'e1' },
+        { id: 2, vorname: 'Bob', name: 'Meier', fraktion: 'BPW', nextcloudUid: 'bmeier', aktiv: true, externId: 'e2' },
       ],
       fraktionen: [
-        { id: 1, name: 'Grüne', aktiv: true },
-        { id: 2, name: 'SP', aktiv: true },
+        { id: 1, name: 'MPW', aktiv: true },
+        { id: 2, name: 'BPW', aktiv: true },
       ],
     },
     global: {
@@ -62,18 +62,18 @@ describe('Vorstoesseliste — Dialog nutzt die gemeinsamen Widgets', () => {
 
   it('Herkunftsfraktion schliesst die eigene Fraktion aus', async () => {
     const wrapper = mountFn()
-    wrapper.vm.eigeneFraktion = 'Grüne'
+    wrapper.vm.eigeneFraktion = 'MPW'
     await wrapper.vm.$nextTick()
     const namen = wrapper.vm.fremdeFraktionsOptionen.map(o => o.label || o)
-    expect(namen).toContain('SP')
-    expect(namen).not.toContain('Grüne')
+    expect(namen).toContain('BPW')
+    expect(namen).not.toContain('MPW')
   })
 
   it('Ansprechpartner-Optionen sind die Mitglieder der gewählten fremden Fraktion', async () => {
     const wrapper = mountFn()
     wrapper.vm.bearbeiten({ id: 5, titel: 'T' })
     wrapper.vm.bearbeitung.herkunft = 'fremde'
-    wrapper.vm.bearbeitung.herkunftFraktion = 'SP'
+    wrapper.vm.bearbeitung.herkunftFraktion = 'BPW'
     await wrapper.vm.$nextTick()
     const namen = wrapper.vm.ansprechpartnerOptionen.map(o => o.label)
     expect(namen).toEqual(['Bob Meier'])

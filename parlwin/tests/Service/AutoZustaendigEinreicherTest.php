@@ -39,7 +39,7 @@ class AutoZustaendigEinreicherTest extends TestCase
         $m->setExternId($externId);
         $m->setVorname($vorname);
         $m->setName($name);
-        $m->setFraktion('SVP');
+        $m->setFraktion('MPW');
         return $m;
     }
 
@@ -98,7 +98,7 @@ class AutoZustaendigEinreicherTest extends TestCase
         $config = $this->createStub(IConfig::class);
         $config->method('getAppValue')->willReturnCallback(
             static fn(string $app, string $key, string $default = ''): string
-                => $key === 'fraktion' ? 'SVP' : $default
+                => $key === 'fraktion' ? 'MPW' : $default
         );
 
         $userSession = $this->createStub(IUserSession::class);

@@ -7,64 +7,105 @@
 # und ohne eigene Aufnahme, die Detailseiten der Behörden und Sitzungen, und
 # die Dokumente — auch das, was ein unbekannter Weg antwortet.
 #
-# Der Lauf braucht nur diesen einen Container, keinen Stack.
+# Ohne Angabe startet der Lauf die Gegenstelle als einzelnen Container und
+# daneben einen einzigen Container mit curl, der jede Anfrage stellt.
+#
+# Mit PARLWIN_QUELLE_PROJEKT=<compose-projekt> prüft er die Gegenstelle eines
+# laufenden E2E-Stacks und startet keinen Container: Die Anfragen stellt PHP im
+# Container nextcloud-php-fpm desselben Stacks, so wie der Abgleich selbst.
 set -uo pipefail
 
 cd "$(dirname "$0")/.."
 
 ABBILD="mwaeckerlin/parliament-winterthur-tool:quelle"
 CONTAINER="parlwin-quelle-vertrag-$$"
+HOLER="parlwin-quelle-holer-$$"
 FEHLER=0
+PROJEKT="${PARLWIN_QUELLE_PROJEKT:-}"
 
 aufraeumen() {
-  docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
+  if [[ -z "$PROJEKT" ]]; then
+    docker rm -f "$CONTAINER" "$HOLER" >/dev/null 2>&1 || true
+  fi
 }
 trap aufraeumen EXIT
 
-echo "[quelle] Baue die Gegenstelle"
-docker build --file Dockerfile.quelle --tag "$ABBILD" . || exit 1
+if [[ -n "$PROJEKT" ]]; then
+  echo "[quelle] Prüfe die Gegenstelle des Stacks ${PROJEKT}"
+  BASIS="http://parlwin-quelle:8080"
+  # holen <pfad> <ziel-datei> [<methode>]: schreibt den Rumpf in die Datei und
+  # gibt den Status aus. Ohne Methode ist es GET.
+  holen() {
+    docker compose -p "$PROJEKT" exec -T -e Q_URL="${BASIS}$1" -e Q_METHODE="${3:-GET}" nextcloud-php-fpm php -r '
+      $methode = getenv("Q_METHODE");
+      $ctx = stream_context_create(["http" => ["ignore_errors" => true, "timeout" => 30, "method" => $methode, "content" => $methode === "PUT" ? "500" : ""]]);
+      $rumpf = @file_get_contents(getenv("Q_URL"), false, $ctx);
+      $code = "000";
+      if (isset($http_response_header[0]) && preg_match("#\s(\d{3})\s#", $http_response_header[0], $m)) { $code = $m[1]; }
+      fwrite(STDERR, $code);
+      echo $rumpf === false ? "" : $rumpf;
+    ' 2>"$2.status" >"$2"
+    cat "$2.status"
+  }
+  protokoll() { docker compose -p "$PROJEKT" logs --no-color parlwin-quelle 2>&1; }
+else
+  echo "[quelle] Baue die Gegenstelle"
+  docker build --file Dockerfile.quelle --tag "$ABBILD" . || exit 1
 
-echo "[quelle] Starte sie"
-docker run -d --name "$CONTAINER" "$ABBILD" >/dev/null || exit 1
+  echo "[quelle] Starte sie"
+  docker run -d --name "$CONTAINER" "$ABBILD" >/dev/null || exit 1
+  # Ein einziger Container mit curl im Netz der Gegenstelle; jede Anfrage
+  # läuft darin über `docker exec`. Bis zum 2026-11-04 startete jede Anfrage
+  # einen eigenen Container, 41 je Lauf.
+  docker run -d --name "$HOLER" --network "container:${CONTAINER}" \
+    --entrypoint sleep curlimages/curl:latest 3600 >/dev/null || exit 1
+  BASIS="http://127.0.0.1:8080"
+  holen() {
+    local methode="${3:-GET}"
+    if [[ "$methode" == "PUT" ]]; then
+      docker exec "$HOLER" curl -sS -X PUT --data 500 -o /tmp/rumpf -w '%{http_code}' "${BASIS}$1" 2>/dev/null
+    else
+      docker exec "$HOLER" curl -sS -X "$methode" -o /tmp/rumpf -w '%{http_code}' "${BASIS}$1" 2>/dev/null
+    fi
+    docker exec "$HOLER" cat /tmp/rumpf >"$2" 2>/dev/null
+  }
+  protokoll() { docker logs "$CONTAINER" 2>&1; }
 
-# Warten, bis sie antwortet: Der Container bringt kein curl mit, darum fragt
-# ein zweiter Container im Netz des ersten.
-for _ in $(seq 1 30); do
-  if docker run --rm --network "container:${CONTAINER}" curlimages/curl:latest \
-      -fsS -o /dev/null "http://127.0.0.1:8080/politbusiness" 2>/dev/null; then
-    break
-  fi
-  sleep 1
-done
+  # Warten, bis sie antwortet: Der Container bringt kein curl mit, darum fragt
+  # der Container mit curl im Netz des ersten.
+  for _ in $(seq 1 30); do
+    if docker exec "$HOLER" curl -fsS -o /dev/null "${BASIS}/politbusiness" 2>/dev/null; then
+      break
+    fi
+    sleep 1
+  done
+fi
 
-# status <erwartet> <pfad> [<muster im Rumpf>]
+# status <erwartet> <pfad> [<muster im Rumpf>] [<methode>]
 status() {
-  local erwartet="$1" pfad="$2" muster="${3:-}"
-  local antwort
-  antwort="$(docker run --rm --network "container:${CONTAINER}" curlimages/curl:latest \
-    -sS -o /tmp/rumpf -w '%{http_code}' "http://127.0.0.1:8080${pfad}" 2>/dev/null)"
+  local erwartet="$1" pfad="$2" muster="${3:-}" methode="${4:-GET}"
+  local antwort rumpf
+  rumpf="$(mktemp)"
+  antwort="$(holen "$pfad" "$rumpf" "$methode")"
   if [[ "$antwort" != "$erwartet" ]]; then
     echo "[quelle] FEHLER ${pfad}: Status ${antwort}, erwartet ${erwartet}"
     FEHLER=$((FEHLER + 1))
+    rm -f "$rumpf" "$rumpf.status"
     return
   fi
   if [[ -n "$muster" ]]; then
-    # Der Rumpf geht in eine Datei und wird dort gesucht: In einer Pipe
-    # beendet `grep -q` den Lauf beim ersten Treffer, curl stirbt am
+    # Der Rumpf liegt in einer Datei und wird dort gesucht: In einer Pipe
+    # beendet `grep -q` den Lauf beim ersten Treffer, der Absender stirbt am
     # geschlossenen Rohr, und `pipefail` macht aus dem Treffer einen
     # Fehlschlag — bei grossen Seiten und PDF reproduzierbar.
-    local rumpf
-    rumpf="$(mktemp)"
-    docker run --rm --network "container:${CONTAINER}" curlimages/curl:latest \
-      -sS "http://127.0.0.1:8080${pfad}" >"$rumpf" 2>/dev/null
     if ! grep -qa "$muster" "$rumpf"; then
       echo "[quelle] FEHLER ${pfad}: «${muster}» steht nicht in der Antwort"
-      rm -f "$rumpf"
+      rm -f "$rumpf" "$rumpf.status"
       FEHLER=$((FEHLER + 1))
       return
     fi
-    rm -f "$rumpf"
   fi
+  rm -f "$rumpf" "$rumpf.status"
   echo "[quelle] ok ${pfad} (${antwort})"
 }
 
@@ -105,20 +146,37 @@ status 200 /_doc/999999 '%PDF'
 echo "[quelle] Ein unbekannter Weg endet mit 404"
 status 404 /gibt-es-nicht
 
+echo "[quelle] Die Stadtratsbeschlüsse und ihr Steuerweg"
+STEUERUNG=/_steuerung/stadtratsbeschluesse-fehler
+status 200 /stadtratsbeschluesse '/stadtratsbeschluesse/2026-10-21/20261279'
+status 404 "$STEUERUNG"
+# PUT legt den Fehler an: Die Liste antwortet mit 500, ihre Detailseiten nicht.
+status 201 "$STEUERUNG" '' PUT
+status 200 "$STEUERUNG"
+status 500 /stadtratsbeschluesse
+status 500 '/stadtratsbeschluesse?page=2'
+status 200 /stadtratsbeschluesse/2026-10-21/20261279 'resolution-document'
+# Ein anderes Verfahren als GET, PUT und DELETE ist gesperrt.
+status 403 "$STEUERUNG" '' POST
+# DELETE nimmt den Fehler zurück, und die Liste antwortet wieder.
+status 204 "$STEUERUNG" '' DELETE
+status 404 "$STEUERUNG"
+status 200 /stadtratsbeschluesse '/stadtratsbeschluesse/2026-10-21/20261279'
+
 if [[ "${QUELLE_DIAGNOSE:-0}" == "1" ]]; then
-  echo "[quelle] Diagnose: Kopfzeilen und Anfang der Antwort"
+  echo "[quelle] Diagnose: Anfang der Antwort"
   for pfad in /sitzung /stadtparlament/27428 /_rte/anlass/6866848 /_doc/7242604; do
     echo "--- ${pfad}"
-    docker run --rm --network "container:${CONTAINER}" curlimages/curl:latest \
-      -sS -D - -o /tmp/rumpf "http://127.0.0.1:8080${pfad}" 2>/dev/null | head -8 || true
-    docker run --rm --network "container:${CONTAINER}" curlimages/curl:latest \
-      -sS "http://127.0.0.1:8080${pfad}" 2>/dev/null | head -c 200 | tr -d '\0' || true
+    rumpf="$(mktemp)"
+    echo "Status $(holen "$pfad" "$rumpf")"
+    head -c 200 "$rumpf" | tr -d '\0' || true
+    rm -f "$rumpf" "$rumpf.status"
     echo
   done
 fi
 
 echo "[quelle] Das Zugriffsprotokoll nennt jeden Weg"
-PROTOKOLL="$(docker logs "$CONTAINER" 2>&1)"
+PROTOKOLL="$(protokoll)"
 for weg in /politbusiness /_rte/information/ /_doc/; do
   if ! grep -q "$weg" <<<"$PROTOKOLL"; then
     echo "[quelle] FEHLER: ${weg} steht nicht im Zugriffsprotokoll"

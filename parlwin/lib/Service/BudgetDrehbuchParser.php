@@ -135,7 +135,7 @@ class BudgetDrehbuchParser {
                 if ($stueck !== '') {
                     $antraege[$offen]['begruendung'] = trim($antraege[$offen]['begruendung'] . ' ' . $stueck);
                     // Der Antragssatz kann in der Zeile enden («Antrag Fraktion
-                    // Grüne/AL:»), und erst die nächste Zeile sagt, worum es geht.
+                    // Muster:»), und erst die nächste Zeile sagt, worum es geht.
                     // Steht dort der Steuerfuss, ist es kein Antrag auf einen
                     // Globalkredit.
                     if ($this->istSteuerfussAntrag($antraege[$offen]['begruendung'])) {

@@ -1,4 +1,9 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, sperreVorAllem } from './fixtures.js'
+import { login } from './anmeldung.js'
+
+// Die Sperre aus sperre.js steht vor jedem anderen `beforeAll` dieser Datei,
+// weil schon ein `beforeAll` globale Einstellungen schreiben kann.
+test.beforeAll(sperreVorAllem)
 
 /**
  * Querschnitts-E2E der parlwin-Oberfläche im echten Browser gegen den realen
@@ -25,26 +30,6 @@ const BASE_URL = process.env.PARLWIN_BASE_URL || 'http://nextcloud-nginx:8080'
 
 const U1 = { name: process.env.PW_U1 || 'parlwin_praesidium', pass: process.env.PW_P1 || '' }
 const ADMIN = { name: 'admin', pass: process.env.PW_ADMIN_PASS || '' }
-
-/** Meldet einen Nutzer über das Nextcloud-Login-Formular an (wie in den Geschwister-Specs). */
-async function login(page, user) {
-  await page.goto(`${BASE_URL}/index.php/login`)
-  await page.waitForSelector('input[name="user"]', { state: 'visible', timeout: 30_000 })
-  await page.fill('input[name="user"]', user.name)
-  await page.fill('input[name="password"]', user.pass)
-  let zuletzt
-  for (let versuch = 0; versuch < 3; versuch++) {
-    void page.click('button[type="submit"], input[type="submit"]', { noWaitAfter: true }).catch(() => {})
-    try {
-      await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 12_000, waitUntil: 'commit' })
-      await page.waitForLoadState('domcontentloaded').catch(() => {})
-      return
-    } catch (e) {
-      zuletzt = e
-    }
-  }
-  throw zuletzt
-}
 
 /** Öffnet die parlwin-App in einem breiten Desktop-Viewport (Standard-Layout mit Tabellen). */
 async function openApp(page) {
@@ -159,6 +144,7 @@ const ANSICHTEN = [
   { name: 'Sitzungen', rows: '.pw-sitzungen .pw-sitzung-karte', button: '+ Neue Sitzung' },
   { name: 'Mitglieder', rows: '.pw-mitglieder .pw-mitglied-karte', button: null },
   { name: 'Kommissionen', rows: '.pw-kommissionen .pw-kommission-karte', button: null },
+  { name: 'Stadtratsbeschlüsse', rows: '.pw-stadtratsbeschluesse .pw-srb-karte', button: null },
   // Seit F119 zeigt die Übersicht auf breiten Fenstern eine Tabelle, wie bei
   // den Geschäften; die Karten bleiben für schmale.
   { name: 'Vorstösse', rows: '.pw-vorstoesse .pw-table-desktop tbody tr', button: '+ Neuer Vorstoss' },
@@ -174,7 +160,7 @@ const ANSICHTEN = [
 // Zähler — sie gehören in die Navigation, aber nicht in den Zähler-Test. Wer der
 // App einen Eintrag hinzufügt, ergänzt ihn hier an derselben Stelle.
 const NAV_EINTRAEGE = [
-  'Geschäfte', 'Sitzungen', 'Kommissionen', 'Vorstösse', 'Budget', 'Fragestunde',
+  'Geschäfte', 'Sitzungen', 'Kommissionen', 'Stadtratsbeschlüsse', 'Vorstösse', 'Budget', 'Fragestunde',
   'Mitglieder', 'Sitzungstypen', 'Protokoll', 'Bedienungsanleitung', 'Änderungsverlauf',
 ]
 
@@ -831,5 +817,121 @@ test.describe('Kürzel: in App und in Auswahl-Dropdowns, gespeicherter Wert blei
       await expect(page.locator('.pw-kommissionen .pw-kommission-kopf h3', { hasText: KURZ.komm }).first()).toBeVisible()
     }
     expect(jsFehler, `JavaScript-Fehler: ${jsFehler.join(' | ')}`).toEqual([])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// F141: Im Kopf einer Kommissionskarte stehen der Name und «Neues Geschäft» in
+// einer Reihe, der Knopf oben rechts; der Name beginnt an der Oberkante des
+// Kopfes, am Schirm wie auf Papier.
+
+/**
+ * Klappt die Navigation auf, wie am Telefon, auf demselben Weg wie
+ * handy-bedienung.spec.js: Offen ist sie, wenn ihr erster Link im Bild steht;
+ * zugeklappt steht er links neben dem Bildschirm.
+ */
+async function navigationOeffnen(page) {
+  const erster = page.getByRole('link', { name: 'Geschäfte', exact: true })
+  const offen = async () => {
+    const kasten = await erster.boundingBox().catch(() => null)
+    return !!kasten && kasten.x >= 0
+  }
+  if (await offen()) { return }
+  await page.getByRole('button', { name: /navigation/i }).first().click()
+  await expect.poll(offen, { timeout: 10_000, message: 'die Navigation klappt nicht auf' }).toBe(true)
+}
+
+/** Die Kästen von Kopf, Titelblock, Überschrift, Status und Knopf der ersten Karte mit Knopf. */
+async function kommissionsKopf(page) {
+  const kopf = page.locator('.pw-kommissionen .pw-kommission-kopf', { has: page.locator('.pw-kommission-neues-geschaeft') }).first()
+  await kopf.waitFor({ state: 'visible', timeout: 30_000 })
+  return kopf.evaluate((el) => {
+    const kasten = (e) => { const r = e.getBoundingClientRect(); return { x: r.x, y: r.y, rechts: r.right, unten: r.bottom } }
+    const stil = getComputedStyle(el)
+    return {
+      kopf: kasten(el),
+      innen: { oben: parseFloat(stil.paddingTop), rechts: parseFloat(stil.paddingRight) },
+      titelblock: kasten(el.firstElementChild),
+      titel: kasten(el.querySelector('h3')),
+      titelRand: parseFloat(getComputedStyle(el.querySelector('h3')).marginTop),
+      status: kasten(el.querySelector('.pw-kommission-status')),
+      knopf: kasten(el.querySelector('.pw-kommission-neues-geschaeft')),
+    }
+  })
+}
+
+test.describe('Kopf der Kommissionskarte (F141)', () => {
+  test.beforeAll(() => expect(U1.pass, `Passwort für ${U1.name} fehlt`).not.toBe(''))
+
+  for (const [name, breite, hoehe] of [['Full HD', 1920, 1080], ['16:10', 1680, 1050], ['Telefon', 390, 844]]) {
+    test(`${name}: Name und «Neues Geschäft» stehen in einer Reihe, der Knopf oben rechts`, async ({ page }) => {
+      await login(page, U1)
+      await openApp(page)
+      await page.setViewportSize({ width: breite, height: hoehe })
+      // Am Telefon ist die Navigation zugeklappt; auf breiten Formaten steht sie offen.
+      await navigationOeffnen(page)
+      await gotoView(page, 'Kommissionen')
+      const k = await kommissionsKopf(page)
+      // Eine Rundung des Browsers liegt unter einem Pixel.
+      expect(k.titelRand, 'die Überschrift bringt einen eigenen Rand über dem Namen mit').toBe(0)
+      expect(Math.abs(k.titel.y - k.knopf.y), 'Name und Knopf beginnen nicht auf derselben Höhe').toBeLessThan(1)
+      expect(k.titelblock.rechts, 'der Name läuft unter den Knopf').toBeLessThanOrEqual(k.knopf.x + 1)
+      expect(Math.abs(k.kopf.rechts - k.innen.rechts - k.knopf.rechts), 'der Knopf steht nicht rechts im Kopf').toBeLessThan(1)
+      expect(k.knopf.y, 'der Knopf steht unter «Aktiv»').toBeLessThan(k.status.y)
+    })
+  }
+
+  // Gemessen wird der Text des Namens selbst und nicht sein Kasten: Ein langes
+  // Wort ragt über den Kasten der Überschrift hinaus und unter den Knopf.
+  for (const [name, breite, hoehe] of [['21:9 halb', 1720, 1440], ['Telefon klein', 360, 640]]) {
+    test(`${name}: Jeder Name einer Kommission endet links vom Knopf «Neues Geschäft»`, async ({ page }) => {
+      await login(page, U1)
+      await openApp(page)
+      await page.setViewportSize({ width: breite, height: hoehe })
+      await navigationOeffnen(page)
+      await gotoView(page, 'Kommissionen')
+      const koepfe = page.locator('.pw-kommissionen .pw-kommission-kopf', { has: page.locator('.pw-kommission-neues-geschaeft') })
+      await koepfe.first().waitFor({ state: 'visible', timeout: 30_000 })
+      const sprache = await page.evaluate(() => document.documentElement.lang)
+      // Die Trennung folgt der Sprache des Dokuments; das Protokoll nennt sie.
+      console.log(`[kommissionskopf] ${name}: Sprache des Dokuments «${sprache}»`)
+      const masse = await koepfe.evaluateAll((liste) => liste.map((el) => {
+        const h3 = el.querySelector('h3')
+        const bereich = document.createRange()
+        bereich.selectNodeContents(h3)
+        const zeilen = [...bereich.getClientRects()]
+        return {
+          name: h3.textContent.trim(),
+          sprache: h3.closest('[lang]')?.lang || '',
+          textRechts: Math.max(...zeilen.map((r) => r.right)),
+          knopfLinks: el.querySelector('.pw-kommission-neues-geschaeft').getBoundingClientRect().left,
+        }
+      }))
+      expect(masse.length, 'keine Kommission mit dem Knopf «Neues Geschäft»').toBeGreaterThan(0)
+      // Ohne deutsche Sprache trennt der Browser kein Wort, auch wenn Nextcloud englisch eingestellt ist.
+      expect(masse.filter((m) => !m.sprache.startsWith('de')).map((m) => `${m.name}: «${m.sprache}»`), 'der Name trägt nicht die Sprache «de»').toEqual([])
+      const unterDemKnopf = masse.filter((m) => m.textRechts > m.knopfLinks + 1).map((m) => `${m.name}: Text bis ${Math.round(m.textRechts)}, Knopf ab ${Math.round(m.knopfLinks)}`)
+      expect(unterDemKnopf, `der Name läuft unter den Knopf (Sprache des Dokuments «${sprache}»)`).toEqual([])
+    })
+  }
+
+  test('Druck: Der Name steht ohne leeres Band oben im Kopf', async ({ page }) => {
+    await login(page, U1)
+    await openApp(page)
+    await gotoView(page, 'Kommissionen')
+    await page.emulateMedia({ media: 'print' })
+    const kopf = page.locator('.pw-kommissionen .pw-kommission-kopf').first()
+    const k = await kopf.evaluate((el) => {
+      const stil = getComputedStyle(el)
+      return {
+        kopfOben: el.getBoundingClientRect().y,
+        innenOben: parseFloat(stil.paddingTop),
+        titelOben: el.querySelector('h3').getBoundingClientRect().y,
+        titelRand: parseFloat(getComputedStyle(el.querySelector('h3')).marginTop),
+      }
+    })
+    await page.emulateMedia({ media: 'screen' })
+    expect(k.titelRand, 'die Überschrift bringt im Druck einen eigenen Rand mit').toBe(0)
+    expect(Math.abs(k.titelOben - k.kopfOben - k.innenOben), 'über dem Namen bleibt im Druck ein leeres Band').toBeLessThan(1)
   })
 })

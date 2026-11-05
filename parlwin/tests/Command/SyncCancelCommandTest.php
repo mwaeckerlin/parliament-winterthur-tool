@@ -114,11 +114,18 @@ class SyncCancelCommandTest extends TestCase {
         $syncProcessService = $this->createStub(SyncProcessService::class);
         $syncProcessService->method('ensureStopped')
             ->willReturn(['stopped' => true, 'forced' => false, 'signalled' => false]);
+        $ereignisse = [];
+        $realtime = $this->createStub(RealtimePublisherService::class);
+        $realtime->method('publish')->willReturnCallback(
+            static function (string $typ, array $nutzlast) use (&$ereignisse): void {
+                $ereignisse[$typ] = $nutzlast;
+            }
+        );
 
         $command = new SyncCancelCommand(
             $this->config($values),
             new SyncLockService($this->lockFile),
-            $this->createStub(RealtimePublisherService::class),
+            $realtime,
             $syncProcessService,
         );
 
@@ -131,6 +138,8 @@ class SyncCancelCommandTest extends TestCase {
             $lock->abbruchAngefordert(),
             'Das Signal ist weg, bevor der startende Lauf es lesen konnte'
         );
+        // F150: Ohne Signal beendet sich der Lauf selbst und meldet seine Geschäfte im eigenen `sync.cancelled`.
+        self::assertSame([], $ereignisse['sync.cancelled']['geschaeftIds'] ?? 'kein Feld geschaeftIds');
     }
 
     public function testSetztCancelFlagWennSyncLaeuft(): void {
@@ -165,6 +174,7 @@ class SyncCancelCommandTest extends TestCase {
             }
         };
 
+        $ereignisse = [];
         $realtimePublisher = $this->createMock(RealtimePublisherService::class);
         $realtimePublisher->expects(self::exactly(2))
             ->method('publish')
@@ -174,7 +184,10 @@ class SyncCancelCommandTest extends TestCase {
                     self::equalTo('sync.cancelled')
                 ),
                 self::isArray()
-            );
+            )
+            ->willReturnCallback(static function (string $typ, array $nutzlast) use (&$ereignisse): void {
+                $ereignisse[$typ] = $nutzlast;
+            });
 
         $syncProcessService = $this->createMock(SyncProcessService::class);
         $syncProcessService->expects(self::once())
@@ -209,6 +222,9 @@ class SyncCancelCommandTest extends TestCase {
         self::assertSame(Command::SUCCESS, $result);
         self::assertSame('0', $values[SyncCommand::SYNC_CANCEL_REQUESTED_KEY] ?? null);
         self::assertSame('', $values[SyncCommand::SYNC_WORKER_PID_KEY] ?? null);
+        // F150: Der mit einem Signal beendete Lauf meldet seine Geschäfte nicht mehr; `null` lässt die Oberfläche die ganze Liste laden.
+        self::assertArrayHasKey('geschaeftIds', $ereignisse['sync.cancelled']);
+        self::assertNull($ereignisse['sync.cancelled']['geschaeftIds']);
         $holderLock->release();
     }
 

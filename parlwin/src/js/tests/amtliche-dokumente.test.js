@@ -17,7 +17,22 @@ function dokumente() {
 describe('PwAmtlicheDokumente', () => {
   beforeEach(() => {
     axios.get.mockReset()
-    axios.get.mockResolvedValue({ data: [{ id: 7, titel: '2026.15V', markdown: '# Schriftliche Anfrage\n\nWelche Immobilien sind Renditeobjekte?\n' }] })
+    const vorstoss = { id: 7, titel: '2026.15V', markdown: '# Schriftliche Anfrage\n\nWelche Immobilien sind Renditeobjekte?\n' }
+    // Die Liste aller Dokumente eines Geschäfts und das einzelne Dokument.
+    axios.get.mockImplementation((url) => Promise.resolve({
+      data: String(url).endsWith('/amtliche-dokumente/7') ? vorstoss : [vorstoss],
+    }))
+  })
+
+  // F149: Ein Budgetantrag misst mehrere hundert Kilobyte; geholt wird nur
+  // das Dokument, das aufgeklappt wird.
+  it('holt beim Aufklappen nur dieses Dokument über seine eigene Adresse', async () => {
+    const w = mount(PwAmtlicheDokumente, { props: { geschaeftId: 42, dokumente: dokumente() } })
+    await w.findAll('.pw-dokument-kopf')[0].trigger('click')
+    await flushPromises()
+    expect(axios.get).toHaveBeenCalledTimes(1)
+    expect(String(axios.get.mock.calls[0][0])).toMatch(/\/apps\/parlwin\/geschaefte\/42\/amtliche-dokumente\/7$/)
+    expect(w.html()).toContain('Renditeobjekte')
   })
 
   it('zeigt eingeklappt nur Titel, Kategorie und Datum', () => {
@@ -51,6 +66,24 @@ describe('PwAmtlicheDokumente', () => {
     await flushPromises()
     expect(axios.get).toHaveBeenCalledTimes(1)
     expect(w.html()).toContain('Renditeobjekte')
+  })
+
+  it('holt bei «auf, zu, auf» vor der Antwort nur einmal und zeigt danach den Inhalt', async () => {
+    let freigeben
+    axios.get.mockImplementation(() => new Promise((weiter) => {
+      freigeben = () => weiter({ data: { id: 7, markdown: 'Welche Immobilien sind Renditeobjekte?' } })
+    }))
+    const w = mount(PwAmtlicheDokumente, { props: { geschaeftId: 42, dokumente: dokumente() } })
+    const kopf = w.findAll('.pw-dokument-kopf')[0]
+    await kopf.trigger('click')
+    await kopf.trigger('click')
+    await kopf.trigger('click')
+    expect(axios.get, 'das zweite Aufklappen holt das Dokument noch einmal').toHaveBeenCalledTimes(1)
+    expect(w.find('.pw-dokument-inhalt .pw-laden').exists(), 'der Ladezustand fehlt beim zweiten Aufklappen').toBe(true)
+    freigeben()
+    await flushPromises()
+    expect(w.html()).toContain('Renditeobjekte')
+    expect(w.find('.pw-dokument-inhalt .pw-laden').exists()).toBe(false)
   })
 
   it('nennt den Fehler statt einer leeren Fläche, wenn das Dokument nicht gelesen wurde', async () => {

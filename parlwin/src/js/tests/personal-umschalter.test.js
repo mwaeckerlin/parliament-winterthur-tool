@@ -31,7 +31,7 @@ const ansicht = () => ({
   investitionen: [], antraege: [], pauschalantraege: [],
   verteilung: { automatikEin: true, zielModus: 'schwarze_null', zielBetrag: 0, haltung: 'einreichen', ausnahmen: [] },
   summen: { ausgaben: 2000, einnahmen: 1000, ergebnis: -1000, stellen: 19.5, ausgabenDiff: 0, einnahmenDiff: 0, ergebnisDiff: 0, stellenDiff: 0 },
-  standardBetragProStelle: 200000, kommissionZuordnung: [], eigeneFraktion: 'SVP',
+  standardBetragProStelle: 200000, kommissionZuordnung: [], eigeneFraktion: 'MPW',
 })
 
 describe('Umschalter der Grafik (F123)', () => {

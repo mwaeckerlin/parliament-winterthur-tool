@@ -342,16 +342,28 @@ import NotizenListe from './NotizenListe.vue'
 import Aktionszeitleiste from './Aktionszeitleiste.vue'
 import GeschaeftVerknuepfenDialog from './GeschaeftVerknuepfenDialog.vue'
 import { subscribeRealtime } from '../realtime'
+import { BESTAND_SCHLUESSEL } from '../geschaefte-bestand.js'
+
+/** Der Schlüssel, unter dem GeschaeftMaske ihre Meldestelle bereitstellt. */
+export const MASKE_SCHLUESSEL = 'parlwinGeschaeftMaske'
 
 export default {
   name: 'GeschaeftDetail',
   components: { NcButton, PwWysiwyg, PwMultiSelect, PwPrioritaetSelect, PwKommissionSelect, PwTypSelect, PwDatumInput, GeschaeftDokumente, PwAmtlicheDokumente, BeschlussWidget, NotizenListe, Aktionszeitleiste, GeschaeftVerknuepfenDialog },
+  inject: {
+    geteilterBestand: { from: BESTAND_SCHLUESSEL, default: null },
+    maske: { from: MASKE_SCHLUESSEL, default: null },
+  },
   props: {
     geschaeftId: { type: Number, required: true },
     mitglieder: { type: Array, default: () => [] },
     traktandumKontext: { type: Object, default: null },
+    // F141: Wird die Maske von einer Kommission aus geöffnet, steht deren Name
+    // schon im Feld «Kommission». Beim Bearbeiten eines bestehenden Geschäfts
+    // gilt dessen eigene Kommission, nicht diese Vorauswahl.
+    vorauswahlKommission: { type: String, default: '' },
   },
-  emits: ['gespeichert', 'oeffneTraktandum', 'erstellt', 'abbrechen', 'oeffneGeschaeft'],
+  emits: ['gespeichert', 'sitzungsnotizenGeaendert', 'oeffneTraktandum', 'erstellt', 'abbrechen', 'oeffneGeschaeft'],
   data() {
     return {
       laden: false,
@@ -565,7 +577,10 @@ export default {
         }
         this.verknuepfenDialog = false
         showSuccess('Mit dem offiziellen Geschäft verknüpft')
-        this.$emit('gespeichert')
+        // Das offizielle Geschäft trägt jetzt die übernommenen Angaben; das eigene
+        // Ereignis lädt es nicht nach, und die Ansicht lädt nur dieses Geschäft (F150).
+        if (this.geteilterBestand) { await this.geteilterBestand.nachladen([ziel.id]) }
+        this.melden('gespeichert', this.geschaeftId)
       } catch (e) {
         showError('Verknüpfung fehlgeschlagen: ' + (e?.response?.data?.fehler || e?.message || ''))
       }
@@ -632,7 +647,7 @@ export default {
           kommission: this.geschaeft.kommission || '',
         })
         showSuccess('Gespeichert')
-        this.$emit('gespeichert')
+        this.melden('gespeichert', this.geschaeftId)
       } catch (e) {
         showError('Geschäft konnte nicht gespeichert werden: ' + (e?.response?.data?.fehler || e?.message || ''))
       }
@@ -664,7 +679,7 @@ export default {
           // das gesuchte Datum und bleibt änderbar.
           datum: this.heute(),
           inhalt: '',
-          kommission: '',
+          kommission: this.vorauswahlKommission || '',
           aktionen: [],
           zustaendigkeiten: [],
         }
@@ -817,7 +832,7 @@ export default {
         await axios.put(generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}/prioritaet`), { prioritaet })
         if (this.geschaeft) this.geschaeft.prioritaet = prioritaet
         showSuccess('Priorität gespeichert')
-        this.$emit('gespeichert')
+        this.melden('gespeichert', this.geschaeftId)
       } catch (e) {
         showError('Priorität konnte nicht gespeichert werden: ' + (e?.response?.data?.fehler || e?.message || ''))
       }
@@ -844,7 +859,7 @@ export default {
         // Nur Aktionen neu laden (Audit-Trail-Eintrag) – kein Full-Reload
         await this._ladeAktionenNur()
         showSuccess('Zuständigkeiten gespeichert')
-        this.$emit('gespeichert')
+        this.melden('gespeichert', this.geschaeftId)
       } catch (e) {
         showError('Fehler beim Speichern der Zuständigkeiten')
       }
@@ -862,8 +877,20 @@ export default {
     /** Wie onNotizenGeaendert, aber für die Sitzungsnotizen-Kategorie. */
     onSitzungsnotizenGeaendert(neu) {
       if (!this.geschaeft) return
+      const liste = Array.isArray(neu) ? neu : []
       const andere = (this.geschaeft.aktionen || []).filter(a => a.aktionTyp !== 'sitzungsnotiz')
-      this.geschaeft.aktionen = [...andere, ...(Array.isArray(neu) ? neu : [])]
+      this.geschaeft.aktionen = [...andere, ...liste]
+      // Die Sitzung zeigt dieselben Sitzungsnotizen in der Zeile des Traktandums.
+      this.melden('sitzungsnotizenGeaendert', this.geschaeftId, liste)
+    },
+    /**
+     * Meldet, was die Maske gespeichert hat. Ein ✕ kann die Maske schliessen,
+     * bevor der Server antwortet; Vue gibt ein Ereignis einer abgehängten
+     * Komponente nicht mehr weiter. Darum geht die Meldung an GeschaeftMaske,
+     * die eingehängt bleibt, und nur ohne sie als Ereignis.
+     */
+    melden(ereignis, ...daten) {
+      if (this.maske) { this.maske.melden(ereignis, ...daten) } else { this.$emit(ereignis, ...daten) }
     },
     /**
      * Eine in der Aktionszeitleiste wiederhergestellte Notiz zurück in die
@@ -938,7 +965,7 @@ export default {
           this.geschaeft.fraktionsstatus = 'entschieden'
         }
         showSuccess('Beschluss gespeichert')
-        this.$emit('gespeichert')
+        this.melden('gespeichert', this.geschaeftId)
       } catch (e) {
         showError('Fehler beim Speichern des Beschlusses')
       }
@@ -963,7 +990,7 @@ export default {
           this.geschaeft.fraktionsstatus = null
         }
         showSuccess('Beschluss zurückgenommen')
-        this.$emit('gespeichert')
+        this.melden('gespeichert', this.geschaeftId)
       } catch (e) {
         showError('Fehler beim Zurücknehmen des Beschlusses')
       }
@@ -1003,7 +1030,7 @@ export default {
         })
         this.votumAktionId = data?.id || this.votumAktionId
         this.votumStatus = 'Gespeichert'
-        this.$emit('gespeichert')
+        this.melden('gespeichert', this.geschaeftId)
       } catch (e) {
         this.votumStatus = 'Fehler beim Speichern'
         this.votumDirty = true
@@ -1020,7 +1047,7 @@ export default {
         this.votumStatus = 'Votum archiviert'
         showSuccess('Votum archiviert')
         await this.ladeDetail()
-        this.$emit('gespeichert')
+        this.melden('gespeichert', this.geschaeftId)
       } catch (e) {
         showError('Fehler beim Archivieren des Votums')
       }

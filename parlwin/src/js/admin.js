@@ -113,9 +113,10 @@ export function ladeVorschlagswerte() {
     datalist.appendChild(option)
   }
   return Promise.all([
+    // Die Status-Werte selbst, ohne die Geschäfte dazu (F149).
     axios
-      .get(generateUrl('/apps/parlwin/geschaefte?show_erledigt=1&limit=2000'))
-      .then((r) => Array.isArray(r.data) && r.data.forEach((g) => hinzufuegen(g.status)))
+      .get(generateUrl('/apps/parlwin/geschaefte/statuswerte'))
+      .then((r) => Array.isArray(r.data) && r.data.forEach((status) => hinzufuegen(String(status))))
       .catch((err) => console.error('Fehler beim Laden der Status-Werte:', err)),
     axios
       .get(generateUrl('/apps/parlwin/fraktionen'))

@@ -214,14 +214,14 @@ class BudgetSteuerfussAutomatikTest extends TestCase {
         // «Antragsteller fehlt!»: der automatische Steuerfussantrag ist ein Antrag der
         // eigenen Fraktion — ihr Name (Config «fraktion») steht als Antragsteller,
         // damit er im Antrags-PDF nicht leer bleibt.
-        $store = ['fraktion' => 'Schweizerische Volkspartei-Fraktion (SVP)'];
+        $store = ['fraktion' => 'Musterpartei-Fraktion (MPW)'];
         $service = $this->serviceMitUeberschuss([], $this->statefulConfig($store));
         $service->verteilungSetzen(2026, true, 'schwarze_null', 0, 'einreichen', []);
 
         $steuer = $this->steuerfussAntraege();
         self::assertCount(1, $steuer);
         self::assertSame(
-            'Schweizerische Volkspartei-Fraktion (SVP)',
+            'Musterpartei-Fraktion (MPW)',
             (string) $steuer[0]->getAntragsteller(),
             'der automatische Steuerfussantrag trägt die eigene Fraktion als Antragsteller',
         );

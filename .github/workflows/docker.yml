@@ -6,14 +6,27 @@
 #
 # One branch per Nextcloud major version, because Nextcloud upgrades one major
 # version at a time: branch nc34 publishes php-fpm-nc34, nginx-nc34 and
-# realtime-nc34 with their date and version tags, master publishes the plain
-# tags. GitHub starts scheduled runs on the default branch only, so the
-# scheduled run of master starts this workflow on every nc branch as well; that needs
-# «actions: write».
+# realtime-nc34 with their date and version tags, master publishes the same
+# tags without the nc part. Every tag carries its version with a leading «v»
+# (nginx-v1.9.9, nginx-nc35-v1.8.18), so the rule for master sets that prefix
+# with an empty suffix; it stands last, because the first matching rule wins
+# and the nc rules have to be tried first.
+#
+# GitHub starts scheduled runs on the default branch only, so the run of master
+# starts this workflow on every nc branch and every release tag as well; that
+# needs «actions: write».
 #
 # A git tag v<X.Y.Z>-<n> rebuilds an earlier release v<X.Y.Z> on its own
 # base images and publishes it under the tags of that release, php-fpm-v<X.Y.Z>
 # and the others, so a release keeps its tags and gets the fixes of its base.
+#
+# A push to master rebuilds the nc branches too: `version-branches` names the
+# script that regenerates them from the pushed commit, and the reusable
+# workflow runs it after the deploy of master is green, then starts this
+# workflow on each of them with `build=true`. Without it the nc images would
+# carry whatever the script pushed last, which may be weeks behind master. The
+# force-push needs «contents: write»; it starts no run of its own, because a
+# push made with the GITHUB_TOKEN never triggers a workflow.
 
 name: docker
 
@@ -28,6 +41,10 @@ on:
         description: git tag nc<version>-v<X.Y.Z> or v<X.Y.Z>-<n> to build
         type: string
         default: ''
+      build:
+        description: build even when no source changed (set by the run of master)
+        type: boolean
+        default: false
 
 concurrency: docker-${{ inputs.ref || github.ref_name }}
 
@@ -37,9 +54,11 @@ jobs:
     uses: mwaeckerlin/scratch/.github/workflows/docker-image.yml@master
     permissions:
       actions: write
-      contents: read
+      contents: write
     with:
-      branch-tags: '[{"branch": "nc([0-9]+)", "suffix": "-nc\\1", "version": "v"}, {"tag": "(nc[0-9]+-v[0-9.]+)", "suffix": "-\\1"}, {"tag": "(v[0-9.]+)-[0-9]+", "suffix": "-\\1"}]'
+      branch-tags: '[{"branch": "nc([0-9]+)", "suffix": "-nc\\1", "version": "v"}, {"tag": "(nc[0-9]+-v[0-9.]+)", "suffix": "-\\1"}, {"tag": "(v[0-9.]+)-[0-9]+", "suffix": "-\\1"}, {"branch": "master", "suffix": "", "version": "v"}]'
+      version-base: master
+      version-branches: ./create-branches.sh
       # The runner has no PHPUnit and no `parlwin/vendor` (git-ignored, built in
       # the image), so the plain `npm test` cannot start the PHP suites.
       # `test:ci` fetches both out of the build stage php-vendor first.

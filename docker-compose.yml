@@ -19,7 +19,8 @@ services:
     environment:
       WEBROOT: ${WEBROOT:-}
     ports:
-      - "${NEXTCLOUD_HTTP_PORT:-29824}:8080"
+      # alle Adressen des Rechners, IPv4 und IPv6, ausser BIND_ADDRESS nennt eine
+      - "${BIND_ADDRESS:+${BIND_ADDRESS:-}:}${NEXTCLOUD_HTTP_PORT:-29824}:8080"
     volumes:
       - apps:/app/custom_apps:ro
     depends_on:
@@ -49,6 +50,12 @@ services:
       # Die Adresse der Datenquelle. Leer heisst die Webseite des Parlaments,
       # also der Betrieb; der E2E-Lauf zeigt auf seine lokale Gegenstelle.
       PARLWIN_QUELLE_BASE_URL: ${PARLWIN_QUELLE_BASE_URL:-}
+      # Die Adresse der Stadt-Webseite für die Stadtratsbeschlüsse. Leer heisst
+      # https://stadt.winterthur.ch.
+      PARLWIN_STADT_BASE_URL: ${PARLWIN_STADT_BASE_URL:-}
+      # Wie viele Listenseiten der Beschlüsse gelesen werden, je zwölf
+      # Beschlüsse; leer heisst zehn Seiten, 0 heisst alle.
+      PARLWIN_SRB_SEITEN: ${PARLWIN_SRB_SEITEN:-}
       PARLWIN_SYNC_LIMIT_ALL: ${PARLWIN_SYNC_LIMIT_ALL:-}
       PARLWIN_SYNC_LIMIT_GESCHAEFTE: ${PARLWIN_SYNC_LIMIT_GESCHAEFTE:-}
       PARLWIN_SYNC_LIMIT_SITZUNGEN: ${PARLWIN_SYNC_LIMIT_SITZUNGEN:-}

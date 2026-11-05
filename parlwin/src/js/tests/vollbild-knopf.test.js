@@ -9,10 +9,10 @@ vi.mock('@nextcloud/auth', () => ({ getCurrentUser: () => ({ uid: 'mw', displayN
 vi.mock('../realtime', () => ({ subscribeRealtime: () => () => {} }))
 
 /**
- * Vollbild auf flachem Schirm (F131).
+ * Vollbild (F131).
  *
- * Marc am 24.10.2026: «Dann ein Knopf neben dem zum einklappen der Seitenleiste,
- * nur anzeigen bei wenig Höhe und wenn es das Feature im Browser gibt.»
+ * Der Knopf steht bei jeder Schirmhöhe, sobald der Browser ein Vollbild
+ * anbietet. Vorher erschien er nur auf einem Schirm von höchstens 56rem Höhe.
  *
  * Das Vollbild nimmt die Adressleiste des Browsers und seine Schaltflächen weg.
  * Eine Webseite darf es nur auf eine Geste des Benutzers hin betreten — darum
@@ -62,11 +62,15 @@ describe('Vollbild', () => {
     expect(w.find('.pw-vollbild-knopf').exists(), 'der Knopf fehlt').toBe(true)
   })
 
-  it('zeigt ihn nicht auf hohem Schirm', async () => {
+  /**
+   * Der Knopf nützt auf jedem Schirm und bleibt darum überall sichtbar. Vorher
+   * erschien er nur auf einem Schirm von höchstens 56rem Höhe.
+   */
+  it('zeigt ihn auch auf hohem Schirm', async () => {
     schirm(false)
     browserKann(true)
     const w = await app()
-    expect(w.find('.pw-vollbild-knopf').exists(), 'der Knopf steht da, wo er nichts bringt').toBe(false)
+    expect(w.find('.pw-vollbild-knopf').exists(), 'der Knopf fehlt auf hohem Schirm').toBe(true)
   })
 
   it('zeigt ihn nicht, wo der Browser kein Vollbild kann', async () => {
@@ -105,11 +109,10 @@ describe('Vollbild', () => {
   })
 
   /**
-   * Marc am 24.10.2026, am Bild: «Im Stil, Grösse, Position, Art, ist der neue
-   * button gleich wie der links daneben, direkt Seite an Seite daneben»,
-   * «Gleiche Definition, keine Kopie!», «Sie teilen dasselbe CSS», «Und sind
-   * Geschwister im selben Element in derselben Ebene», «Es wird nie etwas
-   * nachgebaut!»
+   * Der Vollbild-Knopf gleicht dem Griff links daneben in Stil, Grösse,
+   * Position und Art und steht direkt neben ihm. Beide sind Geschwister im
+   * selben Element auf derselben Ebene und teilen Definition und CSS; nichts
+   * davon ist nachgebaut.
    */
   it('ist das Geschwister des Griffs im selben Behälter', () => {
     expect(QUELLE, 'der Knopf steht nicht im Behälter des Griffs')

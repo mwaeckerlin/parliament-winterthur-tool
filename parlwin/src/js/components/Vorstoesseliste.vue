@@ -319,6 +319,7 @@ import NotizenListe from './NotizenListe.vue'
 import Aktionszeitleiste from './Aktionszeitleiste.vue'
 import GeschaeftVerknuepfenDialog from './GeschaeftVerknuepfenDialog.vue'
 import PwLoeschen from './PwLoeschen.vue'
+import { BESTAND_SCHLUESSEL } from '../geschaefte-bestand.js'
 
 const HERKUENFTE = [
   { code: 'eigene', label: 'Eigene' },
@@ -347,6 +348,7 @@ const FREMD_BESCHLUESSE = [
 export default {
   name: 'Vorstoesseliste',
   components: { NcTextField, NcButton, NcSelect, NcLoadingIcon, NcEmptyContent, FilterPanel, PwField, BeschlussWidget, PwMultiSelect, PwPrioritaetSelect, PwWysiwyg, GeschaeftDokumente, NotizenListe, Aktionszeitleiste, GeschaeftVerknuepfenDialog, PwLoeschen },
+  inject: { geteilterBestand: { from: BESTAND_SCHLUESSEL, default: null } },
   props: {
     mitglieder: { type: Array, default: () => [] },
     fraktionen: { type: Array, default: () => [] },
@@ -522,6 +524,9 @@ export default {
         this.bearbeitung.geschaeftId = data.geschaeftId || geschaeft.id
         this.bearbeitung.status = data.status || 'erledigt'
         this.verknuepfenDialog = false
+        // Das Geschäft trägt jetzt die Priorität des Vorstosses; das eigene
+        // Ereignis lädt es in der geteilten Liste nicht nach (F150).
+        if (this.geteilterBestand) { await this.geteilterBestand.nachladen([geschaeft.id]) }
         await this.lade()
       } catch (e) {
         showError('Verknüpfung fehlgeschlagen: ' + (e?.response?.data?.fehler || e?.message || ''))

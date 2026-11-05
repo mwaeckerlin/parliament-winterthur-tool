@@ -1,4 +1,4 @@
-# ERZEUGTE DATEIEN — NICHT BEARBEITEN
+# Erzeugte Dateien, nicht bearbeiten
 
 Dieses Verzeichnis enthält, was der Build erzeugt. Jede `*.js`- und `*.js.map`-Datei hier entsteht automatisch, ebenso das Verzeichnis `chunks/`; alle stehen in `parlwin/.gitignore`.
 
@@ -7,3 +7,5 @@ Dieses Verzeichnis enthält, was der Build erzeugt. Jede `*.js`- und `*.js.map`-
 - Aufräumen: `npm run clean`
 
 Bearbeitet wird die Quelle unter `parlwin/src/js/`, nie eine Datei in diesem Verzeichnis. Was hier von Hand geändert wird, überschreibt der nächste Build.
+
+Vor jedem Build leert webpack dieses Verzeichnis. Stehen bleiben nur diese Datei und `.gitkeep`: `output.clean.keep` in `parlwin/webpack.js` nennt beide.

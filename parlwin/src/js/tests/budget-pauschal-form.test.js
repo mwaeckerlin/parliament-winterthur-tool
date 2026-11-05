@@ -11,8 +11,8 @@ function mounted(pauschal, extra = {}) {
     props: {
       pauschal,
       produktegruppen: [{ code: '121', name: 'Personalamt' }, { code: '157', name: 'Subventionsverträge' }],
-      fraktionOptionen: [{ value: 'GLP', label: 'GLP' }, { value: 'SP', label: 'SP' }],
-      eigeneFraktion: 'GLP',
+      fraktionOptionen: [{ value: 'MPW', label: 'MPW' }, { value: 'BPW', label: 'BPW' }],
+      eigeneFraktion: 'MPW',
       ...extra,
     },
     global: { stubs: { NcButton: true, NcSelect: true, NcTextField: true, NcCheckboxRadioSwitch: true, PwMultiSelect: true } },
@@ -45,17 +45,17 @@ describe('BudgetPauschalForm', () => {
 
   it('belegt den Antragsteller mit der eigenen Fraktion vor und meldet ihn (F94)', () => {
     const w = mounted({ id: 1, betrag: -100, prozent: 0, haltung: 'einreichen', ausnahmen: [] })
-    expect(w.vm.antragsteller).toBe('GLP')
+    expect(w.vm.antragsteller).toBe('MPW')
     w.vm.speichern()
-    expect(w.emitted().save[0][0].antragsteller).toBe('GLP')
+    expect(w.emitted().save[0][0].antragsteller).toBe('MPW')
   })
 
   it('übernimmt einen abweichend gewählten Antragsteller (F94)', () => {
-    const w = mounted({ id: 1, betrag: -100, prozent: 0, haltung: 'einreichen', ausnahmen: [], antragsteller: 'SP' })
-    expect(w.vm.antragsteller).toBe('SP')
-    w.vm.antragsteller = 'GLP'
+    const w = mounted({ id: 1, betrag: -100, prozent: 0, haltung: 'einreichen', ausnahmen: [], antragsteller: 'BPW' })
+    expect(w.vm.antragsteller).toBe('BPW')
+    w.vm.antragsteller = 'MPW'
     w.vm.speichern()
-    expect(w.emitted().save[0][0].antragsteller).toBe('GLP')
+    expect(w.emitted().save[0][0].antragsteller).toBe('MPW')
   })
 
   // F84/F85: Ziel-Typ «fester Ertrag» meldet einen positiven Zielbetrag, ohne

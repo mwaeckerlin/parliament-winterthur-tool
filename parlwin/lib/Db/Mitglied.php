@@ -33,7 +33,7 @@ class Mitglied extends Entity implements \JsonSerializable {
     /** @var string Vorname */
     protected string $vorname = '';
 
-    /** @var string Partei des Mitglieds (z.B. SP, Grüne) */
+    /** @var string Partei des Mitglieds (z.B. Musterpartei) */
     protected string $partei = '';
 
     /** @var string Fraktion des Mitglieds */

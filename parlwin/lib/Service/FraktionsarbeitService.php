@@ -87,6 +87,20 @@ class FraktionsarbeitService
 
     private const OBJEKT_TYP = 'geschaeft';
 
+    /** @var list<int> die Geschäfte, die die letzte automatische Zuweisung betroffen hat */
+    private array $zugewieseneIds = [];
+
+    /**
+     * Die IDs der Geschäfte, denen der letzte Aufruf von
+     * {@see autoZuweisenKommissionsmitglieder()} Zuständige gegeben hat (F150).
+     *
+     * @return list<int>
+     */
+    public function zuletztZugewieseneIds(): array
+    {
+        return $this->zugewieseneIds;
+    }
+
     /**
      * @param Geschaeft[] $geschaefte
      * @return array<int, array<string, mixed>>
@@ -97,22 +111,31 @@ class FraktionsarbeitService
         ?bool $filterEntscheidungsbedarf = null
     ): array {
         $result = [];
-        $dokumenteJeGeschaeft = $this->dokumentService?->zuGeschaeften(
-            array_map(static fn (Geschaeft $g): int => (int) $g->getId(), $geschaefte)
-        ) ?? [];
+        // Eine Abfrage je Tabelle und Block; die Dokumente ohne ihren Text (F149).
+        $ids = array_map(static fn (Geschaeft $g): int => (int) $g->getId(), $geschaefte);
+        $dokumenteJeGeschaeft = $this->dokumentService?->koepfeZuGeschaeften($ids) ?? [];
+        $beschluesse = $this->aktionMapper->findLetzteGueltigeBeschluesse($ids);
+        $zustaendigkeitenJeGeschaeft = $this->zustaendigkeitMapper->findAktiveByGeschaefte($ids);
 
         foreach ($geschaefte as $geschaeft) {
+            $id = (int) $geschaeft->getId();
             $eintrag = $geschaeft->jsonSerialize();
             $eintrag['amtlicheDokumente'] = array_map(
-                fn (GeschaeftDokument $d): array => $this->dokumentKopf($d),
-                $dokumenteJeGeschaeft[(int) $geschaeft->getId()] ?? []
+                fn (array $kopf): array => $this->dokumentKopf($kopf['dokument'], $kopf['hatInhalt']),
+                $dokumenteJeGeschaeft[$id] ?? []
             );
-            $letzterBeschluss = $this->aktionMapper->findLetzterGueltigerBeschluss((int) $geschaeft->getId());
-            $haupt = $this->zustaendigkeitMapper->findHauptByGeschaeft((int) $geschaeft->getId());
+            $letzterBeschluss = $beschluesse[$id] ?? null;
+            $aktiveZustaendigkeiten = $zustaendigkeitenJeGeschaeft[$id] ?? [];
+            $haupt = null;
+            foreach ($aktiveZustaendigkeiten as $zustaendigkeit) {
+                if ($zustaendigkeit->getIstHaupt()) {
+                    $haupt = $zustaendigkeit;
+                    break;
+                }
+            }
 
             $eintrag['letzterBeschluss'] = $letzterBeschluss !== null ? $this->mapAktion($letzterBeschluss) : null;
             $eintrag['hauptZustaendigePerson'] = $haupt !== null ? $haupt->getPersonName() : '';
-            $aktiveZustaendigkeiten = $this->zustaendigkeitMapper->findAktiveByGeschaeft((int) $geschaeft->getId());
             $eintrag['zustaendigkeiten'] = array_map(
                 fn(GeschaeftZustaendigkeit $z): array => $this->mapZustaendigkeit($z),
                 $aktiveZustaendigkeiten
@@ -147,11 +170,11 @@ class FraktionsarbeitService
      *
      * @return array<string, mixed>
      */
-    private function dokumentKopf(GeschaeftDokument $dokument): array
+    private function dokumentKopf(GeschaeftDokument $dokument, bool $hatInhalt): array
     {
         $kopf = $dokument->jsonSerialize();
         unset($kopf['markdown'], $kopf['abschnitte']);
-        $kopf['hatInhalt'] = ($dokument->getMarkdown() ?? '') !== '';
+        $kopf['hatInhalt'] = $hatInhalt;
         return $kopf;
     }
 
@@ -859,6 +882,7 @@ class FraktionsarbeitService
 
     public function autoZuweisenKommissionsmitglieder(): array
     {
+        $this->zugewieseneIds = [];
         $statistik = [
             'gepruet' => 0,
             'zugewiesen' => 0,
@@ -926,6 +950,7 @@ class FraktionsarbeitService
             if ($einreicher !== []) {
                 if ($this->setzeAutoZustaendigkeit($geschaeftId, $einreicher)) {
                     $statistik['zugewiesen']++;
+                    $this->zugewieseneIds[] = $geschaeftId;
                 } else {
                     $statistik['uebersprungen']++;
                 }
@@ -970,6 +995,7 @@ class FraktionsarbeitService
             try {
                 $this->zustaendigkeitenSetzen($geschaeftId, $personen, $hauptKey);
                 $statistik['zugewiesen']++;
+                $this->zugewieseneIds[] = $geschaeftId;
             } catch (\Throwable) {
                 $statistik['uebersprungen']++;
             }

@@ -4,11 +4,10 @@ import { readFileSync } from 'node:fs'
 /**
  * Ein Wort bricht an seinen Trennstellen, nicht an jedem Buchstaben.
  *
- * Befunde aus dem Design-Test: In der Spalte «Zuständig» stand «Marc…ckerlin»
- * und «Mich… Gross» (14.09.2026), und bei den Kommissionen auf dem Telefon
- * «Informationsverordnun / g; InfV» (11.09.2026). Beides macht
- * `overflow-wrap: anywhere`: Es bricht an jeder Stelle, auch mitten in der
- * Silbe, obwohl `hyphens: auto` daneben steht.
+ * `overflow-wrap: anywhere` bricht an jeder Stelle, auch mitten in der Silbe,
+ * obwohl `hyphens: auto` daneben steht: In der Spalte «Zuständig» wird daraus
+ * «Mich… Gross», bei den Kommissionen auf dem Telefon
+ * «Informationsverordnun / g; InfV».
  *
  * `overflow-wrap: break-word` bricht zuerst an den Stellen, die der Text
  * anbietet — Leerzeichen, Bindestrich, und mit `hyphens: auto` die

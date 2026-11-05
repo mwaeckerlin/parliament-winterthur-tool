@@ -1,48 +1,426 @@
-# TODO — Ideen und offene Vorhaben
+# Offene Aufgaben
 
-Ideen, die noch nicht umgesetzt sind. Umgesetzte Punkte wandern nach `FEATURES.md` und verschwinden hier.
+Jeder Eintrag ist ein Punkt und nennt das Datum, an dem er kam, seinen Stand und wer ihn brachte; die neuesten stehen oben. Ein Auftrag verschwindet von hier, sobald er umgesetzt, getestet und in `FEATURES.md` und `TESTS.md` eingetragen ist. Der Stand «1.10.1» nennt die Version, für die ein Befund vorgesehen ist.
 
 ## Aufträge von Marc
 
-- 2026-10-23 · offen · Session mwaeckerlin-04: `.github/workflows/docker.yml` auf die stündliche Prüfung von mwaeckerlin/scratch 1.1.12 umstellen (`cron: "17 * * * *"`, die beiden Kommentarzeilen über dem Zeitplan weg, Kopfkommentar und Zeile 10 auf die stündliche Prüfung umschreiben, `permissions` bleiben), dann unter Marcs `/commit` nur diese Datei committen und pushen, auf grüne Runner warten und sha und Ergebnis zurückmelden
+- 2026-11-04 · offen, nach dem Release 1.10.0 · Marc · parlwin generell auf Geschwindigkeit und Speicherverbrauch durchsehen und optimieren.
+- 2026-11-02 · offen · Marc · Commit und Push von parlwin, danach Rückmeldung an Marc. Der Commit folgt dem grünen vollen Lauf.
+- 2026-10-26 · offen · Marc · Die drei Zweige `nc33`, `nc34` und `nc35` aus dem Commit neu erzeugen, sobald er steht: `./create-branches.sh` setzt die `FROM`-Zeilen auf `mwaeckerlin/nextcloud:php-fpm-nc<version>`, und die Tags dieser Basis-Images stehen seit dem 2026-10-26 auf Docker Hub.
+- 2026-08-22 · offen · Marc · Stichtag 1. Dezember (F75), wörtlich: «nach dem 1. Dezember des Vorjahres werden nicht generierte Budgetjahre ignoriert, keine Daten mehr gescannt, die nicht schon in der Datenbank sind». `BudgetImportService::automatischerImport` liest das neueste Jahr ein, sobald es fehlt, und prüft kein Datum.
+- 2026-08-22 · offen · Marc · Novemberbrief automatisch einlesen (F91), wörtlich: «Wenn der Novemberbrief erscheint, werden die Anpassungen automatisch gescannt und an den richtigen Stellen übernommen.» `BudgetImportService::automatischerImport` liest keinen Novemberbrief ein.
+- 2026-08-22 · offen · Marc · Knopf «Novemberbrief einlesen» erst für einen mindestens zwei Tage alten Novemberbrief (F91), wörtlich: «Dieser Knopf erscheint nur, wenn es für das betreffende Jahr ein Budget in der Datenbank gibt und zusätzlich einen mindestens zwei Tage alten Novemberbrief gibt, dieser aber noch nicht in der Datenbank ist.» `BudgetImportService::novemberbriefVerfuegbar` prüft kein Datum.
+
+## Fragen an Marc
+
+- 2026-11-04 · Frage an Marc · Prüfung · Tote Methoden ohne Aufrufer: `GeschaeftZustaendigkeitMapper::findHauptByGeschaeft`, `GeschaeftDokumentService::zuGeschaeften` und `GeschaeftDokumentMapper::findByGeschaefte`, die nur `zuGeschaeften` aufruft, dazu die Attrappe von `findHauptByGeschaeft` in `GeschaeftAmtlicheDokumenteTest`. Sollen sie entfernt werden? Bis zur Antwort bleiben sie stehen.
+- 2026-11-04 · Frage an Marc · Prüfung · Gelöschte Notizen lassen sich an einer Sitzung, an einem Traktandum ohne Geschäft, an einem Stadtratsbeschluss, an einer Frage der Fragestunde und an den Ebenen des Budgets nicht wiederherstellen, weil dort keine Aktionszeitleiste steht; FEATURES beschreibt dort das Löschen ohne Wiederherstellen (F38, F39, F144, F114, F124). Soll dort eine Aktionszeitleiste mit Wiederherstellen gebaut werden, wie beim Geschäft und beim Vorstoss?
 
 ## Offen aus dem Testlauf
 
-- 2026-10-15 · offen · **Der Volltext eines Dokuments mit Tabellen zieht Zellen zusammen.** Gemessen am 2026-10-15: Die Vorstösse, die Antwort des Stadtrats, die Medienmitteilung und das Drehbuch liefern saubere Wörter; im Budgetbuch stehen Zellen ohne Trennzeichen beieinander, und dann entstehen Folgen wie «nbetreffend». Die Dokumentsuche zerlegt den Text in Wörter und findet solche Stellen nicht. Betroffen ist die Suche über den Inhalt (F121) bei Dokumenten mit Tabellen.
+- 2026-11-04 · offen · Testlauf · Nach einem Abbruch in der ersten Sekunde eines Laufs meldet der Stand des Servers einmal «abgebrochen» und danach wieder einen laufenden Abgleich mit «Abbruch angefragt». Gemessen in Chromium im E2E-Fall «Abbrechen bleibt stehen, wenn die erste Abfrage den vorigen Lauf zurückbringt»; die Oberfläche meldete nacheinander «Abbruch angefragt...», «Synchronisation abgebrochen», «Synchronisiere...», «Abbruch angefragt...» und «Synchronisiere...». Der Zeitplan des Abgleichs (`SyncJob`, alle 300 Sekunden) erklärt das nicht; die Ursache ist nicht ermittelt.
+- 2026-11-04 · offen · Testlauf · Der Design-Lauf `.claude/design-scan.sh` konnte sich am 2026-11-04 nicht anmelden; warum, ist nicht ermittelt. Das Skript endet mit 1, wenn die Aufnahme scheitert oder kein Bild entsteht.
+- 2026-11-04 · offen · Testlauf · `npm run lint` scheitert mit «ESLint couldn't find a configuration file»: Das Projekt trägt keine Konfiguration von ESLint und hat nie eine getragen, also prüft der Befehl nichts.
+- 2026-11-04 · offen, nach dem Release 1.10.0 · Testlauf · In Chromium braucht die Ansicht «Geschäfte» im E2E-Lauf über 20 Sekunden, um mit «Erledigte anzeigen» 500 Zeilen mit ihren Auswahlfeldern zu zeichnen; gemessen im Reparaturlauf am Klick auf den Schalter, der so lange nicht fertig wurde. So war es schon vor 1.10.0; damals zeichnete die Ansicht nach der Antwort des Servers und hielt den Klick darum nicht an. Das gehört zum Auftrag vom 2026-11-04, Geschwindigkeit und Speicher.
+- 2026-10-26 · offen · Testlauf · **Die Prüfung des automatischen Cron-Laufs scheitert in einem Lauf mit `PW_GREP`, im vollen Lauf ist sie grün.** Im kurzen Lauf wartet sie ihre 600 Sekunden vergeblich; im vollen Lauf (401 Tests, eine Stunde) läuft sie durch. Die Ablehnungen des Dokument-Auftrags an `parlwin-quelle` («Host parlwin-quelle violates local access rules») liegen alle vor dem Prüffenster und sind damit nicht die Ursache; `allow_local_remote_servers` steht, und `tests/e2e/run-compose-e2e.sh` liest den Wert nach dem Setzen nach. Offen ist, warum der SyncJob im kurzen Lauf nicht an die Reihe kommt.
+- 2026-10-15 · offen · Testlauf · **Der Volltext eines Dokuments mit Tabellen zieht Zellen zusammen.** Die Vorstösse, die Antwort des Stadtrats, die Medienmitteilung und das Drehbuch liefern saubere Wörter; im Budgetbuch stehen Zellen ohne Trennzeichen beieinander, und dann entstehen Folgen wie «nbetreffend». Die Dokumentsuche zerlegt den Text in Wörter und findet solche Stellen nicht. Betroffen ist die Suche über den Inhalt (F121) bei Dokumenten mit Tabellen.
+
+## Befunde
+
+- 2026-11-04 · 1.10.1 · Prüfung · Auslieferung: Die Reserve von 256MiB über `PARLWIN_PHP_MEMORY_LIMIT` ist geschätzt, in `tests/compose-contract.sh` und in `example/.env.sample`, ebenso die 100MiB je Prozess in `tests/compose-contract.sh`. Die Zahl gehört aus den Zeilen `[speicher] Stack … belegt` in `tests/.regression/lauf.log` gemessen, mit Messung und Datum neben der Zahl.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: `Kommissionsliste.vue` trägt Kommentare mit Vorgeschichte («Der Weg über die andere Ansicht und die Auswahl von Hand war zu umständlich», «Ein fester Deckel (früher 1000) liess …»), und der zweite nennt die Ladung «seitenweise», obwohl die Methode nicht blättert.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: `Geschaeftsliste.vue` trägt Kommentare mit Vorgeschichte («wie vorher `limit: 500` beim Server», «Alle Geschäfte samt den erledigten hielten den Browser beim Zeichnen an», «Wie vorher die Anfrage an den Server»).
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: `Sitzungsliste.vue` trägt den Kommentar «wie vor der geteilten Liste».
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: `css/style.scss` trägt beim Paar der Griffe Messprotokolle vom 2026-10-26 mit `px`-Zahlen und das Bild «Offen zieht ihn seine eigene Breite nach links».
+- 2026-11-04 · 1.10.1 · Prüfung · Tests der Oberfläche: `geschaefte-bestand.test.js` trägt Kommentare mit Vorgeschichte («Vorher lud jede Ansicht …», «Fehler vom 2026-11-04 …»).
+- 2026-11-04 · 1.10.1 · Prüfung · Tests der Oberfläche: `sitzung-nachladen.test.js` erzählt im Kopf die Vorgeschichte («Bei langsamer Leitung verschwand …»).
+- 2026-11-04 · 1.10.1 · Prüfung · Tests der Oberfläche: `kommission-neues-geschaeft.test.js` erzählt im Kopf die Vorgeschichte («Vorher führte der einzige Weg …»).
+- 2026-11-04 · 1.10.1 · Prüfung · Tests der Oberfläche: Ein echter Personenname steht als Anzeigename in 17 Testdateien, darunter die neuen `kommission-neues-geschaeft.test.js` und `stadtratsbeschluesse.test.js`.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: Der Kopf von `nachladen.js` begründet `BUENDEL_MS` damit, «dass Mitlesende keine Verzögerung bemerken»; «Mitlesende» ist ein substantiviertes Partizip.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: In `Geschaeftsliste.vue` liest niemand `ausgewaehltesGeschaeft`, und `neuesGeschaeft` und `detailOffen` lesen nur Tests (`geschaeftsliste-filter.test.js`, `dokumente-zweistufig.test.js`); es sind Reste der Maske vor `GeschaeftMaske`.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: In `Kommissionsliste.vue` liest niemand `detailOffen` und `ausgewaehltesGeschaeft`.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: Die Sortierung nach Datum steht dreimal da, `neuesteZuerst` in `Geschaeftsliste.vue` und in `GeschaeftVerknuepfenDialog.vue` und `nachDatum` in `geschaefte-bestand.js`.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: Die Grenze 500 steht zweimal da, als `GESCHAEFTE_ANZEIGE` in `Geschaeftsliste.vue` und als `ANZEIGE` in `GeschaeftVerknuepfenDialog.vue`.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: `Geschaeftsliste.vue` führt die Regel «erledigt» ein zweites Mal als `istErledigtStatus` neben dem importierten `istErledigt`, filtert die Liste zweimal nach «erledigt» und sortiert sie zweimal.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: In `Geschaeftsliste.vue` stehen Konstanten zwischen den Imports.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: Der Kommentarblock über `Stadtratsbeschluesseliste.vue` beschreibt die Lage in der Navigation und die Rolle des Stadtrats, keine Zeile der Komponente tut etwas davon, und er trennt mit einem Gedankenstrich einen Gedanken.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: `GeschaeftDetail.vue` nennt das Objekt mit `melden` im Kommentar «ihre Meldestelle», ein Bild.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests der Oberfläche: Der Kopf von `kommission-neues-geschaeft.test.js` trennt mit «— nur ist die Kommission schon gewählt» einen Gedanken.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: Der Klappkopf steht in drei Fassungen da, als `<button>` in `Stadtratsbeschluesseliste.vue` und als `div role="button"` in `Kommissionsliste.vue` und `PwAmtlicheDokumente.vue`. Das CSS des Knopfs kopiert `.pw-kommission-mitglieder-kopf`, bringt `outline: 2px` und `outline-offset: 2px` mit, und sein Kommentar beschreibt eine Kompensation mit einem Bild. Weil der Druck jeden `button` ausblendet, fehlt auf Papier «Notizen (n):» der Stadtratsbeschlüsse, während «Mitglieder (n):» stehen bleibt.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: Die Breite des Knopfpaars hat in `css/style.scss` zwei Quellen, `calc(2 * var(--default-clickable-area, 34px))` mit einem Ersatzwert in `px` und `calc(2 * var(--pw-click-lg))`.
+- 2026-11-04 · 1.10.1 · Prüfung · Server: Die Blockgrösse 500 steht als Zahl in `array_chunk` von `GeschaeftAktionMapper`, `GeschaeftDokumentMapper` (zweimal), `GeschaeftMapper` und `GeschaeftZustaendigkeitMapper` statt als eine Konstante.
+- 2026-11-04 · 1.10.1 · Prüfung · Server: `GeschaeftController` schreibt die Grenze von 500 IDs ein zweites Mal in `IDS_MUSTER` (`{0,499}`), neben `IDS_HOECHSTENS`.
+- 2026-11-04 · 1.10.1 · Prüfung · Server: In `budget_antraege_pdf.php` stehen die Zeilen für Messgrösse und Sollwert der Zielvorgaben zweimal da, in der Betragsspalte und nach der Begründung.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests des Servers: `GeschaeftListeAbfragenTest` schreibt die gemessene Speichergrösse mit `fwrite(STDERR, …)` in die Ausgabe des Laufs.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests des Servers: Der Name `testDerKopfTraegtJedesFeldWieZuvorUndHatInhaltAusDerDatenbank` nennt mit «wie zuvor» die Vorgeschichte.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests des Servers: `SyncCommandTest` baut fünfmal eine eigene Attrappe von `IConfig` und dreimal eine von `OutputInterface`, neben den Helfern `konfiguration()` und `ausgabe()`.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests des Servers: Die leere Listenseite der Stadtratsbeschlüsse («nennt keinen einzigen Beschluss») prüft nur `StadtratsbeschlussServiceTest`, und dort wirft die Attrappe des Scrapers genau die erwartete Meldung; der Weg durch `ScraperService` ist ohne Test.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests des Servers: Der Kopf von `StadtratsbeschlussServiceTest` sagt, die Notizen der Fraktion überleben einen zweiten Lauf; `NotizService` ist dort eine Attrappe, und kein Test prüft das.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests des Servers: Ein Kommentar in `SettingsControllerTest` erzählt die Vorgeschichte («ein vorzeitiges «abgebrochen» liess die Oberfläche …»).
+- 2026-11-04 · 1.10.1 · Prüfung · Tests des Servers: `StadtratsbeschluesseTest` nennt den Stack der E2E-Tests «E2E-Stapel».
+- 2026-11-04 · 1.10.1 · Prüfung · Testlauf: `..` steht in Pfaden der Tests: `tests/regression/hilfen.mjs`, `tests/compose-contract.sh`, `tests/quelle-contract.sh`, `tests/lock-aktualisieren.sh`, `WURZEL = '../../../..'` in 14 vitest-Dateien, `import('../../../../tests/…')` in `e2e-zustand-rechte.test.js`, `regression-reparatur.test.js`, `regression-abbruch.test.js` und `regression-container-der-tests.test.js`, dazu `parlwin/webpack.js`. Vorbild ohne `..` ist `abhaengigkeiten-sicherheit.test.js`, für die Imports ein Alias von vitest.
+- 2026-11-04 · 1.10.1 · Prüfung · Testlauf: `tests/regression/stack.mjs` schreibt die Version des Images von Playwright fest in den Code (`mcr.microsoft.com/playwright:v1.61.0-noble`).
+- 2026-11-04 · 1.10.1 · Prüfung · Quelle der E2E-Tests: «Steuerweg» ist ein erfundenes Wort, in `docker/quelle/locations.conf`, im README und in TESTS.md; das Wort des Projekts ist «Endpoint». «Liegt die Datei des Steuerwegs unten» in `locations.conf` sagt nicht, welche Datei gemeint ist.
+- 2026-11-04 · 1.10.1 · Prüfung · Testlauf: Kommentare mit Vorgeschichte in `tests/php-suite.sh` («Gemessen am 29.10.2026») und `tests/quelle-contract.sh` («Bis zum 2026-11-04 startete jede Anfrage …»).
+- 2026-11-04 · 1.10.1 · Prüfung · E2E-Tests: Kommentare mit Vorgeschichte in `admin-sync-echtzeit.spec.js` («ein zweiter Klick schickte den Abbruch ein zweites Mal»), `feld-inventar-verwaltung-und-bausteine.spec.js`, `geschaefte-datenfluss.spec.js`, `griffe-seitenleiste.spec.js` und `handy-bedienung.spec.js` (zwei Stellen).
+- 2026-11-04 · 1.10.1 · Prüfung · E2E-Tests: Ein Kommentar in `mitglieder-kommissionen.spec.js` gibt den Wortlaut einer Rückmeldung der Fraktion wieder.
+- 2026-11-04 · 1.10.1 · Prüfung · E2E-Tests: In `handy-bedienung.spec.js` steht der JSDoc von `feldOeffnen` über `auswahlFeld`, und «gesucht wird über die Beschriftung und das Feld in deren Umgebung» sagt nicht, was die Zeilen tun.
+- 2026-11-04 · 1.10.1 · Prüfung · E2E-Tests: `navigation-kuerzel-layout.spec.js` spricht im Kopf von «den drei Ansichten ohne Knopf»; in `ANSICHTEN` stehen fünf mit `button: null`.
+- 2026-11-04 · 1.10.1 · Prüfung · Auslieferung: `Dockerfile.php-fpm` sagt im Kommentar «keine `target:`-Splits mehr — Docker Hub Auto-Builds»; gebaut wird auf GitHub.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, FEATURES: Die Regeln des Nachladens stehen mehrfach da, in F146, F147 und F150; das Nachladen der Traktanden steht in F147, F150 und in der Beschreibung der Sitzungen; ein Satz im Abschnitt der Bedienelemente wiederholt sich selbst.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: Ein Klick neben die Maske «Neue Sitzung» verwirft das Formular (`@click.self="gewaehlterTyp = null"` in `Sitzungsliste.vue`); F8 verlangt, dass ein Klick daneben beim Anlegen nichts bewirkt. So stand es schon vor 1.10.0.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, FEATURES: In F56 fehlen die Administratoren, die den Protokollführer, die Stellvertretung des Fraktionspräsidenten und die Kommissionsmitglieder ebenfalls setzen dürfen.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, FEATURES: F68 sagt mehr über die Aktionszeitleiste, als die App zeigt.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, FEATURES: Der Verweis in F89 auf den Speicher führt ins Leere, und dort steht MB neben MiB.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, FEATURES: F140, F143 und F148 sind unklar.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, FEATURES: Vor «Sekunden» stehen gewöhnliche Leerzeichen.
+- 2026-11-04 · 1.10.1 · Prüfung · Server: Der Kommentar über `BudgetImportService::automatischerImport` sagt, ein vorhandener Novemberbrief werde nachgezogen; der Code gibt `novemberbrief` immer als `false` zurück.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, TESTS: Die Einleitung sagt, `npm test -- --list` nenne alle Tests mit Nummer; ohne `inventar.json` stimmt das nicht.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, TESTS: Der Eintrag «Doppelprüfung: PHPUnit sieht die umgeschalteten Dateien» ist unklar («das Projekt beim Bau hineinkopiert») und sagt mehr, als der Test prüft; der Test liest die Option `PARLWIN_PHP_TEST_GEBAUT` und zwei Zeilen des Quelltexts.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, TESTS: Die Tests des Testlaufs stehen unter «Guards», dessen Einleitung zu ihnen nicht passt; sie gehören mit den Prüfungen von `tests/e2e/run-compose-e2e.sh` in einen eigenen Abschnitt «Testlauf».
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, TESTS: Die Einträge der neuen Komponententests des Testlaufs nennen die Namen ihrer Fälle nicht.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, TESTS: «Steuerweg», «Ausweichweg», «Testersatz», «Einleser» und «Laufsperre» haben keine Quelle; fünf Tests haben keinen Eintrag; die Kennung `pw:<Stack>:lauf` heisst in der Einleitung anders als im Code.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, README: Vorstösse übernimmt die App auch aus `20_Fremde` (`VorstossImportService`); die Darstellung des Ordners nennt nur `10_Eigene`.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, README: Der Satz zu den Linien von Nextcloud steht verkehrt herum: Eine ältere Installation aktualisiert Nextcloud, verweigert wird ein Image, das eine Hauptversion überspringt.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, README: Der Absatz «Speicher:» unter «Tests ausführen» sagt, die Dauer jeder Phase stehe in `speicher.jsonl`; dort steht keine Phase.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, README: «Abbild» steht neben «Image» für dasselbe.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, README: Bei den Regeln des Nachladens fehlen die zwei Ausnahmen.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, README: Stacks und Speicher stehen unter «Tests ausführen» und «Automatischer E2E-Test» mehrfach, `PARLWIN_TESTS_OHNE_E2E` viermal, und fünf Stellen stehen gleich in CONTRIBUTING.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, CONTRIBUTING: Der Hinweis auf den Ordner der Vorstösse nennt `V{id}-*`; die Dokumente liegen unter `‹Jahr›/*`.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, CONTRIBUTING: Eine neue Testgruppe muss auch in `GRUPPEN` von `tests/run-all.sh` und in `LOKAL` von `tests/regression.mjs` stehen; der Abschnitt nennt nur `GRUPPEN` von `tests/regression.mjs`.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, CONTRIBUTING: «am 2026-11-04 gemessen» bei der Dauer eines vollen Laufs ist ein Datumsstempel.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, CONTRIBUTING: «Webserver am Rand» ist ein Bild.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, CONTRIBUTING: Die Liste der Hauptansichten unter «Aufbau einer Ansicht» lässt die Fragestunde aus.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, CONTRIBUTING: Drei Stellen sind blosse Etiketten, drei stellen «nicht …, sondern …» gegenüber, und die Migration V31 ist dreimal beschrieben.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, CONTRIBUTING: «ohne Shell und Skriptsprache» bei den gehärteten Images ist unklar.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, ARCHITECTURE: «Ereignis-Protokoll» in 6.1 hat keine Quelle; in 12.2 steht bei PHPUnit ein Personenname; `parlwin-realtime` hat drei Namen; die gehärteten Images sind viermal beschrieben.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, CHANGELOG: KB steht neben MiB, und weitere Einträge von 1.10.0 sind unklar.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, info.xml: Die Beschreibung lässt Budget, Vorstösse und Fragestunde aus.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests des Servers: `ScraperLiveEndpointTest` weicht auf gespeicherte Seiten aus, wenn die Webseite nicht antwortet; `php-live` wird so grün, ohne die Webseite gefragt zu haben.
+- 2026-11-04 · 1.10.1 · Prüfung · Server: Der Kommentar in `SyncCommand` nennt `SettingsController::starteSyncProzess()`; diese Methode gibt es nicht.
+- 2026-11-04 · 1.10.1 · Prüfung · Verwaltung: `admin.php` zeigt die Fehler der Bereiche (`renderBereichsFehler`) vor der Sperre gegen eine veraltete Antwort; eine Antwort, die vor dem Start abging, zeigt so die Fehler des vorigen Laufs, und der Kommentar daneben sagt das Gegenteil.
+- 2026-11-04 · 1.10.1 · Prüfung · Server: Ein Abbruch während der Listen- und Detailseiten der Stadtratsbeschlüsse wirkt erst beim Schreiben, weil `ScraperService::ladeHtmlParallel` jede Ausnahme aus `$onComplete` nur protokolliert; bis dahin laufen alle Downloads weiter. Jede weitere Seite schreibt dabei «abgebrochen» und sendet `sync.cancelled`, die nächste wieder `running`, und `admin.php` gibt dazwischen «Jetzt synchronisieren» frei.
+- 2026-11-04 · 1.10.1 · Prüfung · Server: `StadtratsbeschlussService` meldet die Nummer des Beschlusses als Punkt zum Fortsetzen, `SyncCommand` gibt ihn dem Bereich nicht weiter; die Verwaltung meldet «Synchronisation wird fortgesetzt», und der Bereich beginnt von vorn.
+- 2026-11-04 · 1.10.1 · Prüfung · Server: Ein Abbruch im Startfenster eines fortgesetzten Laufs setzt `abbruch_angefragt`, und `SyncCommand::fortsetzungspunkte` liest nur den Stand `queued`; die Punkte zum Fortsetzen gehen verloren.
+- 2026-11-04 · 1.10.1 · Prüfung · Server: `ScraperService` hängt die Listenseiten der Stadtratsbeschlüsse ohne Abgleich der Nummer an; verschiebt ein neuer Beschluss die Liste zwischen zwei Abrufen, steht ein Beschluss doppelt da und zählt in `gelesen` und `aktualisiert` zweimal.
+- 2026-11-04 · 1.10.1 · Prüfung · Server: Die Prüfung der Adresse nach der Weiterleitung beim Abruf der ersten Listenseite der Stadtratsbeschlüsse greift nicht mehr, weil `on_redirect` im Weg über Guzzle vorher wirft; die Verwaltung liest dann «… ist nicht erreichbar (Die Weiterleitung von … verlässt die Quelle.)».
+- 2026-11-04 · 1.10.1 · Prüfung · Server: Die Prüfung jeder Weiterleitung gilt auch für die Parlamentswebseite; leitet sie auf einen anderen Rechner weiter, scheitert der Abruf. Keine Aufnahme zeigt, ob die Parlamentswebseite heute so weiterleitet.
+- 2026-11-04 · 1.10.1 · Prüfung · Server: `RealtimePublisherService` nimmt `IRequest` und `IUserSession` als optionale Parameter mit dem Standardwert `null`, dasselbe Muster wie `SettingsController`.
+- 2026-11-04 · 1.10.1 · Prüfung · Server: `SettingsController` bekommt `SyncCommand` im Konstruktor; jede Anfrage an die Einstellungen baut damit alle Dienste der Synchronisation.
+- 2026-11-04 · 1.10.1 · Prüfung · Sicherheit: `RealtimePublisherService` schickt die Benutzer-ID von Nextcloud des Speichernden mit jedem Ereignis an alle Empfänger (`_uid`); das gehört in eine Prüfung der Sicherheit.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests der Oberfläche: `geschaeft-maske.test.js` setzt den Titel direkt am Objekt und ruft `stammdatenSpeichern()`, `oeffneDetail(7)` und `offeneSitzungen.push` direkt auf, statt das Feld zu bedienen und ✕ zu klicken, und stellt den Spy auf `window.confirm` nicht wieder her.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests der Oberfläche: In `verknuepfen-dialog-grenze.test.js` lässt die Grenze `<= BESTAND.length` ein Neuberechnen bei jedem Tastendruck durch; nach `mockClear` wären 0 Aufrufe richtig.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests der Oberfläche: Der Name «hört auf zu blättern» in `Kommissionsliste.test.js` passt nicht mehr; der Test prüft nur, dass zwei Aufrufe eine Anfrage auslösen.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: `Kommissionsliste.vue` lädt bei jedem `sync.completed` die Kommissionen, ohne Bündeln und ohne Laufnummer.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: Startet in `Stadtratsbeschluesseliste.vue` ein Nachladen im Hintergrund während der ersten Ladung, verwirft die Laufnummer deren Antwort, das `finally` setzt trotzdem `laden=false`, und bis die zweite Antwort kommt, steht «Noch keine Stadtratsbeschlüsse» da.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: Scheitert in `GeschaeftVerknuepfenDialog.vue` die geteilte Liste, steht «Keine Geschäfte gefunden.» da statt einer Fehlermeldung.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: Der Dialog «Mit Geschäft verknüpfen» zeigt die Liste vom Öffnen und folgt späteren Änderungen nicht, und sein Hinweis sagt nicht, dass höchstens 500 Treffer erscheinen.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests der Oberfläche: `e2e-zustand-rechte.test.js` prüft `.claude/design-capture.spec.js`, ein Werkzeug, das nur die AI benutzt.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: `Sitzungsliste.vue` sagt im Kommentar «bei allen Mitlesenden».
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: `axios.post = …` in `vorstoss-notizen-verknuepfung.test.js` wird nicht wiederhergestellt.
+- 2026-11-04 · 1.10.1 · Prüfung · Testlauf: `abbrechen()` entfernt nur die Container der Tests; die Warteschlange signalisiert die ganze Prozessgruppe, ein SIGTERM nur an node lässt dagegen `run-all.sh`, die Container von PHPUnit und `run-compose-e2e.sh --nur` weiterlaufen.
+- 2026-11-04 · 1.10.1 · Prüfung · Testlauf: `-t` in `tests/regression.mjs` nimmt nur den letzten Teil des Namens eines vitest-Falls; gleichnamige Fälle derselben Datei laufen mit.
+- 2026-11-04 · 1.10.1 · Prüfung · Testlauf: Der Kommentar in `.claude/design-capture.spec.js` sagt, die Datei gehöre nicht in die Suite; `tests/regression/stack.mjs` führt sie als `bild:aufnahme` im Inventar aus.
+- 2026-11-04 · 1.10.1 · Prüfung · E2E-Tests: «Ein Haken von `page.route`» in `admin-sync-echtzeit.spec.js` und «in dieser Session» in `sitzungen-sitzungstypen.spec.js`.
+- 2026-11-04 · 1.10.1 · Prüfung · Vorlagen der Umgebungsvariablen: In `.env.sample` sind die Kommentare zu `PARLWIN_REALTIME_WS_URL` und zu `PARLWIN_SYNC_LIMIT_*` unklar.
+- 2026-11-04 · 1.10.1 · Design-Test · Design: Die Seitenleiste ist als Schublade durchsichtig. Bei schmalem Fenster und am Telefon steht der Inhalt der Budgetansicht lesbar unter den Einträgen der Navigation («Kommissionen» auf «Stadtratsbudget», die Knöpfe oben in der Leiste auf «Budget neu einlesen»). Vor der Korrektur «Dateien» bei derselben Breite vergleichen: Sieht es dort gleich aus, liegt die Ursache im CSS von Nextcloud.
+- 2026-11-04 · 1.10.1 · Design-Test · Design: Bei niedrigem Fenster deckt der Filterbereich die Navigation zu. Das Feld «Budgetjahr» liegt über den unteren Einträgen, seine Beschriftung fehlt, die geöffnete Liste wird am Fensterrand abgeschnitten, und die Versionsanzeige «v1.10.0» liegt über den Filtern.
+- 2026-11-04 · 1.10.1 · Design-Test · Design: Die Summenzeile des Budgets zeigt bei niedrigem Bildschirm und im Druck auf A4 quer und A5 nur die Zeile «Differenz». Die Spaltenköpfe, «Stadtratsbudget» und «Fraktionsbudget» liegen unter der Titelzeile oder fehlen (F79).
+- 2026-11-04 · 1.10.1 · Design-Test · Design: In der Grafik des Budgets überlagern sich die Beschriftungen der Kreise («Schule und Sport» und «Sicherheit und Umwelt» auf «Finanzen», «Präsidiales» auf «Soziales»), kleine Beschriftungen sind nicht lesbar, Kreise am oberen Rand sind flach abgeschnitten, und die Summe der Einnahmen stösst an das Wort «Ausgaben». Das gilt am Bildschirm und im Druck.
+- 2026-11-04 · 1.10.1 · Design-Test · Druck: Der Druck enthält Bedienelemente, im Budget die Schalter, die Aufklapper der Notizen und der Verpflichtungskredite, je Antrag das ganze Formular, bei den Geschäften in Kartenform das Feld «Priorität».
+- 2026-11-04 · 1.10.1 · Design-Test · Druck: Auf A3 und A4 quer stehen die Geschäfte zweimal da, zuerst als Tabelle und danach als Karten.
+- 2026-11-04 · 1.10.1 · Design-Test · Druck: Seitenumbrüche trennen, was zusammengehört. Der Titel einer Grafik steht am Ende einer Seite und die Grafik auf der nächsten, Kreise sind halbiert, Anträge, Mitgliederkarten und Begründungsfelder laufen über zwei Seiten, und es entstehen leere oder fast leere Seiten (Kommissionen auf Letter und A5 mit nur dem Titel auf S. 1).
+- 2026-11-04 · 1.10.1 · Design-Test · Design: Das Antragsformular ist gequetscht. Es steht in einer Kartenspalte von etwa 350px (auf 21:9 und UHD etwa ein Sechstel der Breite), die Werkzeugleiste der Begründung bricht in drei bis vier Reihen um, und daneben bleiben etwa 800px × 800px leer.
+- 2026-11-04 · 1.10.1 · Design-Test · Design: Im Antragsformular ist der Name des Antragstellers gekürzt, in `desktop-16-10` und FHD steht «Review», in `desktop-16-9` und Third «D·Review» statt «Design Review».
+- 2026-11-04 · 1.10.1 · Design-Test · Design: Projekttitel in der Investitionsrechnung enden mit «…», am Bildschirm und im Druck, etwa «5001250 QA Gutschick-Mattenbach Gebäude B, C,D Ersatzbau+Instandset…» und «5018820 MDM Infrastruktur und Services für den Betrieb von privaten Mob…»; der Schnitt liegt in allen Formaten an derselben Stelle.
+- 2026-11-04 · 1.10.1 · Design-Test · Design: Bei einem einzigen Antrag heisst der Tab «1 Anträge» statt «1 Antrag» (`desktop-4-3--budget-grafik`, `desktop-4-3--budget-stellen`).
+- 2026-11-04 · 1.10.1 · Design-Test · Design: Die Knöpfe ☰ und ⛶ oben links liegen im Antragsformular auf Text («Differenz», am Telefon auf der Begründung, deren oberste Zeile an der Kopfleiste abgeschnitten ist), und die Kopfleiste von Nextcloud ist dort ein blaues Band ohne Logo, Suche und Benutzerbild, weil die ganze Seite mitgescrollt ist.
+- 2026-11-04 · 1.10.1 · Design-Test · Design: Die Titelspalte der Tabelle der Geschäfte ist gequetscht (22 bis 35 Zeichen je Zeile, «Festset-zung», «Hugento-bler», «Wür-zer»), daneben ist «Beschluss» etwa 180px breit und leer; dazu der Befund vom 2026-10-24 unter «Befunde aus dem Design-Test».
+- 2026-11-04 · 1.10.1 · Design-Test · Design: Der Knopf ▼ der amtlichen Dokumente in der Tabelle der Geschäfte trägt keine Beschriftung, steht teils hinter dem Titel, teils auf eigener Zeile, und macht die Zeile höher; in der Karte heisst dieselbe Funktion «▼ Amtliche Dokumente (5)».
+- 2026-11-04 · 1.10.1 · Design-Test · Design: In der Karte eines Geschäfts steht der Status links unter dem Titel; FEATURES («Kartendarstellung», Punkt 3) verlangt ihn rechts in der Kopfzeile.
+- 2026-11-04 · 1.10.1 · Design-Test · Design: Die Pfeile «↗» sind am Telefon und in `tablet-portrait` etwa 10px gross und ohne grössere Fläche zum Antippen (Geschäfte, Kommissionen, Stadtratsbeschlüsse).
+- 2026-11-04 · 1.10.1 · Design-Test · Design: Im Tab «Anträge» bekommt die Begründung im Format Third etwa 90px und bricht Wort für Wort auf sechs Zeilen um, links davon bleibt zwischen «Personalamt (121), Buch S. 5» und dem Betrag eine breite leere Fläche.
+- 2026-11-04 · 1.10.1 · Design-Test · Design: Die entscheidenden Beträge im Budget sind blass: Die Werte von «Differenz» und «Ertrag» in der Summenzeile, die Antragsbeträge in Blassrosa und die Differenzen im Personalbestand («+2.65») sind heller als der graue Begleittext, am Bildschirm und im Druck (nach Augenmass, nicht gemessen).
+- 2026-11-04 · 1.10.1 · Design-Test · Testdaten der Bilder: Alle zwölf Stadtratsbeschlüsse tragen dasselbe Departement «Stadtkanzlei» und dieselben zwei Dokumente, weil `parlwin/tests/Fixtures/html/stadtratsbeschluss-detail-20261279.html` die einzige Detailseite ist. Der Filter «Departement» hat darum nur einen Wert.
+- 2026-11-04 · 1.10.1 · Design-Test · Testdaten der Bilder: Es gibt nur 10 Geschäfte, vier davon mit der Nummer 2026.95. Die Grenze von 500 Zeilen (F150) und eine lange Liste zeigt kein Bild.
+- 2026-11-04 · 1.10.1 · Design-Test · Testdaten der Bilder: Es gibt keine inaktive Kommission. Dass der Knopf «Neues Geschäft» an einer inaktiven Kommission fehlt (F141), zeigt kein Bild.
+- 2026-11-04 · 1.10.1 · Design-Test · Testdaten der Bilder: Es gibt keine Vorstösse. Bilder und Druck zeigen nur den leeren Zustand.
+- 2026-11-04 · 1.10.1 · Design-Test · Testdaten der Bilder: Die Anträge häufen sich von Format zu Format an (3 in `desktop-4-3`, 13 in `full-hd-half`, 35 in der Filterliste), derselbe Antrag steht mehrfach da, und die Summenzeile trägt in jedem Format andere Werte. Die Bilder eines Laufs lassen sich so nicht vergleichen.
+- 2026-11-04 · 1.10.1 · Design-Test · Testdaten der Bilder: Jedes Mitglied steht in derselben Fraktion, gleich welcher Partei es angehört, jedes sitzt in allen sechs Kommissionen, und eine Person präsidiert alle sechs.
+- 2026-11-04 · 1.10.1 · Design-Test · Testdaten der Bilder: Die Filterliste bietet nur das Budgetjahr «2026» an, die Bilder «geladen» und «spaet» sind gleich (bei `full-hd` byte-gleich), und keine Aufnahme zeigt eine Liste, die scrollt.
+- 2026-11-04 · 1.10.1 · Design-Test · Testdaten der Bilder: Das Investitionsprojekt 5001750 hat keine Kredite, darum zeigt kein Bild die Tabelle der Kredite je Konto (F87).
+- 2026-11-04 · 1.10.1 · Design-Test · Testdaten der Bilder: Am Telefon sind die Zustände «Antragsform» und «Antragsform mit Zielvorgaben» dasselbe Bild.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, ARCHITECTURE: «am Rand» in 5.2 ist ein Bild.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, ARCHITECTURE: `<Version>` steht in 7.3 für die Version des Projekts und für die von Nextcloud.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, ARCHITECTURE: Doppelt gesagt sind Stellen in 4 und 8.3, in 2 und 8.2 sowie in 4 und 9.2.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, ARCHITECTURE: In 1.2 steht in der Spalte «Funktion» eine Testdatei, und ihre erste Zelle ist nicht verlinkt.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, ARCHITECTURE: In 10.1 bleibt die Testspalte allgemein.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, ARCHITECTURE: In 3.2 steht ein Produktname («MySQL-Protokoll»).
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, ARCHITECTURE: 11.2 «baut … über ihre eigenen Build-Regeln» ist von hier nicht prüfbar.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, FEATURES: Doppelt gesagt sind die Regel der Kappung (sie gehört einmal in F112), ein Satz zum Löschen, wörtlich zweimal in den ersten Funktionen, und mehrere Absätze im zweiten Teil, darunter die Erklärung der Kürzel und ein Abschnitt der Verwaltung.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, FEATURES: «Notizliste» und «Notiz-Komponente» stehen neben «Notizenliste».
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, FEATURES: «Globale Kürzungsanträge» steht neben «Pauschalantrag».
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, FEATURES: «Bereich» steht neben «Abschnitt».
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, FEATURES: «Weg» steht neben «Pfad».
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, FEATURES: «Vorstossmaske», «Bearbeitungsmaske» und «Fenster» stehen für die Maske.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, FEATURES: «Hinweistext» steht für den Tooltip und für sichtbaren Text.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, FEATURES: «Vorlese-Bezeichnung» steht neben «Beschriftung für Hilfstechnologien».
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, FEATURES: «Abgleich» steht neben «Synchronisation».
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, FEATURES: «Pfadangabe» steht neben «Pfadhinweis».
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, FEATURES: «Ladehinweis» steht neben «Ladeanzeige».
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, FEATURES: «Link» steht neben «Verweis».
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, FEATURES: Unklare oder erfundene Wörter und Sätze: «Beide Zahlen» nach drei Grössen, «alle Jahre auf einmal hielten …», «kann … nur die Beschlüsse holen», eine doppelte Ortsangabe, «Quellkarten» (das Fachwort ist «Source Maps»), «Laufsperre», «Fundart», «Datenbereich», «Bezugselement», «Zeilenaktion», «Stellvertretung» als Person statt der Rolle «Protokollführer Stellvertretung», Guillemets in Guillemets, «=» im Fliesstext, gemischte Einheiten MB und MiB, Füllwörter.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, FEATURES: Die Verweise auf die README-Abschnitte «Variablen für den Speicher» und «Automatischer E2E-Test» treffen deren Wortlaut nicht, die Liste der Tabs lässt «Grafik» aus, und `syncMeldung` wird im Code nie gesetzt.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, TESTS: Die Einträge zu `tests/e2e/run-compose-e2e.sh` nennen weder die Kennung `int:<Abschnitt>` noch die Namen, die im Skript stehen; mehrere Einträge fassen mehrere Tests zusammen; viele Einträge umschreiben den Test statt seinen Namen zu nennen; «Startfenster» ist erfunden; «npnp» wird nie erklärt und steht neben «Doppelprüfung»; die Trenner zwischen Name und Beschreibung sind gemischt; die Einleitung ist zu dicht; einige Einträge erzählen die Vorgeschichte.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, TESTS: Doppelt gesagt sind zwei Einträge zu den Notizen; `BudgetBuchParserTocTest` und `BudgetSpeichergrenzeTest` stehen bei den PDF-Tests, gehören aber nicht dazu; «Endpoint» steht neben «Endpunkt»; die Kennung «Druck» ist keine F-Nummer, und FEATURES führt keinen Druck.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, TESTS: Es fehlen Einträge für die Prüfung von `iconv("macintosh")` in `tests/image-contract.sh`, `BudgetExcelExportTest::testEineKommissionMitWegangabeVerlaesstDenOrdnerNicht`, `GeschaeftDokumentServiceTest::testEineLangeFehlermeldungPasstInIhreSpalte`, zwei Fälle in `XlsxDateiTest` und `BudgetPauschalTest::testNurEinAbsolutesZiel`.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests: Für den zweiten Pauschalantrag eines Budgetjahres (F100, Migration V59 entfernt den eindeutigen Index auf dem Jahr) gibt es keinen Test. Der Eintrag stand in TESTS.md ohne Test dahinter.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests: Für eine Tranche, die nicht zusätzlich zu ihrem Rahmenkredit zählt (F87, Buch 2022, 11334 und 11633), gibt es keinen Test. Der Eintrag stand in TESTS.md ohne Test dahinter.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, CHANGELOG: Der Eintrag zu den PHP-Bibliotheken stellt «nicht mehr …, sondern …» gegenüber.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, CHANGELOG: Die Einträge zur Sicherheit der npm-Pakete tragen Datei- und Paketnamen, und der eine wiederholt den anderen.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, CHANGELOG: Der Ausfall vom 2026-11-03 steht in zwei Einträgen.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, CHANGELOG: «Personalkarte» ist erfunden.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, CHANGELOG: «Griffe» steht neben «linker Knopf».
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, CHANGELOG: «Eintrag» hat zwei Bedeutungen.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, CHANGELOG: Der Port 29824 steht da, als wäre er fest; er ist nur der Standard.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, CHANGELOG: «Drei Ursachen:» zählt vor der Liste.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, CHANGELOG: «5,5 Prozent» weicht von «5,5%» ab.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, README: Gegenüberstellungen «…, sondern …».
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, README: Absätze sind doppelt gesagt.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, README: «drei Kalender:» zählt vor der Liste.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, README: Vor Listen stehen blosse Etiketten.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, README: Ein Satz ist Füllsatz.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, README: «Administration» steht neben «Einstellungen» für dieselbe Stelle.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, README: Das Board trägt mehrere Namen.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, README: Die Liste der Ereignisse ist unvollständig.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, README: Die Option `--bild` fehlt.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, README: Ein Beispiel steht als Standard da.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, README: Einige Befehle stehen nur im Text statt in einem Codeblock.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, CONTRIBUTING: Im Abschnitt der Berechtigungen steht ein schwer lesbarer Satz.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, CONTRIBUTING: «Protokoll» steht für das Log von Nextcloud.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, CONTRIBUTING: «Echtzeit» steht neben «Verteiler».
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, CONTRIBUTING: Ein Komma fehlt.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, CONTRIBUTING: Das ausgelieferte Image trägt zwei Namen.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, CONTRIBUTING: «Entfernungsbedingung» ist erfunden.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, CONTRIBUTING: «Version» steht neben «Fassung».
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, CONTRIBUTING: Der Satz über `npm run lint` steht im Abschnitt der Sicherheit.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, CONTRIBUTING: Die Regel für `ALLEIN` deckt `geschaefte-nachladen.spec.js` nicht ab, das ein synchronisiertes Geschäft ändert.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, CONTRIBUTING: Die Liste der Hauptansichten nennt den Änderungsverlauf, der keine Suche trägt.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, info.xml: Der Screenshot zeigt auf den Zweig `main`, den es auf origin nicht gibt, und `screenshots/` ist nicht im Repository; der Verweis ist tot. «Funktionen:» ist ein blosses Etikett.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, Vorlagen der Umgebungsvariablen: «Zu setzen nur, wenn …» ist kein ganzer Satz, die beiden Vorlagen beschreiben `BIND_ADDRESS` verschieden, und `example/.env.sample` mischt MB und MiB im selben Satz.
+- 2026-11-04 · 1.10.1 · Prüfung · Dokumente, README der Fixtures: Die Einleitung nennt «Stadtratsbeschlüsse», die Überschrift «Stadtwebseite»; «sind … heruntergeladen» gehört ins Präteritum.
+- 2026-11-04 · 1.10.1 · Prüfung · Server: `VorstossController::dokumente` sucht die Dokumente eines Vorstosses mit dem Präfix `V‹id›` direkt in `10_Eigene` oder `20_Fremde`, `ablageOrdner` legt neue Dokumente ohne Präfix im Unterordner des Erstellungsjahres ab.
+- 2026-11-04 · 1.10.1 · Prüfung · Server: Eine gescheiterte automatische Zuweisung der Zuständigen zählt `SyncCommand::zaehleStatistik` nicht als Fehler, und das Protokoll meldet einen Erfolg.
+- 2026-11-04 · 1.10.1 · Prüfung · Server: Ein abgebrochener Lauf der Synchronisation schreibt keinen Eintrag ins Protokoll (`SyncCommand`, auch im Ausweichweg).
+- 2026-11-04 · 1.10.1 · Prüfung · Server: `SettingsController` nimmt `IUserSession` nur für die Tests als optionalen Parameter; fehlt der Dienst, verliert das Protokoll den Auslöser ohne Meldung.
+- 2026-11-04 · 1.10.1 · Prüfung · Server: Die Anfrage «Synchronisierung abbrechen» antwortet einmal mit 200 und einmal mit 202, beide Male mit `abbruch_angefragt`.
+- 2026-11-04 · 1.10.1 · Prüfung · Server: Die Endpunkte der Notizen antworten auf eine unbekannte Notiz verschieden (Stadtratsbeschlüsse 404, Vorstösse 400), und jeder Endpunkt der Stadtratsbeschlüsse sucht den Beschluss zweimal.
+- 2026-11-04 · 1.10.1 · Prüfung · Server: Die Grenze von 500 steht dreimal als Zahl bei den Stadtratsbeschlüssen (`GRENZE`, `alle()`, `findAll()`), und Kommentare nennen Zahlen der Quelle, die veralten («3160 Beschlüsse auf 264 Seiten»).
+- 2026-11-04 · 1.10.1 · Prüfung · Server: `GeschaeftDokumentService` gibt bei einem fehlenden oder fremden Dokument `null` zurück statt eine Ausnahme zu werfen.
+- 2026-11-04 · 1.10.1 · Prüfung · Server: Die geänderten IDs nach einem Abgleich halten `RealtimePublisherService`, `GeschaeftService` und `FraktionsarbeitService` als Zustand; einfacher gibt die Statistik sie zurück.
+- 2026-11-04 · 1.10.1 · Prüfung · Server: `SettingsController::isCancelRequested` ruft im Betrieb keine Stelle mehr auf, nur noch ein Test über Reflection.
+- 2026-11-04 · 1.10.1 · Prüfung · Server: `ScraperService::kamVonDerStadt` ist seit der Prüfung jeder Weiterleitung eine zweite Prüfung, die kein Test rot machen kann.
+- 2026-11-04 · 1.10.1 · Prüfung · Server: In `GeschaeftController` nennt ein Kommentar einen Wert aus einer anderen Datei («Blöcke von 200»), und der Zweig mit `ids` geht direkt an den Mapper, der andere an den Service.
+- 2026-11-04 · 1.10.1 · Prüfung · Server: In `budget_antraege_pdf.php` fehlt `array_values` in einer Schleife, vor «—» steht ein gewöhnliches Leerzeichen, und bei einem Betrag von 0 erscheinen die Zielwerte in keiner Spalte.
+- 2026-11-04 · 1.10.1 · Prüfung · Sicherheit: Ohne `BIND_ADDRESS` erscheint der Entwicklungs-Stack mit dem Admin-Login auf allen Adressen des Rechners, IPv4 und IPv6.
+- 2026-11-04 · 1.10.1 · Prüfung · Sicherheit: `StadtratsbeschlussController` begrenzt `limit` nicht nach oben.
+- 2026-11-04 · 1.10.1 · Prüfung · Sicherheit: `tests/e2e/run-compose-e2e.sh` übergibt Testkennwörter und App-Token auf der Befehlszeile (`-p${NEXTCLOUD_DB_PASSWORD}`, `OC_PASS=`, `WOPI_PASS=`, `DAV_PASS=`, `HX_TOK=`, ein Token als Argument von `php -r`).
+- 2026-11-04 · 1.10.1 · Prüfung · Sicherheit: Die Testkennwörter stehen dreimal in `tests/e2e/run-compose-e2e.sh`.
+- 2026-11-04 · 1.10.1 · Prüfung · Sicherheit: `docker-compose.yml` und `example/docker-compose.yml` setzen `cap_add: MKNOD` ohne `HOST-RIGHTS-DECISION`; `.github/workflows/docker.yml` gibt `contents: write` allen Jobs des wiederverwendeten Workflows, gebraucht wird es nur von `versions`.
+- 2026-11-04 · 1.10.1 · Prüfung · Git-Geschichte: Die Geschichte auf GitHub enthält Partei- und Fraktionsnamen in einem Platzhalter, in einem weiteren Text und in 12 Testdateien, dazu einen Personennamen; sie zu entfernen hiesse, die Geschichte umzuschreiben.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: Die Ansicht «Geschäfte» nennt als Zahl die gezeichneten Zeilen, höchstens 500, und sagt nicht, dass es mehr Treffer gibt; die Sortierung reicht nur über die 500 neuesten Treffer.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: Kommt zwischen zwei Seiten der geteilten Liste ein Geschäft dazu, liefert das Blättern es doppelt, und Vue bekommt doppelte Schlüssel (`geschaefte-bestand.js`, `listeAbgleichen`).
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: Scheitert die erste Ladung der geteilten Liste, zeigt keine Ansicht `zustand.fehler`, nur «Keine Geschäfte gefunden», und Ereignisse laden danach nichts mehr.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: Die Option `eigeneUeberspringen` in `nachladen.js` nutzt keine Ansicht, und `BUENDEL_MS` ist gesetzt und nicht gemessen.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: Anfragen ohne Laufnummer, bei denen eine ältere Antwort eine neuere überschreibt: die Dokumentsuche der Geschäfte, das Nachladen der Traktanden im Hintergrund, `ladeKommissionen` und `ladeAnsicht` des Budgets.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: Wird eine Sitzung während des Nachladens ihrer Traktanden zugeklappt und verworfen, ruft `ladeTraktandenFuerSitzung` danach `listeAbgleichen(undefined, …)` auf, und es kommt zu einem TypeError.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: Ein erledigtes eigenes Geschäft mit gesetzter Kommission steht in der Kommission unter «Pendente Geschäfte».
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche, Budget: `ladeTimer` fehlt in `beforeUnmount`.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche, Budget: Der Kopf der Karte steht doppelt im Code.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche, Budget: «Buch S.» steht mit gewöhnlichem Leerzeichen.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche, Budget: `Budgetliste.vue` trägt `px` und `!important`.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: Kommentare mit «Marc», Auftrag oder Vorgeschichte in `Budgetliste.vue`, `BudgetGrafik.vue`, `style.scss` (dort auch ein Personenname) und in den Budget-Tests.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: `App.vue` sagt dreimal dasselbe zum Vollbild.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: `vollbildKnopfZeigen` in `App.vue` gibt nur noch `vollbildVerfuegbar` zurück.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: `Stadtratsbeschluesseliste.vue` übernimmt von den übrigen Ansichten `NcLoadingIcon :size="32"` und ▲▼↗ als Zeichen; das gehört in allen Ansichten behoben.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: `Sitzungsliste.vue` führt `verknuepfteVorstossIds` und `vorstoesseAlle` doppelt in `data()`.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: `style.scss` trägt rund 70 Klassen ohne Benutzer.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: `style.scss` trägt doppelte Selektoren mit widersprüchlichen Werten.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: `style.scss` trägt `px` an 11 Stellen.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: `style.scss` trägt `black` als Literal.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: `vitest.config.js` beschreibt im Kommentar einen einzelnen Rechner.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: `maxWorkers: 2` in `vitest.config.js` gilt auch für den Runner.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: `webpack.js` trägt Versionsgeschichte im Kommentar und eine veraltete Grösse.
+- 2026-11-04 · 1.10.1 · Prüfung · Oberfläche: `setup.js` verschluckt mit `console.warn = vi.fn()` auch «Failed to resolve component».
+- 2026-11-04 · 1.10.1 · Prüfung · Tests der Oberfläche: Die Attrappe `ladeGeschaefte` in `Kommissionsliste.test.js` ist tot.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests der Oberfläche: `kommission-neues-geschaeft.test.js` ruft `schliesseDetail()` direkt auf.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests der Oberfläche: `kommission-neues-geschaeft.test.js` prüft weder `@abbrechen` noch den Klick neben die Maske.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests der Oberfläche: Für das Nachladen der Stadtratsbeschlüsse nach einem Ereignis und für ihren Ladefehler fehlt ein Test.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests der Oberfläche: `geschaeftsliste-filter.test.js` wartet mit `setTimeout` statt mit Fake-Timern.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests der Oberfläche: `stadtratsbeschluesse.test.js` prüft den Quelltext statt des Verhaltens.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests der Oberfläche: `container-aufraeumen.test.js` prüft den Quelltext statt des Verhaltens.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests der Oberfläche: `compose-images.test.js` prüft den Quelltext statt des Verhaltens.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests der Oberfläche: `einrichtungsuebersicht-internet.test.js` prüft den Quelltext statt des Verhaltens, mit einer von Hand geschriebenen Ausgabe von jq.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests der Oberfläche: `budget-detail-knopf.test.js` prüft den Quelltext statt des Verhaltens.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests der Oberfläche: `antrag-begruendung-formatiert.test.js` prüft den Quelltext statt des Verhaltens.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests der Oberfläche: `budget-excel-export.test.js` prüft den Quelltext statt des Verhaltens.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests der Oberfläche: `budget-flacher-schirm.test.js` prüft den Quelltext statt des Verhaltens.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests der Oberfläche: `design-scan-ergebnis.test.js` prüft ein Werkzeug, das nur die AI benutzt.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests der Oberfläche: `abhaengigkeiten-sicherheit.test.js` verlangt dauerhaft `overrides`.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests der Oberfläche: `regression-freigabe.test.js` wartet in `vi.waitFor` ohne Grenze.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests der Oberfläche: Mocks und `matchMedia` werden nicht zurückgesetzt.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests der Oberfläche: Die Budget-Komponenten werden nie abgehängt.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests der Oberfläche: `WURZEL`, das gefälschte `docker` und die Sicherung der Umgebung stehen mehrfach.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests der Oberfläche: Ein Titel in `vorstoss-uebersicht.test.js` sieht wie ein interner Dateiname der Fraktion aus.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests des Servers: `Fakes/AufzeichnendeDatenbank.php` hält acht Klassen in einer Datei.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests des Servers: `Fakes/AufzeichnendeDatenbank.php` vergleicht lose mit `==`.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests des Servers: `Fakes/AufzeichnendeDatenbank.php` zeichnet `executeStatement` nicht auf.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests des Servers: `bootstrap.php` führt in `findEntity` die Abfrage nicht aus.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests des Servers: `putenv('PARLWIN_STADT_BASE_URL')` stellt den vorigen Wert nicht wieder her.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests des Servers: Die Adresse der Stadtratsbeschlüsse ist fest verdrahtet.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests des Servers: Kein Test prüft genau 500 IDs.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests des Servers: `blockgroessen()` steht zweimal da.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests des Servers: Name und Kommentar von `NotizGeteilterCodeTest` decken die Stadtratsbeschlüsse nicht ab.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests des Servers: Der Testserver in `StadtratsbeschluesseAdressenTest` lauscht auf `0.0.0.0`.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests des Servers: `new SettingsController(` steht zwölfmal mit 17 Argumenten.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests des Servers: `ZielvorgabenMessungTest` ist von Hand umbrochen.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests des Servers: `BudgetSteuerbarkeitTest` nennt «zwölf Zeilen» bei 17 Einträgen.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests des Servers: `BudgetNeuEinlesenTest` misst eine Konstante.
+- 2026-11-04 · 1.10.1 · Prüfung · Tests des Servers: Kein Test liest ein Jahr mit vorhandenen Anträgen neu ein.
+- 2026-11-04 · 1.10.1 · Prüfung · Testlauf: Das Ziel `/tmp/parlwin-design` steht zweimal als absoluter Pfad, ist dasselbe wie in `.claude/design-scan.sh`, und `bild()` löscht dessen `out` mit; ob `docker cp` der Auswahl gelingt, prüft `stack.mjs` nicht.
+- 2026-11-04 · 1.10.1 · Prüfung · Testlauf: Die Sperre in `tests/regression/journal.mjs` wird zuerst geprüft und danach geschrieben, nicht in einem Schritt; zwei gleichzeitige Starts erhalten beide die Sperre (Vorschlag aus der Prüfung: `fs.openSync(SPERRE, 'wx')`).
+- 2026-11-04 · 1.10.1 · Prüfung · Testlauf: Die Gruppe `lint` läuft in keinem vollen Lauf.
+- 2026-11-04 · 1.10.1 · Prüfung · Testlauf: `tests/quelle-contract.sh` prüft die drei neuen Wege aus `docker/quelle/locations.conf` nicht, obwohl der Kopf sagt «Geprüft wird jeder Weg».
+- 2026-11-04 · 1.10.1 · Prüfung · Testlauf: Ein TERM nur an bash lässt in `tests/php-suite.sh` PHPUnit zu Ende laufen.
+- 2026-11-04 · 1.10.1 · Prüfung · Testlauf: Der Kommentar in `tests/vendor-aktualisieren.sh` («Die Tests laufen auf dem Rechner») ist veraltet.
+- 2026-11-04 · 1.10.1 · Prüfung · Testlauf: Der Kommentar in `.gitignore` («lokal via `composer install`») ist veraltet.
+- 2026-11-04 · 1.10.1 · Prüfung · Testlauf: Der Kommentar in `docker-compose.yml` (Auto-Builds ohne `target:`) ist veraltet.
+- 2026-11-04 · 1.10.1 · Prüfung · Testlauf: `tests/run-all.sh` erzählt im Kommentar die Vorgeschichte.
+- 2026-11-04 · 1.10.1 · Prüfung · Testlauf: `tests/e2e/playwright.config.js` sagt «Ein Worker je Browser»; `workers` gilt für den ganzen Lauf.
+- 2026-11-04 · 1.10.1 · Prüfung · Testlauf: `npm install` läuft in `Dockerfile.php-fpm` ohne Cache-Mount von BuildKit.
+- 2026-11-04 · 1.10.1 · Prüfung · Testlauf: In `.claude/design-scan.sh` stehen Kennwörter als `-e NAME=wert`, die Variable `SCANNER` mit `${HOME}/git/…` wird nirgends gebraucht, und der Scanner läuft mit `--network host`.
+- 2026-11-04 · 1.10.1 · Prüfung · E2E-Tests: Feste Wartezeiten in `budget-datenfluss.spec.js`.
+- 2026-11-04 · 1.10.1 · Prüfung · E2E-Tests: Feste Wartezeiten in `feld-inventar-verwaltung-und-bausteine.spec.js`.
+- 2026-11-04 · 1.10.1 · Prüfung · E2E-Tests: Feste Wartezeiten in `admin-sync-echtzeit.spec.js`.
+- 2026-11-04 · 1.10.1 · Prüfung · E2E-Tests: Feste Wartezeiten in `geschaefte-datenfluss.spec.js`, an zehn Stellen.
+- 2026-11-04 · 1.10.1 · Prüfung · E2E-Tests: Feste Wartezeiten in `mitglieder-kommissionen.spec.js`.
+- 2026-11-04 · 1.10.1 · Prüfung · E2E-Tests: Feste Wartezeiten in `multi-user-sharing.spec.js` (3000ms).
+- 2026-11-04 · 1.10.1 · Prüfung · E2E-Tests: Feste Wartezeiten in `vorstoss-datenfluss.spec.js`.
+- 2026-11-04 · 1.10.1 · Prüfung · E2E-Tests: Feste Wartezeiten in `vorstoesse-vollstaendig.spec.js`.
+- 2026-11-04 · 1.10.1 · Prüfung · E2E-Tests: Feste Wartezeiten in `restliche-features-e2e.spec.js`.
+- 2026-11-04 · 1.10.1 · Prüfung · E2E-Tests: Feste Wartezeiten in `sitzungen-sitzungstypen.spec.js`.
+- 2026-11-04 · 1.10.1 · Prüfung · E2E-Tests: Feste Wartezeiten in `navigation-kuerzel-layout.spec.js`.
+- 2026-11-04 · 1.10.1 · Prüfung · E2E-Tests: `admin-sync-echtzeit.spec.js` prüft zu schwach, weil es den alten Wert wieder einfüllt.
+- 2026-11-04 · 1.10.1 · Prüfung · E2E-Tests: `feld-inventar-filter-und-dialoge.spec.js` prüft zu schwach (`toBeGreaterThanOrEqual`).
+- 2026-11-04 · 1.10.1 · Prüfung · E2E-Tests: `navigation-kuerzel-layout.spec.js` prüft zu schwach (`try/catch` und «(siehe Auftrag)»).
+- 2026-11-04 · 1.10.1 · Prüfung · E2E-Tests: `geschaefte-nachladen.spec.js` prüft zu schwach: Bei gleichem Datum kann das Ziel unter den ersten 500 stehen.
+- 2026-11-04 · 1.10.1 · Prüfung · E2E-Tests: `handy-bedienung.spec.js` prüft zu schwach, weil es Einträge mit `continue` überspringt.
+- 2026-11-04 · 1.10.1 · Prüfung · E2E-Tests: `sitzungen-sitzungstypen.spec.js` testet auf Abwesenheit.
+- 2026-11-04 · 1.10.1 · Prüfung · E2E-Tests: `budget-datenfluss.spec.js` räumt nicht vollständig auf, weil das `try` zu spät beginnt.
+- 2026-11-04 · 1.10.1 · Prüfung · E2E-Tests: `multi-user-sharing.spec.js` räumt das Kürzel nicht auf.
+- 2026-11-04 · 1.10.1 · Prüfung · E2E-Tests: `vorstoesse-vollstaendig.spec.js` räumt die Priorität nicht auf.
+- 2026-11-04 · 1.10.1 · Prüfung · E2E-Tests: `stadtratsbeschluesse.spec.js` räumt die Notiz nicht auf.
+- 2026-11-04 · 1.10.1 · Prüfung · E2E-Tests: `sitzungen-sitzungstypen.spec.js` räumt den Sitzungstyp nicht auf.
+- 2026-11-04 · 1.10.1 · Prüfung · E2E-Tests: `fragestunde.spec.js` entfernt nichts.
+- 2026-11-04 · 1.10.1 · Prüfung · E2E-Tests: `layout-consistency.spec.js` prüft 7 von 12 Ansichten.
+- 2026-11-04 · 1.10.1 · Prüfung · E2E-Tests: Helfer stehen doppelt in `admin-sync-echtzeit.spec.js`, `feld-inventar-verwaltung-und-bausteine.spec.js` und `geschaefte-nachladen.spec.js`.
+- 2026-11-04 · 1.10.1 · Prüfung · E2E-Tests: `JAHR = 2026` und `500` stehen fest an mehreren Stellen.
+- 2026-11-04 · 1.10.1 · Prüfung · E2E-Tests: «Default», «Toggle» und englische Kommentare.
+- 2026-11-04 · 1.10.1 · Prüfung · E2E-Tests: Personenbezeichnungen in `neu-dialoge-vollstaendig.spec.js` und `restliche-features-e2e.spec.js`.
+- 2026-11-04 · 1.10.1 · Design-Test · Nextcloud: Im Format `desktop-21-9-third` läuft der Platzhalter «Apps, Dateien, Nachrichten und mehr» der Kopfzeile in «Strg» hinein. Das gehört zu Nextcloud selbst.
+- 2026-11-04 · 1.10.1 · Design-Test · Bildschirm, Filter in der Seitenleiste: Bei hohem Fenster (`full-hd`, `desktop-16-10`, `desktop-16-9`) stehen die Filter ganz unten in der Seitenleiste, bis zu 300px unter der Navigation; bei `hd` direkt darunter.
+- 2026-11-04 · 1.10.1 · Design-Test · Bildschirm, Kartenraster: Die Karten einer Reihe sind gleich hoch, darum bleibt unter kürzeren Karten Fläche leer (Kommissionen bis etwa 280px, Stadtratsbeschlüsse, Mitglieder, Investitionsrechnung, Personalbestand).
+- 2026-11-04 · 1.10.1 · Design-Test · Bildschirm, Kartenraster: Im zweispaltigen Raster und am Telefon quer bleibt die rechte Hälfte leer.
+- 2026-11-04 · 1.10.1 · Design-Test · Bildschirm, Kartenraster: Beim Personalbestand auf UHD haben die Karten je Departement andere Breiten.
+- 2026-11-04 · 1.10.1 · Design-Test · Bildschirm und Druck, Ansichtstitel: Bei offener Seitenleiste steht der Titel einer Ansicht etwa 40px rechts der Kartenkante (`full-hd` bei x 366 statt 325), im Druck bei etwa 92px gegen 45px des Inhalts, in allen Ansichten.
+- 2026-11-04 · 1.10.1 · Design-Test · Karte des Stadtratsbeschlusses: Je Feld steht die Beschriftung über dem Wert, vier kurze Werte belegen so je zwei Zeilen.
+- 2026-11-04 · 1.10.1 · Design-Test · Karte des Stadtratsbeschlusses: Es gibt zwei Arten von Beschriftung, «BESCHLOSSEN» klein und grau, «Dokumente (2):» schwarz mit Doppelpunkt.
+- 2026-11-04 · 1.10.1 · Design-Test · Karte des Stadtratsbeschlusses: Im Druck fehlt «Notizen (n)».
+- 2026-11-04 · 1.10.1 · Design-Test · Karte des Stadtratsbeschlusses: Auf A4 quer und A5 steht nur eine Karte je Seite.
+- 2026-11-04 · 1.10.1 · Design-Test · Trennungen und Umbrüche: «Aufga-benplans», «Wohnsit-zes», «Eintrittsprei-sen», «Mitar-beitenden»; das Kennzeichen «Präsident» steht in den Mitgliedern einmal hinter dem Namen der Kommission, einmal allein auf einer Zeile.
+- 2026-11-04 · 1.10.1 · Design-Test · Datums- und Zahlenformate: Die Tabelle der Geschäfte zeigt «16.09.26», die Karte «16.9.2026», die Stadtratsbeschlüsse «21.10.2026».
+- 2026-11-04 · 1.10.1 · Design-Test · Datums- und Zahlenformate: Franken trennen die Tausender mit «’», Stellen mit «'».
+- 2026-11-04 · 1.10.1 · Design-Test · Datums- und Zahlenformate: Die Summenzeile zeigt «3'820.5», die Grafik «3'820.50».
+- 2026-11-04 · 1.10.1 · Design-Test · Datums- und Zahlenformate: «−28 %» steht mit Leerzeichen, im Druck «-28%» mit Bindestrich.
+- 2026-11-04 · 1.10.1 · Design-Test · Aufklapper und Zeichen: An den Anträgen steht «▸ Notizen» klein und grau neben «▶ Dokumente» in Textgrösse und schwarz.
+- 2026-11-04 · 1.10.1 · Design-Test · Aufklapper und Zeichen: «▼», «▶» und «↗» stehen als Zeichen im Markup.
+- 2026-11-04 · 1.10.1 · Design-Test · Aufklapper und Zeichen: Der Pfeil «↗» steht bei den Stadtratsbeschlüssen hinter der Nummer, bei Geschäften und Kommissionen davor.
+- 2026-11-04 · 1.10.1 · Design-Test · Antragsformular: Der Schalter «Reduktion» ist eingerückt.
+- 2026-11-04 · 1.10.1 · Design-Test · Antragsformular: «Betrag CHF» hat die halbe Breite, «Betrag %» die volle auf der nächsten Zeile (nur `desktop-4-3` nebeneinander).
+- 2026-11-04 · 1.10.1 · Design-Test · Antragsformular: «Begründung» ist klein und grau beschriftet.
+- 2026-11-04 · 1.10.1 · Design-Test · Antragsformular: Auf Third steht «Antrag stellen» neben der Begründung und ✕ auf eigener Zeile.
+- 2026-11-04 · 1.10.1 · Design-Test · Antragsformular: «Antrag» und «Abbrechen» sind gleich gewichtet.
+- 2026-11-04 · 1.10.1 · Design-Test · Zielvorgaben im Antragsformular: Ziel, Beschreibung und Messgrösse laufen in einer kleinen Zeile zusammen, getrennt mit «—».
+- 2026-11-04 · 1.10.1 · Design-Test · Zielvorgaben im Antragsformular: Ein Ziel mit mehreren Messgrössen wiederholt seinen Titel je Messgrösse.
+- 2026-11-04 · 1.10.1 · Design-Test · Zielvorgaben im Antragsformular: Das Feld heisst «neuer Soll» statt «neues Soll».
+- 2026-11-04 · 1.10.1 · Design-Test · Zielvorgaben im Antragsformular: Das Feld nimmt die volle Breite für eine Zahl.
+- 2026-11-04 · 1.10.1 · Design-Test · Investitionsrechnung: Der Hauptbetrag steht einmal auf eigener Zeile, einmal neben dem Titel.
+- 2026-11-04 · 1.10.1 · Design-Test · Investitionsrechnung: «Summe der Jahre», «Bereits getätigt» und «Künftig» stehen auch bei Platz untereinander.
+- 2026-11-04 · 1.10.1 · Design-Test · Investitionsrechnung: «Details» und «+ Antrag» stehen untereinander mit etwa 3px Abstand, beim Personalbestand nebeneinander.
+- 2026-11-04 · 1.10.1 · Design-Test · Investitionsrechnung: «Verpflichtungskredite (3)» und «Details · 3 Kredite» führen beide zu den Krediten.
+- 2026-11-04 · 1.10.1 · Design-Test · Investitionsrechnung: Im Druck braucht sie 191 bis 274 Seiten für 567 Karten.
+- 2026-11-04 · 1.10.1 · Design-Test · Investitionsrechnung: Der Kopf zeigt «Budget 50» (gegen F120 prüfen).
+- 2026-11-04 · 1.10.1 · Design-Test · Detail einer Investition: Der Dialog ist bis 1440px breit für sechs kleine Zahlen und steht als Kasten in der Mitte; F87 nennt ihn «denselben Vollbild-Dialog wie bei einer Produktegruppe».
+- 2026-11-04 · 1.10.1 · Design-Test · Detail einer Investition: Der Hintergrund ist ganz deckend grau.
+- 2026-11-04 · 1.10.1 · Design-Test · Detail einer Investition: Auf UHD und 21:9 ist die Tabelle sehr klein.
+- 2026-11-04 · 1.10.1 · Design-Test · Detail einer Investition: Am Telefon ist der Schliessknopf ein Balken über die ganze Breite.
+- 2026-11-04 · 1.10.1 · Design-Test · Detail einer Investition: Die Spaltenköpfe «Plan 2027 Plan 2028 Plan 2029» stehen fast ohne Abstand.
+- 2026-11-04 · 1.10.1 · Design-Test · Budget, Überschriften und Farben: «Präsidiales» und «Finanzen» stehen unter Investitionsrechnung, Personalbestand und Globalbudgets in Linkblau, im Tab «Anträge» schwarz; ein Tab unter dem Zeiger trägt dieselbe Unterstreichung wie der aktive Tab.
+- 2026-11-04 · 1.10.1 · Design-Test · Grafik des Budgets: Die Grafik nennt «Einnahmen 2’065’358’967» und «Ausgaben 1’946’015’601», die Summenzeile 1’896’100’000 und 1’782’300’000, ohne Erklärung des Unterschieds.
+- 2026-11-04 · 1.10.1 · Design-Test · Grafik des Budgets: In «Stellen» tragen nur die Farben eine Bedeutung, ohne Legende.
+- 2026-11-04 · 1.10.1 · Design-Test · Grafik des Budgets: In `full-hd` ragen die grossen Beschriftungen der Stellen über die Kreise.
+- 2026-11-04 · 1.10.1 · Design-Test · Grafik des Budgets: Auf 21:9, Half und UHD steht über den Kreisen eine grosse leere Fläche, und beim Öffnen sind nur zwei bis vier Departemente sichtbar.
+- 2026-11-04 · 1.10.1 · Design-Test · Grafik des Budgets: Im Druck stehen kleine graue Kreise ohne Beschriftung.
+- 2026-11-04 · 1.10.1 · Design-Test · Tab «Anträge» auf 21:9 und UHD: Der Inhalt endet bei etwa 40% der Breite, «offen» steht ganz rechts, dazwischen ist die Fläche leer; in der Betragsspalte stehen einmal Beträge, einmal Text («Anteil Ressourcen in Projekten (in %): 60 → 4»).
+- 2026-11-04 · 1.10.1 · Design-Test · Personalbestand: In `desktop-16-10` steht der Stellenwert in derselben Reihe teils unter dem Titel, teils daneben.
+- 2026-11-04 · 1.10.1 · Design-Test · Geschäfte, Tabelle: Auf breiten Formaten bricht der Status in einer schmalen Spalte auf drei Zeilen um («Bei der / Aufsichtskommission / pendent»), während «Beschluss» breit und leer bleibt.
+- 2026-11-04 · 1.10.1 · Design-Test · Geschäfte, Tabelle: Die Nummer ist nicht deutlich fetter als der Titel, wie FEATURES es verlangt.
+- 2026-11-04 · 1.10.1 · Design-Test · Geschäfte, Tabelle: Im Druck hat die Titelzelle eine eigene Unterkante neben der Zeilenlinie.
+- 2026-11-04 · 1.10.1 · Design-Test · Geschäfte, Tabelle: PRIO und ZUSTÄNDIG sind leer statt «—».
+- 2026-11-04 · 1.10.1 · Design-Test · Geschäfte, Karten: Das Beschlussfeld hat keine Beschriftung.
+- 2026-11-04 · 1.10.1 · Design-Test · Geschäfte, Karten: Der Abstand von «Zuständigkeit» zu «Priorität» ist enger als die übrigen.
+- 2026-11-04 · 1.10.1 · Design-Test · Geschäfte, Karten: Die Auswahl der Priorität nimmt die volle Breite für «—».
+- 2026-11-04 · 1.10.1 · Design-Test · Geschäfte, Karten: Am Telefon stehen nur eine bis zwei Karten je Bildschirmhöhe.
+- 2026-11-04 · 1.10.1 · Design-Test · Geschäfte, Karten: Die Testdaten haben kein Kürzel, also zeigt kein Bild den Status gekürzt nach F63.
+- 2026-11-04 · 1.10.1 · Design-Test · Telefon, Budget: In `phone-small`, `phone-medium`, `phone-large` und `phone-landscape` füllen Kopfzeile, Summenzeile, Tab-Leiste und Notizen die erste Bildschirmhöhe, vom Tab ist nichts zu sehen.
+- 2026-11-04 · 1.10.1 · Design-Test · Telefon, Budget: Die Tab-Leiste bricht im Hochformat in drei Zeilen um.
+- 2026-11-04 · 1.10.1 · Design-Test · Telefon, Budget: In `phone-landscape--budget-antragsform` belegen die stehenden Leisten 175 der 390 Pixel.
+- 2026-11-04 · 1.10.1 · Design-Test · Kommissionen: Der Hinweis verdoppelt das Wort («Bei Kommission Sachkommission …»).
+- 2026-11-04 · 1.10.1 · Design-Test · Kommissionen: Im Kopf jeder Karte steht ein grau hinterlegter Kasten, also ein Rahmen im Rahmen.
+- 2026-11-04 · 1.10.1 · Design-Test · Kommissionen: Im Druck stehen «Pendente Geschäfte (n):» und «Mitglieder (n):» nicht auf der Kante von Name und «Aktiv» (A4: 71 gegenüber 80px).
+- 2026-11-04 · 1.10.1 · Design-Test · Kommissionen: Im Druck klebt der Hinweis ohne Abstand an den Mitgliederkarten.
+- 2026-11-04 · 1.10.1 · Design-Test · Vorstösse: Die leere Liste zeigt nur eine Textzeile über einer leeren Fläche, ohne das Symbol, das «Dateien» bei einer leeren Liste zeigt.
+- 2026-11-04 · 1.10.1 · Design-Test · Druck: Die Summenzeile steht auf A4 hoch als gestapelte Liste über die halbe Seite 1, auf Letter als Tabelle.
+- 2026-11-04 · 1.10.1 · Design-Test · Druck: Die Mitgliederkarten nehmen die ganze Breite (A3: 1075px für drei Zeilen).
+- 2026-11-04 · 1.10.1 · Design-Test · Druck: Die Karten der Geschäfte haben ungleiche Abstände zwischen Bezeichnung und Wert.
+- 2026-11-04 · 1.10.1 · Design-Test · Druck: Mehrseitige Drucke tragen ab Seite 2 weder Titel noch Seitenzahl.
+- 2026-11-04 · 1.10.1 · Design-Test · Druck: Der Textauszug ist auf der letzten Seite von `papier-A4--budget-personal` und `papier-A3--geschaefte` zerrissen («P roduktegruppe845BuchS. 355»).
 
 ## Befunde aus dem Design-Test
 
 Diese Befunde sind noch nicht beauftragt.
 
-- 2026-10-24 · Geschäfteliste bei 1280 Pixel Breite: Der Titel bekommt die wenigste Breite von allen Spalten und bricht mitten im Wort («Festset-zung»), während «Prio», «Status», «Zuständig» und «Beschluss» zusammen das Dreifache einnehmen und meist nur «—» zeigen. Die Mindestbreiten von «Status» (19 Zeichen für «Aufsichtskommission») und «Zuständig» (9em) stammen vom 20.10.2026; der Status steht in der Zelle ohnehin zweizeilig.
+- 2026-10-24 · offen · Design-Test · Liste der Geschäfte bei 1280 Pixel Breite: Der Titel bekommt die wenigste Breite von allen Spalten und bricht mitten im Wort («Festset-zung»), während «Prio», «Status», «Zuständig» und «Beschluss» zusammen das Dreifache einnehmen und meist nur «—» zeigen. Die Mindestbreiten von «Status» (19 Zeichen für «Aufsichtskommission») und «Zuständig» (9em) stammen vom 2026-10-20; der Status steht in der Zelle ohnehin zweizeilig.
+- 2026-09-14 · offen · Design-Test · Übersichtstabellen der Geschäfte und der Vorstösse: Die eingebetteten Auswahllisten machen die Zeilen etwa doppelt so hoch wie eine Textzeile. Beide Ansichten teilen sich dieselbe Tabelle.
 
-- 2026-09-14 · Übersichtstabellen (Geschäfte UND Vorstösse, dieselbe Tabelle): Die eingebetteten Auswahllisten machen die Zeilen etwa doppelt so hoch wie eine Textzeile. Betrifft beide Ansichten gleichermassen, weil sie sich die Tabelle teilen. Behoben sind der abgeschnittene Name in der Spalte «Zuständig» (`wortumbruch.test.js`), die auf zweieinhalb Zeichen geschrumpfte Spalte «Status» und der ungenutzte Streifen, der aus der unbegrenzt wachsenden Titel-Spalte kam (`spaltenbreite.test.js`).
+## Ideen von Marc
+
+- 2026-08-28 · Idee · Marc · **Entwicklung über die Jahre.** Wenn alte Budgets eingelesen sind, zeigt eine Darstellung, wie sich die Budgetposten und die Zahl der Mitarbeiter über die Jahre entwickelt haben, auch im Verhältnis zum Wachstum der Einwohnerzahl:
+    - Steigen die Kosten und die Zahl der Mitarbeiter proportional oder überproportional?
+    - Steigen die Kosten in einigen Departementen, Produktegruppen oder Produkten stärker als in anderen?
+    - Welche Leistungen werden teurer, welche billiger?
+- 2026-08-28 · Idee · Marc · **Verschwendung aufspüren.** Woran erkennt man im Budget Geld, das ohne Gegenleistung fliesst? Jede der folgenden Kennzahlen lässt sich aus den bereits eingelesenen Daten berechnen, zeigt, wo sich das Nachfragen lohnt, und liefert dem Antrag seine Begründung:
+    - **Kosten je Leistungseinheit im Zeitverlauf.** Die Produkte tragen Zielvorgaben mit Messgrössen (Fälle, Bewilligungen, Betreuungsstunden). Nettokosten geteilt durch die Messgrösse ergibt einen Preis je Leistung; steigt er über Jahre schneller als die Teuerung, ist das der erste Hinweis.
+    - **Kosten je Leistung im Vergleich zwischen ähnlichen Produkten** derselben Stadt, und sobald Daten anderer Städte vorliegen, zwischen Städten.
+    - **Zielvorgaben, die nie verfehlt werden.** Ein Soll, das seit Jahren übertroffen wird, ist zu tief angesetzt; die Leistung kostet mehr, als sie müsste.
+    - **Kostendeckungsgrad, der sinkt, während die Menge steigt.** Die Gebühr deckt einen immer kleineren Teil, ohne dass die Leistung wächst.
+    - **Sprünge ohne Begründung im Buch.** Eine Produktegruppe wächst zweistellig, während ihre Zielvorgaben und Produkte unverändert bleiben.
+    - **Stellen ohne Leistungswachstum.** Die Stellenzahl steigt, die Messgrössen der zugehörigen Produkte nicht.
+    - **Reserven und Rückstellungen**, die Jahr für Jahr gebildet und nie gebraucht werden.
+    - **Auffällig runde Zahlen**, die über mehrere Jahre unverändert bleiben. Sie zeigen einen Budgetposten, den die Verwaltung fortschreibt, ohne ihn neu zu rechnen.
 
 ## Ideen ohne Auftrag
 
 Nichts davon hat Marc verlangt.
 
-- **Zusammenfassung je Geschäft** aus dem gelesenen Inhalt der amtlichen Dokumente, mit einem lokalen Sprachmodell. Stand bis zum 2026-10-15 unter seinen Aufträgen, ohne Beleg: Belegt ist sein Prompt vom 2026-09-23 «Und zuallererst: F121 umsetzen!», und F121 ist das Lesen der Dokumente, umgesetzt und getestet. Zu «Zusammenfassung», «zusammenfassen», «Sprachmodell» und «Inhaltsangabe» findet `find-spec.py` im Projekt keinen Prompt.
-
-## Entwicklung über die Jahre
-
-Wenn alte Budgets vorhanden sind (importiert wurden), darstellen, wie sich die verschiedenen Budgetposten und die Mitarbeiterzahlen über die Jahre entwickelt haben — auch in Relation zum Wachstum an Einwohnern:
-
-- Steigen die Kosten und die Mitarbeiterzahl proportional oder überproportional?
-- Steigen die Kosten in einigen Departementen, Produktegruppen oder Produkten stärker als in anderen?
-- Welche Leistungen werden teurer, welche billiger?
-
-## Verschwendung aufspüren
-
-Woran erkennt man im Budget Geld, das ohne Gegenleistung fliesst? Kandidaten für Kennzahlen, die sich aus den bereits eingelesenen Daten berechnen lassen:
-
-- **Kosten je Leistungseinheit im Zeitverlauf.** Die Produkte tragen Zielvorgaben mit Messgrössen (Fälle, Bewilligungen, Betreuungsstunden). Nettokosten geteilt durch die Messgrösse ergibt einen Preis je Leistung; steigt er über Jahre schneller als die Teuerung, ist das der erste Hinweis.
-- **Kosten je Leistung im Vergleich zwischen ähnlichen Produkten** derselben Stadt und — sobald Daten anderer Städte vorliegen — zwischen Städten.
-- **Zielvorgaben, die nie verfehlt werden.** Ein Soll, das seit Jahren übertroffen wird, ist zu tief angesetzt; die Leistung kostet mehr, als sie müsste.
-- **Kostendeckungsgrad, der sinkt, während die Menge steigt** — die Gebühr deckt einen immer kleineren Teil, ohne dass die Leistung wächst.
-- **Sprünge ohne Begründung im Buch:** eine Produktegruppe wächst zweistellig, während ihre Zielvorgaben und Produkte unverändert bleiben.
-- **Stellen ohne Leistungswachstum:** Stellenzahl steigt, die Messgrössen der zugehörigen Produkte nicht.
-- **Reserven und Rückstellungen**, die Jahr für Jahr gebildet und nie gebraucht werden.
-- **Auffällig runde Zahlen** über mehrere Jahre unverändert: ein Budgetposten, der nie gerechnet, sondern fortgeschrieben wird.
-
-Jede dieser Kennzahlen ist ein Hinweis, kein Urteil — sie zeigt, wo sich das Nachfragen lohnt, und liefert dem Antrag seine Begründung.
+- 2026-10-02 · Idee · Entwicklung · **Zusammenfassung je Geschäft** aus dem gelesenen Inhalt der amtlichen Dokumente, mit einem lokalen Sprachmodell.

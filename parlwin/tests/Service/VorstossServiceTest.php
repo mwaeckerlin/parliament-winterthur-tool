@@ -40,7 +40,7 @@ class VorstossServiceTest extends TestCase
             'herkunft' => 'fremde',
             'status' => 'bereit',
             'zustaendigkeit' => [['key' => 'mueller', 'name' => 'Anna Müller']],
-            'herkunftFraktion' => 'Grüne',
+            'herkunftFraktion' => 'MPW',
             'ansprechpartner' => [['key' => 'meier', 'name' => 'Bob Meier']],
         ]);
 
@@ -53,7 +53,7 @@ class VorstossServiceTest extends TestCase
         // erscheinen in der API-Ausgabe.
         $json = $vorstoss->jsonSerialize();
         $this->assertSame([['key' => 'mueller', 'name' => 'Anna Müller']], $json['zustaendigkeit']);
-        $this->assertSame('Grüne', $json['herkunftFraktion']);
+        $this->assertSame('MPW', $json['herkunftFraktion']);
         $this->assertSame([['key' => 'meier', 'name' => 'Bob Meier']], $json['ansprechpartner']);
     }
 

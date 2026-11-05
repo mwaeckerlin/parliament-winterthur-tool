@@ -574,11 +574,19 @@ export default {
       }
       return zeilen.length ? zeilen : [String(name)]
     },
+    /**
+     * F129: Die Seite im Budgetbuch, wo die Produktegruppe eine trägt. In der
+     * Grafik ist der Hinweistext die einzige Stelle, an der sie stehen kann.
+     */
+    buchseiteTeil(knoten) {
+      const seite = Number(knoten.data.buchseite || 0)
+      return seite > 0 ? ['Buch S. ' + seite] : []
+    },
     beschreibung(knoten) {
       if (this.stellenModus) {
         return this.stellenBeschreibung(knoten)
       }
-      const teile = [knoten.data.name, this.fr(knoten.data.betrag) + ' CHF']
+      const teile = [knoten.data.name, this.fr(knoten.data.betrag) + ' CHF', ...this.buchseiteTeil(knoten)]
       const eltern = knoten.parent
       if (eltern && eltern.value > 0) {
         const anteil = ((knoten.value / eltern.value) * 100).toFixed(1).replace('.', ',')
@@ -607,6 +615,7 @@ export default {
         this.stellenFormat(daten.betrag) + ' Stellen',
         'Vorjahr ' + this.stellenFormat(daten.vorjahr),
         vorzeichen + this.stellenFormat(Math.abs(veraenderung)),
+        ...this.buchseiteTeil(knoten),
       ]
       const eltern = knoten.parent
       if (eltern && eltern.value > 0) {

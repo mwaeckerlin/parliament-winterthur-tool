@@ -8,10 +8,8 @@ vi.mock('@nextcloud/axios')
 /**
  * Notizen am übergeordneten Zusammenhang (F124).
  *
- * Marc am 24.10.2026: «Notizen sollte man überall anlegen, auch in einem
- * übergeordneten Zusammenhang. Beim Budget zum Beispiel sollte man Notizen
- * machen zum Departement und man sollte Notizen machen insgesamt zum ganzen
- * Budget. Global. Und natürlich auf jedem Tab.»
+ * Notizen lassen sich überall anlegen, auch im übergeordneten Zusammenhang:
+ * im Budget zum ganzen Budget, zu jedem Departement und auf jedem Tab.
  *
  * vitest läuft im Projekt-Root.
  */

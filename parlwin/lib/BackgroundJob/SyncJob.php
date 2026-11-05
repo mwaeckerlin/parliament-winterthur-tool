@@ -124,16 +124,14 @@ class SyncJob extends TimedJob {
                 throw new \RuntimeException('SyncCommand lieferte Exit-Code ' . $exitCode);
             }
 
+            // Den Eintrag im Protokoll schreibt SyncCommand für jeden Lauf, mit
+            // Zusammenfassung und dem Auslöser «auto».
             $this->logger->info('Parlament Winterthur: Datensynchronisation (BackgroundJob) erfolgreich abgeschlossen');
-            $this->ereignisse->protokolliere('sync', '', true,
-                'Automatische Synchronisation abgeschlossen', '', 'auto');
         } catch (\Throwable $e) {
             $this->logger->error(
                 'Parlament Winterthur: Fehler bei der Datensynchronisation (BackgroundJob): ' . $e->getMessage(),
                 ['exception' => $e]
             );
-            $this->ereignisse->protokolliere('fehler', '', false,
-                'Automatische Synchronisation fehlgeschlagen', $e->getMessage(), 'auto');
         }
     }
 }

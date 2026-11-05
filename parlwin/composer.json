@@ -5,12 +5,21 @@
     "ext-dom": "*",
     "ext-json": "*",
     "ext-libxml": "*",
-    "league/commonmark": "^2.7",
+    "league/commonmark": "^2.7 <2.10.5",
     "smalot/pdfparser": "^2.0"
   },
   "require-dev": {
-    "phpunit/phpunit": "^13.0",
+    "phpunit/phpunit": "^13.0 <13.4",
     "nextcloud/coding-standard": "^1.1"
+  },
+  "conflict": {
+    "nette/schema": ">=1.4.0",
+    "phpunit/php-code-coverage": ">=14.5.0",
+    "sebastian/git-state": ">=1.1.0",
+    "symfony/polyfill-mbstring": ">=1.43.1"
+  },
+  "extra": {
+    "comment-obergrenzen": "Die Obergrenzen unter «require», «require-dev» und «conflict» halten jede Fassung fern, die beim Festlegen jünger als zwei Wochen war, also nach dem 2026-10-20 erschien. Entfernt wird eine Obergrenze, sobald die Fassungen, die sie ausschliesst, mindestens zwei Wochen alt sind; danach erzeugt `npm run composer:update -- --lock` die composer.lock neu und prüft sie mit composer audit. Nachprüfen am 2026-11-16."
   },
   "autoload": {
     "psr-4": {

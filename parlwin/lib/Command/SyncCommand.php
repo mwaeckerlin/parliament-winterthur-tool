@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace OCA\ParliamentWinterthur\Command;
 
+use OCA\ParliamentWinterthur\Service\EreignisService;
 use OCA\ParliamentWinterthur\Service\GeschaeftService;
 use OCA\ParliamentWinterthur\Service\KalenderService;
 use OCA\ParliamentWinterthur\Service\MitgliedService;
 use OCA\ParliamentWinterthur\Service\RealtimePublisherService;
 use OCA\ParliamentWinterthur\Service\ScraperService;
 use OCA\ParliamentWinterthur\Service\SitzungService;
+use OCA\ParliamentWinterthur\Service\StadtratsbeschlussService;
 use OCA\ParliamentWinterthur\Service\SyncLockService;
 use OCA\ParliamentWinterthur\Service\FraktionsarbeitService;
 use OCP\IConfig;
@@ -27,6 +29,7 @@ use Symfony\Component\Console\Output\OutputInterface;
  *   php occ parlwin:sync --nur-geschaefte
  *   php occ parlwin:sync --nur-sitzungen
  *   php occ parlwin:sync --nur-mitglieder
+ *   php occ parlwin:sync --nur-stadtratsbeschluesse
  */
 #[AsCommand(name: 'parlwin:sync')]
 class SyncCommand extends Command
@@ -42,18 +45,24 @@ class SyncCommand extends Command
         'kommissionen' => ['label' => 'Kommissionen', 'db' => 'pw_kommissionen'],
         'geschaefte' => ['label' => 'Geschäfte', 'db' => 'pw_geschaefte (+ pw_geschaeft_ereignisse)'],
         'sitzungen' => ['label' => 'Sitzungen', 'db' => 'pw_sitzungen (+ pw_traktanden)'],
+        'stadtratsbeschluesse' => ['label' => 'Stadtratsbeschlüsse', 'db' => 'pw_stadtratsbeschluesse'],
     ];
+
+    /** @var array<string, mixed>|null die Statistik der Geschäfte dieses Laufs, `null`, bis ihr Abgleich fertig ist */
+    private ?array $geschaefteStatistik = null;
 
     public function __construct(
         private readonly GeschaeftService $geschaeftService,
         private readonly SitzungService $sitzungService,
         private readonly MitgliedService $mitgliedService,
+        private readonly StadtratsbeschlussService $stadtratsbeschlussService,
         private readonly KalenderService $kalenderService,
         private readonly RealtimePublisherService $realtimePublisher,
         private readonly ScraperService $scraperService,
         private readonly SyncLockService $syncLockService,
         private readonly FraktionsarbeitService $fraktionsarbeitService,
         private readonly IConfig $config,
+        private readonly EreignisService $ereignisse,
     ) {
         parent::__construct();
     }
@@ -64,8 +73,10 @@ class SyncCommand extends Command
             ->addOption('nur-geschaefte', null, InputOption::VALUE_NONE, 'Nur Geschäfte synchronisieren')
             ->addOption('nur-sitzungen', null, InputOption::VALUE_NONE, 'Nur Sitzungen synchronisieren')
             ->addOption('nur-mitglieder', null, InputOption::VALUE_NONE, 'Nur Mitglieder/Fraktionen/Kommissionen synchronisieren')
+            ->addOption('nur-stadtratsbeschluesse', null, InputOption::VALUE_NONE, 'Nur Stadtratsbeschlüsse synchronisieren')
             ->addOption('update-progress', null, InputOption::VALUE_NONE, 'Schreibt Live-Fortschritt für den Admin-Dialog')
-            ->addOption('source', null, InputOption::VALUE_REQUIRED, 'Quelle des Sync-Starts (occ/admin-ui/background-job)', 'occ');
+            ->addOption('source', null, InputOption::VALUE_REQUIRED, 'Quelle des Sync-Starts (occ/admin-ui/background-job)', 'occ')
+            ->addOption('ausgeloest-von', null, InputOption::VALUE_REQUIRED, 'Benutzer-ID, die den Lauf ausgelöst hat, für das Protokoll', '');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -76,11 +87,13 @@ class SyncCommand extends Command
         $nurGeschaefte = $input->getOption('nur-geschaefte');
         $nurSitzungen = $input->getOption('nur-sitzungen');
         $nurMitglieder = $input->getOption('nur-mitglieder');
+        $nurBeschluesse = $input->getOption('nur-stadtratsbeschluesse');
         $updateProgress = (bool) $input->getOption('update-progress');
         $source = trim((string) $input->getOption('source'));
         if ($source === '') {
             $source = 'occ';
         }
+        $ausgeloestVon = mb_substr(trim((string) $input->getOption('ausgeloest-von')), 0, 64);
 
         if (!$this->syncLockService->acquire()) {
             $output->writeln('<comment>Synchronisation läuft bereits, zweiter Start wird angehängt.</comment>');
@@ -98,7 +111,7 @@ class SyncCommand extends Command
             if ($signalZeit === null || $signalZeit < self::prozessStart()) {
                 $this->setCancelRequested(false);
             }
-            $alles = !$nurGeschaefte && !$nurSitzungen && !$nurMitglieder;
+            $alles = !$nurGeschaefte && !$nurSitzungen && !$nurMitglieder && !$nurBeschluesse;
             $startZeitpunkt = new \DateTimeImmutable();
             $aktiveScopes = [];
             if ($alles || $nurMitglieder) {
@@ -110,16 +123,21 @@ class SyncCommand extends Command
             if ($alles || $nurSitzungen) {
                 $aktiveScopes[] = 'sitzungen';
             }
+            if ($alles || $nurBeschluesse) {
+                $aktiveScopes[] = 'stadtratsbeschluesse';
+            }
             $aktiveScopes = array_values(array_unique($aktiveScopes));
-            $status = $this->initialisiereProgressStatus($startZeitpunkt, $aktiveScopes, $source);
+            $fortsetzen = $updateProgress ? $this->fortsetzungspunkte() : [];
+            $status = $this->initialisiereProgressStatus($startZeitpunkt, $aktiveScopes, $source, $fortsetzen);
             if ($updateProgress) {
                 $this->setProgressStatus($status);
             }
 
             $output->writeln('<info>Parlament Winterthur: Starte Synchronisation...</info>');
             $mitgliederStatistik = null;
-            $geschaefteStatistik = null;
+            $this->geschaefteStatistik = null;
             $sitzungenStatistik = null;
+            $beschluesseStatistik = null;
 
             try {
                 // Vor der ersten Netzarbeit: Ein Lauf, der schon beim Start
@@ -162,7 +180,11 @@ class SyncCommand extends Command
                 if ($alles || $nurMitglieder) {
                     $this->throwIfCancelRequested($status, $startZeitpunkt, $source, $updateProgress);
                     $output->writeln('  Synchronisiere Mitglieder, Fraktionen und Kommissionen...');
-                    $mitgliederStatistik = $this->mitgliedService->synchronisieren($fortschritt);
+                    $mitgliederStatistik = $this->mitgliedService->synchronisieren($fortschritt, [
+                        'mitglieder' => ['resume_cursor' => $fortsetzen['mitglieder'] ?? ''],
+                        'fraktionen' => ['resume_cursor' => $fortsetzen['fraktionen'] ?? ''],
+                        'kommissionen' => ['resume_cursor' => $fortsetzen['kommissionen'] ?? ''],
+                    ]);
                     $output->writeln(sprintf(
                         '  Mitglieder: %d neu, %d aktualisiert, %d inaktiv',
                         $mitgliederStatistik['mitglieder']['neu'],
@@ -174,19 +196,19 @@ class SyncCommand extends Command
                 if ($alles || $nurGeschaefte) {
                     $this->throwIfCancelRequested($status, $startZeitpunkt, $source, $updateProgress);
                     $output->writeln('  Synchronisiere Geschäfte...');
-                    $geschaefteStatistik = $this->geschaeftService->synchronisieren($fortschritt);
+                    $this->geschaefteStatistik = $this->geschaeftService->synchronisieren($fortschritt, ['resume_cursor' => $fortsetzen['geschaefte'] ?? '']);
                     $output->writeln(sprintf(
                         '  Geschäfte: %d neu, %d aktualisiert, %d als gelöscht markiert',
-                        $geschaefteStatistik['neu'],
-                        $geschaefteStatistik['aktualisiert'],
-                        $geschaefteStatistik['geloescht'],
+                        $this->geschaefteStatistik['neu'],
+                        $this->geschaefteStatistik['aktualisiert'],
+                        $this->geschaefteStatistik['geloescht'],
                     ));
                 }
 
                 if ($alles || $nurSitzungen) {
                     $this->throwIfCancelRequested($status, $startZeitpunkt, $source, $updateProgress);
                     $output->writeln('  Synchronisiere Sitzungen und Traktanden...');
-                    $sitzungenStatistik = $this->sitzungService->synchronisieren($fortschritt);
+                    $sitzungenStatistik = $this->sitzungService->synchronisieren($fortschritt, ['resume_cursor' => $fortsetzen['sitzungen'] ?? '']);
                     $output->writeln(sprintf(
                         '  Sitzungen: %d neu, %d aktualisiert, %d als gelöscht markiert',
                         $sitzungenStatistik['neu'],
@@ -198,6 +220,27 @@ class SyncCommand extends Command
                     $this->kalenderService->sitzungenAktualisieren(
                         $this->sitzungService->alleAktiven()
                     );
+                }
+
+                if ($alles || $nurBeschluesse) {
+                    $this->throwIfCancelRequested($status, $startZeitpunkt, $source, $updateProgress);
+                    $output->writeln('  Synchronisiere Stadtratsbeschlüsse...');
+                    $beschluesseStatistik = $this->stadtratsbeschlussService->synchronisierenMitFehlerInStatistik($fortschritt);
+                    $output->writeln(sprintf(
+                        '  Stadtratsbeschlüsse: %d gelesen, %d neu, %d aktualisiert, %d nicht gespeichert',
+                        $beschluesseStatistik['gelesen'],
+                        $beschluesseStatistik['neu'],
+                        $beschluesseStatistik['aktualisiert'],
+                        $beschluesseStatistik['fehler'],
+                    ));
+                    $beschluesseFehler = trim((string) ($beschluesseStatistik['fehlermeldung'] ?? ''));
+                    if ($beschluesseFehler !== '') {
+                        $output->writeln('<comment>  Stadtratsbeschlüsse: ' . $beschluesseFehler . '</comment>');
+                        $status['sections']['stadtratsbeschluesse']['fehler'] = $beschluesseFehler;
+                        if ($updateProgress) {
+                            $this->setProgressStatus($status);
+                        }
+                    }
                 }
 
                 $jetzt = (new \DateTime())->format('Y-m-d H:i:s');
@@ -226,8 +269,9 @@ class SyncCommand extends Command
 
                 $statistik = [
                     'mitglieder' => $mitgliederStatistik,
-                    'geschaefte' => $geschaefteStatistik,
+                    'geschaefte' => $this->geschaefteStatistik,
                     'sitzungen' => $sitzungenStatistik,
+                    'stadtratsbeschluesse' => $beschluesseStatistik,
                     'auto_zustaendigkeit' => $autoZustaendigkeit,
                 ];
                 $this->realtimePublisher->publish('sync.completed', [
@@ -236,8 +280,11 @@ class SyncCommand extends Command
                     'nurGeschaefte' => $nurGeschaefte,
                     'nurSitzungen' => $nurSitzungen,
                     'nurMitglieder' => $nurMitglieder,
+                    'nurStadtratsbeschluesse' => $nurBeschluesse,
                     'statistik' => $statistik,
+                    'geschaeftIds' => $this->geaenderteGeschaefte(),
                 ]);
+                $this->protokolliereLauf($source, $ausgeloestVon, true, self::syncFehlerzahl($statistik) === 0, self::syncZusammenfassung($statistik), $output);
 
                 if ($updateProgress) {
                     $status['running'] = false;
@@ -290,6 +337,8 @@ class SyncCommand extends Command
                     $this->setProgressStatus($status);
                 }
                 $output->writeln('<error>Synchronisation fehlgeschlagen: ' . $e->getMessage() . '</error>');
+                $this->protokolliereLauf($source, $ausgeloestVon, false, false, $e->getMessage(), $output);
+                $this->realtimePublisher->publish('sync.failed', ['quelle' => $source, 'fehler' => $e->getMessage(), 'geschaeftIds' => $this->geaenderteGeschaefte()]);
                 return Command::FAILURE;
             }
         } finally {
@@ -297,6 +346,95 @@ class SyncCommand extends Command
             $this->setCurrentWorkerPid(null);
             $this->syncLockService->release();
         }
+    }
+
+    /**
+     * Schreibt den Lauf ins Ereignis-Protokoll. Scheitert der Eintrag, endet der
+     * Lauf trotzdem mit seinem eigenen Ergebnis. Ohne `$ausgeloestVon` setzt das
+     * Protokoll den angemeldeten Benutzer oder «auto».
+     */
+    private function protokolliereLauf(string $source, string $ausgeloestVon, bool $abgeschlossen, bool $erfolg, string $meldung, OutputInterface $output): void
+    {
+        $automatisch = $source === 'background-job';
+        $titel = ($automatisch ? 'Automatische Synchronisation ' : 'Synchronisation ')
+            . ($abgeschlossen ? 'abgeschlossen' : 'fehlgeschlagen');
+        if ($ausgeloestVon === '' && $automatisch) {
+            $ausgeloestVon = 'auto';
+        }
+        try {
+            $this->ereignisse->protokolliere($abgeschlossen ? 'sync' : 'fehler', '', $erfolg, $titel, $meldung, $ausgeloestVon);
+        } catch (\Throwable $e) {
+            $output->writeln('<comment>Eintrag im Protokoll fehlgeschlagen: ' . $e->getMessage() . '</comment>');
+        }
+    }
+
+    /**
+     * Die Zusammenfassung einer Synchronisation für das Protokoll: die Zähler
+     * «neu» und «aktualisiert» über alle Bereiche, dazu was nicht gespeichert
+     * und was nicht gelesen wurde.
+     *
+     * @param array<string, mixed> $statistik
+     */
+    public static function syncZusammenfassung(array $statistik): string
+    {
+        $summe = self::zaehleStatistik($statistik);
+        $text = $summe['neu'] . ' neu, ' . $summe['geaendert'] . ' geändert';
+        if ($summe['fehler'] > 0) {
+            $text .= ', ' . $summe['fehler'] . ' nicht gespeichert';
+            if ($summe['meldungen'] !== []) {
+                $text .= ' (' . $summe['meldungen'][0] . ')';
+            }
+        }
+        foreach ($summe['ausgefallen'] as $meldung) {
+            $text .= ', nicht gelesen: ' . $meldung;
+        }
+        return $text;
+    }
+
+    /**
+     * Wie viele Einträge nicht gespeichert und wie viele Bereiche nicht gelesen
+     * wurden.
+     *
+     * @param array<string, mixed> $statistik
+     */
+    public static function syncFehlerzahl(array $statistik): int
+    {
+        $summe = self::zaehleStatistik($statistik);
+        return $summe['fehler'] + count($summe['ausgefallen']);
+    }
+
+    /**
+     * Summiert die Zähler über alle Bereiche. Eine Ebene mit eigenen Zählern
+     * ist ein Blatt; ihre Unterebenen zählen nicht noch einmal.
+     *
+     * @param array<string, mixed> $statistik
+     * @return array{neu: int, geaendert: int, fehler: int, meldungen: list<string>, ausgefallen: list<string>}
+     */
+    private static function zaehleStatistik(array $statistik): array
+    {
+        $summe = ['neu' => 0, 'geaendert' => 0, 'fehler' => 0, 'meldungen' => [], 'ausgefallen' => []];
+        $sammle = static function ($wert) use (&$sammle, &$summe): void {
+            if (!is_array($wert)) {
+                return;
+            }
+            if (array_key_exists('neu', $wert) || array_key_exists('aktualisiert', $wert)) {
+                $summe['neu'] += (int) ($wert['neu'] ?? 0);
+                $summe['geaendert'] += (int) ($wert['aktualisiert'] ?? 0);
+                $summe['fehler'] += (int) ($wert['fehler'] ?? 0);
+                $meldung = trim((string) ($wert['fehlermeldung'] ?? ''));
+                if ($meldung !== '' && ($wert['ausgefallen'] ?? false) === true) {
+                    $summe['ausgefallen'][] = $meldung;
+                } elseif ($meldung !== '') {
+                    $summe['meldungen'][] = $meldung;
+                }
+                return;
+            }
+            foreach ($wert as $unter) {
+                $sammle($unter);
+            }
+        };
+        $sammle($statistik);
+        return $summe;
     }
 
     /**
@@ -333,15 +471,56 @@ class SyncCommand extends Command
         $this->realtimePublisher->publish('sync.cancelled', [
             'quelle' => $source,
             'zeitpunkt' => (new \DateTime())->format('Y-m-d H:i:s'),
+            'geschaeftIds' => $this->geaenderteGeschaefte(),
         ]);
         throw new SyncAbortedException('Synchronisation wurde manuell abgebrochen');
     }
 
     /**
+     * Die Geschäfte, die dieser Lauf bis jetzt angelegt, geändert oder
+     * zugewiesen hat (F150), für `sync.completed`, `sync.cancelled` und
+     * `sync.failed`; `null`, wenn er Geschäfte als gelöscht markiert hat.
+     *
+     * @return list<int>|null
+     */
+    private function geaenderteGeschaefte(): ?array
+    {
+        return RealtimePublisherService::geaenderteGeschaefte(
+            $this->geschaefteStatistik,
+            $this->geschaeftService->zuletztGeaenderteIds(),
+            $this->fraktionsarbeitService->zuletztZugewieseneIds(),
+        );
+    }
+
+    /**
+     * Die Punkte, an denen ein fortgesetzter Lauf je Bereich weitermacht.
+     * `SettingsController::run` legt sie im wartenden Stand (`queued`) ab, wenn
+     * der vorige Lauf abgebrochen oder gescheitert ist.
+     *
+     * @return array<string, string>
+     */
+    private function fortsetzungspunkte(): array
+    {
+        $stand = json_decode($this->config->getAppValue(self::APP_ID, self::SYNC_PROGRESS_KEY, ''), true);
+        if (!is_array($stand) || ($stand['phase'] ?? '') !== 'queued' || !is_array($stand['sections'] ?? null)) {
+            return [];
+        }
+        $punkte = [];
+        foreach (array_keys(self::SECTION_META) as $scope) {
+            $cursor = trim((string) ($stand['sections'][$scope]['cursor'] ?? ''));
+            if ($cursor !== '') {
+                $punkte[$scope] = $cursor;
+            }
+        }
+        return $punkte;
+    }
+
+    /**
      * @param array<int, string> $aktiveScopes
+     * @param array<string, string> $fortsetzen
      * @return array<string, mixed>
      */
-    private function initialisiereProgressStatus(\DateTimeImmutable $startZeitpunkt, array $aktiveScopes, string $source): array
+    private function initialisiereProgressStatus(\DateTimeImmutable $startZeitpunkt, array $aktiveScopes, string $source, array $fortsetzen = []): array
     {
         $sections = [];
         foreach (self::SECTION_META as $scope => $meta) {
@@ -350,7 +529,7 @@ class SyncCommand extends Command
                 'db' => $meta['db'],
                 'processed' => 0,
                 'total' => 0,
-                'cursor' => '',
+                'cursor' => $fortsetzen[$scope] ?? '',
                 'aktiv' => in_array($scope, $aktiveScopes, true),
             ];
         }

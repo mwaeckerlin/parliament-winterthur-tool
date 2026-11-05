@@ -206,11 +206,10 @@ class BudgetBuchParserTest extends TestCase {
      * Eine Zielvorgabe trägt den Unterabschnitt des Buchs in ihrem Namen, und
      * zwei Vorgaben derselben Produktegruppe heissen nie gleich.
      *
-     * Befund von Marc am 24.10.2026 am Budget 2027, Produktegruppe Immobilien
-     * (240): «Wohnliegenschaften (in %)», «Gewerbeliegenschaften (in %)» und
-     * «Restaurantbetriebe (in %)» standen je zweimal da, einmal mit Soll 1.00
-     * und einmal mit 2.31, 2.98 und 2.38 — ohne den Teil des Namens, der sie
-     * unterscheidet.
+     * Im Budget 2027, Produktegruppe Immobilien (240), kommen
+     * «Wohnliegenschaften (in %)», «Gewerbeliegenschaften (in %)» und
+     * «Restaurantbetriebe (in %)» je zweimal vor, einmal mit Soll 1.00 und
+     * einmal mit 2.31, 2.98 und 2.38. Nur der Unterabschnitt unterscheidet sie.
      *
      * Das Buch führt (Teil B, S. 75, Ziel 1 Wirtschaftlichkeit):
      *   1.1 Minimale Nettorendite
@@ -245,8 +244,8 @@ class BudgetBuchParserTest extends TestCase {
         $this->assertSame('2.38', $nach['Durchschnittliche Nettorendite|Restaurantbetriebe (in %)'] ?? null);
 
         // Keine zwei Vorgaben einer Produktegruppe heissen gleich — sonst trifft
-        // ein Antrag auf die eine die andere. Gilt für jede Produktegruppe des
-        // Buchs, nicht nur für die, in der Marc es gesehen hat.
+        // ein Antrag auf die eine die andere. Das gilt für jede Produktegruppe
+        // des Buchs.
         foreach ($struktur['produktegruppen'] as $g) {
             $namen = [];
             foreach ($g['zielvorgaben'] as $z) {

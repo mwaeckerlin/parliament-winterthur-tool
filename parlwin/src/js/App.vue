@@ -28,10 +28,9 @@
     <!-- F131: Vollbild. Der Knopf ist das Geschwister des Griffs, der die
          Seitenleiste einklappt: dieselbe Komponente, derselbe Behälter,
          dieselbe Ebene, dasselbe CSS — nur das Symbol ist ein anderes. Er
-         erscheint auf flachem Schirm und dort, wo der Browser das Vollbild
-         anbietet; dieses nimmt die Adressleiste des Browsers und seine
-         Schaltflächen weg, und eine Webseite darf dorthin nur auf eine Geste
-         des Benutzers hin. -->
+         erscheint überall, wo der Browser das Vollbild anbietet; dieses nimmt
+         die Adressleiste des Browsers und seine Schaltflächen weg, und eine
+         Webseite darf dorthin nur auf eine Geste des Benutzers hin. -->
     <Teleport v-if="vollbildKnopfZeigen" to=".app-navigation-toggle-wrapper" :disabled="!navigationBereit">
       <NcButton
         class="pw-vollbild-knopf"
@@ -72,6 +71,9 @@
       <Kommissionsliste
         v-else-if="aktiveAnsicht === 'kommissionen'"
         :mitglieder="mitglieder"
+      />
+      <Stadtratsbeschluesseliste
+        v-else-if="aktiveAnsicht === 'stadtratsbeschluesse'"
       />
       <Vorstoesseliste
         v-else-if="aktiveAnsicht === 'vorstoesse'"
@@ -116,6 +118,7 @@ import {
   mdiAccountGroupOutline,
   mdiBankOutline,
   mdiBullhornOutline,
+  mdiGavel,
   mdiFileDocumentEditOutline,
   mdiCashMultiple,
   mdiBookOpenOutline,
@@ -126,10 +129,12 @@ import {
   mdiFullscreenExit,
 } from '@mdi/js'
 import { subscribeRealtime } from './realtime'
+import { BESTAND_SCHLUESSEL, erzeugeBestand } from './geschaefte-bestand.js'
 import Geschaeftsliste from './components/Geschaeftsliste.vue'
 import Sitzungsliste from './components/Sitzungsliste.vue'
 import Mitgliederliste from './components/Mitgliederliste.vue'
 import Kommissionsliste from './components/Kommissionsliste.vue'
+import Stadtratsbeschluesseliste from './components/Stadtratsbeschluesseliste.vue'
 import Vorstoesseliste from './components/Vorstoesseliste.vue'
 import Sitzungstypenliste from './components/Sitzungstypenliste.vue'
 import Budgetliste from './components/Budgetliste.vue'
@@ -151,6 +156,7 @@ export default {
     Sitzungsliste,
     Mitgliederliste,
     Kommissionsliste,
+    Stadtratsbeschluesseliste,
     Vorstoesseliste,
     Sitzungstypenliste,
     Budgetliste,
@@ -158,6 +164,11 @@ export default {
     Bedienungsanleitung,
     Changelog,
     Protokoll,
+  },
+  // F150: Eine Liste der Geschäfte für «Kommissionen», «Geschäfte» und
+  // «Sitzungen»; ein Wechsel der Ansicht lädt sie nicht neu.
+  provide() {
+    return { [BESTAND_SCHLUESSEL]: this.geschaefteBestand }
   },
   data() {
     return {
@@ -172,6 +183,7 @@ export default {
         { key: 'geschaefte', bezeichnung: 'Geschäfte', icon: mdiClipboardTextOutline },
         { key: 'sitzungen', bezeichnung: 'Sitzungen', icon: mdiCalendarBlankOutline },
         { key: 'kommissionen', bezeichnung: 'Kommissionen', icon: mdiBankOutline },
+        { key: 'stadtratsbeschluesse', bezeichnung: 'Stadtratsbeschlüsse', icon: mdiGavel },
         { key: 'vorstoesse', bezeichnung: 'Vorstösse', icon: mdiBullhornOutline },
         { key: 'budget', bezeichnung: 'Budget', icon: mdiCashMultiple },
         { key: 'fragestunde', bezeichnung: 'Fragestunde', icon: mdiCommentQuestionOutline },
@@ -182,23 +194,26 @@ export default {
         { key: 'changelog', bezeichnung: 'Änderungsverlauf', icon: mdiHistory },
       ],
       unsubRealtime: null,
-      // F131: Vollbild. Der Knopf erscheint nur, wo der Browser es anbietet und
-      // der Schirm flach ist; dort gewinnt er die Adressleiste und die
-      // Schaltflächen des Browsers als Fläche dazu.
+      // F131: Vollbild. Der Knopf erscheint, wo der Browser es anbietet; er
+      // gewinnt die Adressleiste und die Schaltflächen des Browsers als Fläche
+      // dazu, und das nützt auf jedem Schirm.
       mdiFullscreen,
       mdiFullscreenExit,
       vollbildVerfuegbar: false,
-      flacherSchirm: false,
       imVollbild: false,
-      flachListe: null,
       // Der Knopf zieht zum Griff der Navigationsleiste; dessen Behälter gibt
       // es erst, wenn die Leiste steht.
       navigationBereit: false,
     }
   },
   computed: {
+    /**
+     * Der Knopf steht bei jeder Schirmhöhe, sobald der Browser ein Vollbild
+     * anbietet. Er nimmt die Adressleiste und die Schaltflächen des Browsers
+     * weg, und das nützt auf jedem Schirm.
+     */
     vollbildKnopfZeigen() {
-      return this.vollbildVerfuegbar && this.flacherSchirm
+      return this.vollbildVerfuegbar
     },
   },
   mounted() {
@@ -214,36 +229,26 @@ export default {
     this.navigationBereit = typeof document !== 'undefined'
       && !!document.querySelector('.app-navigation-toggle-wrapper')
   },
+  beforeCreate() {
+    this.geschaefteBestand = erzeugeBestand()
+  },
   beforeUnmount() {
     window.removeEventListener('hashchange', this.ansichtAusHashAnwenden)
+    this.geschaefteBestand.abbrechen()
     if (this.unsubRealtime) {
       this.unsubRealtime()
       this.unsubRealtime = null
     }
-    if (this.flachListe) { this.flachListe.removeEventListener('change', this.flacherSchirmGewechselt) }
     if (typeof document !== 'undefined') { document.removeEventListener('fullscreenchange', this.vollbildGewechselt) }
   },
   methods: {
-    /**
-     * F131: Vollbild. Der Knopf erscheint nur, wo beides zutrifft — der Browser
-     * bietet das Vollbild an, und der Schirm ist flach (dieselbe Grenze von
-     * 56rem Bildhöhe wie im Stylesheet). Auf einem hohen Schirm gewinnt das
-     * Vollbild zu wenig, um einen Knopf zu rechtfertigen.
-     */
+    /** F131: Vollbild. Der Knopf erscheint, sobald der Browser das Vollbild anbietet. */
     vollbildEinrichten() {
       if (typeof document === 'undefined') { return }
       const el = document.documentElement
       this.vollbildVerfuegbar = !!(document.fullscreenEnabled && el && typeof el.requestFullscreen === 'function')
       this.imVollbild = !!document.fullscreenElement
       document.addEventListener('fullscreenchange', this.vollbildGewechselt)
-      if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
-        this.flachListe = window.matchMedia('(max-height: 56rem)')
-        this.flacherSchirmGewechselt()
-        this.flachListe.addEventListener('change', this.flacherSchirmGewechselt)
-      }
-    },
-    flacherSchirmGewechselt() {
-      this.flacherSchirm = !!(this.flachListe && this.flachListe.matches)
     },
     // Der Browser verlässt das Vollbild auch von sich aus, etwa mit der
     // Zurück-Taste; der Knopf folgt diesem Zustand, statt ihn zu raten.
@@ -313,6 +318,7 @@ export default {
     },
     handleRealtimeEvent(event) {
       const type = event?.type || ''
+      this.geschaefteBestand.ereignis(event)
       if (
         type === 'sync.completed' ||
         type === 'mitglieder.updated' ||

@@ -169,15 +169,47 @@
 /* F131: Der Vollbild-Knopf hat KEINE eigene Gestalt und keine eigene Lage. Er
    ist das Geschwister des Griffs, der die Seitenleiste einklappt: dieselbe
    Komponente (NcButton, «tertiary»), derselbe Behälter
-   («app-navigation-toggle-wrapper»), dieselbe Ebene, dasselbe CSS. Marc am
-   24.10.2026: «Gleiche Definition, keine Kopie!», «Sie teilen dasselbe CSS»,
-   «Und sind Geschwister im selben Element in derselben Ebene», «Es wird nie
-   etwas nachgebaut!»
+   («app-navigation-toggle-wrapper»), dieselbe Ebene, dasselbe CSS: eine
+   Definition für beide, keine Kopie, kein nachgebautes Gegenstück.
 
-   Die eine Zeile hier gilt beiden: Der Behälter ist ein Block, und zwei Knöpfe
-   darin stünden untereinander. Nebeneinander stehen sie als Reihe. */
+   Die erste Zeile gilt beiden: Der Behälter ist ein Block, und zwei Knöpfe
+   darin stünden untereinander. Nebeneinander stehen sie als Reihe.
+
+   Die Lage des Paares: Offen steht es rechtsbündig am Rand der Leiste.
+   Zugeklappt rückt es nach links, bis der linke Knopf am linken Rand des
+   Inhalts steht; die Breite beider Knöpfe zählt also mit.
+
+   Gemessen am 26.10.2026: Der Behälter liegt absolut IN der Leiste, mit
+   «inset-inline-start: 274px» bei 300px Leistenbreite — also weder am
+   einen noch am anderen Rand, sondern 26px über die Leiste hinaus im
+   Inhaltsbereich. Zugeklappt trägt die Leiste «app-navigation--closed» und
+   steht um ihre volle Breite links ausserhalb des Bildes.
+
+   Daraus die beiden Regeln, ohne eine einzige feste Zahl: Der Behälter beginnt
+   am rechten Rand der Leiste. Offen zieht ihn seine eigene Breite nach links,
+   sodass seine rechte Kante auf dem Rand der Leiste liegt. Zugeklappt fällt
+   dieser Zug weg; der rechte Rand der Leiste liegt dann auf dem linken
+   Bildrand, und dort beginnt der linke der beiden Knöpfe. */
 .app-navigation-toggle-wrapper {
   display: flex;
+  /* Nextcloud gibt dem Behälter die Breite EINES Knopfes; der zweite ragte
+     damit über seinen Rand hinaus, und die Verschiebung unten rechnete mit der
+     falschen Breite (gemessen am 26.10.2026: Behälter 42px, Paar 68px). */
+  inline-size: max-content;
+  inset-inline-start: 100%;
+  transform: translateX(-100%);
+}
+.app-navigation--closed .app-navigation-toggle-wrapper {
+  transform: none;
+}
+
+/* Das Paar liegt am oberen rechten Rand der Leiste, und darunter beginnt deren
+   Inhalt mit dem Suchfeld. Ohne diesen Platz deckt der Griff das ✕ des
+   Suchfeldes zu und fängt seine Klicks ab (gemessen am 26.10.2026: Griff bei
+   266 bis 300, das ✕ am rechten Ende des Feldes bei 293). Reserviert wird die
+   Breite der beiden Knöpfe, aus derselben Grösse, die Nextcloud ihnen gibt. */
+.pw-nav-search {
+  padding-inline-end: calc(2 * var(--default-clickable-area, 34px));
 }
 
 /* Die Navigationsleiste scrollt, sobald ihr Inhalt nicht mehr auf den Schirm
@@ -494,6 +526,7 @@
 #parlwin-admin-settings h2,
 .pw-detail-header h3,
 .pw-data-card h3,
+.pw-kommission-kopf h3,
 .pw-modal-kopf h3 {
   margin: 0;
   line-height: 1.15;
@@ -719,6 +752,61 @@
 .pw-mitglied-karte {
   align-content: start;
   padding: var(--pw-gap-2);
+}
+
+// ---- Stadtratsbeschlüsse (F144) ----
+// Die Karte selbst ist eine `pw-data-card` mit `pw-data-card-header` und
+// `pw-data-pair`, also dieselbe Form wie bei den Vorstössen und in der
+// Fragestunde. Eigen sind nur die Liste der Dokumente und der Kopf, der die
+// Notizen auf- und zuklappt.
+.pw-srb-dokumente ul {
+  display: grid;
+  gap: var(--pw-space-xs);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+// Dokumente und Notizen beginnen je mit ihrer Überschrift und stehen darum mit
+// dem Abstand einer solchen unter den Angaben, wie die Mitglieder an der
+// Kommission.
+.pw-srb-karte > .pw-srb-dokumente,
+.pw-srb-karte > .pw-srb-notizen {
+  margin-block-start: var(--pw-gap-3);
+}
+
+// Der Kopf der Notizen sieht aus wie der Schalter der Mitglieder an der
+// Kommission: die Zahl links, das Zeichen rechts an der Kante der Karte. Er ist
+// ein Knopf, und Nextcloud gibt jedem Knopf Hintergrund, Rahmen, Innenabstand
+// und Mindesthöhe; der Wähler mit dem Behälter wiegt schwerer als dessen
+// `button:not(.button-vue)` samt seinen Zuständen und nimmt das zurück.
+.pw-srb-karte .pw-srb-notizen .pw-srb-notizen-kopf {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--pw-gap-2);
+  inline-size: 100%;
+  min-block-size: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.pw-srb-karte .pw-srb-notizen .pw-srb-notizen-kopf:hover,
+.pw-srb-karte .pw-srb-notizen .pw-srb-notizen-kopf:focus {
+  background: none;
+  color: var(--color-primary-element);
+}
+
+.pw-srb-karte .pw-srb-notizen .pw-srb-notizen-kopf:focus-visible {
+  outline: 2px solid var(--color-primary-element);
+  outline-offset: 2px;
+  border-radius: var(--pw-radius-small, 0.25rem);
 }
 
 .pw-data-card-header,
@@ -2099,6 +2187,25 @@ tr.pw-prio-hoch > td {
   border-radius: var(--pw-radius) var(--pw-radius) 0 0;
 }
 
+/* F141: Im Kopf stehen der Name und der Knopf «Neues Geschäft» in einer Reihe,
+   der Knopf oben rechts, bei jeder Breite. Der Knopf behält seine Grösse, der
+   Name nimmt den Rest der Reihe. Reicht der Platz für ein langes Wort wie
+   «Aufsichtskommission» nicht, trennt der Browser es an seinen deutschen
+   Trennstellen (die Überschrift trägt `lang="de"`); nur ein Teil, der auch
+   so nicht in die Zeile passt, bricht noch an der Kante (wortumbruch.test.js).
+   So bleibt der Name links vom Knopf und läuft nie unter ihn. */
+.pw-kommission-kopf > :first-child {
+  flex: 1 1 0;
+}
+.pw-kommission-kopf h3 {
+  overflow-wrap: break-word;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+.pw-kommission-neues-geschaeft {
+  flex: 0 0 auto;
+}
+
 // Die Sitzungskarte klappt als Ganzes auf; die Kommissionskarte zeigt ihre
 // Geschäfte immer und klappt allein die Mitglieder (F118).
 .pw-sitzung-kopf {
@@ -2819,6 +2926,14 @@ tr.pw-prio-hoch > td {
   padding-block-end: var(--pw-gap-1);
 }
 
+/* F131: Steht der Vollbild-Knopf neben dem Griff, rückt bei zugeklappter
+   Leiste das Paar an den linken Rand, und der Titel braucht den Platz beider
+   Knöpfe; sonst lag der zweite über dem ersten Buchstaben des Titels. Bei
+   offener Leiste steht das Paar in der Leiste, und der Kopf bleibt, wie er ist. */
+body:has(.app-navigation--closed > .app-navigation-toggle-wrapper > .pw-vollbild-knopf) .pw-view-header {
+  padding-inline-start: calc(2 * var(--pw-click-lg));
+}
+
 /* Ein Knopf trägt seine Beschriftung ganz; schrumpfen tut die Zeile um ihn
    herum, nie er selbst. */
 .pw-view-header button {
@@ -2995,7 +3110,6 @@ tr.pw-prio-hoch > td {
   }
 
   .pw-sitzung-kopf,
-  .pw-kommission-kopf,
   .pw-app-main-header,
   .pw-toolbar-inline,
   .pw-detail-header,

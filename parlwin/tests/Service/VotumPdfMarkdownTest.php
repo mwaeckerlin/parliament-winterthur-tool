@@ -9,9 +9,9 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Der Wortlaut eines Votums wird im Editor als Markdown gespeichert — dieselbe
- * Schreibweise wie bei den Notizen. Das PDF gab ihn bisher unverändert als HTML
- * aus: «**fett**» stand wörtlich da, und Leerzeilen wurden zu nichts, weil HTML
- * sie nicht als Absatz liest. Beides hat Marc am Votum im Rat gesehen.
+ * Schreibweise wie bei den Notizen. Das PDF wandelt ihn in HTML: Unverändert
+ * ausgegeben stünde «**fett**» wörtlich da, und Leerzeilen würden zu nichts,
+ * weil HTML sie nicht als Absatz liest.
  */
 class VotumPdfMarkdownTest extends TestCase
 {
@@ -77,8 +77,7 @@ class VotumPdfMarkdownTest extends TestCase
 
     /**
      * Die Vorlage des PDF muss den Wandler auch WIRKLICH benutzen. Ein Test nur
-     * gegen RichText bliebe grün, während das PDF den Text weiterhin roh ausgibt
-     * — genau der Zustand, den Marc gesehen hat.
+     * gegen RichText bliebe grün, während das PDF den Text weiterhin roh ausgibt.
      */
     public function testDieVorlageWandeltDenWortlaut(): void
     {

@@ -29,9 +29,21 @@
         >
         <div class="pw-kommission-kopf">
           <div>
-            <h3>{{ kuerze(k.name) }}</h3>
+            <!-- Der Name ist deutsch, auch wenn Nextcloud eine andere Sprache
+                 eingestellt hat; nur so trennt der Browser ein langes Wort. -->
+            <h3 lang="de">{{ kuerze(k.name) }}</h3>
             <p class="pw-kommission-status">{{ istAktiv(k) ? 'Aktiv' : 'Aufgelöst oder inaktiv' }}</p>
           </div>
+          <!-- F141: Derselbe Dialog wie «+ Eigenes Geschäft» in der Ansicht
+               «Geschäfte», mit dieser Kommission als Vorauswahl. Der Weg über
+               die andere Ansicht und die Auswahl von Hand war zu umständlich.
+               Eine inaktive Kommission nimmt keine neuen Geschäfte an. -->
+          <NcButton
+            v-if="istAktiv(k)"
+            type="secondary"
+            class="pw-kommission-neues-geschaeft"
+            @click="neuesGeschaeftOeffnen(k)"
+          >Neues Geschäft</NcButton>
         </div>
         <div class="pw-kommission-details">
           <p v-if="k.beschreibung">{{ k.beschreibung }}</p>
@@ -100,20 +112,16 @@
       </div>
     </section>
 
-    <Teleport to="body">
-      <div v-if="ausgewaehlteGeschaeftId" class="pw-modal-overlay" @click.self="schliesseDetail">
-        <div class="pw-modal">
-          <div class="pw-modal-kopf pw-modal-kopf-leer">
-            <button type="button" class="button pw-btn-schliessen" aria-label="Dialog schliessen" @click.stop="schliesseDetail">✕</button>
-          </div>
-          <GeschaeftDetail
-            :geschaeft-id="ausgewaehlteGeschaeftId"
-            :mitglieder="mitglieder"
-            @gespeichert="nachSpeichern"
-          />
-        </div>
-      </div>
-    </Teleport>
+    <GeschaeftMaske
+      :geschaeft-id="ausgewaehlteGeschaeftId"
+      :bestand="bestand"
+      :mitglieder="mitglieder"
+      :vorauswahl-kommission="neueGeschaeftKommission"
+      @schliessen="schliesseDetail"
+      @erstellt="nachErstellen"
+      @gespeichert="nachSpeichern"
+      @oeffne-geschaeft="oeffneDetail"
+    />
 </template>
 
 <script>
@@ -122,7 +130,10 @@ import { getCurrentUser } from '@nextcloud/auth'
 import axios from '@nextcloud/axios'
 import { kuerze } from '../utils'
 import { subscribeRealtime } from '../realtime'
-import GeschaeftDetail from './GeschaeftDetail.vue'
+import { listeAbgleichen } from '../nachladen'
+import { BESTAND_SCHLUESSEL, bestandAnbinden } from '../geschaefte-bestand.js'
+import GeschaeftMaske from './GeschaeftMaske.vue'
+import NcButton from '@nextcloud/vue/components/NcButton'
 import NcTextField from '@nextcloud/vue/components/NcTextField'
 import NcCheckboxRadioSwitch from '@nextcloud/vue/components/NcCheckboxRadioSwitch'
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
@@ -131,7 +142,8 @@ import FilterPanel from './FilterPanel.vue'
 
 export default {
   name: 'Kommissionsliste',
-  components: { GeschaeftDetail, NcTextField, NcCheckboxRadioSwitch, NcLoadingIcon, NcEmptyContent, FilterPanel },
+  components: { GeschaeftMaske, NcButton, NcTextField, NcCheckboxRadioSwitch, NcLoadingIcon, NcEmptyContent, FilterPanel },
+  inject: { geteilterBestand: { from: BESTAND_SCHLUESSEL, default: null } },
   props: {
     mitglieder: { type: Array, default: () => [] },
   },
@@ -149,10 +161,17 @@ export default {
       // Der Zustand des Anwenders, während der Druck alle Karten offen hat.
       offeneVorDemDruck: null,
       unsubRealtime: null,
+      // Das Geschäft in der Maske: null bei geschlossener Maske, 0 für ein neues.
       ausgewaehlteGeschaeftId: null,
+      // F141: Während ein neues Geschäft an einer Kommission erfasst wird, steht
+      // ihr Name als Vorauswahl in der Maske.
+      neueGeschaeftKommission: '',
     }
   },
   computed: {
+    detailOffen() {
+      return this.ausgewaehlteGeschaeftId !== null
+    },
     gefilterteKommissionen() {
       let liste = [...this.kommissionen]
       if (this.nurAktive) {
@@ -226,6 +245,11 @@ export default {
       }
     },
   },
+  created() {
+    const { bestand, eigener } = bestandAnbinden(this, this.geteilterBestand, () => this.geschaefteUebernehmen())
+    this.bestand = bestand
+    this.eigenerBestand = eigener
+  },
   mounted() {
     this.$nextTick(() => { this.filterReady = true })
     this.ladeKommissionen()
@@ -241,6 +265,7 @@ export default {
   beforeUnmount() {
     window.removeEventListener('beforeprint', this.vorDemDruck)
     window.removeEventListener('afterprint', this.nachDemDruck)
+    if (this.eigenerBestand) { this.bestand.abbrechen() }
     if (this.unsubRealtime) {
       this.unsubRealtime()
       this.unsubRealtime = null
@@ -263,18 +288,28 @@ export default {
       this.nurAktive = true
       this.nurAktiveMitglieder = true
     },
-    async ladeKommissionen() {
-      this.laden = true
+    /**
+     * Lädt die Kommissionen. Nach einem Ereignis (`hintergrund`) bleibt die
+     * Ansicht stehen und wird danach an Ort und Stelle angeglichen; nur beim
+     * ersten Laden erscheint der Lade-Zustand.
+     */
+    async ladeKommissionen(hintergrund = false) {
+      if (!hintergrund) this.laden = true
       try {
         const { data } = await axios.get(generateUrl('/apps/parlwin/kommissionen'))
-        this.kommissionen = (Array.isArray(data) ? data : []).map(k => ({
+        const neu = (Array.isArray(data) ? data : []).map(k => ({
           ...k,
           mitgliederArray: this.parseMitglieder(k.mitglieder),
         }))
+        if (hintergrund) {
+          listeAbgleichen(this.kommissionen, neu)
+        } else {
+          this.kommissionen = neu
+        }
       } catch (e) {
         console.error('Fehler beim Laden der Kommissionen:', e)
       } finally {
-        this.laden = false
+        if (!hintergrund) this.laden = false
       }
     },
     aktualisiereMitgliederArrays() {
@@ -284,30 +319,16 @@ export default {
       }))
     },
     /**
-     * Lädt ALLE Geschäfte, seitenweise. Ein fester Deckel (früher 1000) lässt bei
-     * einem gewachsenen Bestand pendente Geschäfte einer Kommission stillschweigend
-     * verschwinden — die Ansicht zeigte dann eine kürzere Liste, ohne das zu sagen.
-     * Die Schleife hört auf, sobald eine Seite nicht mehr voll ist.
+     * ALLE Geschäfte, seitenweise, aus der Liste, die die Ansichten teilen
+     * (F150). Ein fester Deckel (früher 1000) liess bei einem gewachsenen
+     * Bestand pendente Geschäfte einer Kommission stillschweigend verschwinden.
      */
     async ladeGeschaefte() {
-      const proSeite = 1000
-      const alle = []
-      try {
-        // Grenze gegen eine endlose Schleife, falls der Server immer volle Seiten
-        // liefert: 50 Seiten sind 50'000 Geschäfte und weit jenseits des Bestands.
-        for (let seite = 0; seite < 50; seite++) {
-          const { data } = await axios.get(generateUrl('/apps/parlwin/geschaefte'), {
-            params: { show_erledigt: 1, limit: proSeite, offset: seite * proSeite },
-          })
-          const teil = Array.isArray(data) ? data : []
-          alle.push(...teil)
-          if (teil.length < proSeite) { break }
-        }
-        this.geschaefte = alle
-      } catch (e) {
-        console.error('Fehler beim Laden der Geschäfte:', e)
-        this.geschaefte = alle
-      }
+      await this.bestand.laden()
+      this.geschaefteUebernehmen()
+    },
+    geschaefteUebernehmen() {
+      listeAbgleichen(this.geschaefte, this.bestand.zustand.geschaefte)
     },
     parseMitglieder(raw) {
       if (!raw) return []
@@ -465,9 +486,10 @@ export default {
     },
     handleRealtimeEvent(event) {
       const type = event?.type || ''
+      // Die geteilte Liste der Geschäfte bekommt ihre Ereignisse von App.vue.
+      if (this.eigenerBestand) { this.bestand.ereignis(event) }
       if (type === 'sync.completed') {
-        this.ladeKommissionen()
-        this.ladeGeschaefte()
+        this.ladeKommissionen(true)
       }
     },
     toggleMitglieder(id) {
@@ -478,13 +500,30 @@ export default {
       }
     },
     oeffneDetail(geschaeftId) {
+      this.neueGeschaeftKommission = ''
       this.ausgewaehlteGeschaeftId = geschaeftId
+    },
+    /**
+     * F141: Dieselbe Maske wie «+ Eigenes Geschäft», mit dieser Kommission
+     * schon im Feld. Die Maske legt mit der ID 0 ein neues Geschäft an.
+     */
+    neuesGeschaeftOeffnen(kommission) {
+      this.neueGeschaeftKommission = kommission && kommission.name ? kommission.name : ''
+      this.ausgewaehlteGeschaeftId = 0
     },
     schliesseDetail() {
       this.ausgewaehlteGeschaeftId = null
+      this.neueGeschaeftKommission = ''
     },
-    async nachSpeichern() {
-      await this.ladeGeschaefte()
+    // Die Maske hat das Geschäft schon in der geteilten Liste nachgeladen.
+    nachSpeichern() {
+      this.$emit('aktualisiert')
+    },
+    // Nach dem Anlegen geht dieselbe Maske in die Bearbeitung über, wie in
+    // «Geschäfte», sodass sich Dokumente und Notizen unmittelbar anschliessen.
+    nachErstellen(id) {
+      this.neueGeschaeftKommission = ''
+      this.ausgewaehlteGeschaeftId = id || null
       this.$emit('aktualisiert')
     },
   },

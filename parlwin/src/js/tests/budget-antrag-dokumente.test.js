@@ -10,9 +10,8 @@ vi.mock('@nextcloud/auth', () => ({ getCurrentUser: () => ({ uid: 'mw', displayN
 /**
  * Dokumente am Budgetantrag (F125).
  *
- * Marc am 24.10.2026: «im Weiteren ist beschwert worden, dass man bei den
- * Anträgen im Budget kein Dokument aufladen kann». Jedes andere Objekt der
- * Anwendung trägt Dokumente; der Antrag trug nur Notizen.
+ * Ein Budgetantrag trägt neben Notizen auch Dokumente, wie jedes andere
+ * Objekt der Anwendung.
  *
  * vitest läuft im Projekt-Root.
  */
@@ -27,7 +26,7 @@ const ANSICHT = {
   summen: SUMMEN,
   summenStadtrat: SUMMEN,
   departemente: ['Finanzen'],
-  eigeneFraktion: 'SVP-Fraktion',
+  eigeneFraktion: 'Fraktion-Muster',
   produktegruppen: [{
     code: '240', name: 'Immobilien', departement: 'Finanzen',
     globalkredit: { soll: 1000, sollFraktion: 900, vorjahr: 1000 },

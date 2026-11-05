@@ -143,7 +143,7 @@ class BudgetImportServiceTest extends TestCase {
         $fremd->setZielRef('121');
         $fremd->setHerkunft('fremde');
         $fremd->setHaltung('unterstuetzen');
-        $fremd->setAntragsteller('Grüne/Anna Muster');
+        $fremd->setAntragsteller('BPW/Anna Muster');
         $fremd->setBetragDelta(-500);
         $antraege = $this->createStub(BudgetAntragMapper::class);
         $antraege->method('findByJahr')->willReturn([$eigen, $fremd]);
@@ -167,7 +167,7 @@ class BudgetImportServiceTest extends TestCase {
         // Mit Option: eigener (Fraktion) und der unterstützte fremde (Name bleibt).
         $mit = $steller($svc->antraegePdf(2026, null, true, 'Unsere Fraktion'));
         self::assertContains('Unsere Fraktion', $mit);
-        self::assertContains('Grüne/Anna Muster', $mit);
+        self::assertContains('BPW/Anna Muster', $mit);
         self::assertCount(2, $mit);
 
         // Der Fraktionsname wird zurückgegeben — die Druckseite setzt ihn in den Titel
@@ -179,10 +179,8 @@ class BudgetImportServiceTest extends TestCase {
      * Die Druckdaten tragen zu jeder Zielvorgaben-Änderung den Unterabschnitt
      * und den heutigen Soll — dasselbe, was am Bildschirm steht.
      *
-     * Befund von Marc am 24.10.2026: «Auch in der Liste der Anträge fehlen
-     * angepasste Zielwerte (ebenso wie dann folglich im PDF)!» Gedruckt wurde
-     * nur die Messgrösse und der neue Wert; welche der beiden gleich benannten
-     * Vorgaben gemeint ist und was heute gilt, stand nicht da.
+     * Die Messgrösse und der neue Wert allein sagen nicht, welche von zwei
+     * gleich benannten Vorgaben gemeint ist und was heute gilt.
      */
     public function testAntraegePdfTraegtUnterabschnittUndHeutigenSoll(): void {
         $g = new BudgetProduktegruppe();

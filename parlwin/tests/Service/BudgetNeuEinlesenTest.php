@@ -11,11 +11,9 @@ use PHPUnit\Framework\TestCase;
 /**
  * Neu einlesen nach einer Verbesserung am Einleser (F130).
  *
- * Marc am 24.10.2026: «Stelle sicher, dass bei Verbesserungen im Parser auch
- * bereits eingelesene Dokumente nach dem Update neu eingelesen werden, und
- * bestehende Einträge der Fraktion nicht verloren gehen und auch am richtigen
- * Ort bleiben. Es darf sich an unseren Einträgen nichts ändern, nichts kaputt
- * gehen kann. Das musst du mit Beispielen testen.»
+ * Nach einer Verbesserung am Einleser werden bereits eingelesene Dokumente neu
+ * eingelesen. Die Einträge der Fraktion bleiben dabei erhalten, an ihrem Ort
+ * und unverändert.
  *
  * Geprüft wird mit dem echten Buch 2027: Alles, woran ein Antrag der Fraktion
  * hängt, muss über zwei Lesevorgänge hinweg gleich bleiben — die Nummer der

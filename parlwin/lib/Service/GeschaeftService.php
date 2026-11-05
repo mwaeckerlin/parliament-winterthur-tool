@@ -29,6 +29,23 @@ class GeschaeftService {
     ) {
     }
 
+    /** @var list<int> siehe zuletztGeaenderteIds() */
+    private array $geaenderteIds = [];
+
+    /**
+     * Die IDs der Geschäfte, die der letzte Abgleich dieses Prozesses neu
+     * angelegt hat, deren Angaben aus der Quelle sich geändert haben, die
+     * wieder in der Quelle stehen oder deren Dokumente er neu gelesen hat
+     * (F150). Wechselt die ID eines Geschäfts, stehen die alte und die neue
+     * da. Ein Geschäft, das die Quelle unverändert hergibt, fehlt.
+     *
+     * @return list<int>
+     */
+    public function zuletztGeaenderteIds(): array
+    {
+        return $this->geaenderteIds;
+    }
+
     /**
      * Synchronisiert alle Geschäfte von der Parlamentswebseite.
      *
@@ -60,6 +77,7 @@ class GeschaeftService {
             }
         });
         $statistik = ['neu' => 0, 'aktualisiert' => 0, 'geloescht' => 0];
+        $this->geaenderteIds = [];
         $bekannteExternIds = [];
         $gesamt = count($rohdaten);
         $fortschrittGesamt = $gesamt > 0 ? ($gesamt * 2) : 0;
@@ -149,7 +167,11 @@ class GeschaeftService {
 
             try {
                 $geschaeft = $this->mapper->findByExternId($externId);
+                $idVorher = (int) $geschaeft->getId();
                 $this->mapper->harmonisiereIdMitExternId($geschaeft, $dbId);
+                if ((int) $geschaeft->getId() !== $idVorher) {
+                    array_push($this->geaenderteIds, $idVorher, (int) $geschaeft->getId());
+                }
                 // Ein abgeschlossenes Geschäft wird übersprungen, solange die
                 // Quelle dasselbe hergibt wie beim letzten Mal. Ohne diesen
                 // Vergleich blieb es für immer stehen, wie es war: Am
@@ -173,12 +195,17 @@ class GeschaeftService {
                     continue;
                 }
                 // Aktualisieren (nur öffentliche Felder, fraktionsinterne Felder bleiben erhalten)
+                $hashVorher = $geschaeft->getQuelleHash();
+                $warGeloescht = (bool) $geschaeft->getGeloescht();
                 $this->aktualisiereOeffentlicheFelder($geschaeft, $daten);
                 $this->mapper->update($geschaeft);
                 $this->synchronisiereEreignisse($geschaeft, $daten);
                 $this->verknuepfePassendenEntwurf($geschaeft, $daten);
-                $this->synchronisiereDokumente($geschaeft, $daten);
+                $neueDokumente = $this->synchronisiereDokumente($geschaeft, $daten);
                 $statistik['aktualisiert']++;
+                if ($warGeloescht || $neueDokumente > 0 || $geschaeft->getQuelleHash() !== $hashVorher) {
+                    $this->geaenderteIds[] = (int) $geschaeft->getId();
+                }
             } catch (DoesNotExistException) {
                 // Neues Geschäft anlegen
                 $geschaeft = $this->erstelleAusRohdaten($externId, $dbId, $daten);
@@ -187,6 +214,7 @@ class GeschaeftService {
                 $this->verknuepfePassendenEntwurf($geschaeft, $daten);
                 $this->synchronisiereDokumente($geschaeft, $daten);
                 $statistik['neu']++;
+                $this->geaenderteIds[] = (int) $geschaeft->getId();
             }
 
             if ($fortschritt !== null) {
@@ -378,17 +406,18 @@ class GeschaeftService {
      * Dokumente auf der Seite geschieht nichts.
      *
      * @param array<string, mixed> $daten
+     * @return int Zahl der Dokumente, die dieser Lauf neu gelesen hat
      */
-    private function synchronisiereDokumente(Geschaeft $geschaeft, array $daten): void {
+    private function synchronisiereDokumente(Geschaeft $geschaeft, array $daten): int {
         if ($this->dokumentService === null) {
-            return;
+            return 0;
         }
         $dokumente = ScraperService::wert($daten, ['dokumente'], []);
         if (!is_array($dokumente) || $dokumente === []) {
-            return;
+            return 0;
         }
         try {
-            $this->dokumentService->aktualisiere((int) $geschaeft->getId(), array_values($dokumente));
+            return $this->dokumentService->aktualisiere((int) $geschaeft->getId(), array_values($dokumente));
         } catch (\Throwable $e) {
             // Ein unlesbares Dokument darf den Abgleich der Geschäfte nicht
             // anhalten: Der Fehler steht im Protokoll und am Dokument.
@@ -396,6 +425,7 @@ class GeschaeftService {
                 'Parlament Winterthur: Dokumente eines Geschäfts nicht abgeglichen: ' . $e->getMessage(),
                 ['geschaeft' => $geschaeft->getNummer(), 'exception' => $e]
             );
+            return 0;
         }
     }
 

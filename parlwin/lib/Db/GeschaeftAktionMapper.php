@@ -172,6 +172,37 @@ class GeschaeftAktionMapper extends QBMapper
     }
 
     /**
+     * Der letzte gültige Beschluss jedes Geschäfts der Liste, mit einer Abfrage
+     * je Block von 500 Geschäften. Dieselbe Wahl wie
+     * {@see findLetzterGueltigerBeschluss()}: das jüngste Erstelldatum, bei
+     * Gleichstand die höhere ID.
+     *
+     * @param int[] $geschaeftIds
+     * @return array<int, GeschaeftAktion> nach Geschäft
+     */
+    public function findLetzteGueltigeBeschluesse(array $geschaeftIds): array
+    {
+        $ids = array_values(array_unique(array_map('intval', $geschaeftIds)));
+        $letzte = [];
+        foreach (array_chunk($ids, 500) as $block) {
+            $qb = $this->db->getQueryBuilder();
+            $qb->select('*')
+                ->from($this->getTableName())
+                ->where($qb->expr()->in('geschaeft_id', $qb->createNamedParameter($block, IQueryBuilder::PARAM_INT_ARRAY)))
+                ->andWhere($qb->expr()->eq('objekt_typ', $qb->createNamedParameter('geschaeft')))
+                ->andWhere($qb->expr()->eq('aktion_typ', $qb->createNamedParameter('beschluss')))
+                ->andWhere($qb->expr()->eq('entscheid_gueltig', $qb->createNamedParameter(true, IQueryBuilder::PARAM_BOOL)))
+                ->orderBy('geschaeft_id', 'ASC')
+                ->addOrderBy('erstellt_am', 'DESC')
+                ->addOrderBy('id', 'DESC');
+            foreach ($this->findEntities($qb) as $aktion) {
+                $letzte[(int) $aktion->getGeschaeftId()] ??= $aktion;
+            }
+        }
+        return $letzte;
+    }
+
+    /**
      * Liefert das aktuell aktive (noch nicht archivierte) Votum zu einem
      * Geschäft, falls vorhanden. Aktiv = entscheid_gueltig = true.
      */

@@ -3,7 +3,7 @@ import { shallowMount } from '@vue/test-utils'
 import Vorstoesseliste from '../components/Vorstoesseliste.vue'
 import axios from '@nextcloud/axios'
 
-// Der angemeldete Benutzer ist «amueller» (= Anna Müller, aktiv, Fraktion Grüne).
+// Der angemeldete Benutzer ist «amueller» (= Anna Müller, aktiv, Fraktion MPW).
 vi.mock('@nextcloud/auth', () => ({ getCurrentUser: () => ({ uid: 'amueller', displayName: 'Anna Müller' }) }))
 
 describe('Vorstoesseliste — Vorbelegung & aktive-Einträge', () => {
@@ -15,14 +15,14 @@ describe('Vorstoesseliste — Vorbelegung & aktive-Einträge', () => {
   const mountFn = (props = {}) => shallowMount(Vorstoesseliste, {
     props: {
       mitglieder: [
-        { id: 1, vorname: 'Anna', name: 'Müller', fraktion: 'Grüne', nextcloudUid: 'amueller', aktiv: true, externId: 'e1' },
-        { id: 2, vorname: 'Bob', name: 'Meier', fraktion: 'SP', nextcloudUid: 'bmeier', aktiv: true, externId: 'e2' },
-        { id: 3, vorname: 'Carla', name: 'Alt', fraktion: 'SP', nextcloudUid: 'calt', aktiv: false, externId: 'e3' },
+        { id: 1, vorname: 'Anna', name: 'Müller', fraktion: 'MPW', nextcloudUid: 'amueller', aktiv: true, externId: 'e1' },
+        { id: 2, vorname: 'Bob', name: 'Meier', fraktion: 'BPW', nextcloudUid: 'bmeier', aktiv: true, externId: 'e2' },
+        { id: 3, vorname: 'Carla', name: 'Alt', fraktion: 'BPW', nextcloudUid: 'calt', aktiv: false, externId: 'e3' },
       ],
       fraktionen: [
-        { id: 1, name: 'Grüne', aktiv: true },
-        { id: 2, name: 'SP', aktiv: true },
-        { id: 3, name: 'EVP', aktiv: false },
+        { id: 1, name: 'MPW', aktiv: true },
+        { id: 2, name: 'BPW', aktiv: true },
+        { id: 3, name: 'CPW', aktiv: false },
       ],
       ...props,
     },
@@ -48,16 +48,16 @@ describe('Vorstoesseliste — Vorbelegung & aktive-Einträge', () => {
 
   it('Herkunft listet nur aktive Fraktionen (ohne die eigene)', () => {
     const wrapper = mountFn()
-    wrapper.vm.eigeneFraktion = 'Grüne'
+    wrapper.vm.eigeneFraktion = 'MPW'
     const werte = wrapper.vm.fremdeFraktionsOptionen.map(o => o.value)
-    expect(werte).toEqual(['SP']) // EVP inaktiv raus, Grüne = eigene raus
+    expect(werte).toEqual(['BPW']) // CPW inaktiv raus, MPW = eigene raus
   })
 
   it('Ansprechpartner listet nur aktive Mitglieder der gewählten Fraktion', async () => {
     const wrapper = mountFn()
     wrapper.vm.bearbeiten({ id: 5, titel: 'X' })
     wrapper.vm.bearbeitung.herkunft = 'fremde'
-    wrapper.vm.bearbeitung.herkunftFraktion = 'SP'
+    wrapper.vm.bearbeitung.herkunftFraktion = 'BPW'
     await wrapper.vm.$nextTick()
     const namen = wrapper.vm.ansprechpartnerOptionen.map(o => o.label)
     expect(namen).toEqual(['Bob Meier']) // Carla Alt (inaktiv) fehlt

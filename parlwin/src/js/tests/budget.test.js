@@ -62,7 +62,7 @@ function ansichtFixture() {
     antraege: [
       { id: 10, bereich: 'globalbudget', zielRef: '121', betragDelta: -100000, stellenDelta: 0, antragsteller: 'Fraktion X', begruendung: 'Sparen', automatisch: false, entscheid: 'offen', phase: 'fraktion' },
       { id: 11, bereich: 'globalbudget', zielRef: '121', betragDelta: -20000, stellenDelta: 0, antragsteller: '', begruendung: 'Pauschalkürzung', automatisch: true, entscheid: 'offen', phase: 'fraktion' },
-      { id: 12, bereich: 'globalbudget', zielRef: '121', betragDelta: -30000, stellenDelta: 0, antragsteller: 'SVP', begruendung: 'Offizieller Kürzungsantrag', automatisch: false, entscheid: 'offen', phase: 'sitzung' },
+      { id: 12, bereich: 'globalbudget', zielRef: '121', betragDelta: -30000, stellenDelta: 0, antragsteller: 'MPW', begruendung: 'Offizieller Kürzungsantrag', automatisch: false, entscheid: 'offen', phase: 'sitzung' },
       { id: 13, bereich: 'personal', zielRef: '121', betragDelta: -200000, stellenDelta: -1, antragsteller: 'Fraktion X', begruendung: 'Stelle kürzen', automatisch: false, entscheid: 'offen', phase: 'fraktion' },
       { id: 14, bereich: 'investition', zielRef: '5', betragDelta: -100000, stellenDelta: 0, antragsteller: 'Fraktion X', begruendung: 'Projekt kürzen', automatisch: false, entscheid: 'offen', phase: 'fraktion' },
     ],
@@ -77,7 +77,7 @@ function ansichtFixture() {
       { departement: 'Finanzen', kommission: 'SK Finanzen' },
     ],
     // Eigene Fraktion aus der Konfiguration (F94): Antragsteller-Vorbelegung.
-    eigeneFraktion: 'GLP',
+    eigeneFraktion: 'BPW',
   }
 }
 
@@ -448,15 +448,15 @@ describe('Budgetliste', () => {
   })
 
   // F98: unterstützen wir den Antrag, ist die eigene Fraktion automatisch dabei —
-  // die eigene Fraktion kommt aus der Konfiguration (ansicht.eigeneFraktion, «GLP»).
+  // die eigene Fraktion kommt aus der Konfiguration (ansicht.eigeneFraktion, «BPW»).
   it('nimmt die eigene Fraktion automatisch in die Unterstützer auf', async () => {
     const w = await mitAnsicht()
-    expect(w.vm.eigeneFraktionName).toBe('GLP')
+    expect(w.vm.eigeneFraktionName).toBe('BPW')
     w.vm.neu['121'].betrag = '5000'
     w.vm.neu['121'].haltung = 'einreichen'
     await w.vm.antragGlobalbudget('121')
     const call = axios.post.mock.calls.find(c => String(c[0]).includes('/budget/2026/antraege'))
-    expect(call[1].unterstuetzer).toContain('GLP')
+    expect(call[1].unterstuetzer).toContain('BPW')
   })
 
   // F100: den Einreichen-Entscheid eines Pauschalantrags umschalten
@@ -496,12 +496,12 @@ describe('Budgetliste', () => {
   // Fraktion (aus der Konfiguration, ansicht.eigeneFraktion), nicht die Person.
   it('belegt den Antragsteller neuer eigener Anträge mit der eigenen Fraktion vor', async () => {
     const w = await mitAnsicht()
-    expect(w.vm.eigeneFraktionName).toBe('GLP')
-    expect(w.vm.leererAntrag().antragsteller).toBe('GLP')
+    expect(w.vm.eigeneFraktionName).toBe('BPW')
+    expect(w.vm.leererAntrag().antragsteller).toBe('BPW')
     // Die eigene Fraktion ist auch bei eigenen Anträgen als Option wählbar (zuoberst).
-    expect(w.vm.antragstellerOptionen('eigene')[0]).toMatchObject({ value: 'GLP' })
+    expect(w.vm.antragstellerOptionen('eigene')[0]).toMatchObject({ value: 'BPW' })
     // Und sie ist im Pauschalantrag-Fraktionsmenü enthalten.
-    expect(w.vm.fraktionOptionen.some(o => o.value === 'GLP')).toBe(true)
+    expect(w.vm.fraktionOptionen.some(o => o.value === 'BPW')).toBe(true)
   })
 
   // F94: ein eigener Antrag wird von der eigenen Fraktion oder von einem ihrer
@@ -511,16 +511,16 @@ describe('Budgetliste', () => {
     const w = shallowMount(Budgetliste, {
       props: {
         mitglieder: [
-          { name: 'Anna Muster', fraktion: 'GLP', aktiv: true },
-          { name: 'Beat Fremd', fraktion: 'SVP', aktiv: true },
-          { name: 'Cara Weg', fraktion: 'GLP', aktiv: false },
+          { name: 'Anna Muster', fraktion: 'BPW', aktiv: true },
+          { name: 'Beat Fremd', fraktion: 'MPW', aktiv: true },
+          { name: 'Cara Weg', fraktion: 'BPW', aktiv: false },
         ],
-        fraktionen: [{ name: 'GLP', aktiv: true }, { name: 'SVP', aktiv: true }],
+        fraktionen: [{ name: 'BPW', aktiv: true }, { name: 'MPW', aktiv: true }],
       },
     })
     await flushPromises()
-    expect(w.vm.antragstellerOptionen('eigene').map(o => o.value)).toEqual(['GLP', 'Anna Muster'])
-    expect(w.vm.antragstellerOptionen('fremde').map(o => o.value)).toEqual(['GLP', 'SVP', 'Anna Muster', 'Beat Fremd'])
+    expect(w.vm.antragstellerOptionen('eigene').map(o => o.value)).toEqual(['BPW', 'Anna Muster'])
+    expect(w.vm.antragstellerOptionen('fremde').map(o => o.value)).toEqual(['BPW', 'MPW', 'Anna Muster', 'Beat Fremd'])
   })
 
   // F87: Ein Investitionsprojekt hat Details, die auf der Karte keinen Platz haben —
@@ -858,7 +858,7 @@ describe('Budgetliste', () => {
     const kasten = w.find('.pw-pauschalantraege')
     expect(kasten.exists(), 'Pauschalanträge-Kasten fehlt').toBe(true)
     // Der Kasten klappt auf flachem Schirm zu; seine Überschrift ist darum der
-    // Griff des aufklappbaren Bereichs (Auftrag von Marc am 24.10.2026).
+    // Griff des aufklappbaren Bereichs.
     expect(kasten.find('summary').text()).toContain('Pauschalanträge')
     expect(kasten.find('.pw-pauschal-automatik').exists(), 'alter Automatik-Block noch da').toBe(false)
     const html = w.html()

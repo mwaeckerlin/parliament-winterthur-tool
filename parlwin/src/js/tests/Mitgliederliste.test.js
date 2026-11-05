@@ -7,15 +7,15 @@ import Mitgliederliste from '../components/Mitgliederliste.vue'
 // damit die Funktions-Sortierung sich klar von der reinen Namens-Sortierung
 // unterscheidet — sonst wäre der Test gegen die alte Namens-Sortierung falsch-grün.
 const MITGLIEDER = [
-  { id: 1, externId: '1', vorname: 'Zoe', name: 'Zürcher', partei: 'SVP', fraktion: 'SVP/EDU', aktiv: true },
-  { id: 2, externId: '2', vorname: 'Max', name: 'Müller', partei: 'SVP', fraktion: 'SVP/EDU', aktiv: true },
-  { id: 3, externId: '3', vorname: 'Hans', name: 'Huber', partei: 'FDP', fraktion: 'FDP', aktiv: true },
-  { id: 4, externId: '4', vorname: 'Bea', name: 'Berger', partei: 'GLP', fraktion: 'GLP', aktiv: true },
-  { id: 5, externId: '5', vorname: 'Amy', name: 'Ammann', partei: 'SP', fraktion: 'SP', aktiv: true },
+  { id: 1, externId: '1', vorname: 'Zoe', name: 'Zürcher', partei: 'MPW', fraktion: 'Fraktion-Muster', aktiv: true },
+  { id: 2, externId: '2', vorname: 'Max', name: 'Müller', partei: 'MPW', fraktion: 'Fraktion-Muster', aktiv: true },
+  { id: 3, externId: '3', vorname: 'Hans', name: 'Huber', partei: 'BPW', fraktion: 'BPW', aktiv: true },
+  { id: 4, externId: '4', vorname: 'Bea', name: 'Berger', partei: 'CPW', fraktion: 'CPW', aktiv: true },
+  { id: 5, externId: '5', vorname: 'Amy', name: 'Ammann', partei: 'DPW', fraktion: 'DPW', aktiv: true },
 ]
 const FRAKTIONEN = [
   {
-    name: 'SVP/EDU',
+    name: 'Fraktion-Muster',
     aktiv: true,
     mitglieder: JSON.stringify([
       { externId: '1', funktion: 'Präsident' },
@@ -50,11 +50,11 @@ describe('Mitgliederliste — Sortierung nach Funktion (Standard)', () => {
   it('sortiert den Rest (gleiche Funktion) nach Partei, dann Name', () => {
     // Zwei funktionslose Mitglieder: unterschiedliche Partei → Partei entscheidet.
     const m = [
-      { id: 10, externId: '10', vorname: 'A', name: 'A', partei: 'SP', fraktion: 'SP', aktiv: true },
-      { id: 11, externId: '11', vorname: 'B', name: 'B', partei: 'FDP', fraktion: 'FDP', aktiv: true },
+      { id: 10, externId: '10', vorname: 'A', name: 'A', partei: 'DPW', fraktion: 'DPW', aktiv: true },
+      { id: 11, externId: '11', vorname: 'B', name: 'B', partei: 'BPW', fraktion: 'BPW', aktiv: true },
     ]
     const wrapper = mount(m, [], [])
-    expect(ids(wrapper)).toEqual(['11', '10']) // FDP vor SP
+    expect(ids(wrapper)).toEqual(['11', '10']) // BPW vor DPW
   })
 })
 

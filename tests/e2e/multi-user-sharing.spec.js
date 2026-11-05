@@ -1,4 +1,14 @@
-import { test, expect, request as pwRequest } from '@playwright/test'
+import { test, expect, request as pwRequest, sperreVorAllem } from './fixtures.js'
+import { login } from './anmeldung.js'
+
+// Die Sperre aus sperre.js steht vor jedem anderen `beforeAll` dieser Datei,
+// weil schon ein `beforeAll` globale Einstellungen schreiben kann.
+test.beforeAll(sperreVorAllem)
+
+// Die Tests 5, 6+7, 9 und 10+11 lesen, was ihr Vorgänger unter `stamp`
+// angelegt hat. Die Annotation `braucht` nennt ihn; die Reparaturrunde von
+// tests/regression.mjs führt ihn mit aus.
+const braucht = (titel) => ({ annotation: { type: 'braucht', description: titel } })
 
 /**
  * Multi-User-E2E-Test: drei gleichzeitige Nutzer in drei Browser-Kontexten.
@@ -37,34 +47,6 @@ const EVENT_UID = `parlwin-e2e-${stamp}@winterthur`
 const DOC_NAME = `E2E-Dokument-${stamp}.md`
 const DOC_TEXT = `Erste Fassung ${stamp}`
 const DOC_TEXT_EDIT = `Bearbeitete Fassung ${stamp}`
-
-/** Meldet einen Nutzer über das Nextcloud-Login-Formular an. */
-async function login(page, user) {
-  await page.goto(`${BASE_URL}/index.php/login`)
-  // Auf das interaktive Login-Formular warten: in Firefox wird der Submit-Handler
-  // (Vue) teils verzögert gebunden, ein zu früher Klick löst dann keine Navigation
-  // aus und der Login bleibt hängen.
-  await page.waitForSelector('input[name="user"]', { state: 'visible', timeout: 30_000 })
-  await page.fill('input[name="user"]', user.name)
-  await page.fill('input[name="password"]', user.pass)
-  // Bis zu drei Versuche: Klick auslösen (Fehler bewusst verwerfen, da der Klick
-  // selbst die Navigation startet) und auf den Seitenwechsel warten. waitUntil
-  // 'commit' statt des Defaults 'load' – sonst wartet Playwright in Firefox auf das
-  // vollständige Laden des Dashboards (viele Requests) und läuft in einen Timeout,
-  // obwohl die URL längst nicht mehr auf /login zeigt.
-  let zuletzt
-  for (let versuch = 0; versuch < 3; versuch++) {
-    void page.click('button[type="submit"], input[type="submit"]', { noWaitAfter: true }).catch(() => {})
-    try {
-      await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 12_000, waitUntil: 'commit' })
-      await page.waitForLoadState('domcontentloaded').catch(() => {})
-      return
-    } catch (e) {
-      zuletzt = e
-    }
-  }
-  throw zuletzt
-}
 
 /** Öffnet die Files-App und wartet bis die Dateiliste geladen ist. */
 async function openFiles(page) {
@@ -241,7 +223,7 @@ test.describe('Fraktion: drei Nutzer arbeiten gleichzeitig zusammen', () => {
   })
 
   // 5: User2 sieht den Termin und bearbeitet ihn (CalDAV – keine Kalender-Web-App).
-  test('5: User2 sieht den Termin und bearbeitet ihn', async () => {
+  test('5: User2 sieht den Termin und bearbeitet ihn', braucht('4: User1 legt einen Termin im geteilten Kalender an (CalDAV)'), async () => {
     const inhalt = await readEvent(dav2, USERS.u2)
     expect(inhalt, 'User2 sieht den neuen Termin nicht').toContain(EVENT_TITLE)
 
@@ -260,7 +242,7 @@ test.describe('Fraktion: drei Nutzer arbeiten gleichzeitig zusammen', () => {
   })
 
   // 6 & 7: User3 und User1 sehen den bearbeiteten Termin.
-  test('6+7: User3 und User1 sehen den bearbeiteten Termin', async () => {
+  test('6+7: User3 und User1 sehen den bearbeiteten Termin', braucht('5: User2 sieht den Termin und bearbeitet ihn'), async () => {
     for (const [dav, user] of [[dav3, USERS.u3], [dav1, USERS.u1]]) {
       const inhalt = await readEvent(dav, user)
       expect(inhalt, `${user.name} sieht den bearbeiteten Termin nicht`).toContain(EVENT_TITLE_EDIT)
@@ -277,7 +259,7 @@ test.describe('Fraktion: drei Nutzer arbeiten gleichzeitig zusammen', () => {
   })
 
   // 9: User2 sieht den geteilten Ordner (Browser) und bearbeitet das Dokument (WebDAV).
-  test('9: User2 sieht den geteilten Ordner und bearbeitet das Dokument', async () => {
+  test('9: User2 sieht den geteilten Ordner und bearbeitet das Dokument', braucht('8: User1 legt ein Dokument im geteilten Fraktionsordner an'), async () => {
     await openFiles(page2)
     await expect(
       page2.getByText(FOLDER, { exact: false }).first(),
@@ -296,7 +278,7 @@ test.describe('Fraktion: drei Nutzer arbeiten gleichzeitig zusammen', () => {
   })
 
   // 10 & 11: User3 und User1 sehen den geteilten Ordner (Browser) und den bearbeiteten Inhalt (WebDAV).
-  test('10+11: User3 und User1 sehen den bearbeiteten Dokumentinhalt', async () => {
+  test('10+11: User3 und User1 sehen den bearbeiteten Dokumentinhalt', braucht('9: User2 sieht den geteilten Ordner und bearbeitet das Dokument'), async () => {
     for (const [dav, page, user] of [[dav3, page3, USERS.u3], [dav1, page1, USERS.u1]]) {
       await openFiles(page)
       await expect(

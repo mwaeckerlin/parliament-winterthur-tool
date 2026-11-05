@@ -67,6 +67,41 @@ class GeschaeftDokumentMapper extends QBMapper
         return $gruppiert;
     }
 
+    /** Die Spalten, die die Übersicht von einem Dokument liest: alles ausser dem Text. */
+    public const KOPF_SPALTEN = ['id', 'geschaeft_id', 'extern_id', 'titel', 'kategorie', 'datum', 'url', 'seiten', 'gelesen_am', 'fehler'];
+
+    /**
+     * Die Köpfe der Dokumente mehrerer Geschäfte, nach Geschäft gruppiert,
+     * ohne Markdown, Abschnitte und Volltext. Ob ein Dokument gelesen ist,
+     * rechnet die Datenbank aus der Länge des Markdowns, ohne ihn zu liefern.
+     *
+     * @param int[] $geschaeftIds
+     * @return array<int, list<array{dokument: GeschaeftDokument, hatInhalt: bool}>>
+     */
+    public function findKoepfeByGeschaefte(array $geschaeftIds): array
+    {
+        $ids = array_values(array_unique(array_map('intval', $geschaeftIds)));
+        $gruppiert = [];
+        foreach (array_chunk($ids, 500) as $block) {
+            $qb = $this->db->getQueryBuilder();
+            $qb->select(...self::KOPF_SPALTEN)
+                ->selectAlias($qb->func()->octetLength('markdown'), 'inhalt_laenge')
+                ->from($this->getTableName())
+                ->where($qb->expr()->in('geschaeft_id', $qb->createNamedParameter($block, IQueryBuilder::PARAM_INT_ARRAY)))
+                ->orderBy('datum', 'ASC')
+                ->addOrderBy('id', 'ASC');
+            $ergebnis = $qb->executeQuery();
+            while (($zeile = $ergebnis->fetch()) !== false) {
+                $hatInhalt = (int) ($zeile['inhalt_laenge'] ?? 0) > 0;
+                unset($zeile['inhalt_laenge']);
+                $dokument = $this->mapRowToEntity($zeile);
+                $gruppiert[(int) $dokument->getGeschaeftId()][] = ['dokument' => $dokument, 'hatInhalt' => $hatInhalt];
+            }
+            $ergebnis->closeCursor();
+        }
+        return $gruppiert;
+    }
+
     /**
      * Dokumente, die verzeichnet, aber noch nicht gelesen sind — der
      * Hintergrundauftrag holt sie Stück für Stück nach. Das jüngste zuerst:

@@ -30,15 +30,16 @@ module.exports = {
     publicPath: '/apps/parlwin/js/',
     filename: '[name].js',
     chunkFilename: 'chunks/[name].[contenthash].js',
+    // Vor jedem Bau leert webpack das Verzeichnis; README.md beschreibt es und bleibt stehen.
     clean: {
-      keep: /\.gitkeep$/,
+      keep: /(^|\/)(\.gitkeep|README\.md)$/,
     },
   },
   optimization: {
     ...(webpackConfig.optimization || {}),
     minimizer: [new TerserPlugin({ extractComments: false })],
   },
-  // WARNING-BEGRUENDUNG (bei jedem Lauf neu pruefen, Review: 2026-10-23):
+  // WARNING-BEGRUENDUNG (bei jedem Lauf neu pruefen, Review: 2026-12-02):
   // webpacks Standardbudget von 244 KiB zielt auf Seiten, die ueber langsame
   // Mobilnetze ausgeliefert werden. Diese App ist eine Nextcloud-Erweiterung:
   // sie wird aus derselben Instanz geladen wie Nextcloud selbst und bringt
@@ -49,9 +50,15 @@ module.exports = {
   // Regression verbergen) steht hier ein realistisches Budget mit gut 10 %
   // Luft: waechst ein Bundle deutlich, warnt der Build wieder.
   // Entfernen bzw. senken, sobald die Abhaengigkeiten kleiner werden.
+  //
+  // Gemessen am 02.11.2026: parlwin-main.js ist 2'537'871 Bytes. Gewachsen ist
+  // es durch die Sicherheitsaktualisierungen desselben Tages — tiptap 3.23 auf
+  // 3.30, vue 3.5.34 auf 3.5.44, @nextcloud/dialogs und markdown-it —, die
+  // Luecken in den mitgelieferten Bibliotheken schliessen. Das Budget steht
+  // darum auf 2'800'000 Bytes, wieder mit gut 10 % Luft.
   performance: {
     hints: 'warning',
-    maxAssetSize: 2_400_000,
-    maxEntrypointSize: 2_400_000,
+    maxAssetSize: 2_800_000,
+    maxEntrypointSize: 2_800_000,
   },
 }

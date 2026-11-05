@@ -12,8 +12,8 @@ use PHPUnit\Framework\TestCase;
  * Messung, kein Nachweis: Zeigt die Zielvorgaben der Produktegruppe Immobilien
  * (240) im Buch 2027, so wie der Parser sie liefert.
  *
- * Marc am 24.10.2026: Drei Vorgaben stehen doppelt da, je mit Soll 1.00 und mit
- * 2.31, 2.98 und 2.38. Diese Messung zeigt, was das Buch an dieser Stelle
+ * Drei Messgrössen kommen je zweimal vor, mit Soll 1.00 und mit 2.31, 2.98 und
+ * 2.38. Diese Messung zeigt, was das Buch an dieser Stelle
  * schreibt und welchen Teil davon die Anzeige heute weglässt.
  */
 #[Group('messung')]
@@ -58,7 +58,7 @@ final class ZielvorgabenMessungTest extends TestCase {
     /**
      * Welche Kostenzeilen das Buch je Produktegruppe führt, mit ihrer
      * Häufigkeit. Grundlage für die Einstufung in gebundene und beeinflussbare
-     * Kosten (Auftrag von Marc am 24.10.2026).
+     * Kosten (F128).
      */
     public function testKostenzeilenDesBuchs2027(): void {
         $parser = new BudgetBuchParser();

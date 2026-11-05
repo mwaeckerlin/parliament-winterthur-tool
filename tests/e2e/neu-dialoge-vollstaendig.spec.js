@@ -1,4 +1,9 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, sperreVorAllem } from './fixtures.js'
+import { login } from './anmeldung.js'
+
+// Die Sperre aus sperre.js steht vor jedem anderen `beforeAll` dieser Datei,
+// weil schon ein `beforeAll` globale Einstellungen schreiben kann.
+test.beforeAll(sperreVorAllem)
 
 /**
  * Feld-Inventar aller «+ Neu»-Einstiege im echten Browser.
@@ -102,25 +107,6 @@ const SITZUNG_PLATZHALTER = [
 ]
 
 // --- Basis-Helfer (identisch zu den übrigen Specs) --------------------------
-
-async function login(page, user) {
-  await page.goto(`${BASE_URL}/index.php/login`)
-  await page.waitForSelector('input[name="user"]', { state: 'visible', timeout: 30_000 })
-  await page.fill('input[name="user"]', user.name)
-  await page.fill('input[name="password"]', user.pass)
-  let zuletzt
-  for (let versuch = 0; versuch < 3; versuch++) {
-    void page.click('button[type="submit"], input[type="submit"]', { noWaitAfter: true }).catch(() => {})
-    try {
-      await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 12_000, waitUntil: 'commit' })
-      await page.waitForLoadState('domcontentloaded').catch(() => {})
-      return
-    } catch (e) {
-      zuletzt = e
-    }
-  }
-  throw zuletzt
-}
 
 async function oeffneAnsicht(page, name, knopf) {
   await page.goto(`${BASE_URL}/index.php/apps/parlwin/`)

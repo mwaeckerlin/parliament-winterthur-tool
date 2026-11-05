@@ -80,6 +80,109 @@ final class BudgetAntraegePdfTest extends TestCase
         self::assertStringNotContainsString('verpflichtungskredit', $html, 'der interne Schlüssel steht im Ausdruck');
     }
 
+    /**
+     * Ein Antrag auf Zielwerte hat keinen Betrag, also steht der geänderte
+     * Zielwert dort, wo sonst der Betrag steht, und keine Null daneben.
+     */
+    public function testDerGeaenderteZielwertStehtStattEinesBetrags(): void
+    {
+        $html = $this->rendere([
+            $this->eintrag([
+                'betragDelta' => 0,
+                'begruendung' => 'Die bisherigen Zielwerte liegen unter den erzielten Nettorenditen.',
+                'zielAenderungen' => [
+                    [
+                        'zielNummer' => 1,
+                        'unterTitel' => 'Minimale Nettorendite',
+                        'messgroesse' => 'Wohnliegenschaften (in %)',
+                        'soll' => '1.00',
+                        'neuerWert' => '4',
+                    ],
+                ],
+            ], 'Immobilien', 74),
+        ]);
+
+        $spalte = $this->betragsSpalte($html);
+        // Der Betrag 0 druckt sich als «0», darum zählt jede Zeile der Spalte,
+        // die nur aus dieser Ziffer besteht.
+        $zeilen = self::zeilen($spalte);
+        self::assertNotContains('0', $zeilen, 'neben dem Zielwert steht ein Betrag von null: ' . implode(' | ', $zeilen));
+        self::assertStringContainsString('Minimale Nettorendite', $spalte, 'der Zielwert fehlt in der Betragsspalte');
+        self::assertStringContainsString('1.00 → 4', $spalte, 'der heutige und der neue Soll fehlen in der Betragsspalte');
+        self::assertStringContainsString(
+            'Die bisherigen Zielwerte liegen unter den erzielten Nettorenditen.',
+            $html,
+            'die Begründung selbst fehlt',
+        );
+    }
+
+    /**
+     * Trägt ein Antrag einen Betrag und Zielwerte, steht der Betrag in seiner
+     * Spalte, und die Zielwerte stehen in der Begründung.
+     */
+    public function testMitBetragStehenDieZielwerteInDerBegruendung(): void
+    {
+        $html = $this->rendere([
+            $this->eintrag([
+                'betragDelta' => -20000,
+                'begruendung' => 'Die Liegenschaften erzielen mehr, als das Budget annimmt.',
+                'zielAenderungen' => [
+                    [
+                        'zielNummer' => 1,
+                        'unterTitel' => 'Minimale Nettorendite',
+                        'messgroesse' => 'Wohnliegenschaften (in %)',
+                        'soll' => '1.00',
+                        'neuerWert' => '4',
+                    ],
+                ],
+            ], 'Immobilien', 74),
+        ]);
+
+        self::assertSame(['−20\'000'], self::zeilen($this->betragsSpalte($html)), 'in der Betragsspalte steht nicht genau der Betrag');
+        $begruendung = self::text($this->begruendung($html));
+        self::assertStringContainsString('Die Liegenschaften erzielen mehr, als das Budget annimmt.', $begruendung, 'die Begründung selbst fehlt');
+        self::assertStringContainsString(
+            'Zielvorgaben: Ziel 1 «Minimale Nettorendite — Wohnliegenschaften (in %)» → Soll 1.00 → 4;',
+            $begruendung,
+            'die Zielwerte fehlen in der Begründung',
+        );
+    }
+
+    /** Der Inhalt der ersten Betragsspalte der ersten Antragszeile. */
+    private function betragsSpalte(string $html): string
+    {
+        self::assertSame(
+            1,
+            preg_match('#<td class="betrag">(.*?)</td>#s', $html, $treffer),
+            'der Ausdruck hat keine Betragsspalte',
+        );
+        return $treffer[1];
+    }
+
+    /** Der Inhalt der Spalte «Begründung» der ersten Antragszeile, der sechsten Zelle. */
+    private function begruendung(string $html): string
+    {
+        preg_match_all('#<td(?: class="[^"]*")?>(.*?)</td>#s', $html, $zellen);
+        self::assertGreaterThanOrEqual(6, count($zellen[1]), 'der Ausdruck hat keine Spalte «Begründung»');
+        return $zellen[1][5];
+    }
+
+    /** Der Text einer Zelle ohne Auszeichnung und mit aufgelösten Zeichen. */
+    private static function text(string $zelle): string
+    {
+        return trim(html_entity_decode(strip_tags($zelle), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+    }
+
+    /**
+     * Die Zeilen einer Zelle, getrennt an ihren Umbrüchen.
+     *
+     * @return list<string>
+     */
+    private static function zeilen(string $zelle): array
+    {
+        return array_map(self::text(...), preg_split('#<br\s*/?>#', $zelle) ?: []);
+    }
+
     public function testDasBewilligungsorganStehtStattEinesBetrags(): void
     {
         $html = $this->rendere([

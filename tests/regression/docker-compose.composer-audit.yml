@@ -1,0 +1,18 @@
+# Der Dienst der Gruppe composer-audit (tests/run-all.sh). Er nimmt die Stufe
+# php-deps von Dockerfile.php-fpm: Sie bringt composer mit und hält in /deps
+# composer.json und composer.lock der App. composer audit fragt bei jedem Start
+# die Datenbank der Sicherheitshinweise von Packagist und braucht darum Netz.
+name: parlwin-composer-audit
+
+services:
+  composer-audit:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.php-fpm
+      target: php-deps
+    image: parlwin-composer-audit:lokal
+    user: somebody
+    working_dir: /deps
+    environment:
+      COMPOSER_HOME: /tmp/composer
+    command: ["composer", "audit", "--no-dev", "--locked", "--no-interaction"]

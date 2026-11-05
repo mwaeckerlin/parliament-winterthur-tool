@@ -4,10 +4,9 @@ import { describe, it, expect } from 'vitest'
 /**
  * Nichts geht über den Bildschirm hinaus.
  *
- * Marcs Regel vom 20.10.2026: «Alles was über den Bildschirm hinaus geht, muss
- * auf den Bildschirm limitiert, horizonal eingepasst (z.B. mit Zeilen-Umbruch)
- * und vertikal scrollbar gemacht werden. Für Handy braucht es halt
- * Kompromisse.»
+ * Was über den Bildschirm hinausgeht, wird auf den Bildschirm begrenzt,
+ * waagrecht eingepasst, etwa mit Zeilenumbruch, und senkrecht scrollbar. Am
+ * Telefon gilt das mit Kompromissen.
  *
  * Also scrollt kein Behälter seitwärts, und keine Tabelle erzwingt eine
  * Breite, die ein Telefon nicht hat. Was nicht nebeneinander passt, bricht um
@@ -81,9 +80,8 @@ describe('Nichts geht über den Bildschirm hinaus', () => {
   it('eine Karte bleibt in ihrer Spalte', () => {
     // Ein Rasterelement ist von sich aus so breit, wie sein Inhalt mindestens
     // braucht, und ragt darüber hinaus nach rechts. In der linken Spalte bleibt
-    // das im Bild, in der rechten steht es ausserhalb: Marcs Bild vom
-    // 24.10.2026 zeigt das offene Antragsformular der letzten Spalte mit
-    // abgeschnittenem «Betrag CHF».
+    // das im Bild, in der rechten steht es ausserhalb: Vom offenen
+    // Antragsformular der letzten Spalte wäre «Betrag CHF» abgeschnitten.
     const stelle = schirm.indexOf('.pw-card-grid > *')
     expect(stelle, 'die Rasterelemente dürfen nicht schmaler werden').toBeGreaterThan(-1)
     expect(schirm.slice(stelle, stelle + 200)).toMatch(/min-inline-size:\s*0/)
@@ -126,8 +124,8 @@ describe('Nichts geht über den Bildschirm hinaus', () => {
 
   it('die Navigationsleiste scrollt, wenn ihr Inhalt nicht passt', () => {
     // Menüeinträge und Filter sind auf einem flachen Schirm zusammen höher als
-    // die Leiste; ohne diese Regel stand alles ab «Budgetjahr» unerreichbar
-    // unter dem unteren Rand (Bild von Marc vom 24.10.2026, Tablet quer).
+    // die Leiste; ohne diese Regel steht auf einem Tablet quer alles ab
+    // «Budgetjahr» unerreichbar unter dem unteren Rand.
     const stelle = schirm.indexOf('.app-navigation__list')
     expect(stelle, 'für die Navigationsliste gilt keine eigene Regel').toBeGreaterThan(-1)
     const block = schirm.slice(stelle, stelle + 200)

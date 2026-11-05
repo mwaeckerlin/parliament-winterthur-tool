@@ -64,7 +64,15 @@ const gruppenKreis = (gruppe, seite) => {
     return null
   }
   const produkte = produktKreise(gruppe, seite, betrag)
-  const knoten = { name: String(gruppe?.name || gruppe?.code || '').trim(), code: String(gruppe?.code || ''), betrag, flaeche: betrag }
+  // F129: Die Seite im Budgetbuch reist mit, damit der Hinweistext des Kreises
+  // sie nennen kann — in der Grafik gibt es keine Karte, die sie sonst trüge.
+  const knoten = {
+    name: String(gruppe?.name || gruppe?.code || '').trim(),
+    code: String(gruppe?.code || ''),
+    buchseite: Number(gruppe?.buchseite || 0),
+    betrag,
+    flaeche: betrag,
+  }
   return produkte ? { ...knoten, children: produkte.kinder, produktDeckung: produkte.deckung } : knoten
 }
 
@@ -132,7 +140,7 @@ export function personalHierarchie(produktegruppen) {
       String(gruppe?.name || gruppe?.code || '').trim(),
       betrag,
       positiv(gruppe?.stellen?.sollVorjahr),
-      { code: String(gruppe?.code || '') },
+      { code: String(gruppe?.code || ''), buchseite: Number(gruppe?.buchseite || 0) },
     ))
   }
   const departemente = reihenfolge.map(dep => {

@@ -19,12 +19,12 @@ class VorstossTest extends TestCase
         $v = new Vorstoss();
         $v->setZustaendigkeit(json_encode([['key' => 'a', 'name' => 'Anna']]));
         $v->setAnsprechpartner(json_encode([['key' => 'b', 'name' => 'Bob']]));
-        $v->setHerkunftFraktion('Grüne');
+        $v->setHerkunftFraktion('MPW');
 
         $j = $v->jsonSerialize();
         self::assertSame([['key' => 'a', 'name' => 'Anna']], $j['zustaendigkeit']);
         self::assertSame([['key' => 'b', 'name' => 'Bob']], $j['ansprechpartner']);
-        self::assertSame('Grüne', $j['herkunftFraktion']);
+        self::assertSame('MPW', $j['herkunftFraktion']);
     }
 
     public function testJsonSerializeDefaultsSindLeereListen(): void

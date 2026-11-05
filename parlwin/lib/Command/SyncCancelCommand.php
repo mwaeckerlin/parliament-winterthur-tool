@@ -71,6 +71,8 @@ class SyncCancelCommand extends Command {
                 'zeitpunkt' => (new \DateTime())->format('Y-m-d H:i:s'),
                 'forced' => (bool) ($stopResult['forced'] ?? false),
                 'signalled' => (bool) ($stopResult['signalled'] ?? false),
+                // Ein Lauf, der sich selbst beendet, nennt seine Geschäfte im eigenen `sync.cancelled`; nach einem Signal kennt sie niemand.
+                'geschaeftIds' => ($stopResult['signalled'] ?? false) ? null : [],
             ]);
             if (($stopResult['forced'] ?? false) === true) {
                 $output->writeln('<info>Abbruchsignal gesetzt, Sync-Prozess wurde hart beendet.</info>');

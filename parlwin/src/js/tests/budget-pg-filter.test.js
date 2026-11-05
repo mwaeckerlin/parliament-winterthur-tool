@@ -51,7 +51,7 @@ function ansicht() {
     summen: { ausgaben: 0, einnahmen: 0, ergebnis: 0, stellen: 0 },
     standardBetragProStelle: 200000,
     kommissionZuordnung: [],
-    eigeneFraktion: 'GLP',
+    eigeneFraktion: 'MPW',
   }
 }
 

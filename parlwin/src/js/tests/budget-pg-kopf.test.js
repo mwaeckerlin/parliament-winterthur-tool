@@ -38,9 +38,9 @@ function ansicht() {
     antraege: [
       {
         id: 10, bereich: 'globalbudget', zielRef: '121', betragDelta: -247541, prozentDelta: -5,
-        stellenDelta: 0, antragsteller: 'SVP', begruendung: 'Sparen', automatisch: false,
+        stellenDelta: 0, antragsteller: 'MPW', begruendung: 'Sparen', automatisch: false,
         entscheid: 'offen', phase: 'fraktion', herkunft: 'eigene', haltung: 'einreichen',
-        unterstuetzer: [{ key: 'svp', name: 'SVP' }], zielAenderungen: [], aufteilung: [],
+        unterstuetzer: [{ key: 'mpw', name: 'MPW' }], zielAenderungen: [], aufteilung: [],
       },
       {
         id: 11, bereich: 'globalbudget', zielRef: '121', betragDelta: -990166, prozentDelta: -20,
@@ -54,7 +54,7 @@ function ansicht() {
     summenStadtrat: { ausgaben: 11157667, einnahmen: 0, ergebnis: -11157667, stellen: 27.5 },
     standardBetragProStelle: 200000,
     kommissionZuordnung: [],
-    eigeneFraktion: 'SVP',
+    eigeneFraktion: 'MPW',
   }
 }
 
@@ -152,7 +152,7 @@ describe('F117 — ein Antrag wird durch Klick bearbeitbar', () => {
     expect(form.exists(), 'das Formular steht am Antrag').toBe(true)
     expect(form.props('form').betrag).toBe('247541')
     expect(form.props('form').mehrausgabe).toBe(false)
-    expect(form.props('form').antragsteller).toBe('SVP')
+    expect(form.props('form').antragsteller).toBe('MPW')
     expect(form.props('form').begruendung).toBe('Sparen')
   })
 

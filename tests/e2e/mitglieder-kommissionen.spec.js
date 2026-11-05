@@ -1,4 +1,9 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, sperreVorAllem } from './fixtures.js'
+import { login } from './anmeldung.js'
+
+// Die Sperre aus sperre.js steht vor jedem anderen `beforeAll` dieser Datei,
+// weil schon ein `beforeAll` globale Einstellungen schreiben kann.
+test.beforeAll(sperreVorAllem)
 
 /**
  * End-to-end browser coverage for the read-only "Mitglieder" and
@@ -21,26 +26,6 @@ const USERS = {
 }
 
 // --- shared helpers -------------------------------------------------------
-
-/** Logs a user in through the Nextcloud login form (same flow as vorstoss spec). */
-async function login(page, user) {
-  await page.goto(`${BASE_URL}/index.php/login`)
-  await page.waitForSelector('input[name="user"]', { state: 'visible', timeout: 30_000 })
-  await page.fill('input[name="user"]', user.name)
-  await page.fill('input[name="password"]', user.pass)
-  let zuletzt
-  for (let versuch = 0; versuch < 3; versuch++) {
-    void page.click('button[type="submit"], input[type="submit"]', { noWaitAfter: true }).catch(() => {})
-    try {
-      await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 12_000, waitUntil: 'commit' })
-      await page.waitForLoadState('domcontentloaded').catch(() => {})
-      return
-    } catch (e) {
-      zuletzt = e
-    }
-  }
-  throw zuletzt
-}
 
 const norm = (s) => (s || '').replace(/\s+/g, ' ').trim()
 
@@ -907,5 +892,42 @@ test.describe('Kommissionen: Ansicht end-to-end', () => {
     await karte.locator('.pw-kommission-geschaeft-eintrag', { hasText: titel }).locator('.pw-titel').click()
     await expect(page.locator('.pw-modal-overlay .pw-geschaeft-detail')).toBeVisible({ timeout: 30_000 })
     await expect(page.locator('.pw-modal-overlay .pw-geschaeft-detail').getByLabel('Titel')).toHaveValue(titel)
+  })
+
+  /**
+   * F141: Der Knopf «Neues Geschäft» an der Kommission öffnet dieselbe Maske
+   * wie «+ Eigenes Geschäft» in der Ansicht «Geschäfte» und hat dieselbe
+   * Wirkung — nur steht die Kommission schon im Feld. Rückmeldung aus der
+   * Fraktion, am 26.10.2026 weitergegeben: Bei der Kommission liess sich nichts
+   * erfassen, und der Weg über die andere Ansicht ist zu umständlich.
+   */
+  test('«Neues Geschäft» an der Kommission legt es mit dieser Kommission an', async ({ page }) => {
+    const KOMMISSION = 'E2E Gemischte Kommission'
+    const titel = `E2E An der Kommission ${Date.now()}`
+    await login(page, USERS.u1)
+    await oeffneKommissionen(page)
+
+    const karte = page.locator('.pw-kommission-karte', { hasText: KOMMISSION }).first()
+    await expect(karte, `Die Kommission «${KOMMISSION}» fehlt in der Ansicht`).toBeVisible({ timeout: 30_000 })
+    await karte.getByRole('button', { name: 'Neues Geschäft' }).click()
+
+    // Dieselbe Maske wie in der Ansicht «Geschäfte», mit der Kommission darin.
+    const detail = page.locator('.pw-modal-overlay .pw-geschaeft-detail')
+    await detail.waitFor({ state: 'visible', timeout: 30_000 })
+    await expect(
+      detail.locator('tr', { hasText: 'Kommission' }).locator('.vs__selected'),
+      'die Kommission ist nicht vorgewählt',
+    ).toContainText(KOMMISSION)
+
+    await detail.getByLabel('Titel').fill(titel)
+    await page.locator('.pw-modal').first().locator('.pw-modal-footer')
+      .getByRole('button', { name: 'Speichern' }).click()
+
+    // Es steht danach bei dieser Kommission, ohne dass jemand die Ansicht wechselt.
+    await expect(
+      page.locator('.pw-kommission-karte', { hasText: KOMMISSION }).first()
+        .locator('.pw-kommission-geschaeft-eintrag', { hasText: titel }),
+      'Das an der Kommission erfasste Geschäft erscheint dort nicht',
+    ).toHaveCount(1, { timeout: 30_000 })
   })
 })

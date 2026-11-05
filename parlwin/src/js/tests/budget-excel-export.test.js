@@ -10,10 +10,10 @@ vi.mock('@nextcloud/auth', () => ({ getCurrentUser: () => ({ uid: 'mw', displayN
 /**
  * Excel-Export der Budgetanträge (F138).
  *
- * Marc am 24.10.2026: «Noch ein Excel export zusätzlich zum PDF Export. Direkt
- * in den files in Nextcloud Speichen. … Und optional download statt in der
- * Cloud speichern.» Die Datei geht in denselben Ordner wie die Dokumente der
- * Anträge: «Fraktion/50_Budget/<Budgetjahr>».
+ * Neben dem PDF gibt es die Budgetanträge als Excel-Datei. Sie wird direkt in
+ * den Dateien der Nextcloud gespeichert oder wahlweise heruntergeladen, und
+ * sie geht in denselben Ordner wie die Dokumente der Anträge:
+ * «Fraktion/50_Budget/<Budgetjahr>».
  *
  * vitest läuft im Projekt-Root.
  */
@@ -28,7 +28,7 @@ const ANSICHT = {
   summen: SUMMEN,
   summenStadtrat: SUMMEN,
   departemente: ['Finanzen'],
-  eigeneFraktion: 'SVP-Fraktion',
+  eigeneFraktion: 'Fraktion-Muster',
   produktegruppen: [{
     code: '240', name: 'Immobilien', departement: 'Finanzen', buchseite: 243,
     globalkredit: { soll: 1000, sollFraktion: 900, vorjahr: 1000 },

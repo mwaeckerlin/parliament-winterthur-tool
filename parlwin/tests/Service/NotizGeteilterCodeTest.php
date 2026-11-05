@@ -23,6 +23,7 @@ class NotizGeteilterCodeTest extends TestCase
         foreach ([
             'Service/FraktionsarbeitService.php',
             'Service/VorstossService.php',
+            'Service/StadtratsbeschlussService.php',
         ] as $datei) {
             self::assertStringContainsString(
                 'notizService',

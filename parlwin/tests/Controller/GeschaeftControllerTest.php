@@ -589,4 +589,125 @@ class GeschaeftControllerTest extends TestCase
         $response = $controller->setPrioritaet(5);
         $this->assertSame(400, $response->getStatus());
     }
+
+    /**
+     * @param array<string, mixed> $parameter
+     */
+    private function controllerMit(
+        array $parameter,
+        ?GeschaeftService $service = null,
+        ?GeschaeftMapper $mapper = null,
+        ?GeschaeftDokumentService $dokumente = null,
+        ?FraktionsarbeitService $fraktionsarbeit = null,
+    ): GeschaeftController {
+        $request = $this->createStub(IRequest::class);
+        $request->method('getParam')
+            ->willReturnCallback(static fn (string $key, mixed $default = null): mixed => $parameter[$key] ?? $default);
+        if ($fraktionsarbeit === null) {
+            $fraktionsarbeit = $this->createStub(FraktionsarbeitService::class);
+            $fraktionsarbeit->method('angereicherteGeschaefte')
+                ->willReturnCallback(static fn (array $geschaefte): array => array_map(
+                    static fn (Geschaeft $g): array => ['id' => $g->getId()],
+                    array_values($geschaefte)
+                ));
+        }
+        return new GeschaeftController(
+            $request,
+            $service ?? $this->createStub(GeschaeftService::class),
+            $fraktionsarbeit,
+            $this->createStub(RealtimePublisherService::class),
+            $this->createStub(IRootFolder::class),
+            $this->createStub(IUserSession::class),
+            $this->createStub(LoggerInterface::class),
+            $mapper ?? $this->createStub(GeschaeftMapper::class),
+            $dokumente ?? $this->createStub(GeschaeftDokumentService::class),
+        );
+    }
+
+    private function geschaeftMitId(int $id): Geschaeft
+    {
+        $geschaeft = new Geschaeft();
+        $geschaeft->setId($id);
+        return $geschaeft;
+    }
+
+    /**
+     * F150: Nach einem Ereignis fragt die App nur die geänderten Geschäfte
+     * nach, erledigte eingeschlossen, und die Liste aller bleibt ungelesen.
+     */
+    public function testIndexMitIdsLiefertGenauDieseGeschaefte(): void
+    {
+        $service = $this->createMock(GeschaeftService::class);
+        $service->expects($this->never())->method('alle');
+        $mapper = $this->createMock(GeschaeftMapper::class);
+        $mapper->expects($this->once())
+            ->method('findByIds')
+            ->with([7, 12])
+            ->willReturn([$this->geschaeftMitId(7), $this->geschaeftMitId(12)]);
+
+        $response = $this->controllerMit(['ids' => '7,12'], $service, $mapper)->index();
+
+        $this->assertSame(200, $response->getStatus());
+        $this->assertSame([['id' => 7], ['id' => 12]], $response->getData());
+    }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function ungueltigeIds(): array
+    {
+        return [
+            'Buchstaben' => ['7,abc'],
+            'SQL' => ['7) OR 1=1'],
+            'leerer Eintrag' => ['7,,8'],
+            'zu viele' => [implode(',', range(1, 501))],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('ungueltigeIds')]
+    public function testIndexLehntUngueltigeIdsAb(string $ids): void
+    {
+        $mapper = $this->createMock(GeschaeftMapper::class);
+        $mapper->expects($this->never())->method('findByIds');
+
+        $response = $this->controllerMit(['ids' => $ids], null, $mapper)->index();
+
+        $this->assertSame(400, $response->getStatus());
+    }
+
+    /**
+     * F149: Ein aufgeklapptes Dokument kommt einzeln mit seinem Inhalt.
+     */
+    public function testEinAmtlichesDokumentKommtMitSeinemInhalt(): void
+    {
+        $dokument = new \OCA\ParliamentWinterthur\Db\GeschaeftDokument();
+        $dokument->setId(9);
+        $dokument->setGeschaeftId(42);
+        $dokument->setTitel('2026.15V');
+        $dokument->setMarkdown('# Anfrage');
+        $dokumente = $this->createMock(GeschaeftDokumentService::class);
+        $dokumente->expects($this->once())->method('einDokument')->with(42, 9)->willReturn($dokument);
+        $dokumente->expects($this->never())->method('zuGeschaeft');
+
+        $response = $this->controllerMit([], null, null, $dokumente)->amtlichesDokument(42, 9);
+
+        $this->assertSame(200, $response->getStatus());
+        $this->assertSame(9, $response->getData()['id']);
+        $this->assertSame('# Anfrage', $response->getData()['markdown']);
+    }
+
+    /**
+     * Ein Dokument eines anderen Geschäfts oder ein unbekanntes gilt als nicht
+     * gefunden: Über die ID eines Geschäfts lässt sich kein fremdes Dokument
+     * lesen.
+     */
+    public function testEinFremdesOderUnbekanntesDokumentIstNichtGefunden(): void
+    {
+        $dokumente = $this->createStub(GeschaeftDokumentService::class);
+        $dokumente->method('einDokument')->willReturn(null);
+
+        $response = $this->controllerMit([], null, null, $dokumente)->amtlichesDokument(42, 10);
+
+        $this->assertSame(404, $response->getStatus());
+    }
 }

@@ -411,6 +411,7 @@ if (!interface_exists('OCP\DB\QueryBuilder\IQueryBuilder')) {
         public const PARAM_INT = 1;
         public const PARAM_STR_ARRAY = 2;
         public const PARAM_BOOL = 3;
+        public const PARAM_INT_ARRAY = 101;
     }');
 }
 
@@ -465,7 +466,16 @@ if (!class_exists('OCP\AppFramework\Db\QBMapper')) {
         public function __construct(protected \OCP\IDBConnection $db, protected string $tableName, protected string $entityClass) {}
         protected function getTableName(): string { return $this->tableName; }
         protected function findEntity($qb) { throw new DoesNotExistException("Nicht gefunden"); }
-        protected function findEntities($qb): array { return []; }
+        // Wie der echte QBMapper: die Abfrage ausführen und jede Zeile abbilden.
+        protected function findEntities($qb): array {
+            $ergebnis = $qb->executeQuery();
+            $entities = [];
+            while (($zeile = $ergebnis->fetch()) !== false) {
+                $entities[] = $this->mapRowToEntity($zeile);
+            }
+            $ergebnis->closeCursor();
+            return $entities;
+        }
         protected function mapRowToEntity(array $row) {
             $entity = new $this->entityClass();
             foreach ($row as $key => $value) {

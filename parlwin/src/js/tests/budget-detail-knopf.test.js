@@ -4,9 +4,9 @@ import { describe, it, expect } from 'vitest'
 /**
  * Derselbe Detail-Knopf auf jedem Tab (F133).
  *
- * Marc am 24.10.2026: «Auch beim Tab Personalbestand sollte derselbe Detail
- * button sein.» Eine Karte führt auf jedem Tab dieselbe Aktionszeile: «+ Antrag»
- * als Hauptaktion und «Details» ins Vollbild der Produktegruppe.
+ * Eine Karte führt auf jedem Tab dieselbe Aktionszeile, auch im Tab
+ * «Personalbestand»: «+ Antrag» als Hauptaktion und «Details» ins Vollbild der
+ * Produktegruppe.
  *
  * vitest läuft im Projekt-Root.
  */

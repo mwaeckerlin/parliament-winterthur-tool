@@ -161,7 +161,7 @@
       </div>
 
       <!-- Tab: Globalbudgets -->
-      <div v-show="aktiverTab === 'globalbudget'" class="pw-budget-tabpanel">
+      <div v-show="aktiverTab === 'globalbudget'" class="pw-budget-tabpanel pw-budget-global">
         <!-- Pauschalanträge (F100): alle gleich behandelt, jeder mit eigenem Ziel-Typ
              (Einsparungen, schwarze Null, fester Ertrag, festes Defizit). Die Liste
              startet leer; «+ Pauschalantrag» legt einen neuen an. -->
@@ -364,7 +364,7 @@
       </div>
 
       <!-- Tab: Personalbestand -->
-      <div v-show="aktiverTab === 'personal'" class="pw-budget-tabpanel">
+      <div v-show="aktiverTab === 'personal'" class="pw-budget-tabpanel pw-budget-personal">
         <div v-for="dep in gruppenNachDepartement" :key="dep.name" class="pw-budget-departement">
           <h3 class="pw-budget-dep-titel">{{ dep.name }}</h3>
           <!-- F124: Notizen zum Departement, über alle seine Produktegruppen. -->
@@ -383,7 +383,13 @@
             <article v-for="g in dep.gruppen" v-show="!g.kuenstlich" :key="g.id" class="pw-data-card">
               <div class="pw-data-card-header pw-budget-kopf">
                 <div class="pw-budget-kopf-titel">
-                  <p class="pw-data-card-kicker">Produktegruppe {{ g.code }}</p>
+                  <!-- F129: dieselbe Seitenangabe wie beim Globalbudget; die
+                       Produktegruppe steht im Buch auf derselben Seite, gleich
+                       in welchem Tab man sie ansieht. -->
+                  <p class="pw-data-card-kicker">
+                    Produktegruppe {{ g.code }}
+                    <span v-if="g.buchseite" class="pw-buchseite">Buch S.&nbsp;{{ g.buchseite }}</span>
+                  </p>
                   <h3>{{ g.name }}</h3>
                 </div>
                 <!-- F116: dieselben zwei Zeilen wie beim Globalbudget, hier mit den Stellen. -->
@@ -687,15 +693,20 @@
             <h3 class="pw-antraege-dep">{{ grp.name }}</h3>
             <div v-for="a in grp.antraege" :key="a.id" class="pw-antrag-zeile" :class="{ 'pw-antrag-auto': a.automatisch }">
               <span class="pw-antrag-pos">{{ a.posName }}</span>
-              <span class="pw-antrag-betrag pw-num" :class="diffKlasse(a.betragDelta)">{{ a.betragDelta ? fr(a.betragDelta) : '' }}</span>
+              <!-- Ein Antrag auf Zielwerte ohne Betrag zeigt den geänderten
+                   Zielwert dort, wo sonst der Betrag steht; trägt er auch einen
+                   Betrag, steht der Betrag dort und die Zielwerte unter der
+                   Begründung. Das PDF ordnet dieselben Daten gleich an. -->
+              <ul v-if="zielwerteStattBetrag(a)" class="pw-antrag-betrag pw-antrag-zielwerte">
+                <li v-for="(zeile, zi) in zielAenderungZeilen(a)" :key="zi">{{ zeile }}</li>
+              </ul>
+              <span v-else class="pw-antrag-betrag pw-num" :class="diffKlasse(a.betragDelta)">{{ a.betragDelta ? fr(a.betragDelta) : '' }}</span>
               <span class="pw-antrag-znum pw-num" :class="diffKlasse(antragZusatzWert(a))">{{ antragZusatzNum(a) }}</span>
               <span class="pw-antrag-zeinheit">{{ antragZusatzEinheit(a) }}</span>
               <span class="pw-antrag-steller">{{ a.antragsteller || (a.automatisch ? 'automatisch' : '') }}</span>
               <span class="pw-antrag-begruendung">
                 <span v-html="markdownZuHtml(a.begruendung)"></span>
-                <!-- Dieselben Zielwerte wie auf der Karte; das PDF liest dieselben
-                     Daten aus `zielAenderungen` (Befund vom 24.10.2026). -->
-                <ul v-if="zielAenderungZeilen(a).length" class="pw-antrag-zielwerte">
+                <ul v-if="!zielwerteStattBetrag(a) && zielAenderungZeilen(a).length" class="pw-antrag-zielwerte">
                   <li v-for="(zeile, zi) in zielAenderungZeilen(a)" :key="zi">{{ zeile }}</li>
                 </ul>
               </span>
@@ -1317,6 +1328,14 @@ export default {
         return `${name}: ${heute !== '' ? heute + ' → ' : ''}${z.neuerWert}`
       })
     },
+    /**
+     * F109: Die geänderten Zielwerte stehen in der Betragsspalte, wenn der
+     * Antrag keinen Betrag trägt; sonst steht dort der Betrag, und die
+     * Zielwerte folgen der Begründung. Dieselbe Regel gilt im Antrags-PDF.
+     */
+    zielwerteStattBetrag(a) {
+      return !Number(a && a.betragDelta) && this.zielAenderungZeilen(a).length > 0
+    },
     antragZusatzWert(a) {
       if (a.stellenDelta) { return a.stellenDelta }
       if (a.prozentDelta && a.bereich === 'steuerfuss') { return a.prozentDelta }
@@ -1487,7 +1506,7 @@ export default {
     // Alle Benutzer dieser Nextcloud, für die Antragsteller-Auswahl. Wer der
     // Fraktion angehört, ohne im Parlament zu sitzen, steht in keiner
     // Mitgliederliste und konnte sich nicht als Antragsteller wählen (Befund
-    // von Marc am 24.10.2026, Manuel Zanoni).
+    // gemessen am 24.10.2026).
     async ladeBenutzer() {
       try {
         const { data } = await axios.get(generateUrl('/apps/parlwin/sitzungstypen/nc/users'), { params: { limit: 100 } })
@@ -2371,6 +2390,18 @@ export default {
 .pw-antrag-bearbeitbar:hover { background: var(--color-background-hover); }
 .pw-antrag-bearbeiten { flex: 1 1 100%; cursor: auto; }
 .pw-antrag-betrag { font-variant-numeric: tabular-nums; min-inline-size: 6rem; }
+/* Die geänderten Zielwerte stehen dort, wo sonst der Betrag steht: linksbündig,
+   weil hier Text und keine Zahl steht, und gedeckelt, damit eine Zeile von
+   sechzig Zeichen die Spalte nicht über den halben Schirm zieht. Ohne eigene
+   Regel setzte der Browser seine Aufzählungspunkte und seinen Einzug. */
+.pw-antrag-zielwerte {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  text-align: start;
+  max-inline-size: 20rem;
+  white-space: normal;
+}
 .pw-antrag-steller { font-weight: 600; }
 .pw-antrag-begruendung { color: var(--color-text-maxcontrast); flex: 1 1 12rem; }
 .pw-antrag-entscheid { font-size: 0.8rem; padding: 0.05rem 0.4rem; border-radius: 0.4rem; }

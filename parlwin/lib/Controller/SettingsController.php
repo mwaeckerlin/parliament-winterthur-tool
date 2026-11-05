@@ -8,15 +8,10 @@ use OCA\ParliamentWinterthur\AppInfo\Application;
 use OCA\ParliamentWinterthur\Command\SyncCommand;
 use OCA\ParliamentWinterthur\Db\FraktionMapper;
 use OCA\ParliamentWinterthur\Db\Mitglied;
-use OCA\ParliamentWinterthur\Service\EreignisService;
 use OCA\ParliamentWinterthur\Service\FraktionsarbeitService;
 use OCA\ParliamentWinterthur\Service\FraktionsraumService;
-use OCA\ParliamentWinterthur\Service\GeschaeftService;
-use OCA\ParliamentWinterthur\Service\KalenderService;
 use OCA\ParliamentWinterthur\Service\MitgliedService;
 use OCA\ParliamentWinterthur\Service\RealtimePublisherService;
-use OCA\ParliamentWinterthur\Service\ScraperService;
-use OCA\ParliamentWinterthur\Service\SitzungService;
 use OCA\ParliamentWinterthur\Service\SyncLockService;
 use OCA\ParliamentWinterthur\Service\SyncProcessService;
 use OCP\AppFramework\Controller;
@@ -30,6 +25,9 @@ use OCP\IGroupManager;
 use OCP\IRequest;
 use OCP\IUser;
 use OCP\IUserManager;
+use OCP\IUserSession;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\NullOutput;
 
 /**
  * REST-Controller für Einstellungen und manuelle Synchronisation.
@@ -40,7 +38,6 @@ class SettingsController extends Controller
     private const SYNC_CANCEL_REQUESTED_KEY = SyncCommand::SYNC_CANCEL_REQUESTED_KEY;
     private const SYNC_WORKER_PID_KEY = SyncCommand::SYNC_WORKER_PID_KEY;
     private const SYNC_STALE_SECONDS = 900;
-    private const SYNC_ABORT_SIGNAL = '__parlwin_sync_abort__';
     private const SYNC_QUEUE_GRACE_SECONDS = 10;
     private const SYNC_CANCEL_GRACE_MS = 900;
     private const SYNC_CANCEL_TERM_WAIT_MS = 250;
@@ -53,6 +50,7 @@ class SettingsController extends Controller
         'kommissionen' => ['label' => 'Kommissionen', 'db' => 'pw_kommissionen'],
         'geschaefte' => ['label' => 'Geschäfte', 'db' => 'pw_geschaefte (+ pw_geschaeft_ereignisse)'],
         'sitzungen' => ['label' => 'Sitzungen', 'db' => 'pw_sitzungen (+ pw_traktanden)'],
+        'stadtratsbeschluesse' => ['label' => 'Stadtratsbeschlüsse', 'db' => 'pw_stadtratsbeschluesse'],
     ];
 
     /** Erlaubte Einstellungsschlüssel und ihre Standardwerte */
@@ -66,11 +64,7 @@ class SettingsController extends Controller
     public function __construct(
         IRequest $request,
         private readonly IConfig $config,
-        private readonly GeschaeftService $geschaeftService,
-        private readonly SitzungService $sitzungService,
         private readonly MitgliedService $mitgliedService,
-        private readonly ScraperService $scraperService,
-        private readonly KalenderService $kalenderService,
         private readonly FraktionsarbeitService $fraktionsarbeitService,
         private readonly RealtimePublisherService $realtimePublisher,
         private readonly SyncLockService $syncLockService,
@@ -79,7 +73,8 @@ class SettingsController extends Controller
         private readonly IGroupManager $groupManager,
         private readonly IUserManager $userManager,
         private readonly FraktionsraumService $fraktionsraumService,
-        private readonly EreignisService $ereignisse,
+        private readonly SyncCommand $syncCommand,
+        private readonly ?IUserSession $userSession = null,
     ) {
         parent::__construct(Application::APP_ID, $request);
     }
@@ -312,7 +307,7 @@ class SettingsController extends Controller
             }
         }
 
-        // Fall 3: verwaiste lokale User → aus Gruppe entfernen + deaktivieren, keine Mail
+        // Fall 3: verwaiste lokale Benutzer → aus Gruppe entfernen + deaktivieren, keine Mail
         foreach ($orphanUids as $uid) {
             $user = $this->userManager->get($uid);
             if (!$user instanceof IUser) {
@@ -542,6 +537,12 @@ class SettingsController extends Controller
             if ((bool) ($stopResult['signalled'] ?? false) || !$this->istWorkerProzessLebendig()) {
                 $this->setCancelRequested(false);
                 $this->setCurrentWorkerPid(null);
+            } else {
+                return new DataResponse([
+                    'erfolg' => true,
+                    'abbruch_angefragt' => true,
+                    'zeitpunkt' => (new \DateTime())->format('Y-m-d H:i:s'),
+                ]);
             }
             $status = $this->markiereSyncAlsAbgebrochen(
                 $status,
@@ -554,6 +555,8 @@ class SettingsController extends Controller
                 'zeitpunkt' => (new \DateTime())->format('Y-m-d H:i:s'),
                 'forced' => (bool) ($stopResult['forced'] ?? false),
                 'signalled' => (bool) ($stopResult['signalled'] ?? false),
+                // Ein Lauf, der sich selbst beendet, nennt seine Geschäfte im eigenen `sync.cancelled`; nach einem Signal kennt sie niemand.
+                'geschaeftIds' => ($stopResult['signalled'] ?? false) ? null : [],
             ]);
 
             return new DataResponse([
@@ -1457,17 +1460,7 @@ class SettingsController extends Controller
         // zurückkehrt, lassen wir das Process-Handle bewusst fallen (kein proc_close),
         // damit der Sync-Prozess nach Beenden des FPM-Workers von init (PID 1) adoptiert
         // wird und im Hintergrund weiterläuft.
-        $kommando = [
-            $phpBinary,
-            '-d',
-            'max_execution_time=0',
-            $occPfad,
-            'parlwin:sync',
-            '--update-progress',
-            '--source=admin-ui',
-            '--no-ansi',
-            '--no-interaction',
-        ];
+        $kommando = $this->syncKommando($phpBinary, $occPfad);
         $stdoutResource = @fopen('php://fd/1', 'w');
         $stderrResource = @fopen('php://fd/2', 'w');
         $descriptors = [
@@ -1510,6 +1503,32 @@ class SettingsController extends Controller
         unset($handle);
 
         return $pid > 1;
+    }
+
+    /**
+     * Der Aufruf von `occ parlwin:sync` für eine Synchronisation aus der
+     * Verwaltung, mit der Benutzer-ID für das Protokoll.
+     *
+     * @return list<string>
+     */
+    private function syncKommando(string $phpBinary, string $occPfad): array
+    {
+        $kommando = [
+            $phpBinary,
+            '-d',
+            'max_execution_time=0',
+            $occPfad,
+            'parlwin:sync',
+            '--update-progress',
+            '--source=admin-ui',
+            '--no-ansi',
+            '--no-interaction',
+        ];
+        $uid = (string) $this->userSession?->getUser()?->getUID();
+        if ($uid !== '') {
+            $kommando[] = '--ausgeloest-von=' . $uid;
+        }
+        return $kommando;
     }
 
     /**
@@ -1591,224 +1610,20 @@ class SettingsController extends Controller
         return !in_array($name, $disabled, true);
     }
 
+    /**
+     * Der Ausweichweg ohne eigenen Prozess: derselbe Lauf wie `occ parlwin:sync`,
+     * im Arbeitsprozess von FPM.
+     */
     private function fuehreSynchronisationAus(): void
     {
-        if (!$this->syncLockService->acquire()) {
-            return;
+        $argumente = ['--update-progress' => true, '--source' => 'admin-ui'];
+        $uid = (string) $this->userSession?->getUser()?->getUID();
+        if ($uid !== '') {
+            $argumente['--ausgeloest-von'] = $uid;
         }
-
-        $this->setCurrentWorkerPid(getmypid() ?: null);
-        $status = $this->getSyncProgress();
-        $startIso = (string) ($status['startedAt'] ?? (new \DateTimeImmutable())->format(DATE_ATOM));
-        $start = \DateTimeImmutable::createFromFormat(DATE_ATOM, $startIso) ?: new \DateTimeImmutable();
-        @ignore_user_abort(true);
-        @set_time_limit(0);
-
-        try {
-            $this->scraperService->prefetchTopLevelListen([
-                'geschaefte',
-                'sitzungen',
-                'mitglieder',
-                'kommissionen',
-                'fraktionen',
-            ]);
-            $vorabTotals = $this->scraperService->vorabTotalsFuerSync();
-            foreach ($vorabTotals as $scope => $total) {
-                if (!isset($status['sections'][$scope]) || !is_array($status['sections'][$scope])) {
-                    continue;
-                }
-                $status['sections'][$scope]['total'] = max(0, (int) $total);
-            }
-            $status['updatedAt'] = (new \DateTimeImmutable())->format(DATE_ATOM);
-            $this->setSyncProgress($status);
-
-            $fortschritt = function (array $event) use (&$status, $start): void {
-                $scope = (string) ($event['scope'] ?? '');
-                if ($scope === '' || !isset(self::SYNC_SECTION_META[$scope])) {
-                    return;
-                }
-                if (!isset($status['sections'][$scope]) || !is_array($status['sections'][$scope])) {
-                    $status['sections'][$scope] = [
-                        'label' => self::SYNC_SECTION_META[$scope]['label'],
-                        'db' => self::SYNC_SECTION_META[$scope]['db'],
-                        'processed' => 0,
-                        'total' => 0,
-                        'cursor' => '',
-                    ];
-                }
-
-                $processed = max(0, (int) ($event['processed'] ?? 0));
-                $total = max(0, (int) ($event['total'] ?? 0));
-                $cursor = trim((string) ($event['cursor'] ?? ''));
-                if ($total > 0) {
-                    $processed = min($processed, $total);
-                }
-
-                $status['sections'][$scope]['processed'] = $processed;
-                $status['sections'][$scope]['total'] = $total;
-                if ($cursor !== '') {
-                    $status['sections'][$scope]['cursor'] = $cursor;
-                }
-                $status['phase'] = 'running';
-                $status['phaseLabel'] = 'Synchronisiere ' . self::SYNC_SECTION_META[$scope]['label'];
-                $status['error'] = null;
-                $status['current'] = [
-                    'scope' => $scope,
-                    'label' => self::SYNC_SECTION_META[$scope]['label'],
-                    'db' => self::SYNC_SECTION_META[$scope]['db'],
-                    'processed' => $processed,
-                    'total' => $total,
-                    'cursor' => $cursor,
-                ];
-
-                $elapsedSekunden = max(0, time() - $start->getTimestamp());
-                $status['elapsed'] = $this->formatiereDauer($elapsedSekunden);
-                [$globalProcessed, $globalTotal] = $this->berechneGlobalenFortschritt($status['sections']);
-                $etaSekunden = null;
-                if ($globalTotal > 0 && $globalProcessed > 0 && $globalProcessed < $globalTotal && $elapsedSekunden >= 5 && $globalProcessed >= 5) {
-                    $etaSekunden = (int) round(($elapsedSekunden / $globalProcessed) * ($globalTotal - $globalProcessed));
-                } elseif ($total > 0 && $processed > 0 && $processed < $total && $elapsedSekunden >= 5) {
-                    $etaSekunden = (int) round(($elapsedSekunden / $processed) * ($total - $processed));
-                }
-
-                if ($globalTotal > 0 && $globalProcessed >= $globalTotal) {
-                    $status['eta'] = '00:00:00';
-                } elseif ($etaSekunden !== null && $etaSekunden >= 0) {
-                    $status['eta'] = $this->formatiereDauer($etaSekunden);
-                } else {
-                    $status['eta'] = '--:--:--';
-                }
-                $status['updatedAt'] = (new \DateTimeImmutable())->format(DATE_ATOM);
-                $this->setSyncProgress($status);
-                if ($this->isCancelRequested()) {
-                    throw new \RuntimeException(self::SYNC_ABORT_SIGNAL);
-                }
-            };
-
-            $resumeCursors = $this->ermittleResumeCursors($status);
-            $this->setzePhase($status, 'mitglieder', $start);
-            if ($this->isCancelRequested()) {
-                throw new \RuntimeException(self::SYNC_ABORT_SIGNAL);
-            }
-            $mitglieder = $this->mitgliedService->synchronisieren($fortschritt, [
-                'mitglieder' => ['resume_cursor' => $resumeCursors['mitglieder'] ?? ''],
-                'fraktionen' => ['resume_cursor' => $resumeCursors['fraktionen'] ?? ''],
-                'kommissionen' => ['resume_cursor' => $resumeCursors['kommissionen'] ?? ''],
-            ]);
-            $this->setzePhase($status, 'geschaefte', $start);
-            if ($this->isCancelRequested()) {
-                throw new \RuntimeException(self::SYNC_ABORT_SIGNAL);
-            }
-            $geschaefte = $this->geschaeftService->synchronisieren($fortschritt, [
-                'resume_cursor' => $resumeCursors['geschaefte'] ?? '',
-            ]);
-            $this->setzePhase($status, 'sitzungen', $start);
-            if ($this->isCancelRequested()) {
-                throw new \RuntimeException(self::SYNC_ABORT_SIGNAL);
-            }
-            $sitzungen = $this->sitzungService->synchronisieren($fortschritt, [
-                'resume_cursor' => $resumeCursors['sitzungen'] ?? '',
-            ]);
-            $this->kalenderService->sitzungenAktualisieren(
-                $this->sitzungService->alleAktiven()
-            );
-
-            // Automatische Zuständigkeit: Geschäfte ohne Zuständigkeit, die in
-            // einer bekannten Kommission hängig sind, bekommen die
-            // Kommissionsmitglieder der eigenen Fraktion als zuständig.
-            try {
-                $autoZustaendigkeit = $this->fraktionsarbeitService->autoZuweisenKommissionsmitglieder();
-            } catch (\Throwable $e) {
-                $autoZustaendigkeit = ['fehler' => $e->getMessage()];
-            }
-
-            $jetzt = (new \DateTime())->format('Y-m-d H:i:s');
-            $this->config->setAppValue(Application::APP_ID, 'letzte_synchronisation', $jetzt);
-            $statistik = [
-                'mitglieder' => $mitglieder,
-                'geschaefte' => $geschaefte,
-                'sitzungen' => $sitzungen,
-                'auto_zustaendigkeit' => $autoZustaendigkeit,
-            ];
-            $this->realtimePublisher->publish('sync.completed', [
-                'quelle' => 'admin-ui',
-                'zeitpunkt' => $jetzt,
-                'statistik' => $statistik,
-            ]);
-            // Ereignis-Protokoll (F105): wann gesynct und was neu/geändert kam.
-            $this->ereignisse->protokolliere('sync', '', true,
-                'Synchronisation abgeschlossen', $this->syncZusammenfassung($statistik));
-
-            $status['running'] = false;
-            $status['phase'] = 'abgeschlossen';
-            $status['phaseLabel'] = 'Synchronisation abgeschlossen';
-            $status['finishedAt'] = (new \DateTimeImmutable())->format(DATE_ATOM);
-            $status['updatedAt'] = $status['finishedAt'];
-            $status['elapsed'] = $this->formatiereDauer(max(0, time() - $start->getTimestamp()));
-            $status['eta'] = '00:00:00';
-            $status['error'] = null;
-            $status['current'] = [
-                'scope' => 'done',
-                'label' => 'Synchronisation abgeschlossen',
-                'db' => '-',
-                'processed' => 0,
-                'total' => 0,
-                'cursor' => '',
-            ];
-            $status['statistik'] = $statistik;
-            $status['sections'] = $this->initialisiereSections();
-            $this->setSyncProgress($status);
-        } catch (\Throwable $e) {
-            if ($e->getMessage() === self::SYNC_ABORT_SIGNAL) {
-                $status['running'] = false;
-                $status['phase'] = 'abgebrochen';
-                $status['phaseLabel'] = 'Synchronisation abgebrochen';
-                $status['finishedAt'] = (new \DateTimeImmutable())->format(DATE_ATOM);
-                $status['updatedAt'] = $status['finishedAt'];
-                $status['elapsed'] = $this->formatiereDauer(max(0, time() - $start->getTimestamp()));
-                $status['eta'] = '--:--:--';
-                $status['error'] = 'Synchronisation wurde manuell abgebrochen';
-                $status['current'] = [
-                    'scope' => 'abgebrochen',
-                    'label' => 'Abgebrochen',
-                    'db' => '-',
-                    'processed' => 0,
-                    'total' => 0,
-                    'cursor' => '',
-                ];
-                $this->setSyncProgress($status);
-                $this->realtimePublisher->publish('sync.cancelled', [
-                    'quelle' => 'admin-ui',
-                    'zeitpunkt' => (new \DateTime())->format('Y-m-d H:i:s'),
-                ]);
-                return;
-            }
-            $status['running'] = false;
-            $status['phase'] = 'fehler';
-            $status['phaseLabel'] = 'Synchronisation fehlgeschlagen';
-            $status['finishedAt'] = (new \DateTimeImmutable())->format(DATE_ATOM);
-            $status['updatedAt'] = $status['finishedAt'];
-            $status['elapsed'] = $this->formatiereDauer(max(0, time() - $start->getTimestamp()));
-            $status['eta'] = '--:--:--';
-            $status['error'] = $e->getMessage();
-            $status['current'] = [
-                'scope' => 'error',
-                'label' => 'Fehler',
-                'db' => '-',
-                'processed' => 0,
-                'total' => 0,
-                'cursor' => '',
-            ];
-            $this->setSyncProgress($status);
-            $this->realtimePublisher->publish('sync.failed', [
-                'quelle' => 'admin-ui',
-                'fehler' => $e->getMessage(),
-            ]);
-        } finally {
-            $this->setCancelRequested(false);
-            $this->setCurrentWorkerPid(null);
-            $this->syncLockService->release();
-        }
+        $input = new ArrayInput($argumente);
+        $input->setInteractive(false);
+        $this->syncCommand->run($input, new NullOutput());
     }
 
     /**
@@ -1844,61 +1659,12 @@ class SettingsController extends Controller
             $normalisiert[$scope]['processed'] = max(0, (int) ($werte['processed'] ?? 0));
             $normalisiert[$scope]['total'] = max(0, (int) ($werte['total'] ?? 0));
             $normalisiert[$scope]['cursor'] = trim((string) ($werte['cursor'] ?? $normalisiert[$scope]['cursor']));
+            $fehler = trim((string) ($werte['fehler'] ?? ''));
+            if ($fehler !== '') {
+                $normalisiert[$scope]['fehler'] = $fehler;
+            }
         }
         return $normalisiert;
-    }
-
-    /**
-     * @param array<string, array<string, mixed>> $sections
-     * @return array{0: int, 1: int}
-     */
-    /**
-     * Kurze Zusammenfassung der Synchronisation für das Protokoll (F105): summiert
-     * rekursiv die «neu»- und «aktualisiert»-Zähler über alle Bereiche.
-     *
-     * @param array<string, mixed> $statistik
-     */
-    private function syncZusammenfassung(array $statistik): string
-    {
-        $neu = 0;
-        $geaendert = 0;
-        $sammle = function ($wert) use (&$sammle, &$neu, &$geaendert): void {
-            if (!is_array($wert)) {
-                return;
-            }
-            // Trägt diese Ebene selbst Zähler, gilt sie als Blatt (nicht weiter
-            // absteigen) — so wird ein Aggregat nicht zusätzlich zu seinen Details
-            // gezählt.
-            if (array_key_exists('neu', $wert) || array_key_exists('aktualisiert', $wert)) {
-                $neu += (int) ($wert['neu'] ?? 0);
-                $geaendert += (int) ($wert['aktualisiert'] ?? 0);
-                return;
-            }
-            foreach ($wert as $unter) {
-                $sammle($unter);
-            }
-        };
-        $sammle($statistik);
-        return $neu . ' neu, ' . $geaendert . ' geändert';
-    }
-
-    private function berechneGlobalenFortschritt(array $sections): array
-    {
-        $processed = 0;
-        $total = 0;
-        foreach ($sections as $section) {
-            if (!is_array($section)) {
-                continue;
-            }
-            $sectionProcessed = max(0, (int) ($section['processed'] ?? 0));
-            $sectionTotal = max(0, (int) ($section['total'] ?? 0));
-            if ($sectionTotal <= 0) {
-                continue;
-            }
-            $processed += min($sectionProcessed, $sectionTotal);
-            $total += $sectionTotal;
-        }
-        return [$processed, $total];
     }
 
     /**
@@ -1980,31 +1746,6 @@ class SettingsController extends Controller
         $m = intdiv($sekunden % 3600, 60);
         $s = $sekunden % 60;
         return sprintf('%02d:%02d:%02d', $h, $m, $s);
-    }
-
-    /**
-     * @param array<string, mixed> $status
-     */
-    private function setzePhase(array &$status, string $scope, \DateTimeImmutable $start): void
-    {
-        if (!isset(self::SYNC_SECTION_META[$scope])) {
-            return;
-        }
-        $status['phase'] = 'running';
-        $status['phaseLabel'] = 'Synchronisiere ' . self::SYNC_SECTION_META[$scope]['label'];
-        $status['current'] = [
-            'scope' => $scope,
-            'label' => self::SYNC_SECTION_META[$scope]['label'],
-            'db' => self::SYNC_SECTION_META[$scope]['db'],
-            'processed' => (int) ($status['sections'][$scope]['processed'] ?? 0),
-            'total' => (int) ($status['sections'][$scope]['total'] ?? 0),
-            'cursor' => (string) ($status['sections'][$scope]['cursor'] ?? ''),
-        ];
-        $status['updatedAt'] = (new \DateTimeImmutable())->format(DATE_ATOM);
-        $status['elapsed'] = $this->formatiereDauer(max(0, time() - $start->getTimestamp()));
-        $this->setSyncProgress($status);
-        error_log('[parlwin] sync-phase: ' . self::SYNC_SECTION_META[$scope]['label']
-            . ' (db=' . self::SYNC_SECTION_META[$scope]['db'] . ')');
     }
 
     /**

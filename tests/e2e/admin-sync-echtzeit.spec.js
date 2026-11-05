@@ -1,4 +1,8 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, sperreVorAllem } from './fixtures.js'
+import { login } from './anmeldung.js'
+
+// Die Sperre aus sperre.js steht vor jedem anderen `beforeAll` dieser Datei, weil schon ein `beforeAll` globale Einstellungen schreiben kann.
+test.beforeAll(sperreVorAllem)
 
 /**
  * E2E der Administration im echten Browser gegen das reale System
@@ -12,6 +16,8 @@ import { test, expect } from '@playwright/test'
  *  - manuelle Synchronisation mit Live-Fortschritt und «läuft bereits», danach
  *    sicher abgebrochen (kein Warten auf den langsamen Voll-Lauf),
  *  - Abbruch einer laufenden Synchronisation (Status-API bestätigt den Stopp),
+ *    «Synchronisierung abbrechen» bleibt bis zum Ende des Laufs gesperrt,
+ *    ein gescheiterter Abbruch lässt sich wiederholen,
  *  - Fraktion/Gruppe: Optionen, Autosave, Persistenz, Gruppen-Status,
  *  - Kürzel über die UI (hinzufügen/löschen) und Datalist-Vorschläge,
  *  - Mitglieder-Zuordnung (Hinweise, Zeilen, der Benutzername speichert von selbst),
@@ -27,6 +33,11 @@ const BASE_URL = process.env.PARLWIN_BASE_URL || 'http://nextcloud-nginx:8080'
 const APP = `${BASE_URL}/index.php/apps/parlwin`
 const ADMIN_URL = `${BASE_URL}/index.php/settings/admin/parlwin`
 
+// Der Simulator der Stadtquelle im Stack (Dockerfile.quelle) und sein Steuerweg:
+// PUT schaltet die Liste der Stadtratsbeschlüsse auf 500, DELETE zurück.
+const QUELLE_URL = process.env.PARLWIN_QUELLE_URL || 'http://parlwin-quelle:8080'
+const STADT_FEHLER = `${QUELLE_URL}/_steuerung/stadtratsbeschluesse-fehler`
+
 const ADMIN = { name: 'admin', pass: process.env.PW_ADMIN_PASS || '' }
 const U1 = { name: process.env.PW_U1 || 'parlwin_praesidium', pass: process.env.PW_P1 || '' }
 
@@ -34,26 +45,6 @@ const stamp = Date.now()
 
 // Live-Fortschritt in #pw-sync-details: «… - 5/10 | Gesamt 20/40 (50%) | …».
 const FORTSCHRITT_RE = /\d+\/\d+ \| Gesamt \d+\/\d+ \(\d+%\)/
-
-/** Meldet einen Nutzer über das Nextcloud-Login-Formular an (wie die Schwester-Specs). */
-async function login(page, user) {
-  await page.goto(`${BASE_URL}/index.php/login`)
-  await page.waitForSelector('input[name="user"]', { state: 'visible', timeout: 30_000 })
-  await page.fill('input[name="user"]', user.name)
-  await page.fill('input[name="password"]', user.pass)
-  let zuletzt
-  for (let versuch = 0; versuch < 3; versuch++) {
-    void page.click('button[type="submit"], input[type="submit"]', { noWaitAfter: true }).catch(() => {})
-    try {
-      await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 12_000, waitUntil: 'commit' })
-      await page.waitForLoadState('domcontentloaded').catch(() => {})
-      return
-    } catch (e) {
-      zuletzt = e
-    }
-  }
-  throw zuletzt
-}
 
 /** Öffnet die Admin-Einstellungsseite und wartet, bis die Wurzel gerendert ist. */
 async function openAdmin(page) {
@@ -131,6 +122,38 @@ async function ensureSyncIdle(page) {
     final?.running,
     'Synchronisation läuft nach ensureSyncIdle noch — würde folgende Specs stören',
   ).toBe(false)
+}
+
+/**
+ * Ein Versprechen, das der Test selbst einlöst: Ein Haken von `page.route`
+ * wartet auf `warten`, bis der Test `frei()` ruft.
+ */
+function freigabe() {
+  let frei
+  const warten = new Promise((r) => { frei = r })
+  return { warten, frei }
+}
+
+/**
+ * Hält fest, was die Seite bei jeder Änderung zeigt: den Text in
+ * #pw-sync-status und ob «Synchronisierung abbrechen» gesperrt ist. Gelesen
+ * wird die Liste mit `window.__pwSyncVerlauf`.
+ */
+function verlaufMitschreiben(page) {
+  return page.evaluate(() => {
+    window.__pwSyncVerlauf = []
+    const feld = document.querySelector('#pw-sync-status')
+    const knopf = document.querySelector('#pw-btn-sync-cancel')
+    const merken = () => {
+      const eintrag = { text: (feld.textContent || '').trim(), gesperrt: knopf.disabled }
+      const letzter = window.__pwSyncVerlauf[window.__pwSyncVerlauf.length - 1]
+      if (!letzter || letzter.text !== eintrag.text || letzter.gesperrt !== eintrag.gesperrt) {
+        window.__pwSyncVerlauf.push(eintrag)
+      }
+    }
+    new MutationObserver(merken).observe(feld, { childList: true, characterData: true, subtree: true })
+    new MutationObserver(merken).observe(knopf, { attributes: true, attributeFilter: ['disabled'] })
+  })
 }
 
 /** Namen der aktiven, synchronisierten Fraktionen. */
@@ -593,10 +616,14 @@ test.describe('Administration, Sync, Echtzeit, Änderungsverlauf (e2e)', () => {
       // «abgebrochen») — unabhängig von der UI-Textphase «abgebrochen», die in
       // Firefox unzuverlässig erscheint. Ein transienter null-Status zählt NICHT.
       //
-      // Der Verlauf wird mitgeschrieben: Bleibt der Abbruch aus, sagt erst die
-      // Folge der Phasen, woran er hängt — ohne sie steht im Protokoll nur
-      // «nach 180 Sekunden nicht gestoppt» (29.09.2026).
+      // Der Verlauf wird mitgeschrieben: Bleibt der Abbruch aus, nennt die
+      // Meldung die Folge der Phasen, an der er hängt.
       const verlauf = []
+      // F59: Bis der Lauf wirklich steht, bleibt die Meldung beim Abbruch; sie
+      // fällt nicht auf «Synchronisiere...» zurück, solange der Server das
+      // Signal noch nicht aufgenommen hat. Mitgeschrieben wird darum auch, was
+      // die Oberfläche bei jeder Abfrage zeigt.
+      const anzeigen = []
       await expect
         .poll(async () => {
           const s = await syncStatus(page)
@@ -604,16 +631,295 @@ test.describe('Administration, Sync, Echtzeit, Änderungsverlauf (e2e)', () => {
             ? `${s.phase}/${s.current?.scope || '-'} läuft=${s.running} ${s.current?.processed ?? '-'}/${s.current?.total ?? '-'}`
             : 'kein Status'
           if (verlauf[verlauf.length - 1] !== marke) verlauf.push(marke)
+          const gezeigt = (await status.innerText()).trim()
+          if (anzeigen[anzeigen.length - 1] !== gezeigt) anzeigen.push(gezeigt)
           return !!s && (s.running === false || s.phase === 'abgebrochen')
         }, { timeout: 180_000, intervals: [1000] })
         .toBe(true)
         .catch((e) => {
           throw new Error(`${e.message}\nVerlauf des Abbruchs: ${verlauf.join(' → ')}`)
         })
+      const abbruchAb = anzeigen.findIndex((t) => /Abbruch|abgebrochen/i.test(t))
+      expect(
+        anzeigen.slice(Math.max(abbruchAb, 0)).filter((t) => /Synchronisiere/i.test(t)),
+        `nach «Synchronisierung abbrechen» stand wieder «Synchronisiere...» da: ${anzeigen.join(' → ')}; Stand des Servers: ${verlauf.join(' → ')}`,
+      ).toEqual([])
 
       await ensureSyncIdle(page)
       const final = await syncStatus(page)
       expect(final?.running, 'Sync läuft am Testende noch').toBe(false)
+      expect(jsFehler, `JS-Fehler: ${jsFehler.join(' | ')}`).toEqual([])
+    })
+
+    // F59: Eine Abfrage des Status, die vor dem Start hinausging, kann nach dem
+    // Klick auf «Synchronisierung abbrechen» ankommen. Sie bringt den Stand des
+    // vorigen Laufs und darf weder den Abbruch-Wunsch löschen noch die Meldung
+    // ersetzen. Der Test hält die echte Antwort der ersten Abfrage zurück, die
+    // der Server vor dem Start beantwortet, dazu die Antwort auf den Start und
+    // die Anfrage zum Abbruch.
+    test('Abbrechen bleibt stehen, wenn die erste Abfrage den vorigen Lauf zurückbringt', async ({ page }) => {
+      test.setTimeout(360_000)
+      await login(page, ADMIN)
+      await openAdmin(page)
+      await ensureSyncIdle(page)
+      await openAdmin(page)
+
+      const start = freigabe()
+      const abbruch = freigabe()
+      const alterGeholt = freigabe()
+      const alterStand = freigabe()
+      const zweiLaeufe = freigabe()
+      let erste = true
+      let alteDaten = null
+      let alterGeliefert = false
+      let laufendGeliefert = 0
+      // Der Start geht erst an den Server, wenn die erste Abfrage des Status
+      // ihre Antwort hat; diese Antwort trägt darum den Stand vor dem Start.
+      await page.route('**/apps/parlwin/sync', async (route) => {
+        if (route.request().method() !== 'POST') { return route.continue() }
+        await alterGeholt.warten
+        const antwort = await route.fetch()
+        await start.warten
+        await route.fulfill({ response: antwort })
+      })
+      await page.route('**/apps/parlwin/sync/cancel', async (route) => {
+        await abbruch.warten
+        await route.continue()
+      })
+      await page.route('**/apps/parlwin/sync/status', async (route) => {
+        const istErste = erste
+        erste = false
+        const antwort = await route.fetch()
+        const daten = await antwort.json().catch(() => null)
+        if (istErste) {
+          alteDaten = daten
+          alterGeholt.frei()
+          await alterStand.warten
+          await route.fulfill({ response: antwort })
+          alterGeliefert = true
+          return
+        }
+        await route.fulfill({ response: antwort })
+        if (alterGeliefert && daten?.running === true && ++laufendGeliefert >= 2) { zweiLaeufe.frei() }
+      })
+
+      const status = page.locator('#pw-sync-status')
+      await verlaufMitschreiben(page)
+
+      await page.locator('#pw-btn-sync').click()
+      await page.locator('#pw-btn-sync-cancel').click()
+      await expect(status).toHaveText(/Abbruch/, { timeout: 20_000 })
+      await alterGeholt.warten
+      expect(alteDaten, 'die erste Abfrage des Status hat keine auswertbare Antwort').not.toBeNull()
+      expect(alteDaten.running, 'die zurückgehaltene Antwort trägt schon einen laufenden Abgleich').toBe(false)
+      // Der vorige Lauf kommt nach dem Abbruch an, danach zweimal der laufende.
+      alterStand.frei()
+      await zweiLaeufe.warten
+      abbruch.frei()
+      start.frei()
+
+      await expect
+        .poll(async () => (await syncStatus(page))?.running === false, { timeout: 180_000, intervals: [1000] })
+        .toBe(true)
+      // Gelesen wird bis zur Meldung «abgebrochen» nach der Antwort auf den
+      // Start: Danach kann der Zeitplan des Stacks (PARLWIN_CRON_INTERVAL) einen
+      // neuen Lauf starten, der zu Recht «Synchronisiere...» zeigt. Ein
+      // «abgebrochen» davor ist der Stand des vorigen Laufs.
+      await expect
+        .poll(() => page.evaluate(() => {
+          const verlauf = window.__pwSyncVerlauf
+          const gestartet = verlauf.findIndex((e) => /Synchronisation gestartet/.test(e.text))
+          return gestartet >= 0 && verlauf.slice(gestartet + 1).some((e) => /abgebrochen/i.test(e.text))
+        }), { timeout: 30_000 })
+        .toBe(true)
+      const texte = await page.evaluate(() => window.__pwSyncVerlauf.map((e) => e.text))
+      const abbruchAb = texte.findIndex((t) => /Abbruch/.test(t))
+      expect(abbruchAb, `kein Abbruch angezeigt: ${texte.join(' → ')}`).toBeGreaterThanOrEqual(0)
+      const gestartet = texte.findIndex((t) => /Synchronisation gestartet/.test(t))
+      const ende = texte.findIndex((t, i) => i > gestartet && gestartet >= 0 && /abgebrochen/i.test(t))
+      expect(texte.slice(abbruchAb, ende < 0 ? undefined : ende).filter((t) => /Synchronisiere/.test(t)),
+        `nach «Synchronisierung abbrechen» stand wieder «Synchronisiere...» da: ${texte.join(' → ')}`).toEqual([])
+
+      await page.unrouteAll({ behavior: 'ignoreErrors' })
+      await ensureSyncIdle(page)
+      expect(jsFehler, `JS-Fehler: ${jsFehler.join(' | ')}`).toEqual([])
+    })
+
+    // F59: Nach dem Klick auf «Synchronisierung abbrechen» bleibt der Knopf
+    // gesperrt, bis der Lauf steht; ein zweiter Klick schickte den Abbruch ein
+    // zweites Mal an den Server. Der Test hält die Anfrage zum Abbruch zurück,
+    // bis zwei echte Stände des laufenden Abgleichs angekommen sind.
+    test('Der Knopf zum Abbrechen bleibt nach dem Klick gesperrt, bis der Lauf steht', async ({ page }) => {
+      test.setTimeout(360_000)
+      await login(page, ADMIN)
+      await openAdmin(page)
+      await ensureSyncIdle(page)
+      await openAdmin(page)
+
+      const btnSync = page.locator('#pw-btn-sync')
+      const btnCancel = page.locator('#pw-btn-sync-cancel')
+      const status = page.locator('#pw-sync-status')
+
+      const abbruch = freigabe()
+      const zweiLaeufe = freigabe()
+      let abbruchAnfragen = 0
+      let geklickt = false
+      let laufendNachKlick = 0
+      await page.route('**/apps/parlwin/sync/cancel', async (route) => {
+        abbruchAnfragen++
+        await abbruch.warten
+        await route.continue()
+      })
+      await page.route('**/apps/parlwin/sync/status', async (route) => {
+        const antwort = await route.fetch()
+        const daten = await antwort.json().catch(() => null)
+        await route.fulfill({ response: antwort })
+        if (geklickt && daten?.running === true && ++laufendNachKlick >= 2) { zweiLaeufe.frei() }
+      })
+      await verlaufMitschreiben(page)
+
+      await expect(btnSync).toBeEnabled({ timeout: 60_000 })
+      await btnSync.click()
+      await expect(btnCancel).toBeEnabled({ timeout: 30_000 })
+      await expect(status).toHaveText(/Synchronisiere/, { timeout: 60_000 })
+
+      geklickt = true
+      await btnCancel.click()
+      await expect(status).toHaveText(/Abbruch/, { timeout: 20_000 })
+      await zweiLaeufe.warten
+      await expect(btnCancel, '«Synchronisierung abbrechen» ist wieder frei, solange der Lauf noch steht').toBeDisabled()
+      abbruch.frei()
+
+      await expect
+        .poll(async () => (await syncStatus(page))?.running === false, { timeout: 180_000, intervals: [1000] })
+        .toBe(true)
+      // Gelesen wird bis zur Meldung «abgebrochen»: Danach kann der Zeitplan
+      // des Stacks einen neuen Lauf starten, der «Synchronisierung abbrechen»
+      // zu Recht freigibt.
+      await expect
+        .poll(() => page.evaluate(() => {
+          const verlauf = window.__pwSyncVerlauf
+          const ab = verlauf.findIndex((e) => /Abbruch/.test(e.text))
+          return ab >= 0 && verlauf.slice(ab + 1).some((e) => /abgebrochen/i.test(e.text))
+        }), { timeout: 30_000 })
+        .toBe(true)
+      const verlauf = await page.evaluate(() => window.__pwSyncVerlauf.slice())
+      const ab = verlauf.findIndex((e) => /Abbruch/.test(e.text))
+      const ende = verlauf.findIndex((e, i) => i > ab && /abgebrochen/i.test(e.text))
+      const bild = verlauf.map((e) => `${e.text} (${e.gesperrt ? 'gesperrt' : 'frei'})`).join(' → ')
+      expect(verlauf.slice(ab, ende + 1).filter((e) => !e.gesperrt),
+        `«Synchronisierung abbrechen» war vor dem Ende des Laufs wieder frei: ${bild}`).toEqual([])
+      expect(abbruchAnfragen, 'die Seite hat den Abbruch mehr als einmal geschickt').toBe(1)
+
+      await page.unrouteAll({ behavior: 'ignoreErrors' })
+      await ensureSyncIdle(page)
+      expect(jsFehler, `JS-Fehler: ${jsFehler.join(' | ')}`).toEqual([])
+    })
+
+    // F59: Kommt die Anfrage zum Abbruch nicht beim Server an, gibt die nächste
+    // Meldung des laufenden Abgleichs «Synchronisierung abbrechen» wieder frei,
+    // und ein zweiter Klick bricht den Lauf ab. Der Test lässt die Verbindung
+    // der ersten Anfrage zum Abbruch scheitern; die Antworten des Servers
+    // bleiben echt.
+    test('Kommt der Abbruch nicht an, lässt sich der Lauf erneut abbrechen', async ({ page }) => {
+      test.setTimeout(360_000)
+      await login(page, ADMIN)
+      await openAdmin(page)
+      await ensureSyncIdle(page)
+      await openAdmin(page)
+
+      const btnSync = page.locator('#pw-btn-sync')
+      const btnCancel = page.locator('#pw-btn-sync-cancel')
+      const status = page.locator('#pw-sync-status')
+
+      let abbruchAnfragen = 0
+      await page.route('**/apps/parlwin/sync/cancel', async (route) => {
+        abbruchAnfragen++
+        if (abbruchAnfragen === 1) { return route.abort('connectionfailed') }
+        return route.continue()
+      })
+      await verlaufMitschreiben(page)
+
+      await expect(btnSync).toBeEnabled({ timeout: 60_000 })
+      await btnSync.click()
+      await expect(btnCancel).toBeEnabled({ timeout: 30_000 })
+      await expect(status).toHaveText(/Synchronisiere/, { timeout: 60_000 })
+
+      await btnCancel.click()
+      // Die Fehlermeldung kann die nächste Meldung des Laufs gleich ersetzen,
+      // darum wird sie im Verlauf gesucht.
+      await expect
+        .poll(() => page.evaluate(() => window.__pwSyncVerlauf.some((e) => /^Fehler/.test(e.text))), { timeout: 20_000 })
+        .toBe(true)
+      const zwischenstand = await syncStatus(page)
+      expect(['queued', 'running'], `der Abbruch kam doch beim Server an: ${JSON.stringify(zwischenstand)}`)
+        .toContain(zwischenstand?.phase)
+      await expect(btnCancel, 'nach dem gescheiterten Abbruch bleibt «Synchronisierung abbrechen» gesperrt').toBeEnabled({ timeout: 30_000 })
+      await expect(status, 'nach dem gescheiterten Abbruch meldet die Seite weiter den Abbruch').toHaveText(/Synchronisiere/)
+
+      await btnCancel.click()
+      await expect(status).toHaveText(/Abbruch/, { timeout: 20_000 })
+      await expect
+        .poll(async () => (await syncStatus(page))?.running === false, { timeout: 180_000, intervals: [1000] })
+        .toBe(true)
+      expect(abbruchAnfragen, 'die Seite hat den zweiten Abbruch nicht geschickt').toBe(2)
+
+      await page.unrouteAll({ behavior: 'ignoreErrors' })
+      await ensureSyncIdle(page)
+      expect(jsFehler, `JS-Fehler: ${jsFehler.join(' | ')}`).toEqual([])
+    })
+
+    // F146: Antwortet die Webseite der Stadt nicht, läuft die Synchronisation
+    // zu Ende, und die Verwaltung nennt den Bereich der Stadtratsbeschlüsse mit
+    // der Meldung des Servers unter der Statuszeile. Die Webseite der Stadt ist
+    // im Stack der Simulator `parlwin-quelle`; sein Steuerweg schaltet die
+    // Liste der Stadtratsbeschlüsse auf 500 und wieder zurück.
+    test('Ist die Webseite der Stadt nicht erreichbar, steht der Bereich mit seiner Meldung unter der Statuszeile', async ({ page }) => {
+      test.setTimeout(600_000)
+      await login(page, ADMIN)
+      await openAdmin(page)
+      await ensureSyncIdle(page)
+
+      const gesetzt = await page.request.put(STADT_FEHLER, { data: '500' })
+      expect([201, 204], 'der Simulator nimmt den Fehler nicht an').toContain(gesetzt.status())
+      try {
+        const liste = await page.request.get(`${QUELLE_URL}/stadtratsbeschluesse`)
+        expect(liste.status(), 'die Liste der Stadtratsbeschlüsse antwortet trotz gesetztem Fehler').toBe(500)
+
+        await openAdmin(page)
+        const btnSync = page.locator('#pw-btn-sync')
+        const status = page.locator('#pw-sync-status')
+        await expect(btnSync).toBeEnabled({ timeout: 60_000 })
+        await btnSync.click()
+        await expect(status).toHaveText(/gestartet|Synchronisiere/i, { timeout: 30_000 })
+
+        // Der Lauf endet: Der Server meldet ihn abgeschlossen und nicht gescheitert.
+        await expect
+          .poll(async () => (await syncStatus(page))?.phase, { timeout: 540_000, intervals: [2000] })
+          .toBe('abgeschlossen')
+        const stand = await syncStatus(page)
+        // Die Meldung nennt Adresse und HTTP-Status, nie den Rumpf der Fehlerseite.
+        const erwartet = `Die Liste der Stadtratsbeschlüsse unter ${QUELLE_URL}/stadtratsbeschluesse ist nicht erreichbar (HTTP 500).`
+        const meldung = String(stand?.sections?.stadtratsbeschluesse?.fehler || '')
+        expect(meldung, 'der Server schreibt keinen oder einen anderen Fehler in den Bereich der Stadtratsbeschlüsse').toBe(erwartet)
+        expect(stand?.error ?? null, 'der Lauf meldet einen Fehler des ganzen Laufs').toBeNull()
+        expect(stand?.statistik?.stadtratsbeschluesse?.ausgefallen, 'die Statistik nennt den Bereich nicht als ausgefallen').toBe(true)
+        for (const bereich of ['geschaefte', 'sitzungen']) {
+          expect(typeof stand?.statistik?.[bereich]?.aktualisiert, `der Bereich ${bereich} ist nicht durchgelaufen`).toBe('number')
+        }
+        expect(stand?.statistik?.mitglieder?.mitglieder, 'die Mitglieder sind nicht durchgelaufen').toBeTruthy()
+
+        await expect(status).toHaveText(/Synchronisation abgeschlossen/, { timeout: 30_000 })
+        const zeilen = page.locator('#pw-sync-fehler li')
+        await expect(page.locator('#pw-sync-fehler')).toBeVisible()
+        await expect(zeilen).toHaveText([`Fehler im Bereich Stadtratsbeschlüsse: ${erwartet}`])
+      } finally {
+        await page.request.delete(STADT_FEHLER).catch(() => {})
+      }
+      const wieder = await page.request.get(`${QUELLE_URL}/stadtratsbeschluesse`)
+      expect(wieder.status(), 'der Fehler der Stadtquelle ist nach dem Test noch gesetzt').toBe(200)
+
+      await ensureSyncIdle(page)
       expect(jsFehler, `JS-Fehler: ${jsFehler.join(' | ')}`).toEqual([])
     })
   })

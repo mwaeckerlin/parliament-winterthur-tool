@@ -28,6 +28,10 @@ use Psr\Log\LoggerInterface;
  */
 class GeschaeftController extends Controller
 {
+    /** Höchstzahl der IDs einer Anfrage mit `ids`; die App fragt in Blöcken von 200. */
+    public const IDS_HOECHSTENS = 500;
+    private const IDS_MUSTER = '/^\d{1,10}(,\d{1,10}){0,499}$/';
+
     public function __construct(
         IRequest $request,
         private readonly GeschaeftService $service,
@@ -68,7 +72,21 @@ class GeschaeftController extends Controller
             $filterEntscheidungsbedarf = false;
         }
 
-        $geschaefte = $this->service->alle($limit, $offset, $inklusiveErledigt);
+        // Mit `ids` liefert die Liste genau diese Geschäfte, erledigte
+        // eingeschlossen: So lädt die App nach einem Ereignis nur, was sich
+        // geändert hat (F150).
+        $idsRaw = trim((string) $this->request->getParam('ids', ''));
+        if ($idsRaw !== '') {
+            if (!preg_match(self::IDS_MUSTER, $idsRaw)) {
+                return new DataResponse(
+                    ['fehler' => 'Die Liste der Geschäfte erwartet bis zu ' . self::IDS_HOECHSTENS . ' Nummern, durch Kommas getrennt'],
+                    Http::STATUS_BAD_REQUEST
+                );
+            }
+            $geschaefte = $this->geschaeftMapper->findByIds(array_map('intval', explode(',', $idsRaw)));
+        } else {
+            $geschaefte = $this->service->alle($limit, $offset, $inklusiveErledigt);
+        }
 
         // Filter nach Status wenn angegeben
         if ($filterStatus !== '') {
@@ -469,12 +487,6 @@ class GeschaeftController extends Controller
     }
 
     /**
-     * Die amtlichen Dokumente eines Geschäfts mit ihrem gelesenen Inhalt —
-     * Vorstoss, Antwort des Stadtrats, Beilagen (F121). Die Übersicht lädt sie
-     * erst beim Aufklappen, weil der Inhalt eines Budgetantrags mehrere hundert
-     * Kilobyte misst.
-     */
-    /**
      * Die IDs der Geschäfte, deren amtliche Dokumente den Begriff tragen. Die
      * Übersicht nimmt sie zu ihren Treffern aus Nummer und Titel dazu (F121).
      */
@@ -488,6 +500,10 @@ class GeschaeftController extends Controller
         return new DataResponse($this->dokumentService->geschaeftIdsMitText($begriff));
     }
 
+    /**
+     * Die amtlichen Dokumente eines Geschäfts mit ihrem gelesenen Inhalt —
+     * Vorstoss, Antwort des Stadtrats, Beilagen (F121).
+     */
     #[NoAdminRequired]
     public function amtlicheDokumente(int $id): DataResponse
     {
@@ -495,6 +511,22 @@ class GeschaeftController extends Controller
             static fn ($dokument): array => $dokument->jsonSerialize(),
             $this->dokumentService->zuGeschaeft($id)
         ));
+    }
+
+    /**
+     * Ein amtliches Dokument mit seinem Inhalt (F149). Die Übersicht holt es
+     * beim Aufklappen, weil der Inhalt eines Budgetantrags mehrere hundert
+     * Kilobyte misst; ein Dokument eines anderen Geschäfts gilt als nicht
+     * gefunden.
+     */
+    #[NoAdminRequired]
+    public function amtlichesDokument(int $id, int $dokumentId): DataResponse
+    {
+        $dokument = $this->dokumentService->einDokument($id, $dokumentId);
+        if ($dokument === null) {
+            return new DataResponse(['fehler' => 'Dokument nicht gefunden'], Http::STATUS_NOT_FOUND);
+        }
+        return new DataResponse($dokument->jsonSerialize());
     }
 
     /**

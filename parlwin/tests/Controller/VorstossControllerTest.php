@@ -28,12 +28,15 @@ class VorstossControllerTest extends TestCase
         return $request;
     }
 
-    private function controller(IRequest $request, ?VorstossService $service = null): VorstossController
-    {
+    private function controller(
+        IRequest $request,
+        ?VorstossService $service = null,
+        ?RealtimePublisherService $realtime = null,
+    ): VorstossController {
         return new VorstossController(
             $request,
             $service ?? $this->createStub(VorstossService::class),
-            $this->createStub(RealtimePublisherService::class),
+            $realtime ?? $this->createStub(RealtimePublisherService::class),
             $this->createStub(IRootFolder::class),
             $this->createStub(IUserSession::class),
             $this->createStub(LoggerInterface::class),
@@ -111,5 +114,44 @@ class VorstossControllerTest extends TestCase
         $response = $this->controller($request, $service)->verknuepfen(5);
 
         $this->assertSame('erledigt', $response->getData()->getStatus());
+    }
+
+    /**
+     * Die Verknüpfung schreibt die Priorität des Vorstosses ins Geschäft; die
+     * geteilte Liste der Geschäfte erfährt das über `geschaefte.updated` mit
+     * der ID des Geschäfts.
+     */
+    public function testVerknuepfenMeldetAuchDasGeschaeft(): void
+    {
+        $vorstoss = new Vorstoss();
+        $vorstoss->setId(5);
+        $service = $this->createStub(VorstossService::class);
+        $service->method('verknuepfen')->willReturn($vorstoss);
+        $meldungen = [];
+        $realtime = $this->createMock(RealtimePublisherService::class);
+        $realtime->expects($this->exactly(2))
+            ->method('publish')
+            ->willReturnCallback(static function (string $typ, array $payload) use (&$meldungen): void {
+                $meldungen[] = [$typ, $payload];
+            });
+
+        $this->controller($this->makeRequest(['geschaeftId' => 42]), $service, $realtime)->verknuepfen(5);
+
+        $this->assertSame([
+            ['vorstoesse.updated', ['id' => 5]],
+            ['geschaefte.updated', ['id' => 42, 'grund' => 'verknuepft']],
+        ], $meldungen);
+    }
+
+    public function testVerknuepfenOhneVorstossMeldetNichts(): void
+    {
+        $service = $this->createStub(VorstossService::class);
+        $service->method('verknuepfen')->willThrowException(new DoesNotExistException('weg'));
+        $realtime = $this->createMock(RealtimePublisherService::class);
+        $realtime->expects($this->never())->method('publish');
+
+        $response = $this->controller($this->makeRequest(['geschaeftId' => 42]), $service, $realtime)->verknuepfen(5);
+
+        $this->assertSame(Http::STATUS_NOT_FOUND, $response->getStatus());
     }
 }

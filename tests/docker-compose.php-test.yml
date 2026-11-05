@@ -1,0 +1,12 @@
+# Das Image der PHPUnit-Läufe, gebaut wie jedes Image des Projekts über
+# docker compose. tests/php-suite.sh baut es und startet daraus je Suite einen
+# Container. Der Kontext ist das Wurzelverzeichnis des Projekts, weil
+# Dockerfile.php-test dort liegt und das ganze Projekt kopiert.
+name: parlwin-php-test
+
+services:
+  php-test:
+    build:
+      context: ..
+      dockerfile: Dockerfile.php-test
+    image: parlwin-php-test:lokal

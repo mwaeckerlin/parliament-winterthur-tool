@@ -1,4 +1,9 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, sperreVorAllem } from './fixtures.js'
+import { login } from './anmeldung.js'
+
+// Die Sperre aus sperre.js steht vor jedem anderen `beforeAll` dieser Datei,
+// weil schon ein `beforeAll` globale Einstellungen schreiben kann.
+test.beforeAll(sperreVorAllem)
 
 /**
  * E2E-Datenfluss des BUDGET-Bereichs im echten Browser gegen das reale System
@@ -24,25 +29,6 @@ const JAHR = 2026
 
 function eindeutig(prefix) {
   return `E2E-${prefix} ${Date.now()}-${Math.floor(performance.now())}`
-}
-
-async function login(page, user) {
-  await page.goto(`${BASE_URL}/index.php/login`)
-  await page.waitForSelector('input[name="user"]', { state: 'visible', timeout: 30_000 })
-  await page.fill('input[name="user"]', user.name)
-  await page.fill('input[name="password"]', user.pass)
-  let zuletzt
-  for (let versuch = 0; versuch < 3; versuch++) {
-    void page.click('button[type="submit"], input[type="submit"]', { noWaitAfter: true }).catch(() => {})
-    try {
-      await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 12_000, waitUntil: 'commit' })
-      await page.waitForLoadState('domcontentloaded').catch(() => {})
-      return
-    } catch (e) {
-      zuletzt = e
-    }
-  }
-  throw zuletzt
 }
 
 async function reqToken(page) {
@@ -521,8 +507,8 @@ test.describe('Budget: Personalbestand und Investitionen (F86, F87)', () => {
     // Budgetjahr nichts, und Gesamtkosten führt nur, wer einen bewilligten Kredit
     // hat. Eine Karte ganz ohne Zahl ist dagegen leer, und davon gibt es im Buch
     // wenige: über den ganzen Tab muss die grosse Mehrheit der Werte stehen.
-    // «Nicht alle sind null» genügt hier nicht — Marc sah fast überall Nullen,
-    // und diese Prüfung liess das durch (F87).
+    // «Nicht alle sind null» genügt hier nicht: Diese Prüfung lässt einen Tab
+    // durch, der fast überall Nullen zeigt (F87).
     const werte = await panel.locator('.pw-data-card .pw-data-pair strong').allTextContents()
     expect(werte.length, 'Keine Wertfelder in der Investitionsrechnung').toBeGreaterThan(20)
     const gefuellt = werte.filter(t => /[1-9]/.test(t)).length
@@ -1030,6 +1016,141 @@ test.describe('Budget: Antragsmodell — Herkunft, Betrag, Haltung, Pauschal, No
     await form.locator('.pw-loeschen').click()
     await expect(kasten.locator('.pw-pauschal-form'), 'Test-Pauschalantrag nicht gelöscht').toHaveCount(vorher, { timeout: 20_000 })
 
+    expect(jsFehler, `JS-Fehler: ${jsFehler.join(' | ')}`).toEqual([])
+  })
+})
+
+/** Die Produktegruppen des Jahres, wie die Ansicht sie vom Server bekommt. */
+async function produktegruppen(page) {
+  const res = await api(page, 'get', `/budget/${JAHR}`)
+  expect(res.ok(), `Budgetansicht ${JAHR} antwortet mit ${res.status()}`).toBeTruthy()
+  return (await res.json()).produktegruppen || []
+}
+
+/** Nummer und Buchseite aus dem Kopf einer Karte: «Produktegruppe 121 Buch S. 5». */
+function kopfLesen(text) {
+  const t = text.replace(/\s+/g, ' ')
+  return {
+    code: (t.match(/Produktegruppe (\S+)/) || [])[1] || '',
+    seite: Number((t.match(/Buch S\. (\d+)/) || [])[1] || 0),
+  }
+}
+
+test.describe('Budget: Seite im Budgetbuch in jeder Ansicht (F129)', () => {
+  test('Die Karten im Tab «Personalbestand» nennen dieselbe Buchseite wie der Server', async ({ page }) => {
+    await login(page, USERS.u1)
+    await gotoBudget(page)
+    await sorgeFuerBudgetjahr(page, JAHR)
+    await gotoBudget(page)
+    const seiten = new Map((await produktegruppen(page)).map((g) => [String(g.code), Number(g.buchseite || 0)]))
+    expect([...seiten.values()].some((s) => s > 0), 'das Buch des Laufs liefert keine einzige Seite').toBe(true)
+
+    await tabOeffnen(page, 'Personalbestand')
+    const koepfe = page.locator('.pw-budget-personal .pw-data-card .pw-data-card-kicker')
+    await koepfe.first().waitFor({ state: 'visible', timeout: 30_000 })
+    const gelesen = (await koepfe.allInnerTexts()).map(kopfLesen).filter((k) => k.code)
+    expect(gelesen.length, 'keine Karte im Tab «Personalbestand»').toBeGreaterThan(0)
+    for (const { code, seite } of gelesen) {
+      expect(seite, `Produktegruppe ${code}: falsche oder fehlende Buchseite im Tab «Personalbestand»`)
+        .toBe(seiten.get(code) || 0)
+    }
+    expect(gelesen.some((k) => k.seite > 0), 'keine Karte im Tab «Personalbestand» nennt eine Buchseite').toBe(true)
+  })
+
+  test('Der Hinweis eines Kreises der Produktegruppe nennt ihre Buchseite, in Franken und in Stellen', async ({ page }) => {
+    await login(page, USERS.u1)
+    await gotoBudget(page)
+    await sorgeFuerBudgetjahr(page, JAHR)
+    await gotoBudget(page)
+    const seiten = new Map((await produktegruppen(page))
+      .map((g) => [String(g.name || g.code || '').trim(), Number(g.buchseite || 0)]))
+
+    await tabOeffnen(page, 'Grafik')
+    const grafik = page.locator('.pw-budget-grafik')
+    await expect(grafik).toBeVisible({ timeout: 20_000 })
+    // Der Hinweis eines Kreises ist sein `<title>`; der Name steht am Kreis.
+    const pruefen = async (mass) => {
+      const kreise = await grafik.locator('circle[data-ebene="2"]').evaluateAll((nodes) => nodes.map((n) => ({
+        name: n.getAttribute('data-name') || '',
+        titel: (n.querySelector('title') || {}).textContent || '',
+      })))
+      expect(kreise.length, `${mass}: keine Kreise der Produktegruppen`).toBeGreaterThan(0)
+      let mitSeite = 0
+      for (const { name, titel } of kreise) {
+        const seite = Number((titel.match(/Buch S\. (\d+)/) || [])[1] || 0)
+        expect(seite, `${mass}: der Hinweis «${titel.replace(/\s+/g, ' ')}» nennt nicht die Buchseite des Servers`)
+          .toBe(seiten.get(name) || 0)
+        if (seite > 0) { mitSeite++ }
+      }
+      expect(mitSeite, `${mass}: kein Hinweis nennt eine Buchseite`).toBeGreaterThan(0)
+    }
+    await pruefen('Franken')
+    const stellen = page.locator('.pw-grafik-mass button', { hasText: 'Stellen' })
+    await stellen.click()
+    await expect(stellen).toHaveAttribute('aria-pressed', 'true')
+    // Im Stellenplan nennt jeder Hinweis die Stellen; erst dann ist umgebaut.
+    await expect(grafik.locator('circle[data-ebene="2"] > title').first()).toContainText('Stellen')
+    await pruefen('Stellen')
+  })
+})
+
+test.describe('Budget: Zielwerte in der Antragsübersicht und im PDF (F109)', () => {
+  test('Ein Antrag auf Zielwerte zeigt den neuen Zielwert dort, wo sonst der Betrag steht', async ({ page }) => {
+    const jsFehler = fehlerWaechter(page)
+    await login(page, USERS.u1)
+    await gotoBudget(page)
+    await sorgeFuerBudgetjahr(page, JAHR)
+    await gotoBudget(page)
+    const gruppe = (await produktegruppen(page)).find((g) => (g.zielvorgaben || []).length > 0 && !g.kuenstlich)
+    expect(gruppe, 'keine Produktegruppe mit Zielvorgaben im Buch des Laufs').toBeTruthy()
+
+    const karte = page.locator('.pw-budget-global .pw-data-card', {
+      has: page.locator('.pw-data-card-kicker', { hasText: new RegExp(`Produktegruppe ${gruppe.code}(\\s|$)`) }),
+    }).first()
+    await karte.waitFor({ state: 'visible', timeout: 30_000 })
+    const begruendung = eindeutig('Zielwert')
+    await karte.getByRole('button', { name: '+ Antrag' }).click()
+    const form = karte.locator('.pw-antrag-form')
+    await form.locator('.pw-antrag-ziele > summary').click()
+    await form.locator('.pw-antrag-ziel-eingabe input').first().fill('7')
+    await form.getByLabel('Begründung').fill(begruendung)
+    await karte.getByRole('button', { name: 'Antrag', exact: true }).click()
+    await expect(karte.locator('.pw-budget-antraege li', { hasText: begruendung }), 'der Antrag erscheint nicht an der Karte')
+      .toBeVisible({ timeout: 15_000 })
+
+    try {
+      // Antragsübersicht: der Zielwert in der Betragsspalte, die Begründung ohne ihn.
+      await page.evaluate(() => window.scrollTo(0, 0))
+      await page.locator('.pw-budget-tabs .pw-budget-tab', { hasText: /^\d+ Anträge$/ }).click()
+      const zeile = page.locator('.pw-antrag-zeile', { hasText: begruendung })
+      await expect(zeile).toBeVisible({ timeout: 15_000 })
+      const betrag = zeile.locator('.pw-antrag-betrag')
+      await expect(betrag, 'der neue Zielwert steht nicht in der Betragsspalte').toContainText('→ 7')
+      await expect(betrag, 'neben dem Zielwert steht ein Betrag').not.toHaveText(/\d['’]\d{3}/)
+      await expect(zeile.locator('.pw-antrag-begruendung'), 'die Begründung wiederholt den Zielwert').not.toContainText('→ 7')
+
+      // Das PDF: dieselbe Zeile, der Zielwert in der ersten Betragsspalte. Die
+      // Druckansicht öffnet sich in einem eigenen Tab wie über den Knopf, damit
+      // die Ansicht mit ihrer Anmeldung für das Aufräumen stehen bleibt.
+      const druck = await page.context().newPage()
+      try {
+        await druck.goto(`${BASE_URL}/index.php/apps/parlwin/budget/${JAHR}/antraege-pdf`)
+        const pdfZeile = druck.locator('tr', { hasText: begruendung })
+        await expect(pdfZeile, 'der Antrag fehlt im Antrags-PDF').toHaveCount(1)
+        const betragsSpalte = pdfZeile.locator('td.betrag').first()
+        await expect(betragsSpalte, 'im PDF steht der Zielwert nicht in der Betragsspalte').toContainText('→ 7')
+        // Ein Betrag steht im PDF als eigene Zeile der Zelle, so wie die
+        // Vorlage ihn setzt: Vorzeichen, Ziffern, Tausender mit «'», auch «0».
+        const zeilen = (await betragsSpalte.innerText()).split('\n').map((z) => z.trim()).filter(Boolean)
+        expect(zeilen.filter((z) => /^[+−]?\d{1,3}(['’]\d{3})*$/.test(z)), 'im PDF steht neben dem Zielwert ein Betrag').toEqual([])
+      } finally {
+        await druck.close()
+      }
+    } finally {
+      const res = await api(page, 'get', `/budget/${JAHR}`)
+      const angelegt = ((await res.json()).antraege || []).filter((a) => a.begruendung === begruendung)
+      for (const a of angelegt) { await api(page, 'delete', `/budget/antraege/${a.id}`) }
+    }
     expect(jsFehler, `JS-Fehler: ${jsFehler.join(' | ')}`).toEqual([])
   })
 })

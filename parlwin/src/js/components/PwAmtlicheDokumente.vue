@@ -79,8 +79,8 @@ export default {
       }
       this.offene = [...this.offene, dokument.id]
       // Der Inhalt eines Dokuments ändert sich nur beim Abgleich, also wird er
-      // einmal geholt und bleibt danach stehen.
-      if (this.inhalt[dokument.id] !== undefined) return
+      // einmal geholt und bleibt danach stehen; läuft die Anfrage noch, kommt er mit ihr.
+      if (this.inhalt[dokument.id] !== undefined || this.laden.includes(dokument.id)) return
       // Nur wer einen Grund trägt, wird nicht geholt: Ein Dokument, das beim
       // Abgleich nur verzeichnet wurde, hat der Hintergrundauftrag inzwischen
       // gelesen, auch wenn die Liste noch das Gegenteil sagt.
@@ -91,17 +91,14 @@ export default {
       }
       await this.holeInhalt(dokument.id)
     },
+    // Nur das aufgeklappte Dokument kommt mit seinem Text (F149).
     async holeInhalt(dokumentId) {
       this.laden = [...this.laden, dokumentId]
       try {
         const antwort = await axios.get(
-          generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}/amtliche-dokumente`),
+          generateUrl(`/apps/parlwin/geschaefte/${this.geschaeftId}/amtliche-dokumente/${dokumentId}`),
         )
-        const geholt = { ...this.inhalt }
-        for (const eintrag of antwort.data || []) {
-          geholt[eintrag.id] = markdownZuHtml(eintrag.markdown || '')
-        }
-        this.inhalt = geholt
+        this.inhalt = { ...this.inhalt, [dokumentId]: markdownZuHtml(antwort.data?.markdown || '') }
       } catch (e) {
         // Ohne Inhalt sagt die Fläche, was fehlt, statt leer zu bleiben.
         this.inhalt = { ...this.inhalt, [dokumentId]: '' }

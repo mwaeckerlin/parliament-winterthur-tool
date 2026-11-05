@@ -6,9 +6,12 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import { startRealtimeBridge } from './realtime'
 import { installiereRetry } from './axios-retry'
+import { fensterKennungAnhaengen } from './nachladen'
 
 // Nachladen bei schlechter Leitung so lange wiederholen, bis es klappt.
 installiereRetry()
+// Jede Anfrage nennt ihr Fenster, damit es sein eigenes Ereignis erkennt.
+fensterKennungAnhaengen()
 
 const app = createApp(App)
 app.mount('#parlwin-root')

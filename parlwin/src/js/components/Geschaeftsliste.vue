@@ -194,27 +194,15 @@
       </template>
     </section>
 
-    <Teleport to="body">
-      <!-- Dieselbe Maske für Anlegen und Bearbeiten: beim Anlegen ist die ID 0,
-           die Maske sammelt dann nur die Eingaben und bietet Speichern/Abbrechen.
-           Ein Klick daneben verwirft dabei nichts. -->
-      <div v-if="detailOffen" class="pw-modal-overlay" @click.self="overlayKlick">
-        <div class="pw-modal">
-          <div v-if="!neuesGeschaeft" class="pw-modal-kopf pw-modal-kopf-leer">
-            <button type="button" class="button pw-btn-schliessen" aria-label="Dialog schliessen" @click.stop="schliesseDetail">✕</button>
-          </div>
-          <GeschaeftDetail
-            ref="detail"
-            :geschaeft-id="ausgewaehlteGeschaeftId"
-            :mitglieder="mitglieder"
-            @gespeichert="nachSpeichern"
-            @erstellt="nachErstellen"
-            @abbrechen="neuAbbrechen"
-            @oeffne-geschaeft="oeffneDetail"
-          />
-        </div>
-      </div>
-    </Teleport>
+    <GeschaeftMaske
+      :geschaeft-id="ausgewaehlteGeschaeftId"
+      :bestand="bestand"
+      :mitglieder="mitglieder"
+      @schliessen="schliesseDetail"
+      @erstellt="nachErstellen"
+      @gespeichert="nachSpeichern"
+      @oeffne-geschaeft="oeffneDetail"
+    />
 </template>
 
 <script>
@@ -223,8 +211,14 @@ import axios from '@nextcloud/axios'
 import { showError } from '@nextcloud/dialogs'
 import '@nextcloud/dialogs/style.css'
 import { subscribeRealtime } from '../realtime'
+import { listeAbgleichen } from '../nachladen'
+import { BESTAND_SCHLUESSEL, bestandAnbinden, istErledigt } from '../geschaefte-bestand.js'
+
+/** So viele Geschäfte zeigt die Tabelle, die neuesten zuerst, wie vorher `limit: 500` beim Server. */
+const GESCHAEFTE_ANZEIGE = 500
+const neuesteZuerst = (a, b) => String(b.datum || '').localeCompare(String(a.datum || ''))
 import { vollerName, personKey, PRIORITAETEN, kuerze, mitLeerOption } from '../utils'
-import GeschaeftDetail from './GeschaeftDetail.vue'
+import GeschaeftMaske from './GeschaeftMaske.vue'
 import NcTextField from '@nextcloud/vue/components/NcTextField'
 import NcSelect from '@nextcloud/vue/components/NcSelect'
 import PwMultiSelect from './PwMultiSelect.vue'
@@ -240,7 +234,8 @@ import PwAmtlicheDokumente from './PwAmtlicheDokumente.vue'
 
 export default {
   name: 'Geschaeftsliste',
-  components: { GeschaeftDetail, NcTextField, NcSelect, PwMultiSelect, PwPrioritaetSelect, NcCheckboxRadioSwitch, NcButton, NcLoadingIcon, NcEmptyContent, BeschlussWidget, FilterPanel, PwAmtlicheDokumente },
+  components: { GeschaeftMaske, NcTextField, NcSelect, PwMultiSelect, PwPrioritaetSelect, NcCheckboxRadioSwitch, NcButton, NcLoadingIcon, NcEmptyContent, BeschlussWidget, FilterPanel, PwAmtlicheDokumente },
+  inject: { geteilterBestand: { from: BESTAND_SCHLUESSEL, default: null } },
   props: {
     mitglieder: { type: Array, default: () => [] },
   },
@@ -258,8 +253,6 @@ export default {
       dokumenteOffen: [],
       filterStatus: [],
       filterPrioritaet: [],
-      // Die Maske ist im Anlege-Modus: es existiert noch kein Geschäft.
-      neuesGeschaeft: false,
       filterTyp: [],
       filterZustaendige: [],
       filterBeschluss: [],
@@ -270,9 +263,9 @@ export default {
       zeigeErledigte: false,
       sortFeld: 'datum',
       sortRichtung: 'desc',
+      // Das Geschäft in der Maske: null bei geschlossener Maske, 0 für ein neues.
       ausgewaehlteGeschaeftId: null,
       unsubRealtime: null,
-      reloadTimer: null,
     }
   },
   computed: {
@@ -421,10 +414,12 @@ export default {
     ausgewaehltesGeschaeft() {
       return this.geschaefte.find((geschaeft) => geschaeft.id === this.ausgewaehlteGeschaeftId) || null
     },
-    // Die Maske ist offen, wenn ein Geschäft gewählt ist ODER ein neues erfasst
-    // wird (dort ist die ID noch 0).
+    // Die Maske erfasst ein neues Geschäft: Es hat noch keine ID.
+    neuesGeschaeft() {
+      return this.ausgewaehlteGeschaeftId === 0
+    },
     detailOffen() {
-      return this.neuesGeschaeft || !!this.ausgewaehlteGeschaeftId
+      return this.ausgewaehlteGeschaeftId !== null
     },
     gefilterteGeschaefte() {
       let liste = [...this.geschaefte]
@@ -475,6 +470,10 @@ export default {
         liste = liste.filter(g => this.einreicherParteien(g).some(p => this.filterPartei.includes(p)))
       }
 
+      // Gezeichnet werden die neuesten GESCHAEFTE_ANZEIGE Treffer: Alle
+      // Geschäfte samt den erledigten hielten den Browser beim Zeichnen an.
+      liste.sort(neuesteZuerst)
+      liste = liste.slice(0, GESCHAEFTE_ANZEIGE)
       liste.sort((a, b) => {
         const av = this.sortWert(a, this.sortFeld)
         const bv = this.sortWert(b, this.sortFeld)
@@ -485,11 +484,14 @@ export default {
     },
   },
   watch: {
+    // Beide Filter wählen aus der geteilten Liste aus; eine Anfrage gibt es
+    // nur, solange die Liste noch nicht geladen ist (F150). Der
+    // Fraktionssitzungsmodus setzt den Filter beim Öffnen, bevor etwas lädt.
     filterEntscheidungsbedarf() {
-      this.ladeGeschaefte()
+      this.filterGewechselt()
     },
     zeigeErledigte() {
-      this.ladeGeschaefte()
+      this.filterGewechselt()
     },
     async suche(begriff) {
       const gesucht = String(begriff || '').trim()
@@ -511,6 +513,11 @@ export default {
       }
     },
   },
+  created() {
+    const { bestand, eigener } = bestandAnbinden(this, this.geteilterBestand, () => this.geschaefteUebernehmen())
+    this.bestand = bestand
+    this.eigenerBestand = eigener
+  },
   mounted() {
     this.$nextTick(() => { this.filterReady = true })
     this.initialisiereAnsicht()
@@ -521,10 +528,7 @@ export default {
       this.unsubRealtime()
       this.unsubRealtime = null
     }
-    if (this.reloadTimer) {
-      window.clearTimeout(this.reloadTimer)
-      this.reloadTimer = null
-    }
+    if (this.eigenerBestand) { this.bestand.abbrechen() }
   },
   methods: {
     // Die Liste eines Filterfeldes bleibt im sichtbaren Bereich, auch wenn
@@ -588,7 +592,7 @@ export default {
           zustaendigkeiten: payload,
           haupt_person_key: haupt,
         })
-        await this.ladeGeschaefte()
+        await this.bestand.nachladen([geschaeft.id])
         this.$emit('aktualisiert')
       } catch (fehler) {
         console.error('Fehler beim Speichern der Zuständigkeit:', fehler)
@@ -601,7 +605,7 @@ export default {
       const prioritaet = ['hoch', 'mittel', 'tief'].includes(wert) ? wert : ''
       try {
         await axios.put(generateUrl(`/apps/parlwin/geschaefte/${geschaeft.id}/prioritaet`), { prioritaet })
-        await this.ladeGeschaefte()
+        await this.bestand.nachladen([geschaeft.id])
         this.$emit('aktualisiert')
       } catch (fehler) {
         console.error('Fehler beim Speichern der Priorität:', fehler)
@@ -616,7 +620,7 @@ export default {
         } else {
           await axios.delete(generateUrl(`/apps/parlwin/geschaefte/${geschaeft.id}/beschluesse`))
         }
-        await this.ladeGeschaefte()
+        await this.bestand.nachladen([geschaeft.id])
         this.$emit('aktualisiert')
       } catch (fehler) {
         console.error('Fehler beim Speichern des Beschlusses:', fehler)
@@ -634,54 +638,57 @@ export default {
       }
       this.ladeGeschaefte()
     },
-    async ladeGeschaefte(zeigeLaden = true) {
-      // Bei Realtime-Reloads KEIN Lade-Flackern (sonst verschwindet die Liste kurz
-      // und der Scrollbalken/Fokus springt); mergeGeschaefte() patcht in-place.
-      if (zeigeLaden) this.laden = true
+    /**
+     * Die Geschäfte kommen aus der Liste, die die Ansichten teilen (F150): Nur
+     * das erste Laden zeigt den Lade-Zustand, danach steht die Tabelle, und
+     * Änderungen gleichen sie an Ort und Stelle an.
+     */
+    async ladeGeschaefte() {
+      if (!this.bestand.zustand.geladen) this.laden = true
       try {
-        const params = { limit: 500 }
-        params.show_erledigt = this.zeigeErledigte ? '1' : '0'
-        if (this.filterEntscheidungsbedarf !== '') {
-          params.entscheidungsbedarf = this.filterEntscheidungsbedarf
-        }
-        const { data } = await axios.get(generateUrl('/apps/parlwin/geschaefte'), { params })
-        this.mergeGeschaefte(Array.isArray(data) ? data : [])
-      } catch (fehler) {
-        console.error('Fehler beim Laden der Geschäfte:', fehler)
+        await this.bestand.laden()
+        this.geschaefteUebernehmen()
       } finally {
-        if (zeigeLaden) this.laden = false
+        this.laden = false
       }
+    },
+    /**
+     * Wie vorher die Anfrage an den Server: Die Ansicht zeigt den Lade-Zustand
+     * und zeichnet die neue Auswahl erst im nächsten Durchgang des Browsers.
+     * 500 Zeilen mit ihren Auswahlfeldern zu zeichnen dauert in Chromium
+     * länger als 20 Sekunden; im selben Durchgang wie der Klick hielte es den
+     * Klick so lange an.
+     */
+    async filterGewechselt() {
+      this.laden = true
+      await new Promise((weiter) => setTimeout(weiter))
+      await this.ladeGeschaefte()
+    },
+    /**
+     * Wählt aus der geteilten Liste, was der Server mit `show_erledigt` und
+     * `entscheidungsbedarf` geliefert hätte: ohne «Erledigte anzeigen» die
+     * hängigen Geschäfte, mit dem Filter «Entscheid» die passenden.
+     */
+    geschaefteUebernehmen() {
+      const bedarf = this.filterEntscheidungsbedarf
+      const auswahl = this.bestand.zustand.geschaefte.filter(g =>
+        (this.zeigeErledigte || !istErledigt(g)) &&
+        (bedarf === '' || Boolean(g.entscheidungsbedarf) === (bedarf === '1')))
+      // Suche und Filter laufen über die ganze Auswahl; wie viel gezeichnet
+      // wird, begrenzt `gefilterteGeschaefte`.
+      auswahl.sort(neuesteZuerst)
+      this.mergeGeschaefte(auswahl)
     },
     // In-place-Merge (wie bei den Sitzungen): ein Realtime-Sync baut so nicht das
     // ganze DOM neu auf, der Scrollbalken bleibt stehen.
     mergeGeschaefte(neu) {
-      const neuMap = new Map(neu.map(g => [g.id, g]))
-      for (const g of this.geschaefte) {
-        const n = neuMap.get(g.id)
-        if (n) Object.assign(g, n)
-      }
-      const vorhanden = new Set(this.geschaefte.map(g => g.id))
-      for (const n of neu) {
-        if (!vorhanden.has(n.id)) this.geschaefte.push(n)
-      }
-      for (let i = this.geschaefte.length - 1; i >= 0; i--) {
-        if (!neuMap.has(this.geschaefte[i].id)) this.geschaefte.splice(i, 1)
-      }
-      const reihenfolge = new Map(neu.map((g, i) => [g.id, i]))
-      this.geschaefte.sort((a, b) => (reihenfolge.get(a.id) ?? 0) - (reihenfolge.get(b.id) ?? 0))
+      listeAbgleichen(this.geschaefte, neu)
     },
+    // Die geteilte Liste bekommt ihre Ereignisse von App.vue; eine eigene Liste
+    // bekommt sie von hier und lädt nur die Geschäfte nach, die das Ereignis
+    // nennt (geschaefte-bestand.js).
     handleRealtimeEvent(event) {
-      const type = event?.type || ''
-      if (type === 'sync.completed' || type.startsWith('geschaefte.') || type === 'fraktionssitzung.updated') {
-        this.scheduleReload()
-      }
-    },
-    scheduleReload() {
-      if (this.reloadTimer) return
-      this.reloadTimer = window.setTimeout(async () => {
-        this.reloadTimer = null
-        await this.ladeGeschaefte(false)
-      }, 250)
+      if (this.eigenerBestand) { this.bestand.ereignis(event) }
     },
     sortiereNach(feld) {
       if (this.sortFeld === feld) {
@@ -709,25 +716,13 @@ export default {
     // «+ Eigenes Geschäft» öffnet dieselbe Maske wie das Bearbeiten (geteilter
     // Code). Angelegt wird noch nichts — erst «Speichern» erzeugt das Geschäft.
     neuesGeschaeftOeffnen() {
-      this.neuesGeschaeft = true
       this.ausgewaehlteGeschaeftId = 0
     },
     // Nach dem Anlegen geht dieselbe Maske in die Bearbeitung über, sodass sich
     // Dokumente und Notizen unmittelbar anschliessen lassen.
-    async nachErstellen(id) {
-      this.neuesGeschaeft = false
-      await this.ladeGeschaefte()
+    nachErstellen(id) {
       this.ausgewaehlteGeschaeftId = id || null
       this.$emit('aktualisiert')
-    },
-    // Nur der ausdrückliche Abbruch verwirft die Eingaben.
-    neuAbbrechen() {
-      this.neuesGeschaeft = false
-      this.ausgewaehlteGeschaeftId = null
-    },
-    // Ein Klick neben die Maske darf beim Erfassen nichts verwerfen.
-    overlayKlick() {
-      if (!this.neuesGeschaeft) this.schliesseDetail()
     },
     resetFilter() {
       this.suche = ''
@@ -744,16 +739,10 @@ export default {
       this.ladeGeschaefte()
     },
     schliesseDetail() {
-      // Warnung, wenn im Notiz-Editor ungespeicherte Änderungen offen sind.
-      if (this.$refs.detail?.hatUngespeicherteNotizen?.()) {
-        // eslint-disable-next-line no-alert
-        if (!window.confirm('Die Notiz ist noch nicht gespeichert. Trotzdem schliessen?')) return
-      }
       this.ausgewaehlteGeschaeftId = null
-      this.neuesGeschaeft = false
     },
-    async nachSpeichern() {
-      await this.ladeGeschaefte()
+    // Die Maske hat das Geschäft schon in der geteilten Liste nachgeladen.
+    nachSpeichern() {
       this.$emit('aktualisiert')
     },
     formatieredatum(datum) {

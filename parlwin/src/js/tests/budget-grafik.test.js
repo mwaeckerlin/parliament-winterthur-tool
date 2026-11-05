@@ -167,9 +167,9 @@ describe('BudgetGrafik (F111)', () => {
     expect(beschriftung).toMatch(/14['’]000['’]000/)
   })
 
-  // Marc sah vier Kreise nebeneinander, alle mit «Bewirtscha…» beschriftet — der
-  // Name war auf die Kreisbreite gekürzt und dadurch für alle vier derselbe. Ein
-  // Name wird deshalb nie gekürzt: Er bricht an seinen Leerzeichen um.
+  // Vier Namen, die alle mit «Bewirtschaftung» beginnen, wären auf die
+  // Kreisbreite gekürzt alle gleich («Bewirtscha…»). Ein Name wird deshalb nie
+  // gekürzt: Er bricht an seinen Leerzeichen um.
   it('bricht einen langen Namen um, statt ihn zu kürzen', async () => {
     const lang = [
       'Bewirtschaftung Verwaltungsvermögen',
@@ -253,10 +253,9 @@ describe('BudgetGrafik (F111)', () => {
     expect(weg, 'die Kreise bewegen sich nicht').toBeGreaterThan(0.5)
 
     // Und sie kommen an: nach dem Einschwingen steht jeder Kreis an dem Platz,
-    // den ihm die Packung zuweist. Marc sah das Gegenteil — die Kreise klebten
-    // verstreut in den Ecken, weil der Zug zu schwach war gegen die Kollision.
-    // Lange laufen lassen: Marc sah das Bild nicht in der ersten Sekunde,
-    // sondern im Dauerzustand — dort darf die Kollision die Kreise nicht nach
+    // den ihm die Packung zuweist. Ist der Zug zum Platz zu schwach gegen die
+    // Kollision, kleben die Kreise verstreut in den Ecken. Die Simulation läuft
+    // darum lange: Im Dauerzustand darf die Kollision die Kreise nicht nach
     // aussen schieben, während der Zug zum Platz zu schwach dagegen hält.
     w.vm.simulationSchritte(2000)
     await w.vm.$nextTick()
@@ -288,9 +287,8 @@ describe('BudgetGrafik (F111)', () => {
   })
 
   it('gibt dem grösseren Betrag den grösseren Kreis, auch bei vielen kleinen Kindern', () => {
-    // Der Fehler, den Marc gesehen hat: Soziales (615 Mio) war kleiner
-    // gezeichnet als Schule und Sport (465 Mio). Ursache war die Packung — ein
-    // Elternkreis wird so gross, wie seine Kinder samt Abständen es verlangen,
+    // Soziales (615 Mio) ist nie kleiner gezeichnet als Schule und Sport
+    // (465 Mio). Die Packung allein verletzt das: Ein Elternkreis wird so gross, wie seine Kinder samt Abständen es verlangen,
     // und viele kleine Kinder packen schlechter als wenige grosse. Die aktuelle
     // Ebene wird deshalb eigens gelegt, mit den Einheiten als Blätter.
     const vieleKleine = Array.from({ length: 12 }, (_, i) => ({

@@ -5,12 +5,12 @@ import FilterPanel from '../components/FilterPanel.vue'
 /**
  * Ein angetipptes Filterfeld rückt an den Anfang des Filterbereichs.
  *
- * Befund von Marc am 19.10.2026 vom iPhone, hier nachgestellt und gemessen:
- * Tippt man im Filterbereich ein Auswahlfeld an, bekommt sein Suchfeld den
- * Fokus, die Bildschirmtastatur fährt hoch und lässt rund die Hälfte der Fläche
- * übrig. Die Liste öffnet sich nach unten — gemessen lag ihr erster Eintrag bei
- * 481 Punkten, während nur 439 sichtbar blieben. Sie stand also hinter der
- * Tastatur, und das Feld sah aus, als liesse es sich nicht bedienen.
+ * Tippt man am Telefon im Filterbereich ein Auswahlfeld an, bekommt sein
+ * Suchfeld den Fokus, die Bildschirmtastatur fährt hoch und lässt rund die
+ * Hälfte der Fläche übrig. Die Liste öffnet sich nach unten: Auf einem iPhone
+ * liegt ihr erster Eintrag bei 481 Punkten, während nur 439 sichtbar bleiben.
+ * Bliebe das Feld an seinem Platz, stünde die Liste hinter der Tastatur, und
+ * das Feld sähe aus, als liesse es sich nicht bedienen.
  *
  * Darum rückt das Feld beim Fokus an den Anfang des scrollenden
  * Filterbereichs: Darunter ist dann Platz für seine Liste.

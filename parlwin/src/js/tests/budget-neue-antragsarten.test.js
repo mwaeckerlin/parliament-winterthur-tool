@@ -35,7 +35,7 @@ const ANSICHT = {
   summen: SUMMEN,
   summenStadtrat: SUMMEN,
   departemente: ['Finanzen'],
-  eigeneFraktion: 'SVP-Fraktion',
+  eigeneFraktion: 'Fraktion-Muster',
   produktegruppen: [{
     code: '240', name: 'Immobilien', departement: 'Finanzen', buchseite: 75,
     globalkredit: { soll: 1000, sollFraktion: 900, vorjahr: 1000 },

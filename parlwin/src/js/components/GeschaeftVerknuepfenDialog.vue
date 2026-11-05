@@ -28,13 +28,19 @@ import NcTextField from '@nextcloud/vue/components/NcTextField'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
 import { titelAehnlichkeit } from '../utils'
+import { BESTAND_SCHLUESSEL, istErledigt } from '../geschaefte-bestand.js'
+
+/** So viele Treffer zeigt der Dialog, die neuesten, wie die Tabelle in «Geschäfte». */
+const ANZEIGE = 500
+const neuesteZuerst = (a, b) => String(b.datum || '').localeCompare(String(a.datum || ''))
 
 /**
  * Geteilter «Mit Geschäft verknüpfen»-Dialog — EIN Ort für die Auswahl eines
  * Geschäfts per Titel-Ähnlichkeit, genutzt von Vorstoss→Geschäft UND von
- * eigenes→offizielles Geschäft (kein Copy-Paste). Lädt die Geschäfte selbst,
- * sortiert die ähnlichsten zum übergebenen Titel zuoberst (sonst neueste) und
- * meldet die Auswahl über `verknuepfen`.
+ * eigenes→offizielles Geschäft (kein Copy-Paste). Nimmt die geteilte Liste der
+ * Geschäfte und lädt nur ohne sie selbst, zeigt von den Treffern die neuesten
+ * 500, die ähnlichsten zum übergebenen Titel zuoberst, und meldet die Auswahl
+ * über `verknuepfen`.
  */
 export default {
   name: 'GeschaeftVerknuepfenDialog',
@@ -51,11 +57,19 @@ export default {
     inklusiveErledigt: { type: Boolean, default: false },
     kopf: { type: String, default: 'Mit Geschäft verknüpfen' },
   },
+  inject: { geteilterBestand: { from: BESTAND_SCHLUESSEL, default: null } },
   emits: ['verknuepfen', 'schliessen'],
   data() {
     return { suche: '', geschaefte: [] }
   },
   async mounted() {
+    // In der App steht die Liste der Geschäfte schon bereit (F150); der Dialog
+    // nimmt sie und fragt den Server nicht noch einmal.
+    if (this.geteilterBestand) {
+      const alle = await this.geteilterBestand.laden()
+      this.geschaefte = alle.filter(g => this.inklusiveErledigt || !istErledigt(g))
+      return
+    }
     try {
       const params = { limit: 500 }
       if (this.inklusiveErledigt) params.show_erledigt = 1
@@ -66,6 +80,10 @@ export default {
     }
   },
   computed: {
+    // Die Ähnlichkeit hängt nur am Titel, also je Geschäft einmal und nicht bei jedem Tastendruck.
+    aehnlichkeit() {
+      return new Map(this.geschaefte.map(g => [g.id, titelAehnlichkeit(this.titel, g.titel || '')]))
+    },
     aehnliche() {
       const suche = (this.suche || '').toLowerCase().trim()
       let liste = this.geschaefte.filter(g => !g.geloescht && g.id !== this.ausschlussId)
@@ -77,11 +95,8 @@ export default {
           (g.titel || '').toLowerCase().includes(suche) ||
           (g.nummer || '').toLowerCase().includes(suche))
       }
-      return [...liste].sort((a, b) => {
-        const d = titelAehnlichkeit(this.titel, b.titel || '') - titelAehnlichkeit(this.titel, a.titel || '')
-        if (d !== 0) return d
-        return String(b.datum || '').localeCompare(String(a.datum || ''))
-      })
+      const neueste = [...liste].sort(neuesteZuerst).slice(0, ANZEIGE)
+      return neueste.sort((a, b) => (this.aehnlichkeit.get(b.id) - this.aehnlichkeit.get(a.id)) || neuesteZuerst(a, b))
     },
   },
 }
