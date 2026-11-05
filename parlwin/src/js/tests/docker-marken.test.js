@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 
 /**
  * Die Marken, unter denen die Pipeline die Images veröffentlicht.
@@ -163,5 +164,19 @@ describe('Bau und Veröffentlichung der Pipeline', () => {
     const skript = readFileSync('create-branches.sh', 'utf8')
     expect(skript).toMatch(/^\s+git checkout -B "\$branch" "\$BASE_COMMIT"$/m)
     expect(skript).toMatch(/^\s+git push -f origin "\$branch"$/m)
+  })
+
+  // Ein Skript, das direkt als `./<pfad>` aufgerufen wird, braucht in git das
+  // Recht zum Ausführen; sonst endet der Aufruf mit «Permission denied» (Exit
+  // 126). So brach der Runner beim Erzeugen der Linien-Zweige ab.
+  it('jedes Skript, das package.json oder ein Workflow mit ./ aufruft, ist in git ausführbar', () => {
+    const quellen = [readFileSync('package.json', 'utf8'), ...readdirSync('.github/workflows').map((d) => readFileSync(`.github/workflows/${d}`, 'utf8'))]
+    const skripte = [...new Set(quellen.flatMap((text) => [...text.matchAll(/(?:^|[\s"'])\.\/([\w./-]+\.(?:sh|py|mjs|js))/gm)].map((m) => m[1])))]
+    expect(skripte, 'kein Skript mit ./ gefunden').toContain('create-branches.sh')
+    const ohne = skripte.filter((skript) => {
+      const eintrag = execFileSync('git', ['ls-files', '--stage', '--', skript], { encoding: 'utf8' }).trim()
+      return eintrag.split(' ')[0] !== '100755'
+    })
+    expect(ohne, 'diese Skripte tragen in git nicht den Modus 100755').toEqual([])
   })
 })
